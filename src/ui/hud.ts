@@ -74,6 +74,7 @@ export class Hud {
   private lastInspectorKey = '';
   private cardImgs = new Map<string, string>();
   minimap: Minimap;
+  private lastTier = -1;
 
   constructor(
     private game: Game,
@@ -85,9 +86,11 @@ export class Hud {
       /* ignore */
     }
     root.innerHTML = `
-      <button id="menu-btn" class="panel" data-action="menu">☰ Menu</button>
-      <div id="topbar" class="panel"></div>
-      <div id="clock" class="panel"></div>
+      <div id="top">
+        <button id="menu-btn" class="panel" data-action="menu">☰ Menu</button>
+        <div id="topbar" class="panel"></div>
+        <div id="clock" class="panel"></div>
+      </div>
       <div id="objectives" class="panel"></div>
       <div id="town" class="panel"></div>
       <div id="log"></div>
@@ -108,6 +111,7 @@ export class Hud {
   // ---------------------------------------------------------------- build
 
   rebuild(): void {
+    this.lastTier = this.game.state.tier;
     this.shownMessages = this.game.state.messages.length;
     this.el.log.innerHTML = '';
     this.lastInspectorKey = '';
@@ -221,6 +225,8 @@ export class Hud {
     const bar = this.el.clock.querySelector('.month-bar') as HTMLElement | null;
     if (bar) bar.style.width = `${progress}%`;
 
+    if (this.lastTier >= 0 && s.tier > this.lastTier) this.celebrate(s.tier);
+    this.lastTier = s.tier;
     this.updateObjectives();
     this.updateTown();
     if (this.buildBarState() !== this.buildBarKey) this.renderBuildBar();
@@ -351,6 +357,22 @@ export class Hud {
     }
     this.shownMessages = msgs.length;
     while (this.el.log.children.length > 6) this.el.log.firstElementChild?.remove();
+  }
+
+  private celebrate(tier: number): void {
+    const t = TIERS[tier];
+    const unlocked = BUILD_ORDER.filter((b) => BUILDINGS[b].tier === tier);
+    const div = document.createElement('div');
+    div.className = 'banner panel';
+    div.innerHTML = `<div class="ornament">❦ ❦ ❦</div><h1>${t.name}</h1><p>${esc(t.desc)}</p>
+      ${unlocked.length ? `<div class="unlocks">${unlocked.map((b) => `<div><img src="${this.cardImage(b)}" alt=""><span>${BUILDINGS[b].name}</span></div>`).join('')}</div>` : ''}`;
+    this.root.appendChild(div);
+    this.sound('good');
+    setTimeout(() => this.sound('good'), 350);
+    setTimeout(() => div.classList.add('out'), 6000);
+    setTimeout(() => div.remove(), 7000);
+    div.addEventListener('click', () => div.remove());
+    this.renderBuildBar();
   }
 
   // ---------------------------------------------------------------- hints

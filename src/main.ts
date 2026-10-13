@@ -16,9 +16,11 @@ import {
   resourceInRange,
   roadError,
   stepDay,
+  updateHappiness,
   yearOf,
 } from './game/sim';
 import type { BuildingType, GameState } from './game/types';
+import { FOOD_IDS } from './game/types';
 import { generateWorld, idx, inBounds } from './game/world';
 import { AgentSystem } from './render/agents';
 import { type Overlay, Renderer } from './render/renderer';
@@ -88,6 +90,9 @@ export class Game {
   newGame(seed: number): void {
     this.state = generateWorld(seed);
     recompute(this.state);
+    // Show a meaningful happiness breakdown from the very first day.
+    this.state.report.variety = FOOD_IDS.filter((f) => this.state.res[f] > 0).length;
+    updateHappiness(this.state);
     log(this.state, 'Your settlers have arrived at a quiet corner of the land. Build houses and gather food!', 'info');
     this.afterLoad();
   }

@@ -106,11 +106,21 @@ button.active {
 
 /* ------------------------------------------------------------ top bar */
 
-#topbar {
+#top {
   position: absolute;
   top: 8px;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 8px;
+  right: 8px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  pointer-events: none;
+}
+#top > * {
+  pointer-events: auto;
+}
+#topbar {
+  margin: 0 auto;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -152,9 +162,7 @@ button.active {
 }
 
 #clock {
-  position: absolute;
-  top: 8px;
-  right: 8px;
+  flex: 0 0 auto;
   padding: 6px 10px;
   display: flex;
   align-items: center;
@@ -163,7 +171,7 @@ button.active {
 #clock .date {
   font-family: var(--title);
   font-size: 14px;
-  min-width: 132px;
+  min-width: 118px;
   line-height: 1.1;
 }
 #clock .date small {
@@ -183,9 +191,7 @@ button.active {
 }
 
 #menu-btn {
-  position: absolute;
-  top: 8px;
-  left: 8px;
+  flex: 0 0 auto;
   font-family: var(--title);
   padding: 6px 12px;
 }
@@ -314,6 +320,7 @@ button.active {
   left: 50%;
   transform: translateX(-50%);
   padding: 6px 8px 8px;
+  width: max-content;
   max-width: calc(100vw - 16px);
 }
 #buildbar .tabs {
@@ -324,8 +331,8 @@ button.active {
 }
 #buildbar .tabs button {
   font-family: var(--title);
-  font-size: 12.5px;
-  padding: 3px 9px;
+  font-size: 12px;
+  padding: 3px 8px;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -692,6 +699,18 @@ button.active {
   margin: 6px 0;
 }
 
+@media (max-width: 1250px) {
+  .res {
+    min-width: 0;
+    font-size: 15px;
+    padding: 2px 4px;
+  }
+  #clock .speeds button {
+    min-width: 26px;
+    padding: 2px 5px;
+  }
+}
+
 @media (max-width: 900px) {
   #objectives {
     width: 210px;
@@ -715,5 +734,58 @@ button.active {
   .card img {
     width: 56px;
     height: 56px;
+  }
+}
+
+/* ------------------------------------------------------------ tier banner */
+
+.banner {
+  position: absolute;
+  top: 18%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 14px 28px 18px;
+  text-align: center;
+  z-index: 40;
+  min-width: 340px;
+  max-width: calc(100vw - 32px);
+  animation: bannerIn 0.6s cubic-bezier(0.2, 1.4, 0.4, 1);
+  transition: opacity 1s, transform 1s;
+  cursor: pointer;
+}
+.banner h1 {
+  font-size: 40px;
+  color: var(--wood);
+}
+.banner p {
+  font-style: italic;
+  margin: 4px 0 10px;
+}
+.banner.out {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-20px);
+}
+.banner .unlocks {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.banner .unlocks div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 600;
+  width: 84px;
+}
+.banner .unlocks img {
+  width: 64px;
+  height: 64px;
+}
+@keyframes bannerIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.7);
   }
 }
