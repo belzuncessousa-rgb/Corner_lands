@@ -1,0 +1,17 @@
+import { chromium } from 'playwright';
+const out = process.argv[2] || 'shot';
+const browser = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell', args: ['--use-gl=swiftshader','--enable-unsafe-swiftshader'] });
+const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+const errors = [];
+page.on('pageerror', e => errors.push(String(e)));
+page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+await page.goto('http://localhost:3001/');
+await page.waitForTimeout(1500);
+await page.screenshot({ path: `${out}-menu.png` });
+await page.click('text=New Settlement');
+await page.waitForTimeout(300);
+await page.click('text=Found the Settlement');
+await page.waitForTimeout(2500);
+await page.screenshot({ path: `${out}-game.png` });
+console.log('errors:', errors);
+await browser.close();

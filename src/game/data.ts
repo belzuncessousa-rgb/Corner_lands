@@ -108,7 +108,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     cycle: 2,
     outputs: { wood: 3 },
     gathers: 'trees',
-    hotkey: 'w',
+    hotkey: 'e',
   }),
   forester: def({
     type: 'forester',
@@ -145,7 +145,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     cycle: 2,
     outputs: { berries: 3 },
     gathers: 'berries',
-    hotkey: 'f',
+    hotkey: 'g',
   }),
   hunter: def({
     type: 'hunter',

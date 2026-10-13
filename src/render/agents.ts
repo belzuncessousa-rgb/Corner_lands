@@ -1,0 +1,521 @@
+import { BUILDINGS } from '../game/data';
+import { findPath } from '../game/path';
+import { doorTile, forTilesInRadius, bCenter, isWinter } from '../game/sim';
+import type { Building, GameState, ResourceId } from '../game/types';
+import { getBuilding, idx, inBounds } from '../game/world';
+
+export type Role =
+  | { kind: 'work'; id: number }
+  | { kind: 'build'; id: number }
+  | { kind: 'idle' }
+  | { kind: 'settler' };
+
+type Phase = 'walk' | 'inside' | 'act' | 'pause';
+
+export interface Agent {
+  key: string;
+  role: Role;
+  home: number;
+  x: number;
+  y: number;
+  path: number[];
+  phase: Phase;
+  timer: number;
+  /** What to do after arriving. */
+  next: 'enter-work' | 'act' | 'return' | 'enter-home' | 'wander-done' | 'arrive-hall';
+  carry: ResourceId | null;
+  tunic: string;
+  hair: string;
+  ox: number;
+  oy: number;
+  dir: number;
+  step: number;
+  visible: boolean;
+  /** Animation hint while acting: chop, dig, pick, hammer, fish, plant. */
+  act: string;
+  fadeIn: number;
+}
+
+const TUNICS = ['#8a3b2e', '#4a5e8a', '#6b7a3a', '#9a7a3a', '#5e4a6e', '#7a5a3a', '#3a6a6a', '#a05a3a', '#556070'];
+const HAIR = ['#3a2a1a', '#6a4a2a', '#c8a060', '#2a2420', '#8a5a2a', '#d8d0c0'];
+
+const SPEED = 1.7; // tiles per second at 1x
+const MAX_AGENTS = 180;
+
+export class AgentSystem {
+  agents: Agent[] = [];
+  private syncTimer = 0;
+  private lastPop = -1;
+  private serial = 0;
+
+  reset(): void {
+    this.agents = [];
+    this.lastPop = -1;
+    this.syncTimer = 0;
+  }
+
+  update(s: GameState, dt: number): void {
+    this.syncTimer -= dt;
+    if (this.syncTimer <= 0) {
+      this.sync(s);
+      this.syncTimer = 0.75;
+    }
+    for (const a of this.agents) this.tick(s, a, dt);
+  }
+
+  // ---------------------------------------------------------------- roles
+
+  private desiredRoles(s: GameState): Role[] {
+    const roles: Role[] = [];
+    for (const b of s.buildings) {
+      if (b.build < 1) continue;
+      for (let k = 0; k < b.workers; k++) roles.push({ kind: 'work', id: b.id });
+    }
+    let idle = s.population - roles.length;
+    const sites = s.buildings.filter((b) => b.build < 1 && b.connected).sort((a, b) => a.id - b.id);
+    for (const b of sites) {
+      const n = Math.min(idle, 3);
+      for (let k = 0; k < n; k++) roles.push({ kind: 'build', id: b.id });
+      idle -= n;
+    }
+    for (let k = 0; k < idle; k++) roles.push({ kind: 'idle' });
+    return roles;
+  }
+
+  private sync(s: GameState): void {
+    const roles = this.desiredRoles(s);
+    const keyed = new Map<string, Role>();
+    const counts = new Map<string, number>();
+    for (const r of roles) {
+      const base = r.kind === 'work' || r.kind === 'build' ? `${r.kind}:${r.id}` : r.kind;
+      const n = counts.get(base) ?? 0;
+      counts.set(base, n + 1);
+      keyed.set(`${base}#${n}`, r);
+    }
+    // Keep settlers walking in; they are re-keyed on arrival.
+    const keep: Agent[] = [];
+    const taken = new Set<string>();
+    for (const a of this.agents) {
+      if (a.role.kind === 'settler') {
+        keep.push(a);
+        continue;
+      }
+      if (keyed.has(a.key) && !taken.has(a.key)) {
+        taken.add(a.key);
+        keep.push(a);
+      }
+    }
+    const homes = this.homeSlots(s);
+    const growth = this.lastPop >= 0 ? Math.max(0, s.population - this.lastPop) : 0;
+    let settlersToSpawn = Math.min(growth, 12);
+    this.lastPop = s.population;
+    let i = 0;
+    for (const [key, role] of keyed) {
+      if (keep.length >= MAX_AGENTS) break;
+      i++;
+      if (taken.has(key)) continue;
+      const home = homes[i % Math.max(1, homes.length)] ?? -1;
+      const a = this.spawn(s, key, role, home);
+      if (settlersToSpawn > 0 && this.sendFromEdge(s, a)) settlersToSpawn--;
+      keep.push(a);
+    }
+    // Drop agents beyond the population (people who left).
+    const nonSettlers = keep.filter((a) => a.role.kind !== 'settler').length;
+    void nonSettlers;
+    this.agents = keep;
+  }
+
+  private homeSlots(s: GameState): number[] {
+    const out: number[] = [];
+    for (const b of s.buildings) for (let k = 0; k < b.residents; k++) out.push(b.id);
+    return out;
+  }
+
+  private spawn(s: GameState, key: string, role: Role, home: number): Agent {
+    const n = this.serial++;
+    const hb = getBuilding(s, home);
+    const start = hb ? doorTile(s, hb) : this.hallDoor(s);
+    const a: Agent = {
+      key,
+      role,
+      home,
+      x: start.x + 0.5,
+      y: start.y + 0.5,
+      path: [],
+      phase: 'inside',
+      timer: Math.random() * 2,
+      next: 'enter-home',
+      carry: null,
+      tunic: TUNICS[n % TUNICS.length],
+      hair: HAIR[(n * 7) % HAIR.length],
+      ox: ((n * 37) % 7) / 7 - 0.5,
+      oy: ((n * 53) % 5) / 5 - 0.5,
+      dir: 1,
+      step: Math.random() * 10,
+      visible: false,
+      act: '',
+      fadeIn: 0,
+    };
+    return a;
+  }
+
+  private hallDoor(s: GameState): { x: number; y: number } {
+    const hall = s.buildings.find((b) => b.type === 'townhall');
+    return hall ? doorTile(s, hall) : { x: s.width >> 1, y: s.height >> 1 };
+  }
+
+  /** Makes a new agent walk in from the map edge. */
+  private sendFromEdge(s: GameState, a: Agent): boolean {
+    const hall = this.hallDoor(s);
+    // Pick the closest dry edge tile in a random direction.
+    for (let tries = 0; tries < 20; tries++) {
+      const side = Math.floor(Math.random() * 4);
+      const t = Math.floor(Math.random() * s.width);
+      const x = side === 0 ? 0 : side === 1 ? s.width - 1 : t;
+      const y = side === 2 ? 0 : side === 3 ? s.height - 1 : t;
+      if (s.terrain[idx(s, x, y)] || s.occ[idx(s, x, y)] >= 0) continue;
+      const path = findPath(s, x, y, hall.x, hall.y, [], 12000);
+      if (!path) continue;
+      const real = a.role;
+      a.role = { kind: 'settler' };
+      a.x = x + 0.5;
+      a.y = y + 0.5;
+      a.path = path;
+      a.phase = 'walk';
+      a.visible = true;
+      a.next = 'arrive-hall';
+      a.carry = 'wood';
+      (a as Agent & { realRole?: Role }).realRole = real;
+      return true;
+    }
+    return false;
+  }
+
+  // ---------------------------------------------------------------- behaviour
+
+  private walkTo(s: GameState, a: Agent, tx: number, ty: number, allow: number[], next: Agent['next']): void {
+    const sx = Math.floor(a.x);
+    const sy = Math.floor(a.y);
+    const extra = [...allow];
+    const occ = inBounds(s, sx, sy) ? s.occ[idx(s, sx, sy)] : -1;
+    if (occ >= 0) extra.push(occ);
+    const path = findPath(s, sx, sy, tx, ty, extra);
+    a.next = next;
+    a.visible = true;
+    if (!path) {
+      // Unreachable: just appear there.
+      a.x = tx + 0.5;
+      a.y = ty + 0.5;
+      a.path = [];
+    } else {
+      a.path = path;
+    }
+    a.phase = 'walk';
+  }
+
+  private tick(s: GameState, a: Agent, dt: number): void {
+    if (a.fadeIn < 1) a.fadeIn = Math.min(1, a.fadeIn + dt * 2);
+    if (a.phase === 'walk') {
+      let move = SPEED * dt * (s.road[idx(s, Math.floor(a.x), Math.floor(a.y))] ? 1.25 : 1);
+      while (move > 0 && a.path.length) {
+        const t = a.path[0];
+        const tx = (t % s.width) + 0.5;
+        const ty = Math.floor(t / s.width) + 0.5;
+        const dx = tx - a.x;
+        const dy = ty - a.y;
+        const d = Math.hypot(dx, dy);
+        if (d <= move) {
+          a.x = tx;
+          a.y = ty;
+          move -= d;
+          a.path.shift();
+        } else {
+          a.x += (dx / d) * move;
+          a.y += (dy / d) * move;
+          move = 0;
+        }
+        // Screen-space facing: +1 right, -1 left.
+        if (Math.abs(dx - dy) > 0.01) a.dir = dx - dy > 0 ? 1 : -1;
+      }
+      a.step += dt * 9;
+      if (!a.path.length) this.arrive(s, a);
+      return;
+    }
+    a.timer -= dt;
+    if (a.phase === 'act') a.step += dt * 6;
+    if (a.timer <= 0) this.decide(s, a);
+  }
+
+  private arrive(_s: GameState, a: Agent): void {
+    switch (a.next) {
+      case 'enter-work':
+      case 'enter-home':
+        a.phase = 'inside';
+        a.visible = false;
+        a.carry = null;
+        a.timer = 2 + Math.random() * 3;
+        break;
+      case 'act':
+        a.phase = 'act';
+        a.timer = 2.5 + Math.random() * 2.5;
+        break;
+      case 'return':
+      case 'wander-done':
+        a.phase = 'pause';
+        a.timer = 0.5 + Math.random() * 2;
+        break;
+      case 'arrive-hall': {
+        const real = (a as Agent & { realRole?: Role }).realRole;
+        a.role = real ?? { kind: 'idle' };
+        a.carry = null;
+        a.phase = 'pause';
+        a.timer = 1;
+        break;
+      }
+    }
+  }
+
+  /** Chooses the next activity once the current one is finished. */
+  private decide(s: GameState, a: Agent): void {
+    const r = a.role;
+    if (r.kind === 'settler') return;
+    if (r.kind === 'idle') {
+      this.decideIdle(s, a);
+      return;
+    }
+    const b = getBuilding(s, r.id);
+    if (!b) {
+      a.role = { kind: 'idle' };
+      this.decideIdle(s, a);
+      return;
+    }
+    if (r.kind === 'build') {
+      if (b.build >= 1) {
+        a.role = { kind: 'idle' };
+        this.decideIdle(s, a);
+        return;
+      }
+      // Walk to a spot beside the site, then hammer.
+      if (a.phase === 'act' || a.next === 'act') {
+        a.phase = 'act';
+        a.act = 'hammer';
+        a.timer = 2 + Math.random() * 3;
+        a.next = 'act';
+        // Shuffle around the site occasionally.
+        if (Math.random() < 0.4) this.goToSiteEdge(s, a, b);
+        return;
+      }
+      this.goToSiteEdge(s, a, b);
+      return;
+    }
+    this.decideWork(s, a, b);
+  }
+
+  private goToSiteEdge(s: GameState, a: Agent, b: Building): void {
+    const spots: [number, number][] = [];
+    for (let x = b.x - 1; x <= b.x + b.w; x++) {
+      for (let y = b.y - 1; y <= b.y + b.h; y++) {
+        const inside = x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h;
+        if (inside || !inBounds(s, x, y)) continue;
+        const i = idx(s, x, y);
+        if (s.terrain[i] || s.occ[i] >= 0) continue;
+        spots.push([x, y]);
+      }
+    }
+    if (!spots.length) return;
+    const [x, y] = spots[Math.floor(Math.random() * spots.length)];
+    a.act = 'hammer';
+    this.walkTo(s, a, x, y, [], 'act');
+  }
+
+  private decideIdle(s: GameState, a: Agent): void {
+    const home = getBuilding(s, a.home);
+    if (a.phase === 'inside') {
+      // Step out for a stroll along nearby roads.
+      const c = home ? bCenter(home) : { x: a.x, y: a.y };
+      const roads: number[] = [];
+      forTilesInRadius(s, c, 7, (i) => {
+        if (s.road[i]) roads.push(i);
+      });
+      if (roads.length && Math.random() < 0.7) {
+        const t = roads[Math.floor(Math.random() * roads.length)];
+        if (home) {
+          const d = doorTile(s, home);
+          a.x = d.x + 0.5;
+          a.y = d.y + 0.5;
+        }
+        a.carry = null;
+        this.walkTo(s, a, t % s.width, Math.floor(t / s.width), [], 'wander-done');
+      } else {
+        a.timer = 3 + Math.random() * 4;
+      }
+      return;
+    }
+    if (home) {
+      const d = doorTile(s, home);
+      this.walkTo(s, a, d.x, d.y, [home.id], 'enter-home');
+    } else {
+      a.phase = 'pause';
+      a.timer = 3;
+    }
+  }
+
+  private decideWork(s: GameState, a: Agent, b: Building): void {
+    const d = BUILDINGS[b.type];
+    const door = doorTile(s, b);
+    // After working outside, carry goods back.
+    if (a.phase === 'act') {
+      a.carry = carryFor(b.type);
+      this.walkTo(s, a, door.x, door.y, [b.id], 'enter-work');
+      return;
+    }
+    if (a.phase === 'pause') {
+      // Arrived somewhere (e.g. delivered goods); head back to work.
+      this.walkTo(s, a, door.x, door.y, [b.id], 'enter-work');
+      return;
+    }
+    // Inside the workplace: decide what to do next.
+    const target = this.workTarget(s, b);
+    if (a.home !== -1 && Math.random() < 0.08) {
+      const home = getBuilding(s, a.home);
+      if (home) {
+        this.exitAt(a, door);
+        a.carry = null;
+        const hd = doorTile(s, home);
+        this.walkTo(s, a, hd.x, hd.y, [home.id], 'enter-home');
+        a.role = { kind: 'work', id: b.id };
+        return;
+      }
+    }
+    if (target) {
+      this.exitAt(a, door);
+      a.act = target.act;
+      a.carry = null;
+      this.walkTo(s, a, target.x, target.y, [b.id], 'act');
+      return;
+    }
+    if (d.outputs && Object.keys(d.outputs).length && Math.random() < 0.5 && b.type !== 'market') {
+      // Deliver goods to the manor hall or a storehouse.
+      const store = nearestStore(s, b);
+      if (store) {
+        this.exitAt(a, door);
+        a.carry = carryFor(b.type);
+        const sd = doorTile(s, store);
+        this.walkTo(s, a, sd.x, sd.y, [b.id, store.id], 'return');
+        return;
+      }
+    }
+    a.phase = 'inside';
+    a.visible = false;
+    a.timer = 3 + Math.random() * 4;
+  }
+
+  private exitAt(a: Agent, door: { x: number; y: number }): void {
+    if (!a.visible) {
+      a.x = door.x + 0.5;
+      a.y = door.y + 0.5;
+      a.fadeIn = 0;
+    }
+  }
+
+  private workTarget(s: GameState, b: Building): { x: number; y: number; act: string } | null {
+    const d = BUILDINGS[b.type];
+    const c = bCenter(b);
+    const pick = (pred: (i: number) => boolean, act: string) => {
+      const cands: number[] = [];
+      forTilesInRadius(s, c, d.radius, (i) => {
+        if (pred(i)) cands.push(i);
+      });
+      if (!cands.length) return null;
+      const t = cands[Math.floor(Math.random() * cands.length)];
+      return { x: t % s.width, y: Math.floor(t / s.width), act };
+    };
+    const open = (i: number) => s.terrain[i] === 0 && s.occ[i] < 0;
+    switch (b.type) {
+      case 'woodcutter':
+        return pick((i) => s.trees[i] > 0, 'chop');
+      case 'quarry':
+        return pick((i) => s.rock[i] > 0, 'dig');
+      case 'mine':
+        return pick((i) => s.ore[i] > 0, 'dig');
+      case 'forager':
+        return isWinter(s.day) ? null : pick((i) => s.berries[i] > 0, 'pick');
+      case 'forester':
+        return pick((i) => open(i) && !s.road[i] && s.trees[i] < 4, 'plant');
+      case 'hunter':
+        return pick((i) => s.trees[i] > 0, 'hunt');
+      case 'fisher': {
+        // A dry tile next to water.
+        return pick((i) => {
+          if (!open(i)) return false;
+          const x = i % s.width;
+          const y = Math.floor(i / s.width);
+          for (const [dx, dy] of [
+            [1, 0],
+            [-1, 0],
+            [0, 1],
+            [0, -1],
+          ]) {
+            if (inBounds(s, x + dx, y + dy) && s.terrain[idx(s, x + dx, y + dy)] === 1) return true;
+          }
+          return false;
+        }, 'fish');
+      }
+      case 'farm': {
+        const m = Math.floor(s.day / 10) % 12;
+        if (m >= 9) return null;
+        // Field tiles are part of the farm footprint (front quadrants).
+        const fx = b.x + 2 + Math.floor(Math.random() * 2);
+        const fy = b.y + Math.floor(Math.random() * 4);
+        return Math.random() < 0.5
+          ? { x: fx, y: fy, act: m >= 6 ? 'scythe' : 'hoe' }
+          : { x: b.x + Math.floor(Math.random() * 2), y: b.y + 2 + Math.floor(Math.random() * 2), act: m >= 6 ? 'scythe' : 'hoe' };
+      }
+      default:
+        return null;
+    }
+  }
+}
+
+function nearestStore(s: GameState, b: Building): Building | null {
+  const c = bCenter(b);
+  let best: Building | null = null;
+  let bestD = Infinity;
+  for (const o of s.buildings) {
+    if ((o.type !== 'townhall' && o.type !== 'storehouse') || o.build < 1 || !o.connected) continue;
+    const oc = bCenter(o);
+    const d = Math.hypot(oc.x - c.x, oc.y - c.y);
+    if (d < bestD) {
+      bestD = d;
+      best = o;
+    }
+  }
+  return best;
+}
+
+function carryFor(type: string): ResourceId | null {
+  switch (type) {
+    case 'woodcutter':
+      return 'wood';
+    case 'quarry':
+      return 'stone';
+    case 'mine':
+      return 'iron';
+    case 'forager':
+      return 'berries';
+    case 'hunter':
+      return 'meat';
+    case 'fisher':
+      return 'fish';
+    case 'farm':
+      return 'grain';
+    case 'bakery':
+      return 'bread';
+    case 'sawmill':
+      return 'planks';
+    case 'smithy':
+      return 'tools';
+    default:
+      return null;
+  }
+}
