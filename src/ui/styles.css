@@ -789,3 +789,125 @@ button.active {
     transform: translateX(-50%) scale(0.7);
   }
 }
+
+/* ------------------------------------------------------------ small screens */
+
+@media (max-width: 700px), (max-height: 520px) {
+  #top {
+    top: 4px;
+    left: 4px;
+    right: 4px;
+    gap: 4px;
+  }
+  #menu-btn {
+    padding: 4px 8px;
+    font-size: 13px;
+  }
+  #topbar {
+    padding: 2px 4px;
+    gap: 0;
+  }
+  .res {
+    font-size: 13px;
+    padding: 1px 3px;
+    gap: 2px;
+  }
+  .res svg {
+    width: 15px;
+    height: 15px;
+  }
+  .sep {
+    display: none;
+  }
+  #clock {
+    padding: 3px 6px;
+    gap: 4px;
+  }
+  #clock .date {
+    min-width: 0;
+    font-size: 12px;
+  }
+  #clock .date small {
+    font-size: 11px;
+  }
+  #clock .speeds button {
+    min-width: 0;
+    padding: 1px 5px;
+    font-size: 12px;
+  }
+  #objectives {
+    top: auto;
+    bottom: 150px;
+    left: 4px;
+    width: 190px;
+    padding: 6px 8px;
+  }
+  #objectives .tier b {
+    font-size: 14px;
+  }
+  #log {
+    display: none;
+  }
+  #inspector {
+    right: 4px;
+    bottom: 150px;
+    width: min(260px, calc(100vw - 8px));
+    padding: 8px 10px;
+  }
+  #buildbar {
+    bottom: 4px;
+    padding: 4px 6px 6px;
+    width: auto;
+    left: 4px;
+    right: 4px;
+    transform: none;
+    max-width: none;
+  }
+  #buildbar .tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    margin-bottom: 4px;
+  }
+  #buildbar .tabs button {
+    font-size: 10.5px;
+    padding: 2px 6px;
+    white-space: nowrap;
+    flex: 0 0 auto;
+  }
+  #buildbar .tabs .spacer {
+    display: none;
+  }
+  .card {
+    width: 74px;
+    padding: 2px;
+  }
+  .card img {
+    width: 44px;
+    height: 44px;
+  }
+  .card .name {
+    font-size: 11px;
+    height: 24px;
+  }
+  .card .cost {
+    font-size: 11px;
+  }
+  #hint {
+    bottom: 140px;
+    font-size: 13px;
+    white-space: normal;
+    max-width: calc(100vw - 16px);
+  }
+  .modal h1 {
+    font-size: 26px;
+  }
+  .banner h1 {
+    font-size: 28px;
+  }
+}
+
+@media (max-width: 480px) {
+  #clock .date {
+    display: none;
+  }
+}

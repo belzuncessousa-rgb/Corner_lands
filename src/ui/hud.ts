@@ -70,7 +70,7 @@ export class Hud {
   private modal: HTMLElement | null = null;
   private audio: AudioContext | null = null;
   muted = false;
-  private objectivesMin = false;
+  private objectivesMin = window.innerWidth < 700 || window.innerHeight < 520;
   private lastInspectorKey = '';
   private cardImgs = new Map<string, string>();
   minimap: Minimap;
