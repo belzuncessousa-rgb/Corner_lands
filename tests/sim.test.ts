@@ -136,3 +136,51 @@ describe('simulation', () => {
     expect(serialize(copy)).toEqual(serialize(s));
   });
 });
+
+describe('production chains', () => {
+  it('mine and blacksmith turn ore into tools', () => {
+    const s = generateWorld(77);
+    s.tier = 2;
+    for (const k of Object.keys(s.res) as (keyof typeof s.res)[]) s.res[k] = 100;
+    // Find an ore tile and build a road from the hall to it.
+    const ore = s.ore.findIndex((v) => v > 0);
+    const ox = ore % s.width;
+    const oy = Math.floor(ore / s.width);
+    const h = hall(s);
+    // Clear a straight path of map features so roads can be laid.
+    const path: [number, number][] = [];
+    const startY = h.y + 3;
+    for (let x = Math.min(h.x, ox); x <= Math.max(h.x, ox); x++) path.push([x, startY]);
+    for (let y = Math.min(startY, oy + 3); y <= Math.max(startY, oy + 3); y++) path.push([ox, y]);
+    for (const [x, y] of path) {
+      const i = idx(s, x, y);
+      s.terrain[i] = 0;
+      s.rock[i] = 0;
+      s.ore[i] = 0;
+      if (s.occ[i] < 0) buildRoad(s, x, y);
+    }
+    recompute(s);
+    let mine = null;
+    for (const [dx, dy] of [[1, 1], [-2, 1], [1, 2], [-2, 2], [1, -2], [-2, -2]]) {
+      const x = ox + dx;
+      const y = oy + 3 + dy;
+      for (let yy = y; yy < y + 2; yy++) for (let xx = x; xx < x + 2; xx++) {
+        const i = idx(s, xx, yy);
+        s.terrain[i] = 0;
+        s.rock[i] = 0;
+        s.trees[i] = 0;
+        if (!(xx === ox && Math.abs(yy - oy) < 1)) s.ore[i] = 0;
+      }
+      mine = placeOrder(s, 'mine', x, y);
+      if (mine?.connected) break;
+    }
+    expect(mine?.connected).toBe(true);
+    s.ore[ore] = 30;
+    const smithy = placeNearRoad(s, 'smithy');
+    run(s, 40);
+    expect(mine!.build).toBe(1);
+    expect(smithy.build).toBe(1);
+    run(s, 40);
+    expect(s.res.tools).toBeGreaterThan(100);
+  });
+});

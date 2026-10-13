@@ -347,6 +347,13 @@ export function doorTile(s: GameState, b: Building): { x: number; y: number } {
 
 // ---------------------------------------------------------------- recompute
 
+const BLOCKED = /^(No |Bushes|Storage full|Waiting|Not enough|Fields untended|Fields lie|Fields resting|Fields harvested)/;
+
+/** True when the building's last status says it cannot currently produce. */
+export function isBlocked(b: Building): boolean {
+  return b.build >= 1 && BLOCKED.test(b.status) && b.status !== 'No workers available';
+}
+
 export function housingOf(b: Building): number {
   if (b.build < 1 || !b.connected) return 0;
   if (b.type === 'house') return b.level >= 2 ? HOUSE_L2_HOUSING : BUILDINGS.house.housing;
@@ -384,13 +391,10 @@ export function recompute(s: GameState): void {
   }
   // Workers.
   let free = s.population;
-  const jobs = s.buildings
-    .filter((b) => BUILDINGS[b.type].workers > 0)
-    .sort((a, b) => {
-      const pa = CATEGORY_PRIORITY[BUILDINGS[a.type].category];
-      const pb = CATEGORY_PRIORITY[BUILDINGS[b.type].category];
-      return pa - pb || a.id - b.id;
-    });
+  // Buildings that could not work last time go to the back of the queue, so
+  // villagers are not stuck at a forager with no berries while a hunter idles.
+  const prio = (b: Building) => CATEGORY_PRIORITY[BUILDINGS[b.type].category] + (isBlocked(b) ? 10 : 0);
+  const jobs = s.buildings.filter((b) => BUILDINGS[b.type].workers > 0).sort((a, b) => prio(a) - prio(b) || a.id - b.id);
   for (const b of s.buildings) b.workers = 0;
   for (const b of jobs) {
     if (b.build < 1 || !b.connected || b.paused) continue;
@@ -480,7 +484,7 @@ function produce(s: GameState, b: Building, rng: StateRng, cap: number): string 
       const t = nearestTile(s, b, d.radius, (i, dist) => (s.berries[i] > 0 ? dist : null));
       if (t < 0) {
         return countInRadius(s, bCenter(b), d.radius, (i) => s.berriesMax[i] > 0) > 0
-          ? 'Bushes picked clean until spring'
+          ? 'Bushes picked clean for now'
           : 'No berry bushes in range';
       }
       s.berries[t]--;
@@ -504,7 +508,11 @@ function produce(s: GameState, b: Building, rng: StateRng, cap: number): string 
       return null;
     }
     default: {
-      // Generic converter: inputs -> outputs.
+      // Generic converter: inputs -> outputs. Timber is never used below a
+      // small reserve so homes keep their firewood.
+      if ((d.inputs.wood ?? 0) > 0 && s.res.wood - (d.inputs.wood ?? 0) < WOOD_RESERVE) {
+        return 'Waiting for wood (keeping firewood reserve)';
+      }
       if (!canAfford(s, d.inputs)) {
         const missing = Object.keys(d.inputs).filter((k) => s.res[k as ResourceId] < (d.inputs[k as ResourceId] ?? 0));
         return `Waiting for ${missing.join(', ')}`;
@@ -526,7 +534,9 @@ function farmFertility(s: GameState, b: Building): number {
   return f / (b.w * b.h);
 }
 
-export const FARM_YIELD = 160;
+export const FARM_YIELD = 300;
+/** Converters leave this much timber in stock for firewood. */
+export const WOOD_RESERVE = 20;
 
 function stepFarm(s: GameState, b: Building, cap: number): void {
   const month = monthOf(s.day);
@@ -538,11 +548,13 @@ function stepFarm(s: GameState, b: Building, cap: number): void {
     b.status = b.growth > 0 ? 'Crops ripening' : 'Fields lie fallow';
   } else if (month === 7 && s.day % DAYS_PER_MONTH === 0 && b.growth > 0) {
     if (crew > 0) {
-      const amount = Math.round(FARM_YIELD * b.growth * farmFertility(s, b) * (0.6 + 0.4 * crew));
+      const amount = Math.round(FARM_YIELD * b.growth * (0.5 + 0.5 * farmFertility(s, b)) * (0.6 + 0.4 * crew));
       const before = s.res.grain;
-      s.res.grain = Math.min(cap, s.res.grain + amount);
-      b.output += s.res.grain - before;
-      log(s, `Harvest! A farm brought in ${s.res.grain - before} grain.`, 'good');
+      s.res.grain = Math.max(before, Math.min(cap, before + amount));
+      const gained = s.res.grain - before;
+      b.output += gained;
+      if (gained < amount) log(s, `Harvest! A farm brought in ${gained} grain; ${amount - gained} spoiled for lack of storage.`, 'bad');
+      else log(s, `Harvest! A farm brought in ${gained} grain.`, 'good');
       b.status = 'Harvest gathered';
     } else {
       log(s, 'Crops rotted in an unstaffed field.', 'bad');
@@ -577,7 +589,9 @@ export function dailyProduction(s: GameState, rng: StateRng): void {
       continue;
     }
     if (b.workers === 0) {
-      b.status = 'No workers available';
+      // Keep a blocked status so the job queue does not flip-flop daily;
+      // blocked buildings are retried at the start of each month.
+      if (!isBlocked(b)) b.status = 'No workers available';
       continue;
     }
     b.work += b.workers / d.workers / d.cycle;
@@ -632,6 +646,7 @@ export function monthly(s: GameState, rng: StateRng): void {
   for (const b of s.buildings) {
     b.lastOutput = b.output;
     b.output = 0;
+    if (isBlocked(b) && b.type !== 'farm') b.status = 'Looking for work';
   }
 
   // Eating: one unit per villager per month, spread across food types.
@@ -681,11 +696,9 @@ export function monthly(s: GameState, rng: StateRng): void {
   updateHappiness(s);
   migrate(s, rng);
 
-  // Spring: bushes regrow.
-  if (month === 0) {
-    s.berries.set(s.berriesMax);
-    log(s, `Spring of year ${yearOf(s.day)} has arrived.`, 'info');
-  }
+  // Bushes fruit in spring and again in summer.
+  if (month === 0 || month === 4) s.berries.set(s.berriesMax);
+  if (month === 0) log(s, `Spring of year ${yearOf(s.day)} has arrived.`, 'info');
   if (month === 9) log(s, 'Winter is here. Keep timber stocked for firewood.', 'info');
 
   updateTier(s);
@@ -694,7 +707,7 @@ export function monthly(s: GameState, rng: StateRng): void {
 
 export function updateHappiness(s: GameState): void {
   const factors: { label: string; value: number }[] = [];
-  factors.push({ label: 'Base contentment', value: 45 });
+  factors.push({ label: 'Base contentment', value: 50 });
   const r = s.report;
   if (s.population > 0) {
     const variety = VARIETY_BONUS[Math.min(4, r.variety)];

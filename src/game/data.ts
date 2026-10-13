@@ -137,7 +137,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   forager: def({
     type: 'forager',
     name: "Forager's Hut",
-    desc: 'Gathers berries from wild bushes. Idle in winter; bushes regrow each spring.',
+    desc: 'Gathers berries from wild bushes. Bushes fruit in spring and summer; idle in winter.',
     category: 'food',
     cost: { wood: 10 },
     workers: 2,
@@ -192,7 +192,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     workers: 2,
     cycle: 2,
     inputs: { grain: 2 },
-    outputs: { bread: 3 },
+    outputs: { bread: 4 },
     tier: 1,
   }),
   sawmill: def({
