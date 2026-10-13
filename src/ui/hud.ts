@@ -50,6 +50,14 @@ function costHtml(cost: Cost, have?: Record<string, number>): string {
     .join('');
 }
 
+const lastHtml = new WeakMap<HTMLElement, string>();
+/** Assigns innerHTML only when it changed, so buttons are not recreated mid-click. */
+function setHTML(el: HTMLElement, html: string): void {
+  if (lastHtml.get(el) === html) return;
+  lastHtml.set(el, html);
+  el.innerHTML = html;
+}
+
 const TOP_RES: ResourceId[] = ['wood', 'stone', 'planks', 'iron', 'tools', 'grain', 'gold'];
 
 export class Hud {
@@ -190,21 +198,25 @@ export class Hud {
       const full = r !== 'gold' && v >= cap;
       html += `<div class="res ${full ? 'full' : ''}" data-tip="<b>${RESOURCE_INFO[r].name}</b><br>${esc(RESOURCE_INFO[r].desc)}${r !== 'gold' ? `<br>Storage: ${v} / ${cap}` : ''}">${ICONS[r]}${v}</div>`;
     }
-    this.el.topbar.innerHTML = html;
+    setHTML(this.el.topbar, html);
 
     // Clock.
     const season = seasonOf(s.day);
     const progress = ((s.day % 10) / 10) * 100;
-    this.el.clock.innerHTML = `
-      <span data-tip="<b>${SEASON_NAMES[season]}</b>">${SEASON_ICONS[season]}</span>
+    setHTML(
+      this.el.clock,
+      `<span data-tip="<b>${SEASON_NAMES[season]}</b>">${SEASON_ICONS[season]}</span>
       <div class="date">Year ${yearOf(s.day)}<small>${MONTH_NAMES[monthOf(s.day)]}</small>
-        <div class="progress" style="height:3px;margin:2px 0 0"><i style="width:${progress}%"></i></div></div>
+        <div class="progress" style="height:3px;margin:2px 0 0"><i class="month-bar"></i></div></div>
       <div class="speeds">
         <button data-action="speed" data-speed="0" class="${g.speedIndex === 0 ? 'active' : ''}" data-tip="Pause (Space)">❚❚</button>
         <button data-action="speed" data-speed="1" class="${g.speedIndex === 1 ? 'active' : ''}" data-tip="Normal speed (1)">▶</button>
         <button data-action="speed" data-speed="2" class="${g.speedIndex === 2 ? 'active' : ''}" data-tip="Fast (2)">▶▶</button>
         <button data-action="speed" data-speed="3" class="${g.speedIndex === 3 ? 'active' : ''}" data-tip="Fastest (3)">▶▶▶</button>
-      </div>`;
+      </div>`,
+    );
+    const bar = this.el.clock.querySelector('.month-bar') as HTMLElement | null;
+    if (bar) bar.style.width = `${progress}%`;
 
     this.updateObjectives();
     this.updateTown();
@@ -228,14 +240,14 @@ export class Hud {
       })
       .join('');
     this.el.objectives.className = `panel ${this.objectivesMin ? 'min' : ''}`;
-    this.el.objectives.innerHTML = `
+    setHTML(this.el.objectives, `
       <button class="collapse" data-action="toggle-obj">${this.objectivesMin ? '▾' : '▴'}</button>
       <div class="tier"><b>${tier.name}</b></div>
       <div class="body">
         ${next ? `<div class="tier-next">Next: <b>${next.name}</b> — ${req.join(', ')}</div>` : `<div class="tier-next">${tier.desc}</div>`}
         <h3>Objectives</h3>
         ${quests || '<div class="quest"><i>All objectives complete. Your lands flourish!</i></div>'}
-      </div>`;
+      </div>`);
   }
 
   private updateTown(): void {
@@ -250,7 +262,7 @@ export class Hud {
       (t, i) => `<button data-action="tax" data-level="${i}" class="${s.taxLevel === i ? 'active' : ''}" data-tip="<b>${t.name} taxes</b><br>${t.perHead} gold per villager per month.<br>Happiness ${t.happiness >= 0 ? '+' : ''}${t.happiness}">${t.name}</button>`,
     ).join('');
     const r = s.report;
-    this.el.town.innerHTML = `
+    setHTML(this.el.town, `
       <div class="row"><b>Happiness</b><span>${s.happiness}% <small>(→${s.happinessTarget})</small></span></div>
       <div class="bar"><i style="width:${s.happiness}%;background-position:${-220 + s.happiness * 2.2}px 0"></i></div>
       <div class="factors">${factors || '<i>No villagers yet</i>'}</div>
@@ -259,7 +271,7 @@ export class Hud {
       <div class="row"><span>Last month</span><span>ate ${r.eaten}${r.shortage ? `, <span class="neg">${r.shortage} hungry</span>` : ''}</span></div>
       <div class="row"><span>Taxes</span><span>+${r.taxes} ${ICONS.gold}</span></div>
       <div class="tax">${taxes}</div>
-      ${hasBuilt(s, 'market') ? '<button data-action="trade" style="width:100%;margin-top:6px">⚖ Trade at Market</button>' : ''}`;
+      ${hasBuilt(s, 'market') ? '<button data-action="trade" style="width:100%;margin-top:6px">⚖ Trade at Market</button>' : ''}`);
   }
 
   private updateInspector(): void {

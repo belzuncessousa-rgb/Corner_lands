@@ -8,6 +8,7 @@ import {
   type Sprite,
   type TreeKind,
   bushSprite,
+  makeSprite,
   buildingSprite,
   grassTile,
   roadTile,
@@ -51,6 +52,7 @@ interface Particle {
 }
 
 const GRASS_VARIANTS = 6;
+const CHUNK = 16;
 const TREE_VARIANTS = 6;
 
 export class Renderer {
@@ -65,6 +67,16 @@ export class Renderer {
   private boost = new Int32Array(0);
   private buckets: number[][] = [];
   time = 0;
+  /** Set to an object to collect per-section render timings (debugging). */
+  prof: Record<string, number> | null = null;
+  private profT = 0;
+
+  private mark(k: string): void {
+    if (!this.prof) return;
+    const n = performance.now();
+    this.prof[k] = (this.prof[k] ?? 0) + n - this.profT;
+    this.profT = n;
+  }
 
   constructor(public canvas: HTMLCanvasElement) {
     this.ctx = canvas.getContext('2d')!;
@@ -128,10 +140,42 @@ export class Renderer {
     return this.sprite(`b:${type}:${level}:${season}`, () => buildingSprite(type, d.w, d.h, level, season));
   }
 
+  private lodCache = [new WeakMap<HTMLCanvasElement, HTMLCanvasElement>(), new WeakMap<HTMLCanvasElement, HTMLCanvasElement>()];
+
+  /** Reduced-resolution copies of sprite canvases, used when zoomed out. */
+  private lod(cv: HTMLCanvasElement): HTMLCanvasElement {
+    const scale = this.cam.zoom * this.dpr;
+    if (scale > 0.95) return cv;
+    const level = scale > 0.48 ? 0 : 1;
+    const cache = this.lodCache[level];
+    let small = cache.get(cv);
+    if (!small) {
+      const src = level === 0 ? cv : this.lodAt(cv, 0);
+      small = document.createElement('canvas');
+      small.width = Math.max(1, src.width >> 1);
+      small.height = Math.max(1, src.height >> 1);
+      small.getContext('2d')!.drawImage(src, 0, 0, small.width, small.height);
+      cache.set(cv, small);
+    }
+    return small;
+  }
+
+  private lodAt(cv: HTMLCanvasElement, level: number): HTMLCanvasElement {
+    let small = this.lodCache[level].get(cv);
+    if (!small) {
+      small = document.createElement('canvas');
+      small.width = Math.max(1, cv.width >> 1);
+      small.height = Math.max(1, cv.height >> 1);
+      small.getContext('2d')!.drawImage(cv, 0, 0, small.width, small.height);
+      this.lodCache[level].set(cv, small);
+    }
+    return small;
+  }
+
   private blit(sp: Sprite, wx: number, wy: number, alpha = 1): void {
     const c = this.ctx;
     if (alpha !== 1) c.globalAlpha = alpha;
-    c.drawImage(sp.canvas, wx - sp.ax, wy - sp.ay, sp.w, sp.h);
+    c.drawImage(this.lod(sp.canvas), wx - sp.ax, wy - sp.ay, sp.w, sp.h);
     if (alpha !== 1) c.globalAlpha = 1;
   }
 
@@ -163,25 +207,25 @@ export class Renderer {
     const W = s.width;
     const H = s.height;
 
-    // ---- ground
-    for (let d = 0; d < W + H - 1; d++) {
-      for (let x = Math.max(0, d - H + 1); x <= Math.min(W - 1, d); x++) {
-        const y = d - x;
-        const [wx, wy] = iso(x, y);
-        if (!visible(wx, wy)) continue;
-        const i = y * W + x;
-        let sp: Sprite;
-        if (s.terrain[i] === 1) {
-          const mask = this.landMask(s, x, y);
-          sp = this.sprite(`w:${season}:${mask}`, () => waterTile(season, mask));
-        } else {
-          const f = Math.min(3, Math.floor(s.fertility[i] * 4));
-          const v = s.variant[i] % GRASS_VARIANTS;
-          sp = this.sprite(`g:${season}:${f}:${v}`, () => grassTile(season, f, v));
-        }
-        this.blit(sp, wx, wy);
+    this.profT = performance.now();
+    // ---- ground (cached in chunks; terrain never changes, only seasons)
+    const gs = z * this.dpr > 1.25 ? 2 : z * this.dpr > 0.6 ? 1 : 0.5;
+    const cw = Math.ceil(W / CHUNK);
+    const ch = Math.ceil(H / CHUNK);
+    for (let cy = 0; cy < ch; cy++) {
+      for (let cx = 0; cx < cw; cx++) {
+        const x0 = cx * CHUNK;
+        const y0 = cy * CHUNK;
+        const left = (x0 - y0 - CHUNK) * (TW / 2);
+        const right = (x0 + CHUNK - y0) * (TW / 2);
+        const top = (x0 + y0) * (TH / 2);
+        const bottom = (x0 + y0 + CHUNK * 2) * (TH / 2);
+        if (right < vx0 || left > vx1 || bottom < vy0 || top > vy1) continue;
+        const chunk = this.groundChunk(s, cx, cy, season, gs);
+        c.drawImage(chunk, left - 4, top - 4, right - left + 8, bottom - top + 8);
       }
     }
+    this.mark('ground');
     this.drawWaterShimmer(s, visible);
     this.drawFields(s, season);
     // Roads on top of ground: all edges first so joints blend.
@@ -199,7 +243,9 @@ export class Renderer {
       }
     }
 
+    this.mark('shimmer+fields+roads');
     this.drawGroundOverlays(s, ov);
+    this.mark('overlays');
 
     // ---- objects, back to front
     this.computeBoost(s);
@@ -231,6 +277,7 @@ export class Renderer {
       const d = Math.max(tx + ty, this.boost[ty * W + tx]);
       this.buckets[Math.min(nb - 1, d)].push(ai * 4 + 2);
     });
+    this.mark('bucketing');
     for (const bucket of this.buckets) {
       for (const code of bucket) {
         const kind = code & 3;
@@ -243,6 +290,7 @@ export class Renderer {
 
     if (ov.ghost) this.drawGhost(s, ov.ghost, season);
 
+    this.mark('objects');
     // ---- particles (chimney smoke)
     this.updateSmoke(s, dt, season);
     for (const p of this.particles) {
@@ -255,9 +303,59 @@ export class Renderer {
 
     this.drawWeather(s, season, dt);
     this.drawAtmosphere(season, s.day);
+    this.mark('effects');
   }
 
   // ---------------------------------------------------------------- ground helpers
+
+  private chunks = new Map<string, HTMLCanvasElement>();
+  private chunkSeed = -1;
+
+  private groundChunk(s: GameState, cx: number, cy: number, season: Season, scale: number): HTMLCanvasElement {
+    if (this.chunkSeed !== s.seed) {
+      this.chunks.clear();
+      this.chunkSeed = s.seed;
+    }
+    const key = `${cx}:${cy}:${season}:${scale}`;
+    let cv = this.chunks.get(key);
+    if (cv) {
+      // Refresh LRU position.
+      this.chunks.delete(key);
+      this.chunks.set(key, cv);
+      return cv;
+    }
+    const x0 = cx * CHUNK;
+    const y0 = cy * CHUNK;
+    const left = (x0 - y0 - CHUNK) * (TW / 2) - 4;
+    const top = (x0 + y0) * (TH / 2) - 4;
+    const w = CHUNK * TW + 8;
+    const h = CHUNK * TH + 8;
+    cv = document.createElement('canvas');
+    cv.width = w * scale;
+    cv.height = h * scale;
+    const g = cv.getContext('2d')!;
+    g.scale(scale, scale);
+    g.translate(-left, -top);
+    for (let y = y0; y < Math.min(s.height, y0 + CHUNK); y++) {
+      for (let x = x0; x < Math.min(s.width, x0 + CHUNK); x++) {
+        const i = y * s.width + x;
+        let sp: Sprite;
+        if (s.terrain[i] === 1) {
+          const mask = this.landMask(s, x, y);
+          sp = this.sprite(`w:${season}:${mask}`, () => waterTile(season, mask));
+        } else {
+          const f = Math.min(3, Math.floor(s.fertility[i] * 4));
+          const v = s.variant[i] % GRASS_VARIANTS;
+          sp = this.sprite(`g:${season}:${f}:${v}`, () => grassTile(season, f, v));
+        }
+        const [wx, wy] = iso(x, y);
+        g.drawImage(sp.canvas, wx - sp.ax, wy - sp.ay, sp.w, sp.h);
+      }
+    }
+    this.chunks.set(key, cv);
+    while (this.chunks.size > 48) this.chunks.delete(this.chunks.keys().next().value!);
+    return cv;
+  }
 
   private landMask(s: GameState, x: number, y: number): number {
     const land = (xx: number, yy: number) => inBounds(s, xx, yy) && s.terrain[idx(s, xx, yy)] === 0;
@@ -479,17 +577,28 @@ export class Renderer {
     const n = s.trees[i];
     if (n) {
       const kind: TreeKind = v % 9 < 4 ? 'pine' : v % 9 < 8 ? 'oak' : 'birch';
-      const slots = TREE_SLOTS[n - 1];
-      for (let k = 0; k < slots.length; k++) {
-        const tv = (v + k * 3) % TREE_VARIANTS;
-        const kk: TreeKind = k === 1 && kind === 'oak' && v % 2 ? 'birch' : kind;
-        const sp = this.sprite(`t:${kk}:${season}:${tv}`, () => treeSprite(kk, season, tv));
-        const jx = ((v >> 2) % 5) * 0.03 - 0.06;
-        const jy = ((v >> 4) % 5) * 0.03 - 0.06;
-        const [wx, wy] = iso(x + slots[k][0] + jx, y + slots[k][1] + jy);
-        this.blit(sp, wx, wy);
-      }
+      const base = v % TREE_VARIANTS;
+      const mixBirch = kind === 'oak' && v % 2 === 1;
+      // One pre-composed clump per tile keeps draw calls low.
+      const sp = this.sprite(`tc:${kind}:${n}:${base}:${mixBirch}:${season}`, () => this.treeClump(kind, n, base, mixBirch, season));
+      const jx = ((v >> 2) % 5) * 0.03 - 0.06;
+      const jy = ((v >> 4) % 5) * 0.03 - 0.06;
+      const [wx, wy] = iso(x + jx, y + jy);
+      this.blit(sp, wx, wy);
     }
+  }
+
+  private treeClump(kind: TreeKind, n: number, base: number, mixBirch: boolean, season: Season): Sprite {
+    const slots = TREE_SLOTS[n - 1];
+    return makeSprite(TW + 50, TH + 84, TW / 2 + 25, 80, (ctx) => {
+      for (let k = 0; k < slots.length; k++) {
+        const tv = (base + k * 3) % TREE_VARIANTS;
+        const kk: TreeKind = k === 1 && mixBirch ? 'birch' : kind;
+        const t = this.sprite(`t:${kk}:${season}:${tv}`, () => treeSprite(kk, season, tv));
+        const [lx, ly] = iso(slots[k][0], slots[k][1]);
+        ctx.drawImage(t.canvas, lx - t.ax, ly - t.ay, t.w, t.h);
+      }
+    });
   }
 
   private drawBuilding(s: GameState, b: Building, season: Season, selected: boolean): void {
