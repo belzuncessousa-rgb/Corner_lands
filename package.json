@@ -1,0 +1,20 @@
+{
+  "name": "corner-lands",
+  "private": true,
+  "version": "0.1.0",
+  "description": "A casual medieval city builder.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "server": "node server/index.mjs",
+    "build": "tsc --noEmit && vite build",
+    "start": "npm run build && node server/index.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "~5.6.3",
+    "vite": "^5.4.10",
+    "vitest": "^2.1.4"
+  }
+}
