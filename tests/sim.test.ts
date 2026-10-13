@@ -184,3 +184,18 @@ describe('production chains', () => {
     expect(s.res.tools).toBeGreaterThan(100);
   });
 });
+
+describe('events', () => {
+  it('keep the settlement consistent over many years', () => {
+    const s = generateWorld(31);
+    placeNearRoad(s, 'house');
+    placeNearRoad(s, 'house');
+    placeNearRoad(s, 'forager');
+    placeNearRoad(s, 'woodcutter');
+    run(s, DAYS_PER_YEAR * 6);
+    const eventTexts = s.messages.map((m) => m.text);
+    expect(eventTexts.length).toBeGreaterThan(0);
+    for (const v of Object.values(s.res)) expect(v).toBeGreaterThanOrEqual(0);
+    expect(s.population).toBeGreaterThanOrEqual(2);
+  });
+});

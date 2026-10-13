@@ -12,6 +12,7 @@ import {
   TIERS,
   TRADE_PRICES,
 } from './data';
+import { rollEvent } from './events';
 import { checkQuests } from './quests';
 import { StateRng } from './rng';
 import type { Building, BuildingType, Category, Cost, GameState, ResourceId, Season } from './types';
@@ -728,6 +729,7 @@ export function monthly(s: GameState, rng: StateRng): void {
 
   updateHappiness(s);
   migrate(s, rng);
+  if (rollEvent(s, rng, month)) recompute(s);
 
   // Bushes fruit in spring and again in summer.
   if (month === 0 || month === 4) s.berries.set(s.berriesMax);
