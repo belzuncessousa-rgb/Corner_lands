@@ -24,7 +24,7 @@ const placed = await page.evaluate(() => {
   const ry = hall.y + 3;
   for (let x = hall.x - 16; x <= hall.x + 16; x++) cl.buildRoad(s, x, ry);
   for (let y = ry - 12; y <= ry + 12; y++) { cl.buildRoad(s, hall.x + 5, y); cl.buildRoad(s, hall.x - 6, y); }
-  const want = ['farm', 'market', 'church', 'storehouse', 'house', 'house', 'house', 'bakery', 'sawmill', 'smithy', 'mine', 'quarry', 'woodcutter', 'forester', 'forager', 'hunter', 'fisher', 'well', 'house', 'house', 'house', 'house'];
+  const want = ['farm', 'market', 'church', 'storehouse', 'house', 'house', 'house', 'bakery', 'sawmill', 'smithy', 'mine', 'quarry', 'woodcutter', 'forester', 'forager', 'hunter', 'fisher', 'well', 'garden', 'maypole', 'statue', 'garden', 'house', 'house', 'house', 'house'];
   const placed = [];
   for (const type of want) {
     let done = false;

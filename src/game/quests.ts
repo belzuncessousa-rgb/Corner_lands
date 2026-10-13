@@ -61,6 +61,13 @@ export const QUESTS: Quest[] = [
     done: (s) => count(s, 'forester') >= 1,
   },
   {
+    id: 'garden',
+    title: 'Plant a flower garden',
+    hint: 'Decorations from the Decor tab make nearby homes happier.',
+    reward: { gold: 30 },
+    done: (s) => count(s, 'garden') >= 1,
+  },
+  {
     id: 'village',
     title: 'Become a Village',
     hint: 'Reach 20 villagers.',

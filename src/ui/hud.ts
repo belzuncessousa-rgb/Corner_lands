@@ -38,6 +38,7 @@ import { FOOD_IDS } from '../game/types';
 import { idx, inBounds } from '../game/world';
 import type { Game } from '../main';
 import { ICONS, SEASON_ICONS } from './icons';
+import { Minimap } from './minimap';
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
@@ -72,6 +73,7 @@ export class Hud {
   private objectivesMin = false;
   private lastInspectorKey = '';
   private cardImgs = new Map<string, string>();
+  minimap: Minimap;
 
   constructor(
     private game: Game,
@@ -96,6 +98,7 @@ export class Hud {
     for (const id of ['topbar', 'clock', 'objectives', 'town', 'log', 'inspector', 'hint', 'buildbar', 'tooltip']) {
       this.el[id] = root.querySelector(`#${id}`)!;
     }
+    this.minimap = new Minimap(root, game.renderer, () => game.state);
     root.addEventListener('click', (e) => this.onClick(e));
     root.addEventListener('mousemove', (e) => this.onTipMove(e));
     root.addEventListener('mouseleave', () => (this.el.tooltip.style.display = 'none'));

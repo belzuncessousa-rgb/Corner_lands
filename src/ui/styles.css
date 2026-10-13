@@ -418,6 +418,17 @@ button.active {
   background: rgba(241, 228, 195, 0.85);
 }
 
+/* ------------------------------------------------------------ minimap */
+
+#minimap {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  padding: 0;
+  cursor: pointer;
+  background: #3a4a2a;
+}
+
 /* ------------------------------------------------------------ inspector */
 
 #inspector {
@@ -687,6 +698,9 @@ button.active {
     font-size: 13px;
   }
   #town {
+    display: none;
+  }
+  #minimap {
     display: none;
   }
   #log {

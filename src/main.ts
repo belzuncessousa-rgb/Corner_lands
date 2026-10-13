@@ -154,6 +154,7 @@ export class Game {
     }
     this.agents.update(this.state, gameDt);
     this.renderer.render(this.state, this.agents.agents, this.overlay(), running ? dt : 0);
+    this.hud.minimap.update(dt);
     this.hudTimer -= dt;
     if (this.hudTimer <= 0) {
       this.hudTimer = 0.25;
@@ -557,7 +558,7 @@ function rangeHighlighter(s: GameState, type: BuildingType): ((i: number) => boo
     case 'water':
       return (i) => s.terrain[i] === 1;
     default:
-      if (type === 'well' || type === 'market' || type === 'church') {
+      if (type === 'well' || type === 'market' || type === 'church' || BUILDINGS[type].beauty > 0) {
         return (i) => {
           const o = s.occ[i];
           if (o < 0) return false;

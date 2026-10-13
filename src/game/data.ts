@@ -55,6 +55,8 @@ export interface BuildingDef {
   outputs: Cost;
   /** What map resource this building gathers, if any. */
   gathers?: 'trees' | 'rock' | 'ore' | 'berries' | 'forest' | 'water';
+  /** Happiness added to homes within `radius` (decorations). */
+  beauty: number;
   buildable: boolean;
 }
 
@@ -72,6 +74,7 @@ function def(d: Partial<BuildingDef> & Pick<BuildingDef, 'type' | 'name' | 'desc
     inputs: {},
     outputs: {},
     buildable: true,
+    beauty: 0,
     ...d,
   };
 }
@@ -212,7 +215,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     name: 'Iron Mine',
     desc: 'Digs iron ore from nearby deposits.',
     category: 'industry',
-    cost: { wood: 25, planks: 10 },
+    cost: { wood: 25, planks: 10, gold: 30 },
     buildDays: 14,
     workers: 3,
     radius: 4,
@@ -226,7 +229,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     name: 'Blacksmith',
     desc: 'Forges iron and timber into tools.',
     category: 'industry',
-    cost: { stone: 20, planks: 15 },
+    cost: { stone: 20, planks: 15, gold: 30 },
     buildDays: 12,
     workers: 2,
     cycle: 4,
@@ -262,7 +265,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     category: 'civic',
     w: 3,
     h: 3,
-    cost: { planks: 20, stone: 10 },
+    cost: { planks: 20, stone: 10, gold: 50 },
     buildDays: 14,
     workers: 2,
     radius: 11,
@@ -283,7 +286,48 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     radius: 16,
     tier: 2,
   }),
+  garden: def({
+    type: 'garden',
+    name: 'Flower Garden',
+    desc: 'A small garden with flowers and a bench. Homes nearby are more cheerful.',
+    category: 'decor',
+    w: 1,
+    h: 1,
+    cost: { wood: 5, gold: 25 },
+    buildDays: 4,
+    radius: 5,
+    beauty: 3,
+  }),
+  maypole: def({
+    type: 'maypole',
+    name: 'Maypole',
+    desc: 'A festive pole with ribbons where villagers dance. Lifts spirits in a wide area.',
+    category: 'decor',
+    w: 2,
+    h: 2,
+    cost: { wood: 15, gold: 60 },
+    buildDays: 6,
+    radius: 8,
+    beauty: 5,
+    tier: 1,
+  }),
+  statue: def({
+    type: 'statue',
+    name: 'Lord\'s Statue',
+    desc: 'A proud stone statue in your honour. Greatly beautifies the town.',
+    category: 'decor',
+    w: 2,
+    h: 2,
+    cost: { stone: 30, tools: 2, gold: 150 },
+    buildDays: 15,
+    radius: 10,
+    beauty: 8,
+    tier: 2,
+  }),
 };
+
+/** Most beauty a home can enjoy from decorations. */
+export const MAX_BEAUTY = 12;
 
 export const BUILD_ORDER: BuildingType[] = [
   'house',
@@ -302,6 +346,9 @@ export const BUILD_ORDER: BuildingType[] = [
   'storehouse',
   'market',
   'church',
+  'garden',
+  'maypole',
+  'statue',
 ];
 
 export const CATEGORY_NAMES: Record<Category, string> = {
@@ -310,9 +357,10 @@ export const CATEGORY_NAMES: Record<Category, string> = {
   food: 'Food',
   industry: 'Industry',
   civic: 'Civic',
+  decor: 'Decor',
 };
 
-export const HOUSE_UPGRADE_COST: Cost = { planks: 10, stone: 5, tools: 2 };
+export const HOUSE_UPGRADE_COST: Cost = { planks: 10, stone: 5, tools: 2, gold: 20 };
 export const HOUSE_L2_HOUSING = 8;
 
 export const TIERS = [

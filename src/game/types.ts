@@ -36,9 +36,12 @@ export type BuildingType =
   | 'well'
   | 'market'
   | 'church'
-  | 'storehouse';
+  | 'storehouse'
+  | 'garden'
+  | 'maypole'
+  | 'statue';
 
-export type Category = 'housing' | 'resources' | 'food' | 'industry' | 'civic';
+export type Category = 'housing' | 'resources' | 'food' | 'industry' | 'civic' | 'decor';
 
 export type Season = 0 | 1 | 2 | 3; // spring, summer, autumn, winter
 

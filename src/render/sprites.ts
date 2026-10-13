@@ -994,6 +994,149 @@ function drawBuilding(p: Pen, type: BuildingType, level: number, season: Season)
       p.ctx.fill();
       break;
     }
+    case 'garden': {
+      const flowers = season === 3 ? ['#e8eef0'] : season === 2 ? ['#d8903a', '#b8503a', '#e0c040'] : ['#e84a6a', '#f2d34a', '#b97ae0', '#f4f0e0', '#e86a3a'];
+      p.poly(
+        [
+          [0.08, 0.08, 0],
+          [0.92, 0.08, 0],
+          [0.92, 0.92, 0],
+          [0.08, 0.92, 0],
+        ],
+        season === 3 ? '#dfe4e2' : '#6a9a3e',
+      );
+      // Gravel path.
+      p.poly(
+        [
+          [0.42, 0.08, 0],
+          [0.58, 0.08, 0],
+          [0.58, 0.92, 0],
+          [0.42, 0.92, 0],
+        ],
+        season === 3 ? '#d0d3d0' : '#c8b88e',
+      );
+      const rand = mulberry32(7);
+      for (const [x0, x1] of [
+        [0.12, 0.38],
+        [0.62, 0.88],
+      ]) {
+        for (let i = 0; i < 9; i++) {
+          const x = x0 + rand() * (x1 - x0);
+          const y = 0.15 + rand() * 0.7;
+          p.bush(x, y, 2.6, season === 3 ? '#9aa894' : '#3f7a35');
+          if (season !== 3) {
+            const [fx, fy] = iso(x, y, 3);
+            p.ctx.fillStyle = flowers[i % flowers.length];
+            p.ctx.beginPath();
+            p.ctx.arc(fx, fy, 1.6, 0, Math.PI * 2);
+            p.ctx.fill();
+          }
+        }
+      }
+      // Bench.
+      p.box(0.66, 0.78, 0.86, 0.86, 3, 1.5, '#8a6236');
+      p.line([0.68, 0.84, 0], [0.68, 0.84, 3], '#5e4129', 1);
+      p.line([0.84, 0.84, 0], [0.84, 0.84, 3], '#5e4129', 1);
+      p.fence([0.08, 0.95], [0.4, 0.95], '#e8e0d0');
+      p.fence([0.6, 0.95], [0.92, 0.95], '#e8e0d0');
+      break;
+    }
+    case 'maypole': {
+      p.poly(
+        [
+          [0.2, 0.2, 0],
+          [1.8, 0.2, 0],
+          [1.8, 1.8, 0],
+          [0.2, 1.8, 0],
+        ],
+        season === 3 ? '#dde2e0' : '#86a84a',
+      );
+      // Ring of trampled earth where people dance.
+      const [cx, cy] = iso(1, 1, 0);
+      p.ctx.strokeStyle = season === 3 ? '#c8ccc8' : '#a89060';
+      p.ctx.lineWidth = 5;
+      p.ctx.beginPath();
+      p.ctx.ellipse(cx, cy, 34, 17, 0, 0, Math.PI * 2);
+      p.ctx.stroke();
+      const ribbons = ['#c42b3a', '#2e5e9a', '#e8c040', '#3d7a3a', '#f4f0e0', '#9a4ab0'];
+      ribbons.forEach((col, i) => {
+        const a = (i / ribbons.length) * Math.PI * 2;
+        const ex = 1 + Math.cos(a) * 0.62;
+        const ey = 1 + Math.sin(a) * 0.62;
+        p.ctx.strokeStyle = col;
+        p.ctx.lineWidth = 1.3;
+        const [tx, ty] = iso(1, 1, 52);
+        const [bx, by] = iso(ex, ey, 2);
+        p.ctx.beginPath();
+        p.ctx.moveTo(tx, ty);
+        p.ctx.quadraticCurveTo((tx + bx) / 2 + 4, (ty + by) / 2, bx, by);
+        p.ctx.stroke();
+        p.box(ex - 0.03, ey - 0.03, ex + 0.03, ey + 0.03, 0, 3, '#7b5a36');
+      });
+      p.line([1, 1, 0], [1, 1, 60], '#e8dcc0', 3);
+      p.line([1, 1, 0], [1, 1, 60], '#c8b490', 1);
+      const [wx, wy] = iso(1, 1, 52);
+      p.ctx.fillStyle = season === 3 ? '#e8eef0' : '#4f8a2e';
+      p.ctx.beginPath();
+      p.ctx.ellipse(wx, wy, 7, 3, 0, 0, Math.PI * 2);
+      p.ctx.fill();
+      p.flag(1, 1, 60, 6, '#c42b3a');
+      break;
+    }
+    case 'statue': {
+      p.poly(
+        [
+          [0.15, 0.15, 0],
+          [1.85, 0.15, 0],
+          [1.85, 1.85, 0],
+          [0.15, 1.85, 0],
+        ],
+        season === 3 ? '#d8dcdc' : '#b9b2a2',
+      );
+      for (let i = 1; i < 4; i++) {
+        p.line([0.15, 0.15 + i * 0.42, 0], [1.85, 0.15 + i * 0.42, 0], 'rgba(90,80,60,0.3)', 0.6);
+        p.line([0.15 + i * 0.42, 0.15, 0], [0.15 + i * 0.42, 1.85, 0], 'rgba(90,80,60,0.3)', 0.6);
+      }
+      p.box(0.55, 0.55, 1.45, 1.45, 0, 6, '#a8a093');
+      p.box(0.7, 0.7, 1.3, 1.3, 6, 16, '#b8b0a2');
+      p.box(0.62, 0.62, 1.38, 1.38, 22, 3, '#a8a093');
+      // The lord: legs, cloak, head and raised sword.
+      const st = '#c8c2b6';
+      p.box(0.9, 0.95, 0.98, 1.03, 25, 12, st);
+      p.box(1.02, 0.95, 1.1, 1.03, 25, 12, st);
+      p.box(0.86, 0.9, 1.14, 1.08, 37, 14, '#d0cabe');
+      p.poly(
+        [
+          [0.84, 1.1, 50],
+          [1.16, 1.1, 50],
+          [1.2, 1.12, 30],
+          [0.8, 1.12, 30],
+        ],
+        '#b4ad9f',
+      );
+      const [hx, hy] = iso(1, 1, 56);
+      p.ctx.fillStyle = '#d6d0c4';
+      p.ctx.beginPath();
+      p.ctx.arc(hx, hy, 4, 0, Math.PI * 2);
+      p.ctx.fill();
+      p.line([1.14, 1.0, 47], [1.24, 0.92, 70], '#9aa0a6', 1.8);
+      p.line([1.17, 0.98, 52], [1.11, 1.06, 50], '#8a8e94', 1.6);
+      if (season === 3) {
+        p.ctx.fillStyle = '#f2f6f8';
+        p.ctx.beginPath();
+        p.ctx.arc(hx, hy - 3, 3, Math.PI, 0);
+        p.ctx.fill();
+      }
+      for (const [x, y] of [
+        [0.3, 0.3],
+        [1.7, 0.3],
+        [0.3, 1.7],
+        [1.7, 1.7],
+      ]) {
+        p.bush(x, y, 4, season === 3 ? '#9aa894' : season === 2 ? '#a08a3a' : '#3f7a35');
+      }
+      break;
+    }
   }
   return smoke;
 }

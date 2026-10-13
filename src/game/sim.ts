@@ -4,6 +4,7 @@ import {
   DAYS_PER_MONTH,
   HOUSE_L2_HOUSING,
   HOUSE_UPGRADE_COST,
+  MAX_BEAUTY,
   MONTHS_PER_YEAR,
   SELL_FACTOR,
   STOREHOUSE_STORAGE,
@@ -366,7 +367,7 @@ export function totalHousing(s: GameState): number {
   return n;
 }
 
-const CATEGORY_PRIORITY: Record<Category, number> = { food: 0, resources: 1, industry: 2, civic: 3, housing: 4 };
+const CATEGORY_PRIORITY: Record<Category, number> = { food: 0, resources: 1, industry: 2, civic: 3, housing: 4, decor: 5 };
 
 export function employed(s: GameState): number {
   let n = 0;
@@ -567,6 +568,38 @@ function stepFarm(s: GameState, b: Building, cap: number): void {
   }
 }
 
+function passiveStatus(s: GameState, b: Building): string {
+  const d = BUILDINGS[b.type];
+  if (d.workers > 0 && b.workers === 0) return 'No workers available';
+  switch (b.type) {
+    case 'house':
+    case 'townhall': {
+      const cap = housingOf(b);
+      if (b.residents === 0) return 'Empty, waiting for settlers';
+      if (b.residents < cap) return `Home to ${b.residents}, room for ${cap - b.residents} more`;
+      return `Home to ${b.residents} villagers`;
+    }
+    case 'well':
+    case 'garden':
+    case 'maypole':
+    case 'statue':
+    case 'church': {
+      let homes = 0;
+      const c = bCenter(b);
+      for (const o of s.buildings) {
+        if (o.residents === 0) continue;
+        const oc = bCenter(o);
+        if (Math.hypot(oc.x - c.x, oc.y - c.y) <= d.radius) homes++;
+      }
+      return homes ? `Cheering ${homes} home${homes > 1 ? 's' : ''} nearby` : 'No homes nearby yet';
+    }
+    case 'storehouse':
+      return `Storing goods (limit ${storageCap(s)} each)`;
+    default:
+      return 'Operating';
+  }
+}
+
 export function dailyProduction(s: GameState, rng: StateRng): void {
   const cap = storageCap(s);
   for (const b of s.buildings) {
@@ -585,7 +618,7 @@ export function dailyProduction(s: GameState, rng: StateRng): void {
       continue;
     }
     if (d.workers === 0 || d.cycle === 0) {
-      b.status = d.workers > 0 && b.workers === 0 ? 'No workers' : 'Operating';
+      b.status = passiveStatus(s, b);
       continue;
     }
     if (b.workers === 0) {
@@ -705,6 +738,19 @@ export function monthly(s: GameState, rng: StateRng): void {
   checkQuests(s);
 }
 
+/** Decoration beauty enjoyed by a home, capped. */
+export function beautyAt(s: GameState, home: Building): number {
+  const c = bCenter(home);
+  let total = 0;
+  for (const o of s.buildings) {
+    const d = BUILDINGS[o.type];
+    if (!d.beauty || o.build < 1) continue;
+    const oc = bCenter(o);
+    if (Math.hypot(oc.x - c.x, oc.y - c.y) <= d.radius) total += d.beauty;
+  }
+  return Math.min(MAX_BEAUTY, total);
+}
+
 export function updateHappiness(s: GameState): void {
   const factors: { label: string; value: number }[] = [];
   factors.push({ label: 'Base contentment', value: 50 });
@@ -723,9 +769,11 @@ export function updateHappiness(s: GameState): void {
   let market = 0;
   let church = 0;
   let upgraded = 0;
+  let beauty = 0;
   for (const b of s.buildings) {
     if (b.residents === 0) continue;
     residents += b.residents;
+    beauty += beautyAt(s, b) * b.residents;
     if (coveredBy(s, b, 'well')) well += b.residents;
     if (coveredBy(s, b, 'market')) market += b.residents;
     if (coveredBy(s, b, 'church')) church += b.residents;
@@ -737,6 +785,7 @@ export function updateHappiness(s: GameState): void {
     if (market) factors.push({ label: 'Market nearby', value: Math.round((10 * market) / residents) });
     if (church) factors.push({ label: 'Church nearby', value: Math.round((15 * church) / residents) });
     if (upgraded) factors.push({ label: 'Fine houses', value: Math.round((6 * upgraded) / residents) });
+    if (beauty) factors.push({ label: 'Beautiful surroundings', value: Math.round(beauty / residents) });
   }
   if (homeless > 0 && s.population > 0) {
     factors.push({ label: 'Homelessness', value: -Math.round(5 + (20 * homeless) / s.population) });
