@@ -7,7 +7,7 @@ describe('balance', () => {
     const results = [101, 202, 303].map((seed) => {
       const s = generateWorld(seed);
       const rep = playBot(s, 12, seed);
-      if ((globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env.BALANCE_LOG) console.log(`seed ${seed}\n${rep.log.join('\n')}\n`, rep);
+      if (process.env.BALANCE_LOG) console.log(`seed ${seed}\n${rep.log.join('\n')}\n`, rep);
       return rep;
     });
     for (const r of results) {
