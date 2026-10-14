@@ -82,10 +82,13 @@ export interface Building {
   output: number;
 }
 
+export type MessageKind = 'info' | 'good' | 'bad' | 'advice';
+
 export interface Message {
   day: number;
   text: string;
-  kind: 'info' | 'good' | 'bad';
+  /** info: chronicle only; good/bad: shown as a toast; advice: steward's tip. */
+  kind: MessageKind;
   /** Tile the message is about; clicking it centres the camera there. */
   at?: { x: number; y: number };
 }

@@ -51,7 +51,7 @@ export function advise(s: GameState, month: number): void {
     const last = s.advice[a.id] ?? -Infinity;
     if (s.day - last < COOLDOWN || !a.when(s, month)) continue;
     s.advice[a.id] = s.day;
-    s.messages.push({ day: s.day, text: a.text(s), kind: 'info' });
+    s.messages.push({ day: s.day, text: a.text(s), kind: 'advice' });
     return;
   }
 }

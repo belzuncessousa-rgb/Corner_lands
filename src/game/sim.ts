@@ -23,7 +23,7 @@ import { rollEvent } from './events';
 import { Heap } from './path';
 import { checkQuests } from './quests';
 import { StateRng } from './rng';
-import type { Building, BuildingType, Category, Cost, GameState, ResourceId, Season } from './types';
+import type { Building, BuildingType, Category, Cost, GameState, MessageKind, ResourceId, Season } from './types';
 import { FOOD_IDS } from './types';
 import { getBuilding, idx, inBounds, makeBuilding, placeBuilding, removeBuilding, setRoad } from './world';
 
@@ -44,7 +44,7 @@ export function isWinter(day: number): boolean {
 
 // ---------------------------------------------------------------- messages
 
-export function log(s: GameState, text: string, kind: 'info' | 'good' | 'bad' = 'info', at?: Building): void {
+export function log(s: GameState, text: string, kind: MessageKind = 'info', at?: Building): void {
   s.messages.push({ day: s.day, text, kind, ...(at ? { at: { x: at.x + at.w / 2, y: at.y + at.h / 2 } } : {}) });
   if (s.messages.length > 40) s.messages.splice(0, s.messages.length - 40);
 }
@@ -232,7 +232,7 @@ export function upgradeHouse(s: GameState, b: Building): boolean {
   pay(s, HOUSE_UPGRADE_COST);
   b.level = 2;
   s.dirty = true;
-  log(s, 'A family has upgraded their home.', 'good');
+  log(s, 'A family has upgraded their home.', 'info', b);
   return true;
 }
 
@@ -901,7 +901,7 @@ export function dailyConstruction(s: GameState): void {
       b.status = 'Completed';
       b.need = undefined;
       b.work = 0;
-      log(s, `${d.name} completed.`, 'good', b);
+      log(s, `${d.name} completed.`, 'info', b);
       s.dirty = true;
     }
   }
@@ -1113,7 +1113,7 @@ function migrate(s: GameState, rng: StateRng): void {
       const n = Math.min(free, 1 + Math.floor((s.happiness - 50) / 12) + rng.int(2));
       s.population += n;
       r.arrived += n;
-      log(s, `${n} settler${n > 1 ? 's' : ''} arrived seeking a new life.`, 'good');
+      log(s, `${n} settler${n > 1 ? 's' : ''} arrived seeking a new life.`, 'info');
     }
   }
   recompute(s);

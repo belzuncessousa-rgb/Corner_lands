@@ -40,7 +40,7 @@ import type { Building, BuildingType, Category, Cost, ResourceId } from '../game
 import { FOOD_IDS } from '../game/types';
 import { idx, inBounds } from '../game/world';
 import type { Game } from '../main';
-import { ICONS, SEASON_ICONS } from './icons';
+import { CATEGORY_ICONS, ICONS, SEASON_ICONS } from './icons';
 import { Minimap } from './minimap';
 import { Ambient } from './ambient';
 
@@ -67,7 +67,10 @@ const TOP_RES: ResourceId[] = ['wood', 'stone', 'planks', 'iron', 'tools', 'grai
 
 export class Hud {
   private el: Record<string, HTMLElement> = {};
-  private category: Category = 'housing';
+  /** Open build category, or null when the build menu is folded away. */
+  private category: Category | null = null;
+  private townOpen = false;
+  private lastSeason = -1;
   private hintText = '';
   private flashUntil = 0;
   private shownMessages = 0;
@@ -75,7 +78,7 @@ export class Hud {
   private audio: AudioContext | null = null;
   private ambient: Ambient | null = null;
   muted = false;
-  private objectivesMin = window.innerWidth < 700 || window.innerHeight < 520;
+  private objectivesMin = true;
   private lastInspectorKey = '';
   private cardImgs = new Map<string, string>();
   minimap: Minimap;
@@ -93,18 +96,26 @@ export class Hud {
     root.classList.toggle('demo', game.demo);
     root.innerHTML = `
       <div id="top">
-        <button id="menu-btn" class="panel" data-action="menu">☰ Menu</button>
+        <div class="stack">
+          <div class="btnrow">
+            <button id="menu-btn" class="panel icon-btn" data-action="menu" data-tip="Menu (Esc)">${CATEGORY_ICONS.menu}</button>
+            <button class="panel icon-btn" data-action="chronicle" data-tip="<b>Chronicle</b><br>Everything that has happened in your lands.">${CATEGORY_ICONS.scroll}</button>
+          </div>
+          <div id="objectives" class="panel"></div>
+        </div>
         <div id="topbar" class="panel"></div>
-        <div id="clock" class="panel"></div>
+        <div class="stack right">
+          <div id="clock" class="panel"></div>
+          <div id="town" class="panel"></div>
+        </div>
       </div>
-      <div id="objectives" class="panel"></div>
-      <div id="town" class="panel"></div>
+      <div id="season-banner"></div>
       <div id="log"></div>
       <div id="inspector" class="panel" style="display:none"></div>
       <div id="hint" class="panel" style="display:none"></div>
       <div id="buildbar" class="panel"></div>
       <div id="tooltip" class="panel"></div>`;
-    for (const id of ['topbar', 'clock', 'objectives', 'town', 'log', 'inspector', 'hint', 'buildbar', 'tooltip']) {
+    for (const id of ['topbar', 'clock', 'objectives', 'town', 'log', 'inspector', 'hint', 'buildbar', 'tooltip', 'season-banner']) {
       this.el[id] = root.querySelector(`#${id}`)!;
     }
     this.minimap = new Minimap(root, game.renderer, () => game.state);
@@ -118,6 +129,8 @@ export class Hud {
 
   rebuild(): void {
     this.lastTier = this.game.state.tier;
+    this.lastSeason = seasonOf(this.game.state.day);
+    this.category = null;
     this.shownMessages = this.game.state.messages.length;
     this.el.log.innerHTML = '';
     this.lastInspectorKey = '';
@@ -138,30 +151,48 @@ export class Hud {
     const g = this.game;
     const s = g.state;
     const cats = Object.keys(CATEGORY_NAMES) as Category[];
-    const tabs = cats
-      .map((c) => `<button data-action="cat" data-cat="${c}" class="${c === this.category ? 'active' : ''}">${CATEGORY_NAMES[c]}</button>`)
-      .join('');
     const tool = g.tool;
-    const tools = `<span class="spacer"></span>
-      <button data-action="road" class="${tool.kind === 'road' ? 'active' : ''}" data-tip="<b>Road</b> (R)<br>Drag to lay dirt roads. Buildings must connect to the Manor Hall by road.">${ICONS.road} Road</button>
-      <button data-action="demolish" class="${tool.kind === 'demolish' ? 'active' : ''}" data-tip="<b>Demolish</b> (X)<br>Remove buildings or roads. Finished buildings refund half their cost.">${ICONS.demolish} Demolish</button>`;
-    const cards = BUILD_ORDER.filter((t) => BUILDINGS[t].category === this.category)
-      .map((t) => {
-        const d = BUILDINGS[t];
-        const locked = !isUnlocked(s, t);
-        const poor = !canAfford(s, d.cost);
-        const sel = tool.kind === 'build' && tool.type === t;
-        return `<div class="card ${sel ? 'sel' : ''} ${locked ? 'locked' : ''} ${poor ? 'poor' : ''}" data-action="build" data-type="${t}" data-tip="${esc(this.buildingTip(t))}">
-          ${d.hotkey ? `<span class="key">${d.hotkey}</span>` : ''}
-          <img src="${this.cardImage(t)}" alt="" draggable="false">
-          ${locked ? `<div class="lock">${TIERS[d.tier].name}</div>` : ''}
-          <div class="name">${d.name}</div>
-          <div class="cost">${costHtml(d.cost, s.res)}</div>
-        </div>`;
-      })
+    const tabs = cats
+      .map(
+        (c) =>
+          `<button data-action="cat" data-cat="${c}" class="tab ${c === this.category ? 'active' : ''}" data-tip="<b>${CATEGORY_NAMES[c]}</b>">${CATEGORY_ICONS[c]}<span>${CATEGORY_NAMES[c]}</span></button>`,
+      )
       .join('');
-    this.el.buildbar.innerHTML = `<div class="tabs">${tabs}${tools}</div><div class="cards">${cards}</div>`;
+    const tools = `<span class="divider"></span>
+      <button data-action="road" class="tab ${tool.kind === 'road' ? 'active' : ''}" data-tip="<b>Road</b> (R)<br>Click to start, click again to lay it. Roads speed up walking; buildings work without them.">${ICONS.road}<span>Road</span></button>
+      <button data-action="demolish" class="tab ${tool.kind === 'demolish' ? 'active' : ''}" data-tip="<b>Demolish</b> (X)<br>Remove buildings or roads. Finished buildings return half their cost.">${ICONS.demolish}<span>Demolish</span></button>`;
+    let cards = '';
+    if (this.category) {
+      cards = BUILD_ORDER.filter((t) => BUILDINGS[t].category === this.category)
+        .map((t) => {
+          const d = BUILDINGS[t];
+          const locked = !isUnlocked(s, t);
+          const poor = !canAfford(s, d.cost);
+          const sel = tool.kind === 'build' && tool.type === t;
+          return `<div class="card ${sel ? 'sel' : ''} ${locked ? 'locked' : ''} ${poor ? 'poor' : ''}" data-action="build" data-type="${t}" data-tip="${esc(this.buildingTip(t))}">
+            ${d.hotkey ? `<span class="key">${d.hotkey}</span>` : ''}
+            <img src="${this.cardImage(t)}" alt="" draggable="false">
+            ${locked ? `<div class="lock">${TIERS[d.tier].name}</div>` : ''}
+            <div class="name">${d.name}</div>
+            <div class="cost">${costHtml(d.cost, s.res)}</div>
+          </div>`;
+        })
+        .join('');
+    }
+    this.el.buildbar.classList.toggle('open', !!this.category);
+    this.el.buildbar.innerHTML = `${cards ? `<div class="cards">${cards}</div>` : ''}<div class="tabs">${tabs}${tools}</div>`;
     this.buildBarKey = this.buildBarState();
+  }
+
+  get categoryOpen(): boolean {
+    return this.category !== null;
+  }
+
+  /** Folds the build menu away. */
+  closeCategory(): void {
+    if (!this.category) return;
+    this.category = null;
+    this.renderBuildBar();
   }
 
   private buildBarKey = '';
@@ -170,7 +201,7 @@ export class Hud {
     const s = g.state;
     const t = g.tool;
     return [
-      this.category,
+      this.category ?? '',
       t.kind,
       t.kind === 'build' ? t.type : '',
       s.tier,
@@ -186,6 +217,7 @@ export class Hud {
     if (Object.keys(d.inputs).length) lines.push(`Uses: ${Object.entries(d.inputs).map(([k, v]) => `${v} ${RESOURCE_INFO[k as ResourceId].name}`).join(', ')}`);
     if (Object.keys(d.outputs).length) lines.push(`Makes: ${Object.entries(d.outputs).map(([k, v]) => `${v} ${RESOURCE_INFO[k as ResourceId].name}`).join(', ')}`);
     if (d.tier > this.game.state.tier) lines.push(`<span class="neg">Unlocks at ${TIERS[d.tier].name}</span>`);
+    else if (!canAfford(this.game.state, d.cost)) lines.push('<i>You can place it now; builders wait until the materials are in storage.</i>');
     return lines.join('<br>');
   }
 
@@ -207,6 +239,8 @@ export class Hud {
       <div class="res ${months < 1.2 ? 'low' : ''}" data-tip="${esc(foodTip)}">${ICONS.bread}${Math.floor(food)}</div>`;
     for (const r of TOP_RES) {
       const v = Math.floor(s.res[r]);
+      // Goods you have never had stay out of the way until they matter.
+      if (v <= 0 && r !== 'gold' && r !== 'wood' && r !== 'stone' && !(r === 'planks' && s.tier >= 1) && !(r === 'tools' && s.tier >= 2)) continue;
       const full = r !== 'gold' && roomFor(s, r) <= 0;
       html += `<div class="res ${full ? 'full' : ''}" data-tip="<b>${RESOURCE_INFO[r].name}</b><br>${esc(RESOURCE_INFO[r].desc)}">${ICONS[r]}${v}</div>`;
     }
@@ -244,6 +278,7 @@ export class Hud {
     if (this.buildBarState() !== this.buildBarKey) this.renderBuildBar();
     this.updateInspector();
     this.updateLog();
+    this.updateSeason();
     this.updateHint();
   }
 
@@ -260,22 +295,28 @@ export class Hud {
           <div class="rw costline">Reward: ${costHtml(q.reward)}</div></div>`;
       })
       .join('');
-    this.el.objectives.className = `panel ${this.objectivesMin ? 'min' : ''}`;
-    setHTML(this.el.objectives, `
-      <button class="collapse" data-action="toggle-obj">${this.objectivesMin ? '▾' : '▴'}</button>
-      <div class="tier"><b>${tier.name}</b></div>
+    const active = activeQuests(s, 3);
+    const ready = active.filter((q) => q.done(s)).length;
+    this.el.objectives.className = `panel pill-panel ${this.objectivesMin ? 'min' : ''}`;
+    setHTML(
+      this.el.objectives,
+      this.objectivesMin
+        ? `<button class="pill" data-action="toggle-obj"><b>${tier.name}</b><span class="sep-dot">·</span>Objectives${active.length ? ` <span class="count">${active.length - ready}</span>` : ' ✓'} <span class="chev">▾</span></button>`
+        : `<button class="pill" data-action="toggle-obj"><b>${tier.name}</b><span class="chev">▴</span></button>
       <div class="body">
         ${next ? `<div class="tier-next">Next: <b>${next.name}</b> — ${req.join(', ')}</div>` : `<div class="tier-next">${tier.desc}</div>`}
         <h3>Objectives</h3>
         ${quests || '<div class="quest"><i>All objectives complete. Your lands flourish!</i></div>'}
-      </div>`);
+      </div>`,
+    );
   }
 
   private updateTown(): void {
     const g = this.game;
     const s = g.state;
     const jobs = s.buildings.reduce((a, b) => a + (b.build >= 1 && !b.paused ? BUILDINGS[b.type].workers : 0), 0);
-    const emp = employed(s);
+    const working = s.buildings.reduce((a, b) => a + (b.build >= 1 ? b.workers : 0), 0);
+    const building = s.buildings.reduce((a, b) => a + (b.build < 1 ? b.workers : 0), 0);
     const factors = s.happinessFactors
       .map((f) => `<div><span>${f.label}</span><span class="${f.value >= 0 ? 'pos' : 'neg'}">${f.value > 0 ? '+' : ''}${f.value}</span></div>`)
       .join('');
@@ -283,19 +324,28 @@ export class Hud {
       (t, i) => `<button data-action="tax" data-level="${i}" class="${s.taxLevel === i ? 'active' : ''}" data-tip="<b>${t.name} taxes</b><br>${t.perHead} gold per villager per month.<br>Happiness ${t.happiness >= 0 ? '+' : ''}${t.happiness}">${t.name}</button>`,
     ).join('');
     const r = s.report;
-    setHTML(this.el.town, `
-      <div class="row"><b>Happiness</b><span>${s.happiness}% <small>(→${s.happinessTarget})</small></span></div>
+    const mood = s.happiness >= 65 ? '😊' : s.happiness >= 45 ? '🙂' : s.happiness >= 30 ? '😐' : '☹';
+    this.el.town.className = `panel pill-panel ${this.townOpen ? '' : 'min'}`;
+    const pill = `<button class="pill" data-action="toggle-town" data-tip="<b>Your people</b><br>Happiness, jobs and taxes">${mood} <b>${s.happiness}%</b><span class="sep-dot">·</span>${ICONS.people}${s.population}<span class="chev">${this.townOpen ? '▴' : '▾'}</span></button>`;
+    setHTML(
+      this.el.town,
+      this.townOpen
+        ? `${pill}
+      <div class="body">
       <div class="bar"><i style="width:${s.happiness}%;background-position:${-220 + s.happiness * 2.2}px 0"></i></div>
       <div class="factors">${factors || '<i>No villagers yet</i>'}</div>
-      <div class="row"><span>Workers</span><span>${emp} / ${jobs} jobs</span></div>
-      <div class="row"><span>Idle (builders)</span><span>${Math.max(0, s.population - emp)}</span></div>
+      <div class="row"><span>At work</span><span>${working} / ${jobs} jobs</span></div>
+      <div class="row"><span>Building</span><span>${building}</span></div>
+      <div class="row"><span>Idle</span><span>${Math.max(0, s.population - working - building)}</span></div>
       <div class="row"><span>Last month</span><span>ate ${r.eaten}${r.shortage ? `, <span class="neg">${r.shortage} hungry</span>` : ''}</span></div>
       <div class="row"><span>Taxes</span><span>+${r.taxes} ${ICONS.gold}</span></div>
       <div class="tax">${taxes}</div>
       <div class="town-actions">
-        <button data-action="ledger">📜 Ledger</button>
-        ${hasBuilt(s, 'market') ? '<button data-action="trade">⚖ Trade</button>' : ''}
-      </div>`);
+        <button data-action="ledger">Ledger</button>
+        ${hasBuilt(s, 'market') ? '<button data-action="trade">Trade</button>' : ''}
+      </div></div>`
+        : pill,
+    );
   }
 
   private updateInspector(): void {
@@ -363,9 +413,11 @@ export class Hud {
     let played = false;
     for (let i = this.shownMessages; i < msgs.length; i++) {
       const m = msgs[i];
+      // Routine news goes to the chronicle only.
+      if (m.kind === 'info') continue;
       const div = document.createElement('div');
       div.className = `msg panel ${m.kind}${m.at ? ' link' : ''}`;
-      div.textContent = m.text;
+      div.innerHTML = `${m.kind === 'advice' ? '<b>Steward:</b> ' : ''}${esc(m.text.replace(/^Steward: /, ''))}`;
       if (m.at) {
         const at = m.at;
         div.title = 'Show me';
@@ -375,15 +427,15 @@ export class Hud {
         });
       }
       this.el.log.appendChild(div);
-      setTimeout(() => div.classList.add('old'), 9000);
-      setTimeout(() => div.remove(), 10000);
-      if (!played && m.kind !== 'info') {
-        this.sound(m.kind === 'good' ? 'good' : 'bad');
+      setTimeout(() => div.classList.add('old'), 7000);
+      setTimeout(() => div.remove(), 8000);
+      if (!played) {
+        this.sound(m.kind === 'bad' ? 'bad' : 'good');
         played = true;
       }
     }
     this.shownMessages = msgs.length;
-    while (this.el.log.children.length > 6) this.el.log.firstElementChild?.remove();
+    while (this.el.log.children.length > 3) this.el.log.firstElementChild?.remove();
   }
 
   private celebrate(tier: number): void {
@@ -400,6 +452,31 @@ export class Hud {
     setTimeout(() => div.remove(), 7000);
     div.addEventListener('click', () => div.remove());
     this.renderBuildBar();
+  }
+
+  /** A large, quiet title when a new season begins. */
+  private updateSeason(): void {
+    const s = this.game.state;
+    const season = seasonOf(s.day);
+    if (season === this.lastSeason) return;
+    this.lastSeason = season;
+    if (this.game.demo) return;
+    const el = this.el['season-banner'];
+    el.innerHTML = `<div>${SEASON_NAMES[season]}</div><small>Year ${yearOf(s.day)}${season === 3 ? ' · keep timber for firewood' : season === 0 ? ' · time to sow the fields' : season === 2 ? ' · harvest is near' : ''}</small>`;
+    el.classList.remove('show');
+    void el.offsetWidth;
+    el.classList.add('show');
+  }
+
+  private showChronicle(): void {
+    const s = this.game.state;
+    const rows = s.messages
+      .slice()
+      .reverse()
+      .map((m) => `<div class="chron ${m.kind}"><small>${MONTH_NAMES[monthOf(m.day)]}, Y${yearOf(m.day)}</small> ${esc(m.text)}</div>`)
+      .join('');
+    this.openModal(`<h2>Chronicle</h2><div class="chronicle">${rows || '<i>Nothing has happened yet.</i>'}</div>
+      <div class="row" style="justify-content:flex-end;margin-top:10px"><button class="primary" data-action="close-modal">Close</button></div>`);
   }
 
   // ---------------------------------------------------------------- hints
@@ -508,17 +585,22 @@ export class Hud {
       case 'menu':
         this.showGameMenu();
         break;
-      case 'cat':
-        this.category = t.dataset.cat as Category;
+      case 'cat': {
+        const c = t.dataset.cat as Category;
+        this.category = this.category === c ? null : c;
+        if (g.tool.kind === 'road' || g.tool.kind === 'demolish') g.setTool({ kind: 'select' });
         this.renderBuildBar();
         break;
+      }
       case 'build':
         this.pickBuilding(t.dataset.type as BuildingType);
         break;
       case 'road':
+        this.category = null;
         g.setTool(g.tool.kind === 'road' ? { kind: 'select' } : { kind: 'road' });
         break;
       case 'demolish':
+        this.category = null;
         g.setTool(g.tool.kind === 'demolish' ? { kind: 'select' } : { kind: 'demolish' });
         break;
       case 'speed':
@@ -531,6 +613,13 @@ export class Hud {
       case 'toggle-obj':
         this.objectivesMin = !this.objectivesMin;
         this.update();
+        break;
+      case 'toggle-town':
+        this.townOpen = !this.townOpen;
+        this.update();
+        break;
+      case 'chronicle':
+        this.showChronicle();
         break;
       case 'deselect':
         g.select(null);
@@ -781,16 +870,15 @@ export class Hud {
     const m = this.openModal(
       `<h2>How to Play</h2>
       <div class="help">
-        <p><b>Grow your settlement</b> from a Hamlet into a Borough. Follow the objectives on the left.</p>
-        <p><b>Roads</b> connect everything. Every building needs a road leading to the <b>Manor Hall</b>, or it cannot be built or staffed. Roads laid over water become wooden <b>bridges</b> (4 timber per tile).</p>
-        <p><b>Houses</b> attract settlers. People arrive when happiness is 50% or higher, there is free housing and nobody is going hungry.</p>
-        <p><b>Food:</b> each villager eats one food a month. Eating several kinds of food (berries, meat, fish, bread) makes people happier.</p>
-        <p><b>Winter</b> stops foraging and farming, and each household burns one timber a month for warmth. Stock up in autumn!</p>
-        <p><b>Farms</b> are sown in spring, grow through summer and are harvested in autumn. Bake the grain into bread.</p>
-        <p><b>Wells, markets, churches and decorations</b> make nearby homes happier. Taxes bring gold but upset people. Your <b>steward</b> will warn you when food or firewood runs low, and the <b>Ledger</b> charts how the town is doing.</p>
-        <p><b>Idle villagers</b> help build construction sites, so keep a few unemployed while expanding.</p>
+        <p><b>Grow your settlement</b> from a Hamlet into a Borough. Open the objectives pill (top left) for guidance.</p>
+        <p><b>Building:</b> pick a category at the bottom, then a building, then click the map. Builders carry the materials over from storage, one load per trip, and then raise the walls. You can plan buildings before you have the materials; they wait.</p>
+        <p><b>Roads</b> are optional but villagers walk much faster on them. Click to start a road, click again to lay it, and keep clicking to continue. Roads over water become bridges (4 timber per tile).</p>
+        <p><b>Storage:</b> goods live in the Manor Hall, Storehouses (materials) and Granaries (food). Workplaces close to storage and to their resources work faster.</p>
+        <p><b>Villagers</b> arrive when happiness is 50% or higher, there is free housing and nobody is going hungry. Each eats one food a month; several kinds of food make them happier.</p>
+        <p><b>Winter</b> stops foraging and farming, and each household burns one timber a month. Farms are sown in spring and harvested in autumn.</p>
+        <p><b>Wells, markets, churches and decorations</b> make nearby homes happier. Your <b>steward</b> warns you when food or firewood runs low; the <b>Chronicle</b> (scroll button) keeps the full story.</p>
         <div class="ornament">❦</div>
-        <p><kbd>Left-drag</kbd> / <kbd>WASD</kbd> pan · <kbd>Wheel</kbd> zoom · <kbd>R</kbd> road · <kbd>X</kbd> demolish · <kbd>H</kbd> house · <kbd>Space</kbd> pause · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> speed · <kbd>Right-click</kbd>/<kbd>Esc</kbd> cancel</p>
+        <p><kbd>Left-drag</kbd> / <kbd>WASD</kbd> pan · <kbd>Wheel</kbd> zoom · <kbd>R</kbd> road (click, click) · <kbd>X</kbd> demolish · <kbd>H</kbd> house · <kbd>Space</kbd> pause · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> speed · <kbd>Right-click</kbd>/<kbd>Esc</kbd> cancel</p>
       </div>
       <div class="row" style="justify-content:flex-end"><button class="primary" data-m="back">Back</button></div>`,
       !fromMain,

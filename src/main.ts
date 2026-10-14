@@ -379,8 +379,9 @@ export class Game {
       if (b) {
         this.hud.sound('place');
         if (!canAfford(s, materialsOf(BUILDINGS[tool.type].cost))) this.hud.flash('Builders will start once the materials are in storage.');
-        if (tool.type !== 'house' && tool.type !== 'well') {
+        if (tool.type !== 'house' && tool.type !== 'well' && tool.type !== 'garden') {
           this.setTool({ kind: 'select' });
+          this.hud.closeCategory();
           this.select(b.id);
         }
       }
@@ -408,6 +409,7 @@ export class Game {
       }
       const occ = this.pickBuilding(sx, sy);
       this.select(occ);
+      this.hud.closeCategory();
     }
   }
 
@@ -556,6 +558,7 @@ export class Game {
         if (this.tool.kind === 'road' && this.roadAnchor) this.roadAnchor = null;
         else if (this.tool.kind !== 'select') this.setTool({ kind: 'select' });
         else if (this.selected !== null) this.select(null);
+        else if (this.hud.categoryOpen) this.hud.closeCategory();
         else this.hud.showGameMenu();
         return;
       }

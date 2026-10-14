@@ -1,13 +1,13 @@
 import { DAYS_PER_MONTH } from './data';
 import type { StateRng } from './rng';
 import { totalHousing } from './sim';
-import type { GameState } from './types';
+import type { GameState, MessageKind } from './types';
 
 interface GameEvent {
   id: string;
   /** Relative chance; 0 when the event cannot happen now. */
   weight: (s: GameState, month: number) => number;
-  apply: (s: GameState, rng: StateRng) => { text: string; kind: 'info' | 'good' | 'bad' } | null;
+  apply: (s: GameState, rng: StateRng) => { text: string; kind: MessageKind } | null;
 }
 
 const housingFree = (s: GameState) => totalHousing(s) - s.population;

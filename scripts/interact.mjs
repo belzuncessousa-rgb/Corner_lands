@@ -29,6 +29,7 @@ const roads = await page.evaluate(() => window.game.state.road.reduce((a, b) => 
 console.log('road tiles', roads);
 // Place a house via the build card.
 await page.keyboard.press('Escape');
+await page.click('button[data-cat="housing"]');
 await page.click('.card[data-type="house"]');
 [x0, y0] = await scr(hall.x + 5.5, hall.y + 5.5);
 await page.mouse.move(x0, y0);
