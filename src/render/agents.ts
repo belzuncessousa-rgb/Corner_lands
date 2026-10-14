@@ -1,6 +1,6 @@
 import { BUILDINGS, DAY_SECONDS, OFFROAD_TILES_PER_DAY, ROAD_TILES_PER_DAY, STONE_ROAD_TILES_PER_DAY, STORAGE_CAPACITY } from '../game/data';
 import { findPath } from '../game/path';
-import { doorTile, forTilesInRadius, bCenter, isWinter, needsMaterials } from '../game/sim';
+import { chooseRecipe, doorTile, forTilesInRadius, bCenter, isWinter, needsMaterials } from '../game/sim';
 import type { Building, GameState, ResourceId } from '../game/types';
 import { getBuilding, idx, inBounds } from '../game/world';
 
@@ -495,7 +495,7 @@ export class AgentSystem {
     const door = doorTile(s, b);
     // After working outside, carry goods back.
     if (a.phase === 'act') {
-      a.carry = carryFor(b.type);
+      a.carry = goodCarried(s, b);
       this.walkTo(s, a, door.x, door.y, [b.id], 'enter-work');
       return;
     }
@@ -529,7 +529,7 @@ export class AgentSystem {
       const store = nearestStore(s, b);
       if (store) {
         this.exitAt(a, door);
-        a.carry = carryFor(b.type);
+        a.carry = goodCarried(s, b);
         const sd = doorTile(s, store);
         this.walkTo(s, a, sd.x, sd.y, [b.id, store.id], 'return');
         return;
@@ -624,6 +624,22 @@ function nearestStore(s: GameState, b: Building): Building | null {
     }
   }
   return best;
+}
+
+/** What a worker carries home: the product the workplace is making now. */
+function goodCarried(s: GameState, b: Building): ResourceId | null {
+  if (b.type === 'byre') return ({ sheep: 'wool', cattle: 'milk', pigs: 'pork' } as Record<string, ResourceId>)[b.recipe ?? 'sheep'];
+  if (b.type === 'orchardist') {
+    const o = s.buildings.find((z) => z.owner === b.id);
+    return ((o?.recipe ?? 'apples') as ResourceId) ?? 'apples';
+  }
+  if (b.type === 'farm') {
+    const f = s.buildings.find((z) => z.owner === b.id);
+    return ({ wheat: 'grain', barley: 'barley', oats: 'oats', flax: 'flax' } as Record<string, ResourceId>)[f?.recipe ?? 'wheat'] ?? 'grain';
+  }
+  const r = chooseRecipe(s, b, true);
+  if (r) return (Object.keys(r.outputs)[0] as ResourceId) ?? null;
+  return carryFor(b.trade ?? b.type);
 }
 
 function carryFor(type: string): ResourceId | null {

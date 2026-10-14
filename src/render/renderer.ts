@@ -6,7 +6,7 @@ import type { Building, BuildingType, GameState, ResourceId, Season } from '../g
 import { idx, inBounds } from '../game/world';
 import type { Agent } from './agents';
 import type { Animal } from './wildlife';
-import { Pen, TH, TW, iso } from './pen';
+import { Pen, TH, TW, iso, mix } from './pen';
 import {
   type Sprite,
   type TreeKind,
@@ -1049,13 +1049,7 @@ export class Renderer {
       }
     }
     // Carried goods.
-    if (a.carry) {
-      c.fillStyle = CARRY_COLORS[a.carry] ?? '#c8a46c';
-      c.fillRect(wx - 2.5, wy - 18.5 - bob, 5, 3.5);
-      c.strokeStyle = 'rgba(0,0,0,0.35)';
-      c.lineWidth = 0.6;
-      c.strokeRect(wx - 2.5, wy - 18.5 - bob, 5, 3.5);
-    }
+    if (a.carry) drawCarried(c, a.carry, wx, wy - 17 - bob);
     c.globalAlpha = 1;
   }
 
@@ -1559,10 +1553,9 @@ function drawGood(p: Pen, id: ResourceId, x: number, y: number): void {
   }
 }
 
+/** Darkens a hex colour, keeping it hex so Pen can shade it further. */
 function shadeHex(hex: string, f: number): string {
-  const n = parseInt(hex.slice(1), 16);
-  const c = (v: number) => Math.round(Math.min(255, v * f));
-  return `rgb(${c((n >> 16) & 255)},${c((n >> 8) & 255)},${c(n & 255)})`;
+  return f >= 1 ? hex : mix(hex, '#000000', 1 - f);
 }
 
 const TREE_SLOTS: [number, number][][] = [
@@ -1595,6 +1588,138 @@ const CARRY_COLORS: Partial<Record<ResourceId, string>> = {
   bread: '#c8904a',
   planks: '#d8b47c',
   tools: '#8a8e94',
+};
+
+/** A load on a villager's shoulder, shaped by what it is. */
+function drawCarried(c: CanvasRenderingContext2D, id: ResourceId, x: number, y: number): void {
+  const shape = CARRY_SHAPES[id] ?? 'crate';
+  const color = CARRY_COLORS[id] ?? GOOD_COLORS[id] ?? '#c8a46c';
+  c.strokeStyle = 'rgba(0,0,0,0.4)';
+  c.lineWidth = 0.6;
+  switch (shape) {
+    case 'log':
+      c.fillStyle = color;
+      c.fillRect(x - 5, y - 1.2, 10, 2.6);
+      c.fillStyle = '#d8b47c';
+      c.beginPath();
+      c.arc(x + 5, y + 0.1, 1.3, 0, Math.PI * 2);
+      c.fill();
+      break;
+    case 'sack':
+      c.fillStyle = color;
+      c.beginPath();
+      c.ellipse(x, y, 3.2, 2.6, 0, 0, Math.PI * 2);
+      c.fill();
+      c.stroke();
+      break;
+    case 'basket':
+      c.fillStyle = '#a07a40';
+      c.beginPath();
+      c.ellipse(x, y + 0.5, 3.4, 2.2, 0, 0, Math.PI);
+      c.fill();
+      c.fillStyle = color;
+      c.beginPath();
+      c.ellipse(x, y, 3, 1.3, 0, 0, Math.PI * 2);
+      c.fill();
+      break;
+    case 'cask':
+      c.fillStyle = '#7a5230';
+      c.beginPath();
+      c.ellipse(x, y, 2.6, 3.2, 0, 0, Math.PI * 2);
+      c.fill();
+      c.strokeStyle = '#3c2a1a';
+      c.beginPath();
+      c.moveTo(x - 2.4, y - 1);
+      c.lineTo(x + 2.4, y - 1);
+      c.moveTo(x - 2.4, y + 1);
+      c.lineTo(x + 2.4, y + 1);
+      c.stroke();
+      break;
+    case 'bundle':
+      c.fillStyle = color;
+      c.fillRect(x - 3.5, y - 2, 7, 4);
+      c.strokeRect(x - 3.5, y - 2, 7, 4);
+      c.strokeStyle = 'rgba(80,50,20,0.7)';
+      c.beginPath();
+      c.moveTo(x, y - 2);
+      c.lineTo(x, y + 2);
+      c.stroke();
+      break;
+    default:
+      c.fillStyle = color;
+      c.fillRect(x - 2.5, y - 1.5, 5, 3.5);
+      c.strokeRect(x - 2.5, y - 1.5, 5, 3.5);
+  }
+}
+
+type CarryShape = 'log' | 'sack' | 'basket' | 'cask' | 'bundle' | 'crate';
+const CARRY_SHAPES: Partial<Record<ResourceId, CarryShape>> = {
+  wood: 'log',
+  firewood: 'log',
+  planks: 'log',
+  grain: 'sack',
+  barley: 'sack',
+  oats: 'sack',
+  flour: 'sack',
+  wool: 'sack',
+  herbs: 'sack',
+  clay: 'sack',
+  ore: 'sack',
+  berries: 'basket',
+  mushrooms: 'basket',
+  apples: 'basket',
+  pears: 'basket',
+  plums: 'basket',
+  grapes: 'basket',
+  eggs: 'basket',
+  vegetables: 'basket',
+  fish: 'basket',
+  ale: 'cask',
+  cider: 'cask',
+  wine: 'cask',
+  milk: 'cask',
+  meat: 'bundle',
+  pork: 'bundle',
+  hides: 'bundle',
+  leather: 'bundle',
+  cloth: 'bundle',
+  clothes: 'bundle',
+  flax: 'bundle',
+  paper: 'bundle',
+};
+const GOOD_COLORS: Partial<Record<ResourceId, string>> = {
+  firewood: '#9a6a3a',
+  barley: '#e0cc84',
+  oats: '#e0d090',
+  flour: '#efe6d4',
+  wool: '#f2ece0',
+  herbs: '#6aa04a',
+  clay: '#b0643a',
+  ore: '#6a5a50',
+  mushrooms: '#a8603a',
+  apples: '#c4322a',
+  pears: '#c8c040',
+  plums: '#6a3a80',
+  grapes: '#5a2a6e',
+  eggs: '#f2e8d4',
+  vegetables: '#5d9a3a',
+  pork: '#e89a8a',
+  hides: '#b08458',
+  leather: '#7a4a2a',
+  cloth: '#5a7ab0',
+  clothes: '#8a3b2e',
+  flax: '#c8b878',
+  paper: '#f4ecd8',
+  cheese: '#f0c850',
+  tiles: '#b8483a',
+  dressedstone: '#cac4b6',
+  woodparts: '#a8783e',
+  silver: '#c8ccd4',
+  jewellery: '#d8a838',
+  books: '#3a5a8a',
+  weapons: '#8a8e94',
+  medicine: '#6aa0a0',
+  boots: '#6a3e22',
 };
 
 function shadeCrop(c: string): string {

@@ -738,7 +738,7 @@ export class Hud {
 
   private celebrate(tier: number): void {
     const t = TIERS[tier];
-    const unlocked = BUILD_ORDER.filter((b) => BUILDINGS[b].tier === tier);
+    const unlocked = BUILD_ORDER.filter((b) => BUILDINGS[b].tier === tier && !BUILDINGS[b].charter);
     const div = document.createElement('div');
     div.className = 'banner panel';
     div.innerHTML = `<div class="ornament">❦ ❦ ❦</div><h1>${t.name}</h1><p>${esc(t.desc)}</p>
