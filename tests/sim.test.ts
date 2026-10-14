@@ -731,3 +731,17 @@ describe('full stores', () => {
     expect(s.res.grain).toBe(4);
   });
 });
+
+describe('steward', () => {
+  it('names what fills a full storehouse', async () => {
+    const { advise } = await import('../src/game/advisor');
+    const { storageCap, stored } = await import('../src/game/sim');
+    const s = generateWorld(84);
+    s.res.planks += storageCap(s, 'materials') - stored(s, 'materials');
+    // One tip a month: put the others on cooldown.
+    s.advice = { housing: s.day, 'food-low': s.day, firewood: s.day };
+    advise(s, 3);
+    const msg = s.messages.find((m) => m.kind === 'advice');
+    expect(msg?.text).toMatch(/storehouses are full, mostly \w+ \(\d+\) and planks/);
+  });
+});

@@ -1,7 +1,8 @@
-import { DAYS_PER_MONTH } from './data';
+import { DAYS_PER_MONTH, FOOD_IDS, GOODS, RESOURCE_STORAGE } from './data';
+import type { StorageKind } from './data';
 import { labourSummary, storageCap, stored, totalHousing } from './sim';
+import { RESOURCE_IDS } from './types';
 import type { GameState } from './types';
-import { FOOD_IDS } from './data';
 
 /** Minimum days between repeats of the same piece of advice. */
 const COOLDOWN = DAYS_PER_MONTH * 6;
@@ -14,6 +15,15 @@ interface Advice {
 
 const food = (s: GameState) => FOOD_IDS.reduce((a, f) => a + s.res[f], 0);
 const homes = (s: GameState) => s.buildings.filter((b) => b.residents > 0).length;
+
+/** ", mostly planks (87) and dressed stone (64)": the biggest piles in a store. */
+function piles(s: GameState, kind: StorageKind): string {
+  const top = RESOURCE_IDS.filter((r) => RESOURCE_STORAGE[r] === kind && s.res[r] >= 1)
+    .sort((a, b) => s.res[b] - s.res[a])
+    .slice(0, 2)
+    .map((r) => `${GOODS[r].name.toLowerCase()} (${Math.floor(s.res[r])})`);
+  return top.length ? `, mostly ${top.join(' and ')}` : '';
+}
 
 const ADVICE: Advice[] = [
   {
@@ -70,7 +80,14 @@ const ADVICE: Advice[] = [
   {
     id: 'storage',
     when: (s) => storageCap(s, 'materials') > 0 && stored(s, 'materials') >= storageCap(s, 'materials') - 5,
-    text: () => 'Steward: the storehouses are full and new goods go to waste. Build another Storehouse, sell the surplus, or lower some stock targets.',
+    text: (s) =>
+      `Steward: the storehouses are full${piles(s, 'materials')}, so quarries and woodcutters stand idle. Build another Storehouse, sell the surplus, or lower some stock targets.`,
+  },
+  {
+    id: 'granary',
+    when: (s) => storageCap(s, 'food') > 0 && stored(s, 'food') >= storageCap(s, 'food') - 5,
+    text: (s) =>
+      `Steward: the granaries are full${piles(s, 'food')}, so the harvest and the hunt go to waste. Build a Granary or sell what we cannot eat.`,
   },
   {
     id: 'charter',
