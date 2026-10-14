@@ -1,5 +1,5 @@
 import { DAYS_PER_MONTH } from './data';
-import { labourSummary, totalHousing } from './sim';
+import { labourSummary, storageCap, stored, totalHousing } from './sim';
 import type { GameState } from './types';
 import { FOOD_IDS } from './data';
 
@@ -46,6 +46,36 @@ const ADVICE: Advice[] = [
     },
     text: () =>
       'Steward: some workplaces stand empty for lack of hands. More houses bring more workers; or raise the priority of the work that matters and give less to the rest.',
+  },
+  {
+    id: 'no-fields',
+    when: (s) => s.buildings.some((b) => b.type === 'farm' && b.build >= 1 && !s.buildings.some((z) => z.owner === b.id)),
+    text: () => 'Steward: our farmstead has no fields. Choose Field in the Farming menu and draw it beside the farm: click one corner, then the other.',
+  },
+  {
+    id: 'no-pasture',
+    when: (s) => s.buildings.some((b) => (b.type === 'byre' || b.type === 'orchardist') && b.build >= 1 && !s.buildings.some((z) => z.owner === b.id)),
+    text: () => 'Steward: the animal farm or orchard lodge has nothing to tend. Draw a pasture or plant an orchard next to it.',
+  },
+  {
+    id: 'tavern-dry',
+    when: (s) => s.buildings.some((b) => b.type === 'tavern' && b.build >= 1 && b.blocked === 1),
+    text: () => 'Steward: the tavern casks are dry. A Brewhouse brews ale from barley (sow a barley field) or presses cider from apples.',
+  },
+  {
+    id: 'clothes',
+    when: (s) => s.res.clothes < 1 && s.buildings.some((b) => b.type === 'house' && b.level >= 2 && b.unmet?.includes('Clothes')),
+    text: () => 'Steward: the families in Timber Houses need clothes. Shear sheep or grow flax, weave cloth and have a tailor sew it, or buy clothes at the market.',
+  },
+  {
+    id: 'storage',
+    when: (s) => storageCap(s, 'materials') > 0 && stored(s, 'materials') >= storageCap(s, 'materials') - 5,
+    text: () => 'Steward: the storehouses are full and new goods go to waste. Build another Storehouse, sell the surplus, or lower some stock targets.',
+  },
+  {
+    id: 'charter',
+    when: (s) => s.tier >= 2 && !(s.charters?.length) && s.res.prestige >= 40,
+    text: () => 'Steward: the crown would grant us a charter for our prestige. Open the charters (crown button) and choose what our town should become.',
   },
 ];
 

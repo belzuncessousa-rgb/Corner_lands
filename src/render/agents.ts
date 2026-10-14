@@ -574,7 +574,8 @@ export class AgentSystem {
         return pick((i) => open(i) && !s.road[i] && s.trees[i] < 4, 'plant');
       case 'hunter':
         return pick((i) => s.trees[i] > 0, 'hunt');
-      case 'fisher': {
+      case 'fisher':
+      case 'claypit': {
         // A dry tile next to water.
         return pick((i) => {
           if (!open(i)) return false;
@@ -589,7 +590,7 @@ export class AgentSystem {
             if (inBounds(s, x + dx, y + dy) && s.terrain[idx(s, x + dx, y + dy)] === 1) return true;
           }
           return false;
-        }, 'fish');
+        }, b.type === 'claypit' ? 'dig' : 'fish');
       }
       case 'farm':
       case 'byre':
