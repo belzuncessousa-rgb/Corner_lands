@@ -393,7 +393,10 @@ export function priceOf(s: GameState, id: ResourceId): number {
   return base;
 }
 
-/** Taverns pour ale or cider: a cask a month for every eight villagers they serve. */
+/** Drinks taverns pour, everyday ones first. */
+export const TAVERN_DRINKS: ResourceId[] = ['ale', 'cider', 'mead', 'wine'];
+
+/** Taverns pour ale, cider, mead or wine: a cask a month for every eight villagers they serve. */
 export function serveAle(s: GameState): void {
   for (const t of s.buildings) {
     if (t.type !== 'tavern' || t.build < 1 || t.workers === 0) continue;
@@ -405,22 +408,21 @@ export function serveAle(s: GameState): void {
       if (Math.hypot(hc.x - c.x, hc.y - c.y) <= BUILDINGS.tavern.radius) served += h.residents;
     }
     let casks = Math.ceil(served / 8);
-    const ale = Math.min(casks, Math.floor(s.res.ale));
-    s.res.ale -= ale;
-    casks -= ale;
-    const cider = Math.min(casks, Math.floor(s.res.cider));
-    s.res.cider -= cider;
-    casks -= cider;
-    const wine = Math.min(casks, Math.floor(s.res.wine));
-    s.res.wine -= wine;
-    casks -= wine;
+    const poured: string[] = [];
+    for (const d of TAVERN_DRINKS) {
+      const n = Math.min(casks, Math.floor(s.res[d]));
+      if (n <= 0) continue;
+      s.res[d] -= n;
+      casks -= n;
+      poured.push(GOODS[d].name.toLowerCase());
+    }
     if (casks <= 0) {
       t.blocked = 0;
-      const drinks = [ale && 'ale', cider && 'cider', wine && 'wine'].filter(Boolean).join(' and ');
+      const drinks = poured.join(' and ');
       t.status = served ? `Pouring ${drinks || 'drinks'} for ${served} villagers` : 'No homes nearby yet';
     } else {
       t.blocked = BLOCK_PROBLEM;
-      t.status = 'The casks are dry: needs ale, cider or wine';
+      t.status = 'The casks are dry: needs ale, cider, mead or wine';
     }
   }
 }
@@ -435,7 +437,7 @@ export function hasSupply(s: GameState, b: Building, id: ResourceId): boolean {
 }
 
 /** Luxuries Townhouses enjoy (one at a time): they lift spirits and taxes. */
-export const LUXURIES: ResourceId[] = ['jewellery', 'books', 'wine'];
+export const LUXURIES: ResourceId[] = ['jewellery', 'books', 'wine', 'mead'];
 
 export function hasLuxury(s: GameState, b: Building): boolean {
   return LUXURIES.some((id) => (b.supply?.[id] ?? -1) > s.day);

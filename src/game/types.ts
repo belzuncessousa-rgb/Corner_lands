@@ -42,6 +42,7 @@ export const RESOURCE_IDS = [
   'ale',
   'cider',
   'wine',
+  'mead',
   'herbs',
   'medicine',
   'tools',

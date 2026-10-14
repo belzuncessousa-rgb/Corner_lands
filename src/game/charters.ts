@@ -44,7 +44,7 @@ export const CHARTERS: Charter[] = [
   { id: 'orchard1', path: 'orchard', rank: 1, name: 'Grafting', desc: 'Orchards and hives yield 30% more.' },
   { id: 'orchard2', path: 'orchard', rank: 2, name: 'Vines and Nurseries', desc: 'Orchards may be planted with vines for grapes, and young trees bear in a year instead of a year and a half.' },
   { id: 'orchard3a', path: 'orchard', rank: 3, name: 'Vintners', desc: 'Unlocks the Winery: grapes into wine for taverns and Townhouses. Wine and cider are made and sold for a quarter to half more.', excludes: ['orchard3b'] },
-  { id: 'orchard3b', path: 'orchard', rank: 3, name: 'Meadmakers', desc: 'Hives give twice the honey, and honey cakes cheer the town (+4 happiness).', excludes: ['orchard3a'] },
+  { id: 'orchard3b', path: 'orchard', rank: 3, name: 'Meadmakers', desc: 'Hives give twice the honey; the brewhouse brews mead from it, a tavern drink and a luxury for Townhouses. Honey cakes cheer the town (+4 happiness).', excludes: ['orchard3a'] },
 
   { id: 'learning1', path: 'learning', rank: 1, name: 'Scriptorium', desc: 'Unlocks the Scriptorium: flax into paper, paper and leather into books, a luxury and a rich export. +1 prestige a month.' },
   { id: 'learning2', path: 'learning', rank: 2, name: 'Guild Schools', desc: 'Apprentices learn their trade: workshops work 10% faster.' },

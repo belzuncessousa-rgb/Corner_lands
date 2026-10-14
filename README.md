@@ -101,8 +101,8 @@ then fall back to the browser's localStorage.
   Nature, Traders, Farmers, Shepherds) of two ranks that then fork into rival
   guilds. Every charter makes the next dearer, and each path has a drawback.
   Some charters open new trades: silver and the Jeweller's Shop, vines and the
-  Winery, the Scriptorium's paper and books. Jewellery, books and wine are
-  luxuries: Townhouses that have one are happier and pay more tax. An Armoury
+  Winery, mead from honey, the Scriptorium's paper and books. Jewellery,
+  books, wine and mead are luxuries: Townhouses that have one are happier and pay more tax. An Armoury
   (Borough) makes the arms a castle garrison needs.
 - **Expansions** — workshops can be expanded once for half as many workers again.
 - **Trade** — at the marketplace buy and sell goods; mark goods for sale in the

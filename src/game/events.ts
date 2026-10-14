@@ -55,7 +55,7 @@ const food = (s: GameState) => FOOD_IDS.reduce((a, f) => a + s.res[f], 0);
 // ---------------------------------------------------------------- feasts
 
 /** Drinks poured at a feast, best first. */
-const FEAST_DRINKS: ResourceId[] = ['wine', 'ale', 'cider'];
+const FEAST_DRINKS: ResourceId[] = ['wine', 'mead', 'ale', 'cider'];
 /** Autumn months (after the harvest) in which a feast can be called. */
 export const FEAST_MONTHS = [6, 7, 8];
 

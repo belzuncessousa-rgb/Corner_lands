@@ -84,6 +84,7 @@ export const GOODS: Record<ResourceId, GoodDef> = {
   boots: good('Boots', 'goods', 12, 'Sturdy leather boots. Townhouses need them.', { keep: 60 }),
   ale: good('Ale', 'goods', 5, 'Brewed from barley and poured at the tavern.', { keep: 100 }),
   cider: good('Cider', 'goods', 5, 'Pressed from apples.', { keep: 100 }),
+  mead: good('Mead', 'goods', 10, 'Honey wine from the brewhouse (Meadmakers). Taverns pour it, and Townhouses count it a luxury.', { keep: 60 }),
   wine: good('Wine', 'goods', 12, 'From the winery. Taverns pour it, and Townhouses count it a luxury.', { keep: 60 }),
   herbs: good('Herbs', 'goods', 2, 'Gathered wild, made into medicine.'),
   medicine: good('Medicine', 'goods', 10, 'Salves and tinctures. Townhouses want them.', { keep: 40 }),
@@ -427,7 +428,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   brewhouse: def({
     type: 'brewhouse',
     name: 'Brewhouse',
-    desc: 'Brews ale from barley or presses cider from apples. Taverns pour them for the town.',
+    desc: 'Brews ale from barley or presses cider from apples (and, for Meadmakers, mead from honey). Taverns pour them for the town.',
     category: 'food',
     cost: { wood: 20, planks: 10 },
     workers: 2,
@@ -438,6 +439,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     recipes: [
       { id: 'ale', name: 'Ale', inputs: { barley: 3 }, outputs: { ale: 4 } },
       { id: 'cider', name: 'Cider', inputs: { apples: 4 }, outputs: { cider: 4 } },
+      { id: 'mead', name: 'Mead', inputs: { honey: 3 }, outputs: { mead: 3 }, charter: 'orchard3b' },
     ],
   }),
   dairy: def({

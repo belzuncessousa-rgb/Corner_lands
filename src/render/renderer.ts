@@ -1679,6 +1679,7 @@ const CARRY_SHAPES: Partial<Record<ResourceId, CarryShape>> = {
   ale: 'cask',
   cider: 'cask',
   wine: 'cask',
+  mead: 'cask',
   milk: 'cask',
   meat: 'bundle',
   pork: 'bundle',

@@ -766,3 +766,36 @@ describe('harvest feast', () => {
     expect(feastError(s)).toBeNull();
   });
 });
+
+describe('mead', () => {
+  it('the brewhouse brews mead only for Meadmakers, and taverns pour it', async () => {
+    const { chooseRecipe, serveAle } = await import('../src/game/sim');
+    const s = generateWorld(86);
+    s.tier = 1;
+    const t = placeNearRoad(s, 'tavern');
+    t.build = 1;
+    t.need = undefined;
+    const bh = placeNearRoad(s, 'brewhouse');
+    bh.build = 1;
+    bh.need = undefined;
+    bh.recipe = 'mead';
+    s.res.honey = 30;
+    expect(chooseRecipe(s, bh)).toBeNull();
+    s.charters = ['orchard1', 'orchard2', 'orchard3b'];
+    expect(chooseRecipe(s, bh)?.id).toBe('mead');
+    s.population = 8;
+    s.dirty = true;
+    run(s, 12);
+    expect(s.res.mead).toBeGreaterThan(0);
+    t.workers = 1;
+    // Pouring only looks at who lives within reach: stand it by the manor.
+    t.x = hall(s).x + 3;
+    t.y = hall(s).y;
+    s.res.ale = 0;
+    s.res.cider = 0;
+    const mead = s.res.mead;
+    serveAle(s);
+    expect(s.res.mead).toBeLessThan(mead);
+    expect(t.status).toMatch(/mead/);
+  });
+});
