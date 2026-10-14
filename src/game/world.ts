@@ -151,18 +151,44 @@ export function generateWorld(seed: number, opts: { relaxed?: boolean } = {}): G
       }
     }
   };
-  const depositNear = (arr: Uint8Array, minD: number, maxD: number, r: number, amount: number) => {
-    for (let tries = 0; tries < 200; tries++) {
+  // Land reachable from the site on foot, without bridges.
+  const dry = new Uint8Array(n);
+  {
+    const start = idx(s, site.x + 1, site.y + 1);
+    const queue = [start];
+    dry[start] = 1;
+    while (queue.length) {
+      const i = queue.pop()!;
+      const x = i % W;
+      const y = (i - x) / W;
+      for (const [nx, ny] of [
+        [x + 1, y],
+        [x - 1, y],
+        [x, y + 1],
+        [x, y - 1],
+      ]) {
+        if (!inBounds(s, nx, ny)) continue;
+        const j = idx(s, nx, ny);
+        if (dry[j] || s.terrain[j] !== 0) continue;
+        dry[j] = 1;
+        queue.push(j);
+      }
+    }
+  }
+  const depositNear = (arr: Uint8Array, minD: number, maxD: number, r: number, amount: number, sameShore = false) => {
+    for (let tries = 0; tries < 300; tries++) {
       const a = rand() * Math.PI * 2;
       const d = minD + rand() * (maxD - minD);
       const x = Math.round(site.x + 1 + Math.cos(a) * d);
       const y = Math.round(site.y + 1 + Math.sin(a) * d);
       if (!inBounds(s, x, y) || s.terrain[idx(s, x, y)] !== 0) continue;
+      // The first outcrop must be on the settlers' side of any river.
+      if (sameShore && tries < 250 && !dry[idx(s, x, y)]) continue;
       placeDeposit(arr, x, y, r, amount);
       return;
     }
   };
-  depositNear(s.rock, 8, 13, 2, 30);
+  depositNear(s.rock, 8, 13, 2, 30, true);
   for (let k = 0; k < 6; k++) depositNear(s.rock, 14, 40, 1 + Math.floor(rand() * 2), 30);
   depositNear(s.ore, 14, 22, 1, 25);
   for (let k = 0; k < 3; k++) depositNear(s.ore, 18, 40, 1, 25);
