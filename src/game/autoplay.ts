@@ -1,8 +1,8 @@
 /**
- * A simple greedy player used to check that the game is winnable and to
- * tune balance. It is not part of the shipped game.
+ * A simple greedy player. Tests use it to check the game is winnable and to
+ * tune balance; the title screen uses it to grow a demo village.
  */
-import { BUILDINGS, DAYS_PER_MONTH } from '../src/game/data';
+import { BUILDINGS, DAYS_PER_MONTH } from './data';
 import {
   buildRoad,
   canAfford,
@@ -13,14 +13,15 @@ import {
   placeOrder,
   placementError,
   resourceInRange,
+  roadError,
   stepDay,
   storageCap,
   totalFood,
   totalHousing,
   upgradeHouse,
-} from '../src/game/sim';
-import type { BuildingType, GameState } from '../src/game/types';
-import { idx, inBounds } from '../src/game/world';
+} from './sim';
+import type { BuildingType, GameState } from './types';
+import { idx, inBounds } from './world';
 
 const count = (s: GameState, t: BuildingType) => s.buildings.filter((b) => b.type === t).length;
 
@@ -34,6 +35,10 @@ function tryPlace(s: GameState, type: BuildingType): boolean {
     for (let x = 0; x < s.width; x++) {
       if (Math.abs(x - hall.x) > 26 || Math.abs(y - hall.y) > 26) continue;
       if (placementError(s, type, x, y)) continue;
+      // Keep the planned streets free.
+      let blocksStreet = false;
+      for (let yy = y; yy < y + d.h && !blocksStreet; yy++) for (let xx = x; xx < x + d.w; xx++) if (onGrid(s, xx, yy)) blocksStreet = true;
+      if (blocksStreet) continue;
       // Must touch a connected road.
       let touches = false;
       for (let xx = x - 1; xx <= x + d.w && !touches; xx++) {
@@ -110,12 +115,22 @@ function roadToOre(s: GameState): void {
   }
 }
 
-/** Extends the road network with a straight spur from a random road tile. */
+/** The bot lays out streets on a grid every GRID tiles around the hall. */
+const GRID = 7;
+
+function onGrid(s: GameState, x: number, y: number): boolean {
+  const hall = s.buildings.find((b) => b.type === 'townhall')!;
+  const gx = (((x - (hall.x - 2)) % GRID) + GRID) % GRID;
+  const gy = (((y - (hall.y + 3)) % GRID) + GRID) % GRID;
+  return gx === 0 || gy === 0;
+}
+
+/** Extends a grid street from the edge of the connected network. */
 function growRoads(s: GameState, rand: () => number): void {
   const reached = computeConnectivity(s);
   const tiles: number[] = [];
   reached.forEach((v, i) => v && tiles.push(i));
-  for (let tries = 0; tries < 30; tries++) {
+  for (let tries = 0; tries < 80; tries++) {
     const t = tiles[Math.floor(rand() * tiles.length)];
     const x = t % s.width;
     const y = Math.floor(t / s.width);
@@ -125,9 +140,19 @@ function growRoads(s: GameState, rand: () => number): void {
       [0, 1],
       [0, -1],
     ][Math.floor(rand() * 4)];
-    let n = 0;
-    for (let k = 1; k <= 8; k++) if (buildRoad(s, x + dx * k, y + dy * k)) n++;
-    if (n >= 4) return;
+    // Only follow grid lines, over dry land, without gaps.
+    let ok = 0;
+    for (let k = 1; k <= GRID; k++) {
+      const nx = x + dx * k;
+      const ny = y + dy * k;
+      if (!inBounds(s, nx, ny) || s.terrain[idx(s, nx, ny)] === 1 || !onGrid(s, nx, ny)) break;
+      if (!s.road[idx(s, nx, ny)] && roadError(s, nx, ny)) break;
+      ok = k;
+    }
+    if (ok < 2) continue;
+    let built = 0;
+    for (let k = 1; k <= ok; k++) if (buildRoad(s, x + dx * k, y + dy * k)) built++;
+    if (built) return;
   }
 }
 

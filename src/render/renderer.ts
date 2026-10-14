@@ -69,6 +69,8 @@ export class Renderer {
   private boost = new Int32Array(0);
   private buckets: number[][] = [];
   time = 0;
+  /** Show the little problem markers over buildings. */
+  showMarkers = true;
   /** Set to an object to collect per-section render timings (debugging). */
   prof: Record<string, number> | null = null;
   private profT = 0;
@@ -634,6 +636,7 @@ export class Renderer {
       c.restore();
     }
     // Status markers.
+    if (!this.showMarkers) return;
     if (!b.connected && b.type !== 'townhall') {
       this.drawMarker(b, '#d8462e', '!');
     } else if (hasProblem(b)) {

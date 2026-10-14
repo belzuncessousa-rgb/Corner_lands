@@ -1032,3 +1032,8 @@ button.active {
   content: ' ➜';
   color: var(--wood-2);
 }
+
+/* Title screen: hide the HUD over the demo village. */
+#ui.demo > *:not(.modal-back) {
+  display: none !important;
+}

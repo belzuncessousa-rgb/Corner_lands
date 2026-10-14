@@ -87,6 +87,7 @@ export class Hud {
     } catch {
       /* ignore */
     }
+    root.classList.toggle('demo', game.demo);
     root.innerHTML = `
       <div id="top">
         <button id="menu-btn" class="panel" data-action="menu">☰ Menu</button>
@@ -227,7 +228,7 @@ export class Hud {
     const bar = this.el.clock.querySelector('.month-bar') as HTMLElement | null;
     if (bar) bar.style.width = `${progress}%`;
 
-    if (this.lastTier >= 0 && s.tier > this.lastTier) this.celebrate(s.tier);
+    if (this.lastTier >= 0 && s.tier > this.lastTier && !g.demo) this.celebrate(s.tier);
     this.lastTier = s.tier;
     this.updateObjectives();
     this.updateTown();
@@ -345,6 +346,10 @@ export class Hud {
   private updateLog(): void {
     const s = this.game.state;
     const msgs = s.messages;
+    if (this.game.demo) {
+      this.shownMessages = msgs.length;
+      return;
+    }
     if (msgs.length < this.shownMessages) this.shownMessages = msgs.length;
     let played = false;
     for (let i = this.shownMessages; i < msgs.length; i++) {

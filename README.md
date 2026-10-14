@@ -64,12 +64,13 @@ then fall back to the browser's localStorage.
 
 ```
 src/game/      Simulation (pure TypeScript, no DOM): world generation,
-               economy, quests, events, pathfinding, save format
+               economy, quests, events, advisor, pathfinding, save format,
+               and an autoplayer that grows the title-screen village
 src/render/    Canvas renderer, procedural sprites, villager agents
 src/ui/        HUD, minimap, icons and styles
 src/main.ts    Game loop and input handling
 server/        Zero-dependency Node server: static files + save game API
-tests/         Vitest suites, including a bot that plays the game for balance
+tests/         Vitest suites, including balance runs of the autoplayer
 scripts/       Playwright scripts for screenshots and UI checks
 ```
 

@@ -1,6 +1,7 @@
 import './ui/styles.css';
 import { listSaves, loadGame, saveGame } from './api';
 import { BUILDINGS, BUILD_ORDER, MONTH_NAMES, TIERS } from './game/data';
+import { playBot } from './game/autoplay';
 import { deserialize, serialize } from './game/save';
 import {
   BRIDGE_COST,
@@ -47,6 +48,8 @@ export class Game {
   /** Speed to resume to after a pause. */
   lastSpeed = 1;
   modalOpen = false;
+  /** Title screen: a computer-grown village plays on behind the menu. */
+  demo = true;
   hoverTile: { x: number; y: number } | null = null;
   private simAcc = 0;
   private lastTime = performance.now();
@@ -65,7 +68,8 @@ export class Game {
   constructor() {
     this.canvas = document.getElementById('game') as HTMLCanvasElement;
     this.renderer = new Renderer(this.canvas);
-    this.state = generateWorld(Math.floor(Math.random() * 1e9));
+    this.renderer.showMarkers = false;
+    this.state = makeDemoVillage();
     this.hud = new Hud(this, document.getElementById('ui')!);
     this.renderer.resize();
     this.resetView();
@@ -102,6 +106,9 @@ export class Game {
   }
 
   private afterLoad(): void {
+    this.demo = false;
+    this.renderer.showMarkers = true;
+    document.getElementById('ui')!.classList.remove('demo');
     this.agents.reset();
     this.wildlife.reset();
     this.selected = null;
@@ -145,7 +152,8 @@ export class Game {
   private frame(t: number): void {
     const dt = Math.min(0.1, (t - this.lastTime) / 1000);
     this.lastTime = t;
-    const running = !this.modalOpen && this.speed > 0;
+    const running = (!this.modalOpen || this.demo) && this.speed > 0;
+    if (this.demo) this.driftCamera(dt);
     const gameDt = running ? dt * this.speed : 0;
     this.panByKeys(dt);
     if (running) {
@@ -177,6 +185,7 @@ export class Game {
 
   private onNewMonth(): void {
     this.hud.update();
+    if (this.demo) return;
     // Autosave at the start of every season.
     if (monthOf(this.state.day) % 3 === 0) {
       this.save('autosave').catch(() => undefined);
@@ -534,6 +543,17 @@ export class Game {
     window.addEventListener('blur', () => this.keys.clear());
   }
 
+  private demoTime = 0;
+
+  /** Slow circling pan over the demo village. */
+  private driftCamera(dt: number): void {
+    this.demoTime += dt;
+    const hall = this.state.buildings.find((b) => b.type === 'townhall');
+    if (!hall) return;
+    const t = this.demoTime * 0.04;
+    this.renderer.centerOn(hall.x + 1.5 + Math.cos(t) * 7, hall.y + 1.5 + Math.sin(t) * 7);
+  }
+
   setZoom(z: number): void {
     this.renderer.cam.zoom = Math.max(0.4, Math.min(2.5, z));
   }
@@ -560,6 +580,15 @@ export class Game {
     this.renderer.centerOn(c.x, c.y);
     this.select(id);
   }
+}
+
+/** A fresh map that the autoplayer has grown for a few years. */
+function makeDemoVillage(): GameState {
+  const seed = Math.floor(Math.random() * 1e9);
+  const s = generateWorld(seed);
+  playBot(s, 3.5, seed);
+  s.messages = [];
+  return s;
 }
 
 function rangeHighlighter(s: GameState, type: BuildingType): ((i: number) => boolean) | undefined {

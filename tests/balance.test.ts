@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { generateWorld } from '../src/game/world';
-import { playBot } from './bot';
+import { playBot } from '../src/game/autoplay';
 
 describe('balance', () => {
   it('a simple strategy grows from Hamlet to Borough', { timeout: 60000 }, () => {
