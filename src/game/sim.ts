@@ -866,12 +866,14 @@ function migrate(s: GameState, rng: StateRng): void {
     r.left += n;
     log(s, `${n} homeless villagers left the settlement.`, 'bad');
   }
-  if ((s.happiness < 30 || r.shortage > 0) && s.population > 2) {
+  if ((s.happiness < 30 || r.shortage > 0) && s.population > 2 && !s.relaxed) {
     const n = Math.max(1, Math.round(s.population * (r.shortage > 0 ? 0.12 : 0.06)));
     const actual = Math.min(n, s.population - 2);
     s.population -= actual;
     r.left += actual;
     if (actual > 0) log(s, `${actual} unhappy villagers packed up and left.`, 'bad');
+  } else if (s.happiness < 30 || r.shortage > 0) {
+    // Relaxed mode: nobody leaves, but nobody new arrives either.
   } else if (s.happiness >= 50 && r.shortage === 0) {
     const free = housing - s.population;
     if (free > 0) {

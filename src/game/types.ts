@@ -127,6 +127,8 @@ export interface GameState {
   rngState: number;
   /** Settlers still walking in (cosmetic + counted on arrival). */
   incoming: number;
+  /** Relaxed mode: generous start and villagers never leave in anger. */
+  relaxed?: boolean;
   /** Day each piece of advisor advice was last given. */
   advice?: Record<string, number>;
   /** Monthly snapshots, oldest first. */

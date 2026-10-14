@@ -990,3 +990,33 @@ button.active {
   stroke: rgba(91, 58, 34, 0.4);
   stroke-width: 1;
 }
+
+.modes {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.mode {
+  flex: 1;
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  padding: 6px 8px;
+  border: 1.5px solid rgba(91, 58, 34, 0.35);
+  border-radius: 5px;
+  background: rgba(255, 250, 235, 0.55);
+  cursor: pointer;
+  line-height: 1.15;
+}
+.mode:has(input:checked) {
+  border-color: #c89a38;
+  background: #fff8e0;
+}
+.mode small {
+  color: var(--ink-soft);
+}
+.mode input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}

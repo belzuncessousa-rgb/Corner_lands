@@ -215,3 +215,13 @@ describe('bridges', () => {
     expect(buildRoad(s, next % s.width, Math.floor(next / s.width))).toBe(false);
   });
 });
+
+describe('relaxed mode', () => {
+  it('starts with more supplies and nobody leaves when starving', () => {
+    const s = generateWorld(5, { relaxed: true });
+    expect(s.res.wood).toBe(140);
+    for (const f of ['berries', 'meat'] as const) s.res[f] = 0;
+    run(s, DAYS_PER_MONTH * 3);
+    expect(s.population).toBe(8);
+  });
+});

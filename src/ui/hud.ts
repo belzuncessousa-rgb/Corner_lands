@@ -627,6 +627,10 @@ export class Hud {
       `<h2>New Settlement</h2>
       <p>Every map is generated from a seed. Share a seed to play the same land.</p>
       <div class="row"><label>Seed</label><input id="seed" value="${seed}" inputmode="numeric"><button data-m="dice">🎲</button></div>
+      <div class="modes">
+        <label class="mode"><input type="radio" name="mode" value="normal" checked><span><b>Normal</b><br><small>Hungry or unhappy villagers will leave.</small></span></label>
+        <label class="mode"><input type="radio" name="mode" value="relaxed"><span><b>Relaxed</b><br><small>Double starting supplies; nobody ever leaves in anger.</small></span></label>
+      </div>
       <div class="ornament">❦</div>
       <div class="row" style="justify-content:flex-end">
         <button data-m="back">Back</button>
@@ -644,7 +648,8 @@ export class Hud {
         n = 0;
         for (const ch of v) n = (n * 31 + ch.charCodeAt(0)) >>> 0;
       }
-      this.game.newGame(Math.floor(Math.abs(n)) % 2147483647);
+      const relaxed = (m.querySelector('input[name="mode"]:checked') as HTMLInputElement | null)?.value === 'relaxed';
+      this.game.newGame(Math.floor(Math.abs(n)) % 2147483647, relaxed);
       this.closeModal(true);
       this.game.setSpeed(1);
     });
