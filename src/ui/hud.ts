@@ -6,7 +6,6 @@ import {
   MONTH_NAMES,
   RESOURCE_INFO,
   SEASON_NAMES,
-  SELL_FACTOR,
   EXPORT_PER_MARKET,
   TAX_LEVELS,
   TIERS,
@@ -31,6 +30,8 @@ import {
   recompute,
   seasonOf,
   setKeep,
+  buyPrice,
+  sellPrice,
   lockReason,
   prestigeIncome,
   setTrade,
@@ -1487,12 +1488,12 @@ export class Hud {
     const rows = (Object.keys(TRADE_PRICES) as ResourceId[])
       .filter((r) => basic.includes(r) || s.seen?.includes(r))
       .map((r) => {
-        const price = TRADE_PRICES[r]!;
-        const sell = Math.floor(price * SELL_FACTOR * 10);
+        const buy = buyPrice(s, r, 10);
+        const sell = sellPrice(s, r, 10);
         const keep = keepOf(s, r);
         const on = selling(s, r);
         return `<tr><td>${ICONS[r]} ${RESOURCE_INFO[r].name}</td><td class="num">${Math.floor(s.res[r])}</td>
-          <td><button data-action="trade-do" data-res="${r}" data-n="10" ${s.res.gold < price * 10 || roomFor(s, r) < 10 ? 'disabled' : ''}>Buy 10 <small>${price * 10}c</small></button></td>
+          <td><button data-action="trade-do" data-res="${r}" data-n="10" ${s.res.gold < buy || roomFor(s, r) < 10 ? 'disabled' : ''}>Buy 10 <small>${buy}c</small></button></td>
           <td><button data-action="trade-do" data-res="${r}" data-n="-10" ${s.res[r] < 10 ? 'disabled' : ''}>Sell 10 <small>+${sell}c</small></button></td>
           <td class="export">
             <button data-action="export-toggle" data-res="${r}" class="${on ? 'active' : ''}" data-tip="Sell surplus to visiting merchants each month">${on ? 'Exporting' : 'Export'}</button>

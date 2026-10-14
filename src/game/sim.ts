@@ -354,12 +354,21 @@ export function hasBuilt(s: GameState, type: BuildingType): boolean {
   return s.buildings.some((b) => b.type === type && b.build >= 1);
 }
 
+/** Coins to buy n units at the market. */
+export function buyPrice(s: GameState, id: ResourceId, n: number): number {
+  return Math.ceil(priceOf(s, id) * n * (hasCharter(s, 'trade1') ? 0.85 : 1));
+}
+
+/** Coins earned selling n units at the market. */
+export function sellPrice(s: GameState, id: ResourceId, n: number): number {
+  return Math.floor(priceOf(s, id) * SELL_FACTOR * n * (hasCharter(s, 'trade1') ? 1.2 : 1));
+}
+
 export function trade(s: GameState, id: ResourceId, amount: number): string | null {
   if (!hasBuilt(s, 'market')) return 'Requires a marketplace';
-  const price = priceOf(s, id);
-  if (!price) return 'Cannot trade this';
+  if (!priceOf(s, id)) return 'Cannot trade this';
   if (amount > 0) {
-    const cost = Math.ceil(price * amount * (hasCharter(s, 'trade1') ? 0.85 : 1));
+    const cost = buyPrice(s, id, amount);
     if (s.res.gold < cost) return 'Not enough coins';
     if (roomFor(s, id) < amount) return 'Not enough storage';
     s.res.gold -= cost;
@@ -368,7 +377,7 @@ export function trade(s: GameState, id: ResourceId, amount: number): string | nu
     const n = -amount;
     if (s.res[id] < n) return 'Not enough goods';
     s.res[id] -= n;
-    s.res.gold += Math.floor(price * SELL_FACTOR * n * (hasCharter(s, 'trade1') ? 1.2 : 1));
+    s.res.gold += sellPrice(s, id, n);
   }
   return null;
 }
