@@ -160,4 +160,4 @@ designer asked for.
 - [x] Vines: vineyards (drawn zone) and a winery; wine as a tavern drink and luxury
 - [x] Erudition: paper (from flax/rags) and books at a scriptorium/bookbinder; University eats wood parts
 - [x] Arms: bows and pikes (carpenter), armour (armourer) for the castle's retinue and export
-- [ ] Help screen and tutorial objectives for the new systems; balance pass at the 45-minute year
+- [x] Help screen and tutorial objectives for the new systems; balance pass at the 45-minute year
