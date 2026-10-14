@@ -288,3 +288,22 @@ describe('decision events', () => {
     expect(s.nextEventDay! - s.day).toBeGreaterThan(DAYS_PER_YEAR);
   });
 });
+
+describe('exports', () => {
+  it('merchants buy surplus above the kept amount at staffed markets', async () => {
+    const { setExport } = await import('../src/game/sim');
+    const s = generateWorld(8);
+    s.tier = 2;
+    const m = placeNearRoad(s, 'market');
+    m.build = 1;
+    m.need = undefined;
+    s.res.wood = 110;
+    setExport(s, 'wood', 50);
+    s.dirty = true;
+    const gold = s.res.gold;
+    run(s, DAYS_PER_MONTH);
+    expect(m.workers).toBeGreaterThan(0);
+    expect(s.res.wood).toBeLessThanOrEqual(50);
+    expect(s.res.gold).toBeGreaterThan(gold);
+  });
+});

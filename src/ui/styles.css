@@ -1354,3 +1354,27 @@ button.active {
   font-size: 14px;
   color: var(--ink-soft);
 }
+
+.trade td.num {
+  text-align: right;
+  padding-right: 10px;
+  font-weight: 600;
+}
+.trade small {
+  color: var(--ink-soft);
+}
+.trade td.export {
+  white-space: nowrap;
+}
+.trade .keep {
+  margin-left: 4px;
+  font-size: 13px;
+}
+.trade .keep b {
+  display: inline-block;
+  min-width: 26px;
+  text-align: center;
+}
+.trade .keep button {
+  padding: 0 6px;
+}

@@ -13,6 +13,8 @@ import {
   MAX_BEAUTY,
   MONTHS_PER_YEAR,
   SELL_FACTOR,
+  EXPORT_FACTOR,
+  EXPORT_PER_MARKET,
   STOCK_TARGET,
   TAX_LEVELS,
   TIERS,
@@ -257,6 +259,36 @@ export function trade(s: GameState, id: ResourceId, amount: number): string | nu
     s.res.gold += Math.floor(price * SELL_FACTOR * n);
   }
   return null;
+}
+
+/** Sets or clears an export rule: keep `keep` units, sell the surplus. */
+export function setExport(s: GameState, id: ResourceId, keep: number | null): void {
+  s.exports ??= {};
+  if (keep === null) delete s.exports[id];
+  else s.exports[id] = Math.max(0, Math.round(keep));
+}
+
+/** Monthly visit of merchants buying surplus goods at staffed markets. */
+export function exportGoods(s: GameState): number {
+  const markets = s.buildings.filter((b) => b.type === 'market' && b.build >= 1 && b.workers > 0).length;
+  let budget = markets * EXPORT_PER_MARKET;
+  let gold = 0;
+  const sold: string[] = [];
+  for (const k in s.exports ?? {}) {
+    const id = k as ResourceId;
+    const price = TRADE_PRICES[id];
+    if (!price || budget <= 0) continue;
+    const n = Math.min(budget, Math.floor(s.res[id] - (s.exports![id] ?? 0)));
+    if (n <= 0) continue;
+    s.res[id] -= n;
+    budget -= n;
+    const earned = Math.floor(n * price * EXPORT_FACTOR);
+    gold += earned;
+    sold.push(`${n} ${id}`);
+  }
+  s.res.gold += gold;
+  if (gold > 0) log(s, `Merchants bought ${sold.join(', ')} for ${gold} gold.`, 'info');
+  return gold;
 }
 
 export function setTax(s: GameState, level: number): void {
@@ -980,6 +1012,7 @@ export function monthly(s: GameState, rng: StateRng): void {
   }
   report.taxes = Math.floor(taxes);
   s.res.gold += report.taxes;
+  report.trade = exportGoods(s);
 
   updateHappiness(s);
   migrate(s, rng);

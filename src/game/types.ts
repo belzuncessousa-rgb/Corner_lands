@@ -101,6 +101,8 @@ export interface MonthReport {
   taxes: number;
   arrived: number;
   left: number;
+  /** Gold earned from merchants last month. */
+  trade?: number;
 }
 
 /** One month's snapshot for the ledger charts. */
@@ -149,6 +151,8 @@ export interface GameState {
   relaxed?: boolean;
   /** Day each piece of advisor advice was last given. */
   advice?: Record<string, number>;
+  /** Goods sold to visiting merchants: keep this many, sell the rest. */
+  exports?: Partial<Record<ResourceId, number>>;
   /** Decision event waiting for the player's choice. */
   pendingEvent?: string;
   /** Earliest day the next decision event may happen. */

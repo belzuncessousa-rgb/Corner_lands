@@ -8,7 +8,8 @@ export type Role =
   | { kind: 'work'; id: number }
   | { kind: 'build'; id: number }
   | { kind: 'idle' }
-  | { kind: 'settler' };
+  | { kind: 'settler' }
+  | { kind: 'cart'; id: number; leaving: boolean };
 
 type Phase = 'walk' | 'inside' | 'act' | 'pause';
 
@@ -36,6 +37,10 @@ export interface Agent {
   fadeIn: number;
   /** Resource a builder is fetching. */
   want?: ResourceId;
+  /** Set when a visitor has left the map. */
+  gone?: boolean;
+  /** Where a visiting cart entered the map. */
+  edge?: { x: number; y: number };
 }
 
 const TUNICS = ['#8a3b2e', '#4a5e8a', '#6b7a3a', '#9a7a3a', '#5e4a6e', '#7a5a3a', '#3a6a6a', '#a05a3a', '#556070'];
@@ -59,7 +64,17 @@ export class AgentSystem {
     this.syncTimer = 0;
   }
 
+  private lastMonth = -1;
+
   update(s: GameState, dt: number): void {
+    // Each month a merchant cart visits markets that export goods.
+    const month = Math.floor(s.day / 10);
+    if (this.lastMonth >= 0 && month !== this.lastMonth && dt > 0) {
+      for (const m of s.buildings) {
+        if (m.type === 'market' && m.build >= 1 && Object.keys(s.exports ?? {}).length) this.sendCart(s, m);
+      }
+    }
+    this.lastMonth = month;
     this.syncTimer -= dt;
     if (this.syncTimer <= 0) {
       this.sync(s);
@@ -95,8 +110,8 @@ export class AgentSystem {
     const keep: Agent[] = [];
     const taken = new Set<string>();
     for (const a of this.agents) {
-      if (a.role.kind === 'settler') {
-        keep.push(a);
+      if (a.role.kind === 'settler' || a.role.kind === 'cart') {
+        if (!a.gone) keep.push(a);
         continue;
       }
       if (keyed.has(a.key) && !taken.has(a.key)) {
@@ -190,6 +205,31 @@ export class AgentSystem {
     return false;
   }
 
+  /** A merchant's cart rolls in from the map edge to the market and back. */
+  private sendCart(s: GameState, market: Building): void {
+    const door = doorTile(s, market);
+    for (let tries = 0; tries < 20; tries++) {
+      const side = Math.floor(Math.random() * 4);
+      const t = Math.floor(Math.random() * s.width);
+      const x = side === 0 ? 0 : side === 1 ? s.width - 1 : t;
+      const y = side === 2 ? 0 : side === 3 ? s.height - 1 : t;
+      if (s.terrain[idx(s, x, y)] || s.occ[idx(s, x, y)] >= 0) continue;
+      const path = findPath(s, x, y, door.x, door.y, [market.id], 12000);
+      if (!path) continue;
+      const a = this.spawn(s, `cart:${market.id}:${this.serial}`, { kind: 'cart', id: market.id, leaving: false }, -1);
+      a.x = x + 0.5;
+      a.y = y + 0.5;
+      a.path = path;
+      a.phase = 'walk';
+      a.visible = true;
+      a.next = 'wander-done';
+      a.carry = 'tools';
+      a.edge = { x, y };
+      this.agents.push(a);
+      return;
+    }
+  }
+
   // ---------------------------------------------------------------- behaviour
 
   private walkTo(s: GameState, a: Agent, tx: number, ty: number, allow: number[], next: Agent['next']): void {
@@ -276,7 +316,7 @@ export class AgentSystem {
         break;
       case 'wander-done':
         a.phase = 'pause';
-        a.timer = 1.5 + Math.random() * 4;
+        a.timer = a.role.kind === 'cart' ? (a.role.leaving ? 0.2 : 10) : 1.5 + Math.random() * 4;
         break;
       case 'arrive-hall': {
         const real = (a as Agent & { realRole?: Role }).realRole;
@@ -293,6 +333,18 @@ export class AgentSystem {
   private decide(s: GameState, a: Agent): void {
     const r = a.role;
     if (r.kind === 'settler') return;
+    if (r.kind === 'cart') {
+      if (r.leaving) {
+        a.gone = true;
+        return;
+      }
+      // Trading done: head back to where it came from.
+      r.leaving = true;
+      a.carry = 'gold';
+      const e = a.edge ?? { x: 0, y: 0 };
+      this.walkTo(s, a, e.x, e.y, [r.id], 'wander-done');
+      return;
+    }
     if (r.kind === 'idle') {
       this.decideIdle(s, a);
       return;

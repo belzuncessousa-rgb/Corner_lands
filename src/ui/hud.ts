@@ -8,6 +8,7 @@ import {
   RESOURCE_INFO,
   SEASON_NAMES,
   SELL_FACTOR,
+  EXPORT_PER_MARKET,
   TAX_LEVELS,
   TIERS,
   TRADE_PRICES,
@@ -28,6 +29,7 @@ import {
   nextTierRequirements,
   recompute,
   seasonOf,
+  setExport,
   setTax,
   hasProblem,
   roomFor,
@@ -699,6 +701,18 @@ export class Hud {
         this.showTrade();
         break;
       }
+      case 'export-toggle': {
+        const r = t.dataset.res as ResourceId;
+        setExport(s, r, s.exports?.[r] === undefined ? 50 : null);
+        this.showTrade();
+        break;
+      }
+      case 'export-keep': {
+        const r = t.dataset.res as ResourceId;
+        setExport(s, r, Math.max(0, (s.exports?.[r] ?? 0) + Number(t.dataset.d)));
+        this.showTrade();
+        break;
+      }
       case 'close-modal':
         this.closeModal();
         break;
@@ -948,24 +962,32 @@ export class Hud {
 
   private showTrade(): void {
     const s = this.game.state;
+    const staffed = s.buildings.some((b) => b.type === 'market' && b.build >= 1 && b.workers > 0);
     const rows = (Object.keys(TRADE_PRICES) as ResourceId[])
       .map((r) => {
         const price = TRADE_PRICES[r]!;
         const sell = Math.floor(price * SELL_FACTOR * 10);
-        return `<tr><td>${ICONS[r]} ${RESOURCE_INFO[r].name}</td><td>${Math.floor(s.res[r])}</td>
-          <td><button data-action="trade-do" data-res="${r}" data-n="10" ${s.res.gold < price * 10 || roomFor(s, r) < 10 ? 'disabled' : ''}>Buy 10 (${price * 10})</button></td>
-          <td><button data-action="trade-do" data-res="${r}" data-n="-10" ${s.res[r] < 10 ? 'disabled' : ''}>Sell 10 (+${sell})</button></td></tr>`;
+        const keep = s.exports?.[r];
+        const on = keep !== undefined;
+        return `<tr><td>${ICONS[r]} ${RESOURCE_INFO[r].name}</td><td class="num">${Math.floor(s.res[r])}</td>
+          <td><button data-action="trade-do" data-res="${r}" data-n="10" ${s.res.gold < price * 10 || roomFor(s, r) < 10 ? 'disabled' : ''}>Buy 10 <small>${price * 10}g</small></button></td>
+          <td><button data-action="trade-do" data-res="${r}" data-n="-10" ${s.res[r] < 10 ? 'disabled' : ''}>Sell 10 <small>+${sell}g</small></button></td>
+          <td class="export">
+            <button data-action="export-toggle" data-res="${r}" class="${on ? 'active' : ''}" data-tip="Sell surplus to visiting merchants each month">${on ? 'Exporting' : 'Export'}</button>
+            ${on ? `<span class="keep">keep <button data-action="export-keep" data-res="${r}" data-d="-10">−</button><b>${keep}</b><button data-action="export-keep" data-res="${r}" data-d="10">+</button></span>` : ''}
+          </td></tr>`;
       })
       .join('');
     const wasOpen = this.modal && this.modal.querySelector('.trade');
+    const last = s.report.trade ?? 0;
     const html = `<h2>Marketplace Trade</h2>
-      <p>Gold: <b>${Math.floor(s.res.gold)}</b> ${ICONS.gold}</p>
+      <p>Gold: <b>${Math.floor(s.res.gold)}</b> ${ICONS.gold} · ${staffed ? `Merchants visit every month and buy up to ${EXPORT_PER_MARKET} goods per market${last ? ` (last month: +${last} gold)` : ''}.` : '<span class="neg">Staff the marketplace so merchants will visit.</span>'}</p>
       <table class="trade">${rows}</table>
       <div class="row" style="justify-content:flex-end;margin-top:10px"><button class="primary" data-action="close-modal">Done</button></div>`;
     if (wasOpen && this.modal) {
       this.modal.querySelector('.modal')!.innerHTML = html;
     } else {
-      this.openModal(html);
+      this.openModal(html).querySelector('.modal')!.classList.add('wide');
     }
   }
 

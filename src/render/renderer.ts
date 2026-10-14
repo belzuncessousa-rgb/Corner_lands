@@ -232,6 +232,7 @@ export class Renderer {
     this.mark('ground');
     this.drawWaterShimmer(s, visible);
     this.drawFields(s, season);
+    this.drawFootpaths(s, agents, season, dt, visible);
     // Roads on top of ground: all edges first so joints blend.
     for (const layer of ['edge', 'fill'] as const) {
       for (let y = 0; y < H; y++) {
@@ -318,6 +319,7 @@ export class Renderer {
       c.fill();
     }
 
+    this.drawSky(s, season, dt);
     this.drawWeather(s, season, dt);
     this.drawAtmosphere(season, s.day);
     this.mark('effects');
@@ -410,6 +412,49 @@ export class Renderer {
       c.lineTo(wx + len, wy);
     }
     c.stroke();
+  }
+
+  private wear = new Float32Array(0);
+  private wearSeed = -1;
+
+  /**
+   * Where villagers keep walking off-road the grass wears into a dirt path,
+   * and slowly grows back when they stop.
+   */
+  private drawFootpaths(s: GameState, agents: Agent[], season: Season, dt: number, visible: (x: number, y: number) => boolean): void {
+    const n = s.width * s.height;
+    if (this.wear.length !== n || this.wearSeed !== s.seed) {
+      this.wear = new Float32Array(n);
+      this.wearSeed = s.seed;
+    }
+    const w = this.wear;
+    if (dt > 0) {
+      for (const a of agents) {
+        if (!a.visible || a.phase !== 'walk') continue;
+        const tx = Math.floor(a.x);
+        const ty = Math.floor(a.y);
+        if (!inBounds(s, tx, ty)) continue;
+        const i = ty * s.width + tx;
+        if (!s.road[i] && s.occ[i] < 0) w[i] = Math.min(1, w[i] + dt * 0.05);
+      }
+    }
+    const decay = 1 - dt * 0.0015;
+    const c = this.ctx;
+    c.fillStyle = season === 3 ? '#c9c2b2' : '#a48a62';
+    for (let i = 0; i < n; i++) {
+      if (w[i] <= 0) continue;
+      w[i] *= decay;
+      if (w[i] < 0.12 || s.road[i] || s.occ[i] >= 0 || s.terrain[i]) continue;
+      const x = i % s.width;
+      const y = (i - x) / s.width;
+      const [wx, wy] = iso(x + 0.5, y + 0.5);
+      if (!visible(wx, wy)) continue;
+      c.globalAlpha = Math.min(0.55, (w[i] - 0.12) * 1.2);
+      c.beginPath();
+      c.ellipse(wx, wy, 17, 8.5, 0, 0, Math.PI * 2);
+      c.fill();
+    }
+    c.globalAlpha = 1;
   }
 
   private drawFields(s: GameState, season: Season): void {
@@ -796,6 +841,10 @@ export class Renderer {
   }
 
   private drawAgent(a: Agent): void {
+    if (a.role.kind === 'cart') {
+      this.drawCart(a);
+      return;
+    }
     const c = this.ctx;
     const [wx, wy] = iso(a.x + a.ox * 0.25, a.y + a.oy * 0.25);
     const walking = a.phase === 'walk';
@@ -869,6 +918,63 @@ export class Renderer {
       c.lineWidth = 0.6;
       c.strokeRect(wx - 2.5, wy - 18.5 - bob, 5, 3.5);
     }
+    c.globalAlpha = 1;
+  }
+
+  /** A merchant's covered cart pulled by a horse. */
+  private drawCart(a: Agent): void {
+    const c = this.ctx;
+    const [wx, wy] = iso(a.x, a.y);
+    const f = a.dir;
+    const walking = a.phase === 'walk';
+    const leg = walking ? Math.sin(a.step * 1.4) * 2 : 0;
+    c.globalAlpha = a.fadeIn;
+    c.fillStyle = 'rgba(20,20,10,0.3)';
+    c.beginPath();
+    c.ellipse(wx, wy, 16, 5, 0, 0, Math.PI * 2);
+    c.fill();
+    // Horse in front.
+    const hx = wx + 11 * f;
+    c.strokeStyle = '#3e2c1e';
+    c.lineWidth = 1.4;
+    c.beginPath();
+    c.moveTo(hx - 3, wy - 6);
+    c.lineTo(hx - 3 + leg, wy);
+    c.moveTo(hx + 3, wy - 6);
+    c.lineTo(hx + 3 - leg, wy);
+    c.stroke();
+    c.fillStyle = '#6b4a30';
+    c.beginPath();
+    c.ellipse(hx, wy - 8, 6, 3.2, 0, 0, Math.PI * 2);
+    c.fill();
+    c.beginPath();
+    c.moveTo(hx + 4 * f, wy - 9);
+    c.lineTo(hx + 8 * f, wy - 14);
+    c.lineTo(hx + 10 * f, wy - 12);
+    c.lineTo(hx + 6 * f, wy - 7);
+    c.fill();
+    // Shafts, wheels and the covered cart.
+    c.strokeStyle = '#5e4129';
+    c.lineWidth = 1;
+    c.beginPath();
+    c.moveTo(wx + 2 * f, wy - 6);
+    c.lineTo(hx - 2 * f, wy - 8);
+    c.stroke();
+    c.fillStyle = '#8a6236';
+    c.fillRect(wx - 8, wy - 9, 14, 5);
+    c.fillStyle = '#efe6d2';
+    c.beginPath();
+    c.moveTo(wx - 8, wy - 9);
+    c.quadraticCurveTo(wx - 1, wy - 22, wx + 6, wy - 9);
+    c.closePath();
+    c.fill();
+    c.strokeStyle = 'rgba(90,70,40,0.5)';
+    c.stroke();
+    c.strokeStyle = '#3e2c1e';
+    c.lineWidth = 1.2;
+    c.beginPath();
+    c.arc(wx - 4, wy - 3, 3, 0, Math.PI * 2);
+    c.stroke();
     c.globalAlpha = 1;
   }
 
@@ -966,49 +1072,77 @@ export class Renderer {
   }
 
   private snow: { x: number; y: number; s: number }[] = [];
+  private clouds: { x: number; y: number; rx: number; ry: number }[] = [];
+  private lastCam = { x: 0, y: 0, zoom: 1 };
 
-  private drawWeather(s: GameState, season: Season, dt: number): void {
+  /** Cloud shadows and birds live in the world, so they stay put when panning. */
+  private drawSky(s: GameState, season: Season, dt: number): void {
     const c = this.ctx;
-    c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    // Drifting cloud shadows.
-    const t = this.time;
-    c.fillStyle = 'rgba(20,30,40,0.07)';
-    for (let k = 0; k < 4; k++) {
-      const x = ((t * 14 + k * 600) % (this.width + 900)) - 450;
-      const y = (k * 271) % Math.max(1, this.height);
+    const minX = -s.height * (TW / 2) - 600;
+    const maxX = s.width * (TW / 2) + 600;
+    const maxY = (s.width + s.height) * (TH / 2);
+    if (!this.clouds.length) {
+      for (let k = 0; k < 9; k++) {
+        this.clouds.push({ x: minX + Math.random() * (maxX - minX), y: Math.random() * maxY, rx: 240 + Math.random() * 200, ry: 90 + Math.random() * 60 });
+      }
+    }
+    c.fillStyle = 'rgba(20,30,40,0.075)';
+    for (const cl of this.clouds) {
+      cl.x += 9 * dt;
+      cl.y += 2 * dt;
+      if (cl.x - cl.rx > maxX) {
+        cl.x = minX - cl.rx;
+        cl.y = Math.random() * maxY;
+      }
       c.beginPath();
-      c.ellipse(x, y, 260, 110, 0.2, 0, Math.PI * 2);
+      c.ellipse(cl.x, cl.y, cl.rx, cl.ry, 0.15, 0, Math.PI * 2);
       c.fill();
     }
     this.drawBirds(season, dt);
+  }
+
+  /** Snow and leaves fall in screen space but drift with the camera. */
+  private drawWeather(s: GameState, season: Season, dt: number): void {
+    const c = this.ctx;
+    c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    const t = this.time;
+    const z = this.cam.zoom;
+    const shiftX = (this.cam.x - this.lastCam.x) * z;
+    const shiftY = (this.cam.y - this.lastCam.y) * z;
+    this.lastCam = { x: this.cam.x, y: this.cam.y, zoom: z };
+    const wrap = (f: { x: number; y: number }) => {
+      f.x -= shiftX;
+      f.y -= shiftY;
+      if (f.x < -10) f.x += this.width + 20;
+      if (f.x > this.width + 10) f.x -= this.width + 20;
+      if (f.y < -10) f.y += this.height + 20;
+      if (f.y > this.height + 10) {
+        f.y = -5;
+        f.x = Math.random() * this.width;
+      }
+    };
     if (season === 3) {
       if (this.snow.length < 220) {
-        for (let k = 0; k < 220; k++) this.snow.push({ x: Math.random() * 2000, y: Math.random() * 1200, s: 0.5 + Math.random() });
+        for (let k = 0; k < 220; k++) this.snow.push({ x: Math.random() * this.width, y: Math.random() * this.height, s: 0.5 + Math.random() });
       }
       c.fillStyle = 'rgba(255,255,255,0.85)';
       for (const f of this.snow) {
         f.y += (20 + f.s * 25) * dt;
         f.x += Math.sin(t + f.s * 10) * 10 * dt;
-        if (f.y > this.height) {
-          f.y = -5;
-          f.x = Math.random() * this.width;
-        }
-        c.fillRect(f.x % this.width, f.y, 1.2 + f.s, 1.2 + f.s);
+        wrap(f);
+        c.fillRect(f.x, f.y, 1.2 + f.s, 1.2 + f.s);
       }
     } else if (season === 2) {
       // A few falling leaves.
       if (this.snow.length < 40) {
-        for (let k = 0; k < 40; k++) this.snow.push({ x: Math.random() * 2000, y: Math.random() * 1200, s: Math.random() });
+        for (let k = 0; k < 40; k++) this.snow.push({ x: Math.random() * this.width, y: Math.random() * this.height, s: Math.random() });
       }
       for (const f of this.snow.slice(0, 40)) {
         f.y += (14 + f.s * 10) * dt;
         f.x += Math.sin(t * 1.5 + f.s * 10) * 20 * dt;
-        if (f.y > this.height) {
-          f.y = -5;
-          f.x = Math.random() * this.width;
-        }
+        wrap(f);
         c.fillStyle = f.s < 0.5 ? 'rgba(200,120,40,0.8)' : 'rgba(220,170,60,0.8)';
-        c.fillRect(f.x % this.width, f.y, 3, 2);
+        c.fillRect(f.x, f.y, 3, 2);
       }
     } else if (this.snow.length) {
       this.snow = [];
@@ -1019,18 +1153,20 @@ export class Renderer {
   private birds: { x: number; y: number; vx: number; vy: number; n: number; seed: number }[] = [];
   private birdTimer = 3;
 
-  /** Small flocks flying across the screen outside winter. */
+  /** Small flocks crossing the view outside winter (world coordinates). */
   private drawBirds(season: Season, dt: number): void {
     const c = this.ctx;
     this.birdTimer -= dt;
+    const [vx0, vy0] = this.screenToWorld(0, 0);
+    const [vx1, vy1] = this.screenToWorld(this.width, this.height);
     if (season !== 3 && this.birdTimer <= 0 && this.birds.length < 2) {
-      this.birdTimer = 12 + Math.random() * 20;
+      this.birdTimer = 15 + Math.random() * 25;
       const fromLeft = Math.random() < 0.5;
       this.birds.push({
-        x: fromLeft ? -60 : this.width + 60,
-        y: 60 + Math.random() * this.height * 0.5,
-        vx: (fromLeft ? 1 : -1) * (45 + Math.random() * 25),
-        vy: (Math.random() - 0.5) * 12,
+        x: fromLeft ? vx0 - 80 : vx1 + 80,
+        y: vy0 + (vy1 - vy0) * (0.1 + Math.random() * 0.5),
+        vx: (fromLeft ? 1 : -1) * (40 + Math.random() * 20),
+        vy: (Math.random() - 0.5) * 10,
         n: 3 + Math.floor(Math.random() * 5),
         seed: Math.random() * 100,
       });
@@ -1054,7 +1190,9 @@ export class Renderer {
         c.stroke();
       }
     }
-    this.birds = this.birds.filter((f) => f.x > -200 && f.x < this.width + 200);
+    // Forget flocks far outside the view.
+    const margin = 1500;
+    this.birds = this.birds.filter((f) => f.x > vx0 - margin && f.x < vx1 + margin && f.y > vy0 - margin && f.y < vy1 + margin);
   }
 
   private drawAtmosphere(season: Season, day: number): void {

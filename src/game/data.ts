@@ -440,3 +440,7 @@ export const TRADE_PRICES: Partial<Record<ResourceId, number>> = {
   bread: 3,
 };
 export const SELL_FACTOR = 0.5;
+/** Merchants pay a little better for regular exports. */
+export const EXPORT_FACTOR = 0.6;
+/** Units one marketplace's merchants buy per month. */
+export const EXPORT_PER_MARKET = 60;
