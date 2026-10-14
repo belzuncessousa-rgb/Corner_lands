@@ -3,7 +3,7 @@
  * tune balance; the title screen uses it to grow a demo village.
  */
 import { BUILDINGS, DAYS_PER_MONTH } from './data';
-import { autoResolve } from './events';
+import { autoResolve, feastError, holdFeast } from './events';
 import { grantCharter } from './charters';
 import { startUpgrade, upgradeBlocker, upgradePlan } from './levels';
 import { StateRng } from './rng';
@@ -354,6 +354,7 @@ function act(s: GameState, rand: () => number): void {
   shop(s);
   const pop = s.population;
   const food = totalFood(s);
+  if (!feastError(s) && food > pop * 4) holdFeast(s);
   renovate(s);
   drawFields(s);
   const sites = s.buildings.filter((b) => b.build < 1).length;

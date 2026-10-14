@@ -51,6 +51,46 @@ function takeFood(s: GameState, n: number): number {
 }
 
 const food = (s: GameState) => FOOD_IDS.reduce((a, f) => a + s.res[f], 0);
+
+// ---------------------------------------------------------------- feasts
+
+/** Drinks poured at a feast, best first. */
+const FEAST_DRINKS: ResourceId[] = ['wine', 'ale', 'cider'];
+/** Autumn months (after the harvest) in which a feast can be called. */
+export const FEAST_MONTHS = [6, 7, 8];
+
+/** What a harvest feast costs: a meal for everyone and a cask for every eight. */
+export function feastCost(s: GameState): { food: number; drink: number } {
+  return { food: s.population, drink: Math.ceil(s.population / 8) };
+}
+
+/** Why the lord cannot call a feast now, or null. */
+export function feastError(s: GameState): string | null {
+  if (!FEAST_MONTHS.includes(Math.floor(s.day / DAYS_PER_MONTH) % 12)) return 'In autumn, after the harvest';
+  if (s.lastFeast === Math.floor(s.day / DAYS_PER_YEAR)) return 'There has been a feast this year';
+  if (s.population < 8) return 'Too few villagers';
+  if (food(s) < feastCost(s).food) return `Needs ${feastCost(s).food} food`;
+  return null;
+}
+
+/** Holds a harvest feast; with drink for everyone it is merrier and brings more prestige. */
+export function holdFeast(s: GameState): string | null {
+  const err = feastError(s);
+  if (err) return err;
+  const cost = feastCost(s);
+  takeFood(s, cost.food);
+  let poured = 0;
+  for (const d of FEAST_DRINKS) {
+    const n = Math.min(Math.floor(s.res[d]), cost.drink - poured);
+    s.res[d] -= n;
+    poured += n;
+  }
+  const merry = poured >= cost.drink;
+  addMood(s, 'Memories of the feast', merry ? 14 : 9, 6);
+  s.res.prestige += merry ? 10 : 5;
+  s.lastFeast = Math.floor(s.day / DAYS_PER_YEAR);
+  return null;
+}
 const need = (s: GameState, id: ResourceId, n: number, name: string) => (s.res[id] >= n ? null : `Needs ${n} ${name}`);
 
 export const EVENTS: DecisionEvent[] = [
@@ -163,7 +203,7 @@ export const EVENTS: DecisionEvent[] = [
     title: 'A Harvest Feast?',
     text: () =>
       'The harvest is in and the evenings are drawing in. The villagers look to the manor, hopeful. A feast would be remembered for a long time.',
-    weight: (s, m) => (m >= 6 && m <= 8 && food(s) >= s.population * 3 && s.population >= 8 ? 3 : 0),
+    weight: (s, m) => (m >= 6 && m <= 8 && s.lastFeast !== Math.floor(s.day / DAYS_PER_YEAR) && food(s) >= s.population * 3 && s.population >= 8 ? 3 : 0),
     choices: (s) => [
       {
         label: 'Hold a grand feast',
@@ -172,6 +212,7 @@ export const EVENTS: DecisionEvent[] = [
         apply: (st) => {
           takeFood(st, st.population);
           addMood(st, 'Memories of the feast', 12, 6);
+          st.lastFeast = Math.floor(st.day / DAYS_PER_YEAR);
           return { text: 'Music, ale and roast meat late into the night. Nobody will forget it soon.', kind: 'good' };
         },
       },

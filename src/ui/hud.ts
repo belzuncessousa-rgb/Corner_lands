@@ -15,7 +15,7 @@ import {
   RESOURCE_STORAGE,
   STORAGE_CAPACITY,
 } from '../game/data';
-import { getEvent, resolveEvent } from '../game/events';
+import { feastCost, feastError, getEvent, holdFeast, resolveEvent } from '../game/events';
 import { CHARTERS, CHARTER_TIER, PATHS, charterCost, charterError, grantCharter, hasCharter } from '../game/charters';
 import { HOUSE_LEVELS, MANOR_LEVELS, buildingName, houseNeeds, startUpgrade, upgradeBlocker, upgradePlan, workersOf } from '../game/levels';
 import { activeQuests } from '../game/quests';
@@ -545,6 +545,7 @@ export class Hud {
     const key = JSON.stringify([
       b.id, b.status, b.workers, b.builders, b.residents, b.build.toFixed(2), b.paused, b.level, b.lastOutput, b.growth.toFixed(2), b.want, b.priority, b.recipe, b.yard, b.trade, b.herd, b.owner, Math.floor(b.growth),
       s.tier, blocker, b.need, (b.upProgress ?? 0).toFixed(2), b.unmet, Math.floor(s.res.gold / 10), s.population,
+      s.lastFeast, monthOf(s.day),
       STORAGE_CAPACITY[b.type] ? RESOURCE_IDS.map((r) => (RESOURCE_STORAGE[r] ? Math.floor(s.res[r]) : 0)).join() : '',
     ]);
     if (key === this.lastInspectorKey) return;
@@ -601,6 +602,13 @@ export class Hud {
       }
       rows.push(...this.zoneRows(b));
       rows.push(...this.storeRows(b));
+      if (b.type === 'townhall') {
+        const c = feastCost(s);
+        const err = feastError(s);
+        rows.push(`<div class="kv feast" data-tip="Once each autumn: a meal for every villager and a cask for every eight. With drink for all it is merrier (+14 happiness for half a year, +10 prestige); without, +9 and +5."><span>Harvest feast</span><span>${
+          err ? `<small class="muted">${esc(err)}</small>` : `<button data-action="feast">Call a feast <small>${c.food} food · ${c.drink} drink</small></button>`
+        }</span></div>`);
+      }
       const cap = housingOf(b);
       if (cap) rows.push(`<div class="kv"><span>Residents</span><span>${b.residents} / ${cap}</span></div>`);
       if (Object.keys(d.outputs).length || b.type === 'farm' || b.type === 'forester') {
@@ -1116,6 +1124,16 @@ export class Hud {
       case 'ledger':
         this.showLedger();
         break;
+      case 'feast': {
+        const err = holdFeast(s);
+        if (err) this.flash(err);
+        else {
+          log(s, 'The lord calls a harvest feast: music, ale and roast meat late into the night.', 'good');
+          this.sound('good');
+        }
+        this.lastInspectorKey = '';
+        break;
+      }
       case 'store-sell': {
         const err = trade(s, t.dataset.res as ResourceId, -Number(t.dataset.n));
         if (err) this.flash(err);
@@ -1488,6 +1506,7 @@ export class Hud {
         <p><b>Roads</b> are optional but villagers walk faster on them, faster still on paved stone (T). Click to start, click again to lay it, keep clicking to continue.</p>
         <p><b>The top bar</b> shows happiness, villagers, food, materials, goods and the treasury. Hover a chip for the details, click to pin it: set how much of each good to keep and whether merchants may buy the surplus. Workers rest when their goods reach the target.</p>
         <p><b>Workers:</b> select a workplace to choose how many villagers work there, its priority and its product. Seasonal work frees hands in the off season. Hover the villagers chip to see who is idle and where hands are short.</p>
+        <p><b>Harvest feast</b>: once each autumn, select the manor to call a feast. A meal for everyone and drink for every eight cheer the town for half a year and bring prestige.</p>
         <p><b>Homes</b> eat one food a month each; several food groups (grain, meat, produce, dairy) cheer them. When every food is gone they boil stored wheat or oats into pottage, which is only half as filling. Each winter month a home burns firewood. Finer homes need clothes, a tavern, boots and medicine, and enjoy luxuries; families in them can work a craft from home.</p>
         <p><b>Prestige</b> comes from a fine manor, a church and monuments. From Town on, spend it on <b>charters</b> (crown button) to specialise your town.</p>
         <p>Your <b>steward</b> warns you when things go wrong; the <b>Chronicle</b> (scroll button) keeps the full story.</p>

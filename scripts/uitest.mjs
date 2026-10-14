@@ -130,6 +130,11 @@ await page.screenshot({ path: process.env.SHOT || '/tmp/claude-0/store.png', cli
 await page.click('#inspector [data-action="store-sell"][data-res="planks"]');
 const after = await page.evaluate(() => ({ planks: window.game.state.res.planks, gold: window.game.state.res.gold }));
 check('sell surplus from the store panel', after.planks === sale.planks - 40 && after.gold > sale.gold, JSON.stringify([sale, after]));
+// Call a harvest feast from the manor in autumn.
+await page.evaluate(() => { const s = window.game.state; s.day = 6 * 10 + 1; s.res.bread = 200; window.game.hud.update(); });
+await page.waitForTimeout(300);
+await page.click('#inspector [data-action="feast"]');
+check('call a harvest feast', (await page.evaluate(() => window.game.state.lastFeast)) === 0);
 await page.evaluate(() => window.game.select(null));
 // Save through the menu, then load it back.
 await page.keyboard.press('Escape');

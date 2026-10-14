@@ -92,6 +92,9 @@ then fall back to the browser's localStorage.
 - **The manor** — raise the Manor Hall to a Manor House, Stone Manor,
   Lord's Keep and finally a Castle to become a Village, Town, Borough and
   City. Each rank unlocks buildings and adds storage.
+- **Harvest feast** — once each autumn the lord may call a feast from the
+  manor: a meal for everyone and a cask for every eight. It cheers the town for
+  half a year and brings prestige, more if there is drink for all.
 - **Prestige & charters** — a fine manor, a church, monuments and townhouses
   bring prestige each month. From Town on, spend it on charters (crown
   button): seven paths (Metalwork, Orchard Masters, Erudition, Harmony with

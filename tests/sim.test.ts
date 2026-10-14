@@ -745,3 +745,24 @@ describe('steward', () => {
     expect(msg?.text).toMatch(/storehouses are full, mostly \w+ \(\d+\) and planks/);
   });
 });
+
+describe('harvest feast', () => {
+  it('can be called once each autumn and cheers the town', async () => {
+    const { feastError, holdFeast } = await import('../src/game/events');
+    const s = generateWorld(85);
+    s.population = 16;
+    s.res.bread = 40;
+    s.res.ale = 2;
+    s.day = 2 * DAYS_PER_MONTH;
+    expect(feastError(s)).toMatch(/autumn/);
+    s.day = 6 * DAYS_PER_MONTH + 2;
+    const prestige = s.res.prestige;
+    expect(holdFeast(s)).toBeNull();
+    expect(s.res.ale).toBe(0);
+    expect(s.res.prestige).toBe(prestige + 10);
+    expect(s.moods?.some((m) => m.label === 'Memories of the feast' && m.value === 14)).toBe(true);
+    expect(feastError(s)).toMatch(/this year/);
+    s.day += DAYS_PER_YEAR;
+    expect(feastError(s)).toBeNull();
+  });
+});

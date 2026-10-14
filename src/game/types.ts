@@ -271,6 +271,8 @@ export interface GameState {
   nextEventDay?: number;
   /** Temporary happiness effects from events. */
   moods?: { label: string; value: number; until: number }[];
+  /** Year in which the lord last called a harvest feast. */
+  lastFeast?: number;
   /** Monthly snapshots, oldest first. */
   history: HistoryPoint[];
   /** Set when buildings/roads change; cleared after recompute. */

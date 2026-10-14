@@ -175,6 +175,6 @@ A ten-seed sweep of the autoplayer exposed stalls a player can hit too.
 - [x] Steward names what fills a full storehouse or granary
 - [x] Ten-seed balance sweep as an opt-in test (`SWEEP=1`); every seed reaches Town
 - [x] Storehouse and granary inspector: what is stored there, with a quick "sell surplus" button
-- [ ] Harvest feast: in autumn the lord may call a feast (food and ale for happiness and prestige)
+- [x] Harvest feast: in autumn the lord may call a feast (food and ale for happiness and prestige)
 - [ ] Meadmakers make mead from honey at the brewhouse (tavern drink, luxury)
 - [ ] Retinue: spend prestige on a castle guard that wards off wolves and bandits in events
