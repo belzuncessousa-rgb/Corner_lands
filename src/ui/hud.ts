@@ -153,6 +153,7 @@ export class Hud {
           <div class="btnrow">
             <button id="menu-btn" class="panel icon-btn" data-action="menu" data-tip="Menu (Esc)">${CATEGORY_ICONS.menu}</button>
             <button class="panel icon-btn" data-action="chronicle" data-tip="<b>Chronicle</b><br>Everything that has happened in your lands.">${CATEGORY_ICONS.scroll}</button>
+            <button class="panel icon-btn" data-action="production" data-tip="<b>Production Book</b><br>Every trade, what it takes and what it makes.">${ICONS.books}</button>
             <button class="panel icon-btn" data-action="charters" data-tip="<b>Town Charters</b><br>Spend prestige to specialise your town.">${ICONS.prestige}</button>
           </div>
           <div id="objectives" class="panel"></div>
@@ -1045,6 +1046,9 @@ export class Hud {
       case 'trade':
         this.showTrade();
         break;
+      case 'production':
+        this.showProduction();
+        break;
       case 'charters':
         this.charterSel = null;
         this.showCharters();
@@ -1097,6 +1101,56 @@ export class Hud {
   }
 
   // ---------------------------------------------------------------- modals
+
+  /** Every workshop, branch by branch: what it takes, what it makes, how many you have. */
+  private showProduction(): void {
+    const s = this.game.state;
+    const goods = (c: Cost) =>
+      Object.entries(c)
+        .map(([k, v]) => `<span class="pg" data-tip="${GOODS[k as ResourceId].name}">${ICONS[k as ResourceId] ?? ''}${v}</span>`)
+        .join('');
+    const cats: Category[] = ['resources', 'farming', 'food', 'industry', 'civic'];
+    const sections = cats
+      .map((cat) => {
+        const rows = BUILD_ORDER.filter((t) => BUILDINGS[t].category === cat && (BUILDINGS[t].workers > 0 || BUILDINGS[t].zone))
+          .map((t) => {
+            const d = BUILDINGS[t];
+            const lock = lockReason(s, t);
+            const mine = s.buildings.filter((b) => b.type === t && b.build >= 1);
+            const staff = mine.reduce((a, b) => a + b.workers, 0);
+            const slots = mine.reduce((a, b) => a + workersOf(b), 0);
+            const recipes = (d.recipes ?? [{ id: '', name: '', inputs: d.inputs, outputs: d.outputs }]).filter((r) => !r.charter || hasCharter(s, r.charter));
+            const icons = (ids: ResourceId[]) => ids.map((k) => `<span class="pg" data-tip="${GOODS[k].name}">${ICONS[k] ?? ''}</span>`).join('');
+            const OWNERS: Partial<Record<BuildingType, string>> = {
+              farm: 'Sows and reaps the fields drawn nearby',
+              orchardist: 'Picks the orchards planted nearby',
+              forester: 'Plants trees for the woodcutters',
+            };
+            let lines: string;
+            if (OWNERS[t]) lines = `<i>${OWNERS[t]}</i>`;
+            else if (t === 'byre') lines = icons(['wool', 'milk', 'meat', 'pork', 'hides']);
+            else if (d.zone) lines = icons(recipes.flatMap((r) => Object.keys(r.outputs) as ResourceId[])) + (t === 'pasture' ? '<i>grazing for the Animal Farm</i>' : '');
+            else
+              lines = recipes
+                .filter((r) => Object.keys(r.outputs).length)
+                .map((r) => `<span class="recipe">${Object.keys(r.inputs).length ? `${goods(r.inputs)}<span class="arrow">→</span>` : ''}${goods(r.outputs)}</span>`)
+                .join('<span class="or">or</span>');
+            return `<tr class="${lock ? 'locked' : ''}">
+              <td class="pimg"><img src="${this.cardImage(t)}" alt=""></td>
+              <td><b>${esc(d.name)}</b>${lock ? `<div class="neg small">${esc(lock)}</div>` : ''}</td>
+              <td><div class="plines">${lines || '<i>—</i>'}</div></td>
+              <td class="num">${mine.length ? `${mine.length}${slots ? `<div class="small">${staff}/${slots} at work</div>` : ''}` : ''}</td>
+            </tr>`;
+          })
+          .join('');
+        return rows ? `<h3>${CATEGORY_ICONS[cat]} ${CATEGORY_NAMES[cat]}</h3><table class="prod">${rows}</table>` : '';
+      })
+      .join('');
+    this.openModal(`<h2>Production Book</h2>
+      <p class="note">Every trade in your lands, what it takes and what it makes. Greyed trades unlock with rank or charters.</p>
+      <div class="prodbook">${sections}</div>
+      <div class="row" style="justify-content:flex-end;margin-top:8px"><button class="primary" data-action="close-modal">Close</button></div>`).querySelector('.modal')!.classList.add('wide', 'prod-modal');
+  }
 
   private charterSel: string | null = null;
 

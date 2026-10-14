@@ -1713,3 +1713,82 @@ table.goods button.sell.active svg {
     width: 100%;
   }
 }
+
+/* ------------------------------------------------------------ production book */
+
+.modal.wide.prod-modal {
+  width: min(820px, calc(100vw - 24px));
+}
+.prodbook h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 12px 0 4px;
+  border-bottom: 1px solid rgba(91, 58, 34, 0.3);
+}
+table.prod {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  table-layout: fixed;
+}
+table.prod td.pimg {
+  width: 56px;
+}
+table.prod td:nth-child(2) {
+  width: 190px;
+}
+table.prod td.num {
+  width: 90px;
+}
+table.prod .plines {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+}
+table.prod .or {
+  font-style: italic;
+  opacity: 0.55;
+  font-size: 11px;
+}
+table.prod td {
+  padding: 3px 6px;
+  vertical-align: middle;
+  border-bottom: 1px dashed rgba(91, 58, 34, 0.15);
+}
+table.prod tr.locked {
+  opacity: 0.5;
+}
+table.prod td.pimg img {
+  width: 44px;
+  height: 36px;
+  object-fit: contain;
+}
+table.prod .recipe {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+table.prod .pg {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  font-weight: 600;
+}
+table.prod .pg svg {
+  width: 17px;
+  height: 17px;
+}
+table.prod .arrow {
+  margin: 0 4px;
+  opacity: 0.6;
+}
+table.prod .small,
+.small {
+  font-size: 11px;
+}
+table.prod td.num {
+  text-align: right;
+  white-space: nowrap;
+}
