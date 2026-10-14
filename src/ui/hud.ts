@@ -1141,7 +1141,7 @@ export class Hud {
             let lines: string;
             if (OWNERS[t]) lines = `<i>${OWNERS[t]}</i>`;
             else if (t === 'byre') lines = icons(['wool', 'milk', 'meat', 'pork', 'hides']);
-            else if (d.zone) lines = icons(recipes.flatMap((r) => Object.keys(r.outputs) as ResourceId[])) + (t === 'pasture' ? '<i>grazing for the Animal Farm</i>' : '');
+            else if (d.zone) lines = icons(recipes.flatMap((r) => Object.keys(r.outputs) as ResourceId[])) + (t === 'pasture' ? '<i>Grazing for the Animal Farm</i>' : '');
             else
               lines = recipes
                 .filter((r) => Object.keys(r.outputs).length)

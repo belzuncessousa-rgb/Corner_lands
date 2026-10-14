@@ -164,7 +164,7 @@ designer asked for.
 
 ### Phase 7 — Polish (for the scheduled runs)
 - [x] Villagers visibly carry the new goods (wool bales, cheese wheels, casks, cloth) and work outdoors at the new trades
-- [ ] Winter and autumn looks for pastures, orchards and vines; animals shelter in the byre in deep winter
-- [ ] A first-hour guide tuned to the 45-minute year (objectives that teach fields, workers and stock targets in order)
-- [ ] Phone layout pass for the inspector, charter tree and production book
+- [x] Winter and autumn looks for pastures, orchards and vines; animals shelter in the byre in deep winter
+- [x] A first-hour guide tuned to the 45-minute year (objectives that teach fields, workers and stock targets in order)
+- [x] Phone layout pass for the inspector, charter tree and production book
 - [ ] Performance check on a 250-villager town; trim per-frame work if needed

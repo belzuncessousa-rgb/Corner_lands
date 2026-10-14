@@ -1837,3 +1837,19 @@ table.prod td.num {
     width: min(290px, calc(100vw - 16px));
   }
 }
+@media (max-width: 700px) {
+  table.prod td.pimg {
+    display: none;
+  }
+  table.prod td:nth-child(2) {
+    width: 32%;
+  }
+  table.prod td.num {
+    width: 64px;
+    white-space: normal;
+  }
+  .modal.wide.prod-modal,
+  .modal.wide.charter-modal {
+    padding: 12px;
+  }
+}
