@@ -30,8 +30,7 @@ function placeNearRoad(s: GameState, type: BuildingType) {
       if (placementError(s, type, x, y)) continue;
       for (let rx = Math.min(x, h.x); rx <= Math.max(x + d.w, h.x + 3); rx++) buildRoad(s, rx, roadY);
       const b = placeOrder(s, type, x, y);
-      if (b && b.connected) return b;
-      if (b) demolish(s, b);
+      if (b) return b;
     }
   }
   throw new Error(`could not place ${type}`);
@@ -55,20 +54,23 @@ describe('world generation', () => {
       for (let y = h.y; y < h.y + 3; y++)
         for (let x = h.x; x < h.x + 3; x++) expect(s.terrain[idx(s, x, y)]).toBe(0);
       recompute(s);
-      expect(h.connected).toBe(true);
       expect(s.road.some((r) => r === 1)).toBe(true);
     }
   });
 });
 
 describe('simulation', () => {
-  it('builds a connected house and adds housing', () => {
+  it('builders carry materials over, then raise a house', () => {
     const s = generateWorld(7);
     recompute(s);
     const before = totalHousing(s);
     const house = placeNearRoad(s, 'house');
-    expect(house.connected).toBe(true);
-    run(s, 20);
+    const wood = s.res.wood;
+    // Nothing is paid until builders carry the timber over.
+    expect(s.res.wood).toBe(wood);
+    run(s, 2);
+    expect(s.res.wood).toBeLessThan(wood);
+    run(s, 25);
     expect(house.build).toBe(1);
     expect(totalHousing(s)).toBe(before + 5);
   });
@@ -94,11 +96,12 @@ describe('simulation', () => {
     expect(s.report.eaten).toBeGreaterThan(0);
   });
 
-  it('demolishing a site refunds its cost', () => {
+  it('cancelling a site returns the materials already delivered', () => {
     const s = generateWorld(3);
-    const wood = s.res.wood;
     const b = placeNearRoad(s, 'house');
-    expect(s.res.wood).toBe(wood - 12);
+    const wood = s.res.wood;
+    stepDay(s);
+    expect(s.res.wood).toBeLessThan(wood);
     demolish(s, b);
     expect(s.res.wood).toBe(wood);
     expect(s.occ[idx(s, b.x, b.y)]).toBe(-1);
@@ -173,16 +176,20 @@ describe('production chains', () => {
         if (!(xx === ox && Math.abs(yy - oy) < 1)) s.ore[i] = 0;
       }
       mine = placeOrder(s, 'mine', x, y);
-      if (mine?.connected) break;
+      if (mine) break;
     }
-    expect(mine?.connected).toBe(true);
+    expect(mine).not.toBeNull();
+    // Room to store everything.
+    for (let k = 0; k < 2; k++) placeNearRoad(s, 'storehouse').build = 1;
+    s.dirty = true;
     s.ore[ore] = 30;
     const smithy = placeNearRoad(s, 'smithy');
-    run(s, 40);
+    run(s, 60);
     expect(mine!.build).toBe(1);
     expect(smithy.build).toBe(1);
+    const tools = s.res.tools;
     run(s, 40);
-    expect(s.res.tools).toBeGreaterThan(100);
+    expect(s.res.tools).toBeGreaterThan(tools);
   });
 });
 

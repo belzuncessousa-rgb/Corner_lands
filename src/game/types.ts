@@ -37,6 +37,7 @@ export type BuildingType =
   | 'market'
   | 'church'
   | 'storehouse'
+  | 'granary'
   | 'garden'
   | 'maypole'
   | 'statue';
@@ -62,8 +63,15 @@ export interface Building {
   /** Farm crop growth 0..1. */
   growth: number;
   paused: boolean;
-  connected: boolean;
   status: string;
+  /** Construction materials still to be carried to the site. */
+  need?: Cost;
+  /** Days a round trip to the nearest storage takes, refreshed by recompute. */
+  trip?: number;
+  /** Distance to the last resource tile gathered from. */
+  resDist?: number;
+  /** Production speed relative to an ideal site, 0..1 (travel overhead). */
+  efficiency?: number;
   /**
    * Why the building cannot currently work: 0 or undefined = it can,
    * 1 = blocked by a problem (no resources, storage full), 2 = seasonal rest.

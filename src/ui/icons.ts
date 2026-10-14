@@ -3,7 +3,7 @@ import type { ResourceId } from '../game/types';
 const svg = (body: string) =>
   `<svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">${body}</svg>`;
 
-export const ICONS: Record<ResourceId | 'people' | 'happy' | 'storage' | 'road' | 'demolish' | 'cal', string> = {
+export const ICONS: Record<ResourceId | 'people' | 'happy' | 'storage' | 'granary' | 'road' | 'demolish' | 'cal', string> = {
   wood: svg(
     '<rect x="2" y="7" width="15" height="6" rx="3" fill="#7a5230"/><ellipse cx="16" cy="10" rx="2.4" ry="3" fill="#d8b47c"/><ellipse cx="16" cy="10" rx="1" ry="1.3" fill="#9a7346"/><path d="M4 9h8M5 11h7" stroke="#5a3a20" stroke-width=".8"/>',
   ),
@@ -45,6 +45,9 @@ export const ICONS: Record<ResourceId | 'people' | 'happy' | 'storage' | 'road' 
   ),
   storage: svg(
     '<path d="M3 8l7-4 7 4v9H3z" fill="#9a7247"/><path d="M2 8l8-5 8 5" stroke="#5e3e22" stroke-width="1.4" fill="none"/><rect x="7" y="11" width="6" height="6" fill="#5b3a22"/>',
+  ),
+  granary: svg(
+    '<path d="M4 9h12v8H4z" fill="#c9a050"/><path d="M3 9l7-5 7 5z" fill="#8a6236"/><path d="M5 17v2M15 17v2" stroke="#5e4129" stroke-width="1.6"/><ellipse cx="8" cy="13" rx="2" ry="2.4" fill="#e0c070"/><ellipse cx="12.5" cy="13" rx="2" ry="2.4" fill="#d8b860"/>',
   ),
   road: svg('<path d="M6 18L9 2h2l3 16z" fill="#a88a5c"/><path d="M10 4v2M10 9v2M10 14v2" stroke="#e8d8b0" stroke-width="1"/>'),
   demolish: svg(

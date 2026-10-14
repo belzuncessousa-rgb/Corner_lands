@@ -6,7 +6,7 @@ let closed = new Uint8Array(0);
 let stamp = new Uint32Array(0);
 let curStamp = 0;
 
-class Heap {
+export class Heap {
   ids: number[] = [];
   pri: number[] = [];
   push(id: number, p: number): void {

@@ -1,5 +1,42 @@
 import type { BuildingType, Category, Cost, ResourceId } from './types';
 
+/** Real seconds per game day at 1x speed. */
+export const DAY_SECONDS = 4;
+
+/** Walking speed in tiles per game day, on roads and across open country. */
+export const ROAD_TILES_PER_DAY = 4;
+export const OFFROAD_TILES_PER_DAY = 2.2;
+/** Units of goods a villager carries in one trip. */
+export const CARRY_LOAD = 5;
+/** How strongly walking time slows production (0 = ignored). */
+export const TRAVEL_WEIGHT = 0.5;
+/** Workshops rest once this much of their product is in store. */
+export const STOCK_TARGET = 150;
+
+export type StorageKind = 'materials' | 'food';
+
+/** Which storage pool each resource lives in; gold sits in the manor's coffers. */
+export const RESOURCE_STORAGE: Record<ResourceId, StorageKind | null> = {
+  wood: 'materials',
+  stone: 'materials',
+  planks: 'materials',
+  iron: 'materials',
+  tools: 'materials',
+  berries: 'food',
+  meat: 'food',
+  fish: 'food',
+  grain: 'food',
+  bread: 'food',
+  gold: null,
+};
+
+/** Storage capacity each building provides. */
+export const STORAGE_CAPACITY: Partial<Record<BuildingType, Partial<Record<StorageKind, number>>>> = {
+  townhall: { materials: 120, food: 100 },
+  storehouse: { materials: 250 },
+  granary: { food: 250 },
+};
+
 export const DAYS_PER_MONTH = 10;
 export const MONTHS_PER_YEAR = 12;
 export const DAYS_PER_YEAR = DAYS_PER_MONTH * MONTHS_PER_YEAR;
@@ -105,11 +142,11 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     name: "Woodcutter's Lodge",
     desc: 'Fells nearby trees for timber.',
     category: 'resources',
-    cost: { wood: 15 },
+    cost: { wood: 10 },
     workers: 2,
     radius: 7,
     cycle: 2,
-    outputs: { wood: 3 },
+    outputs: { wood: 4 },
     gathers: 'trees',
     hotkey: 'e',
   }),
@@ -133,7 +170,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     workers: 2,
     radius: 5,
     cycle: 3,
-    outputs: { stone: 2 },
+    outputs: { stone: 3 },
     gathers: 'rock',
     hotkey: 'q',
   }),
@@ -146,7 +183,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     workers: 2,
     radius: 7,
     cycle: 2,
-    outputs: { berries: 4 },
+    outputs: { berries: 5 },
     gathers: 'berries',
     hotkey: 'g',
   }),
@@ -159,7 +196,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     workers: 1,
     radius: 8,
     cycle: 3,
-    outputs: { meat: 4 },
+    outputs: { meat: 5 },
     gathers: 'forest',
   }),
   fisher: def({
@@ -171,7 +208,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     workers: 2,
     radius: 4,
     cycle: 3,
-    outputs: { fish: 4 },
+    outputs: { fish: 5 },
     gathers: 'water',
   }),
   farm: def({
@@ -251,7 +288,17 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   storehouse: def({
     type: 'storehouse',
     name: 'Storehouse',
-    desc: 'Raises the storage limit of every good by 200.',
+    desc: 'Stores 250 building materials: timber, stone, planks, iron and tools.',
+    category: 'civic',
+    w: 3,
+    h: 3,
+    cost: { wood: 30 },
+    buildDays: 12,
+  }),
+  granary: def({
+    type: 'granary',
+    name: 'Granary',
+    desc: 'Stores 250 food: berries, meat, fish, grain and bread.',
     category: 'civic',
     w: 3,
     h: 3,
@@ -344,6 +391,7 @@ export const BUILD_ORDER: BuildingType[] = [
   'smithy',
   'well',
   'storehouse',
+  'granary',
   'market',
   'church',
   'garden',
@@ -377,8 +425,6 @@ export const TAX_LEVELS = [
   { name: 'High', perHead: 1.6, happiness: -14 },
 ];
 
-export const BASE_STORAGE = 150;
-export const STOREHOUSE_STORAGE = 200;
 
 /** Prices in gold for one unit at the market (sell price is lower). */
 export const TRADE_PRICES: Partial<Record<ResourceId, number>> = {

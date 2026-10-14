@@ -8,7 +8,7 @@ import {
   canAfford,
   canUpgrade,
   centerOf,
-  computeConnectivity,
+  reachableRoads,
   monthOf,
   placeOrder,
   placementError,
@@ -16,19 +16,28 @@ import {
   roadError,
   stepDay,
   storageCap,
+  stored,
   totalFood,
   totalHousing,
   upgradeHouse,
+  hasBuilt,
+  trade,
 } from './sim';
-import type { BuildingType, GameState } from './types';
+import type { BuildingType, Cost, GameState, ResourceId } from './types';
 import { idx, inBounds } from './world';
 
 const count = (s: GameState, t: BuildingType) => s.buildings.filter((b) => b.type === t).length;
 
 function tryPlace(s: GameState, type: BuildingType): boolean {
   const d = BUILDINGS[type];
-  if (!canAfford(s, d.cost)) return false;
-  const reached = computeConnectivity(s);
+  // Count materials already promised to unfinished sites.
+  const promised: Cost = { ...d.cost };
+  for (const o of s.buildings) {
+    if (!o.need) continue;
+    for (const k in o.need) promised[k as ResourceId] = (promised[k as ResourceId] ?? 0) + (o.need[k as ResourceId] ?? 0);
+  }
+  if (!canAfford(s, promised)) return false;
+  const reached = reachableRoads(s);
   let best: { x: number; y: number; score: number } | null = null;
   const hall = s.buildings.find((b) => b.type === 'townhall')!;
   for (let y = 0; y < s.height; y++) {
@@ -67,7 +76,7 @@ function tryPlace(s: GameState, type: BuildingType): boolean {
 
 /** Lays a road from the network towards the nearest ore deposit. */
 function roadToOre(s: GameState): void {
-  const reached = computeConnectivity(s);
+  const reached = reachableRoads(s);
   const hall = s.buildings.find((b) => b.type === 'townhall')!;
   let ore = -1;
   let best = Infinity;
@@ -127,7 +136,7 @@ function onGrid(s: GameState, x: number, y: number): boolean {
 
 /** Extends a grid street from the edge of the connected network. */
 function growRoads(s: GameState, rand: () => number): void {
-  const reached = computeConnectivity(s);
+  const reached = reachableRoads(s);
   const tiles: number[] = [];
   reached.forEach((v, i) => v && tiles.push(i));
   for (let tries = 0; tries < 80; tries++) {
@@ -190,7 +199,20 @@ export function playBot(s: GameState, years: number, seed = 1): BotReport {
   return rep;
 }
 
+/** Buys what is short at the market, as a sensible player would. */
+function shop(s: GameState): void {
+  if (!hasBuilt(s, 'market')) return;
+  const buy = (id: ResourceId, n: number, keep: number) => {
+    if (s.res.gold > keep) trade(s, id, n);
+  };
+  if (s.res.wood < 30) buy('wood', 20, 80);
+  if (s.res.tools < 6 && s.tier >= 2) buy('tools', 5, 150);
+  if (totalFood(s) < s.population * 2) buy('bread', 20, 80);
+  if (s.res.stone < 30) buy('stone', 20, 120);
+}
+
 function act(s: GameState, rand: () => number): void {
+  shop(s);
   const pop = s.population;
   const food = totalFood(s);
   const sites = s.buildings.filter((b) => b.build < 1).length;
@@ -212,13 +234,13 @@ function act(s: GameState, rand: () => number): void {
     wants.push('fisher', 'hunter');
     if (s.tier >= 1) wants.push('farm');
   }
-  if (count(s, 'woodcutter') < 1 + Math.floor(pop / 20) || s.res.wood < 25) wants.push('woodcutter');
+  if (count(s, 'woodcutter') < 2 + Math.floor(pop / 15) || s.res.wood < 25) wants.push('woodcutter');
   if (totalHousing(s) - pop < 4 && idle >= 0) wants.push('house');
   if (count(s, 'quarry') < 1 + Math.floor(pop / 40)) wants.push('quarry');
   if (pop >= 10 && count(s, 'well') < Math.ceil(pop / 20)) wants.push('well');
   if (count(s, 'forester') < count(s, 'woodcutter')) wants.push('forester');
-  const cap = storageCap(s);
-  if (Object.entries(s.res).some(([k, v]) => k !== 'gold' && v > cap * 0.85) && count(s, 'storehouse') < 3) wants.push('storehouse');
+  if (stored(s, 'materials') > storageCap(s, 'materials') * 0.8 && count(s, 'storehouse') < 3) wants.push('storehouse');
+  if (stored(s, 'food') > storageCap(s, 'food') * 0.8 && count(s, 'granary') < 3) wants.push('granary');
   if (s.tier >= 1) {
     if (count(s, 'farm') < Math.ceil(pop / 18)) wants.push('farm');
     if (count(s, 'bakery') < Math.ceil(count(s, 'farm') / 2)) wants.push('bakery');

@@ -1,19 +1,26 @@
 import {
-  BASE_STORAGE,
   BUILDINGS,
+  CARRY_LOAD,
   DAYS_PER_MONTH,
+  OFFROAD_TILES_PER_DAY,
+  RESOURCE_STORAGE,
+  ROAD_TILES_PER_DAY,
+  STORAGE_CAPACITY,
+  type StorageKind,
+  TRAVEL_WEIGHT,
   HOUSE_L2_HOUSING,
   HOUSE_UPGRADE_COST,
   MAX_BEAUTY,
   MONTHS_PER_YEAR,
   SELL_FACTOR,
-  STOREHOUSE_STORAGE,
+  STOCK_TARGET,
   TAX_LEVELS,
   TIERS,
   TRADE_PRICES,
 } from './data';
 import { advise } from './advisor';
 import { rollEvent } from './events';
+import { Heap } from './path';
 import { checkQuests } from './quests';
 import { StateRng } from './rng';
 import type { Building, BuildingType, Category, Cost, GameState, ResourceId, Season } from './types';
@@ -44,10 +51,30 @@ export function log(s: GameState, text: string, kind: 'info' | 'good' | 'bad' = 
 
 // ---------------------------------------------------------------- resources
 
-export function storageCap(s: GameState): number {
+export function storageCap(s: GameState, kind: StorageKind): number {
   let n = 0;
-  for (const b of s.buildings) if (b.type === 'storehouse' && b.build >= 1) n++;
-  return BASE_STORAGE + n * STOREHOUSE_STORAGE;
+  for (const b of s.buildings) if (b.build >= 1) n += STORAGE_CAPACITY[b.type]?.[kind] ?? 0;
+  return n;
+}
+
+export function stored(s: GameState, kind: StorageKind): number {
+  let n = 0;
+  for (const k in RESOURCE_STORAGE) if (RESOURCE_STORAGE[k as ResourceId] === kind) n += s.res[k as ResourceId];
+  return n;
+}
+
+/** Free space left for a resource's storage pool (Infinity for gold). */
+export function roomFor(s: GameState, id: ResourceId): number {
+  const kind = RESOURCE_STORAGE[id];
+  if (!kind) return Infinity;
+  return Math.max(0, storageCap(s, kind) - stored(s, kind));
+}
+
+/** Adds goods up to the free space; returns how many fit. */
+export function store(s: GameState, id: ResourceId, n: number): number {
+  const add = Math.max(0, Math.min(n, roomFor(s, id)));
+  s.res[id] += add;
+  return add;
 }
 
 export function canAfford(s: GameState, cost: Cost): boolean {
@@ -68,7 +95,7 @@ export function pay(s: GameState, cost: Cost): void {
 function refund(s: GameState, cost: Cost, factor: number): void {
   for (const k in cost) {
     const id = k as ResourceId;
-    s.res[id] += Math.floor((cost[id] ?? 0) * factor);
+    store(s, id, Math.floor((cost[id] ?? 0) * factor));
   }
 }
 
@@ -107,18 +134,42 @@ export function placementError(s: GameState, type: BuildingType, x: number, y: n
   if (type === 'fisher' && countInRadius(s, centerOf(x, y, d.w, d.h), 2.5, (i) => s.terrain[i] === 1) < 2) {
     return 'Must be next to water';
   }
-  if (!canAfford(s, d.cost)) return 'Not enough resources';
+  if ((d.cost.gold ?? 0) > s.res.gold) return 'Not enough gold';
   return null;
 }
 
+/** Materials of a cost that builders must carry (gold is paid up front). */
+export function materialsOf(cost: Cost): Cost {
+  const out: Cost = {};
+  for (const k in cost) if (k !== 'gold') out[k as ResourceId] = cost[k as ResourceId];
+  return out;
+}
+
+/**
+ * Places a construction site. Gold is paid at once; materials are carried
+ * from storage by builders as they become available.
+ */
 export function placeOrder(s: GameState, type: BuildingType, x: number, y: number): Building | null {
   if (placementError(s, type, x, y)) return null;
   const d = BUILDINGS[type];
-  pay(s, d.cost);
+  s.res.gold -= d.cost.gold ?? 0;
   const b = makeBuilding(s.nextId++, type, x, y);
+  b.need = materialsOf(d.cost);
   placeBuilding(s, b);
   recompute(s);
   return b;
+}
+
+/** Materials already carried to a construction site. */
+export function deliveredTo(b: Building): Cost {
+  const d = BUILDINGS[b.type];
+  const out: Cost = {};
+  const mats = materialsOf(d.cost);
+  for (const k in mats) {
+    const id = k as ResourceId;
+    out[id] = (mats[id] ?? 0) - (b.need?.[id] ?? 0);
+  }
+  return out;
 }
 
 /** Timber needed for each bridge tile laid over water. */
@@ -154,8 +205,13 @@ export function removeRoad(s: GameState, x: number, y: number): boolean {
 export function demolish(s: GameState, b: Building): boolean {
   if (b.type === 'townhall') return false;
   const d = BUILDINGS[b.type];
-  // Unfinished sites refund fully, finished buildings half.
-  refund(s, d.cost, b.build >= 1 ? 0.5 : 1);
+  // Sites return what was delivered (and the gold); finished buildings half.
+  if (b.build >= 1) refund(s, d.cost, 0.5);
+  else {
+    s.res.gold += d.cost.gold ?? 0;
+    const back = deliveredTo(b);
+    for (const k in back) store(s, k as ResourceId, back[k as ResourceId] ?? 0);
+  }
   removeBuilding(s, b);
   recompute(s);
   return true;
@@ -191,7 +247,7 @@ export function trade(s: GameState, id: ResourceId, amount: number): string | nu
   if (amount > 0) {
     const cost = price * amount;
     if (s.res.gold < cost) return 'Not enough gold';
-    if (s.res[id] + amount > storageCap(s)) return 'Not enough storage';
+    if (roomFor(s, id) < amount) return 'Not enough storage';
     s.res.gold -= cost;
     s.res[id] += amount;
   } else {
@@ -281,10 +337,10 @@ function coveredBy(s: GameState, b: Building, type: BuildingType): boolean {
   return false;
 }
 
-// ---------------------------------------------------------------- road network
+// ---------------------------------------------------------------- travel
 
-/** Marks buildings connected to the manor hall by road. */
-export function computeConnectivity(s: GameState): Uint8Array {
+/** Road tiles linked to the manor hall (used by the autoplayer's planning). */
+export function reachableRoads(s: GameState): Uint8Array {
   const reached = new Uint8Array(s.width * s.height);
   const hall = s.buildings.find((b) => b.type === 'townhall');
   const queue: number[] = [];
@@ -300,13 +356,12 @@ export function computeConnectivity(s: GameState): Uint8Array {
     const i = queue.pop()!;
     const x = i % s.width;
     const y = (i - x) / s.width;
-    const nb = [
+    for (const [nx, ny] of [
       [x + 1, y],
       [x - 1, y],
       [x, y + 1],
       [x, y - 1],
-    ];
-    for (const [nx, ny] of nb) {
+    ]) {
       if (!inBounds(s, nx, ny)) continue;
       const j = ny * s.width + nx;
       if (s.road[j] && !reached[j]) {
@@ -315,18 +370,76 @@ export function computeConnectivity(s: GameState): Uint8Array {
       }
     }
   }
-  for (const b of s.buildings) {
-    if (b.type === 'townhall') {
-      b.connected = true;
-      continue;
-    }
-    let ok = false;
-    forPerimeter(s, b, (i) => {
-      if (reached[i]) ok = true;
-    });
-    b.connected = ok;
-  }
   return reached;
+}
+
+/** Cost of stepping onto a tile, in road-tile units. */
+export function stepCost(s: GameState, i: number): number {
+  if (s.road[i]) return 1;
+  const off = ROAD_TILES_PER_DAY / OFFROAD_TILES_PER_DAY;
+  return s.trees[i] ? off * 1.4 : off;
+}
+
+const travelCache = new WeakMap<GameState, Float64Array>();
+
+/**
+ * Walking cost from every tile to the nearest storage building (manor hall,
+ * storehouse or granary), in road-tile units. Roads make it cheaper.
+ */
+export function travelField(s: GameState, rebuild = false): Float64Array {
+  let field = travelCache.get(s);
+  if (field && !rebuild) return field;
+  const n = s.width * s.height;
+  field = new Float64Array(n).fill(Infinity);
+  const heap = new Heap();
+  for (const b of s.buildings) {
+    if (b.build < 1 || !STORAGE_CAPACITY[b.type]) continue;
+    for (let y = b.y; y < b.y + b.h; y++) {
+      for (let x = b.x; x < b.x + b.w; x++) {
+        const i = idx(s, x, y);
+        field[i] = 0;
+        heap.push(i, 0);
+      }
+    }
+  }
+  while (heap.size) {
+    const i = heap.pop();
+    const g = field[i];
+    const x = i % s.width;
+    const y = (i - x) / s.width;
+    for (const [nx, ny] of [
+      [x + 1, y],
+      [x - 1, y],
+      [x, y + 1],
+      [x, y - 1],
+    ]) {
+      if (!inBounds(s, nx, ny)) continue;
+      const j = ny * s.width + nx;
+      if (s.terrain[j] === 1 && !s.road[j]) continue;
+      // Paths may end at a building's edge but not cross other buildings.
+      if (s.occ[j] >= 0 && field[i] > 0) continue;
+      const ng = g + stepCost(s, j);
+      if (ng < field[j]) {
+        field[j] = ng;
+        heap.push(j, ng);
+      }
+    }
+  }
+  travelCache.set(s, field);
+  return field;
+}
+
+/** Days for a round trip between a building and its nearest storage. */
+export function tripDays(s: GameState, b: Building): number {
+  if (STORAGE_CAPACITY[b.type] && b.build >= 1) return 0;
+  const field = travelField(s);
+  let best = Infinity;
+  forPerimeter(s, b, (i) => {
+    if (field[i] < best) best = field[i];
+  });
+  for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) best = Math.min(best, field[idx(s, x, y)]);
+  if (!Number.isFinite(best)) return 20;
+  return (2 * best) / ROAD_TILES_PER_DAY;
 }
 
 export function forPerimeter(s: GameState, b: Building, fn: (i: number, x: number, y: number) => void): void {
@@ -353,7 +466,19 @@ export function doorTile(s: GameState, b: Building): { x: number; y: number } {
       best = { x, y };
     }
   });
-  return best ?? { x: b.x + Math.floor(b.w / 2), y: b.y + b.h };
+  if (best) return best;
+  // No road: use a free tile on the front sides, else any free side tile.
+  let fallback: { x: number; y: number } | null = null;
+  let fbScore = -Infinity;
+  forPerimeter(s, b, (i, x, y) => {
+    if (s.terrain[i] === 1 || s.occ[i] >= 0) return;
+    const score = (y >= b.y + b.h ? 2 : 0) + (x >= b.x + b.w ? 1 : 0);
+    if (score > fbScore) {
+      fbScore = score;
+      fallback = { x, y };
+    }
+  });
+  return fallback ?? { x: b.x + Math.floor(b.w / 2), y: Math.min(s.height - 1, b.y + b.h) };
 }
 
 // ---------------------------------------------------------------- recompute
@@ -373,7 +498,7 @@ export function hasProblem(b: Building): boolean {
 }
 
 export function housingOf(b: Building): number {
-  if (b.build < 1 || !b.connected) return 0;
+  if (b.build < 1) return 0;
   if (b.type === 'house') return b.level >= 2 ? HOUSE_L2_HOUSING : BUILDINGS.house.housing;
   return BUILDINGS[b.type].housing;
 }
@@ -406,7 +531,8 @@ export function employed(s: GameState): number {
 /** Re-runs connectivity, distributes residents and assigns jobs. */
 export function recompute(s: GameState): void {
   if (s.dirty) {
-    computeConnectivity(s);
+    travelField(s, true);
+    for (const b of s.buildings) b.trip = tripDays(s, b);
     s.dirty = false;
   }
   // Residents.
@@ -418,23 +544,46 @@ export function recompute(s: GameState): void {
     b.residents = n;
     left -= n;
   }
-  // Workers.
+  // Workers. Construction sites count as jobs (two builders each, right
+  // after food and raw materials) so building never stalls completely.
   let free = s.population;
   // Buildings that could not work last time go to the back of the queue, so
   // villagers are not stuck at a forager with no berries while a hunter idles.
   const prio = (b: Building) =>
-    CATEGORY_PRIORITY[BUILDINGS[b.type].category] + (TYPE_PRIORITY[b.type] ?? 0) + (isBlocked(b) ? 10 : 0);
-  const jobs = s.buildings.filter((b) => BUILDINGS[b.type].workers > 0).sort((a, b) => prio(a) - prio(b) || a.id - b.id);
+    b.build < 1
+      ? SITE_PRIORITY + b.id * 1e-6
+      : CATEGORY_PRIORITY[BUILDINGS[b.type].category] + (TYPE_PRIORITY[b.type] ?? 0) + (isBlocked(b) ? 10 : 0);
+  const jobs = s.buildings
+    .filter((b) => b.build < 1 || BUILDINGS[b.type].workers > 0)
+    .sort((a, b) => prio(a) - prio(b) || a.id - b.id);
   for (const b of s.buildings) b.workers = 0;
   for (const b of jobs) {
-    if (b.build < 1 || !b.connected || b.paused) continue;
-    const n = Math.min(free, BUILDINGS[b.type].workers);
+    if (b.paused) continue;
+    const slots = b.build < 1 ? SITE_BUILDERS : BUILDINGS[b.type].workers;
+    const n = Math.min(free, slots);
     b.workers = n;
+    free -= n;
+  }
+  // Anyone left over lends a hand on construction sites.
+  for (const b of jobs) {
+    if (free <= 0) break;
+    if (b.build >= 1 || b.paused) continue;
+    const n = Math.min(free, MAX_BUILDERS - b.workers);
+    b.workers += n;
     free -= n;
   }
 }
 
+/** Builders each construction site employs before idle villagers join in. */
+export const SITE_BUILDERS = 2;
+const SITE_PRIORITY = 1.5;
+
 // ---------------------------------------------------------------- production
+
+function tileDist(s: GameState, b: Building, i: number): number {
+  const c = bCenter(b);
+  return Math.hypot((i % s.width) + 0.5 - c.x, Math.floor(i / s.width) + 0.5 - c.y);
+}
 
 function nearestTile(
   s: GameState,
@@ -454,31 +603,29 @@ function nearestTile(
   return best;
 }
 
-function addOutput(s: GameState, b: Building, out: Cost, cap: number): boolean {
-  for (const k in out) {
-    const id = k as ResourceId;
-    if (id !== 'gold' && s.res[id] >= cap) return false;
-  }
-  for (const k in out) {
-    const id = k as ResourceId;
-    const n = out[id] ?? 0;
-    s.res[id] = id === 'gold' ? s.res[id] + n : Math.min(cap, s.res[id] + n);
-    b.output += n;
-  }
+function fullFor(s: GameState, out: Cost): boolean {
+  for (const k in out) if (roomFor(s, k as ResourceId) <= 0) return true;
+  return false;
+}
+
+function addOutput(s: GameState, b: Building, out: Cost): boolean {
+  if (fullFor(s, out)) return false;
+  for (const k in out) b.output += store(s, k as ResourceId, out[k as ResourceId] ?? 0);
   return true;
 }
 
 /** Performs one production cycle. Returns a status string on failure. */
-function produce(s: GameState, b: Building, rng: StateRng, cap: number): string | null {
+function produce(s: GameState, b: Building, rng: StateRng): string | null {
   const d = BUILDINGS[b.type];
   const season = seasonOf(s.day);
   switch (b.type) {
     case 'woodcutter': {
-      if (s.res.wood >= cap) return 'Storage full';
+      if (fullFor(s, d.outputs)) return 'Storage full';
       const t = nearestTile(s, b, d.radius, (i, dist) => (s.trees[i] > 0 ? dist - s.trees[i] * 1.2 : null));
       if (t < 0) return 'No trees in range';
+      b.resDist = tileDist(s, b, t);
       s.trees[t]--;
-      addOutput(s, b, d.outputs, cap);
+      addOutput(s, b, d.outputs);
       return null;
     }
     case 'forester': {
@@ -501,40 +648,42 @@ function produce(s: GameState, b: Building, rng: StateRng, cap: number): string 
     case 'mine': {
       const arr = b.type === 'quarry' ? s.rock : s.ore;
       const out = b.type === 'quarry' ? 'stone' : 'iron';
-      if (s.res[out] >= cap) return 'Storage full';
+      if (roomFor(s, out) <= 0) return 'Storage full';
       const t = nearestTile(s, b, d.radius, (i, dist) => (arr[i] > 0 ? dist : null));
       if (t < 0) return b.type === 'quarry' ? 'No rock in range' : 'No ore in range';
+      b.resDist = tileDist(s, b, t);
       arr[t]--;
-      addOutput(s, b, d.outputs, cap);
+      addOutput(s, b, d.outputs);
       return null;
     }
     case 'forager': {
       if (season === 3) return 'Bushes are bare in winter';
-      if (s.res.berries >= cap) return 'Storage full';
+      if (roomFor(s, 'berries') <= 0) return 'Storage full';
       const t = nearestTile(s, b, d.radius, (i, dist) => (s.berries[i] > 0 ? dist : null));
       if (t < 0) {
         return countInRadius(s, bCenter(b), d.radius, (i) => s.berriesMax[i] > 0) > 0
           ? 'Bushes picked clean for now'
           : 'No berry bushes in range';
       }
+      b.resDist = tileDist(s, b, t);
       s.berries[t]--;
-      addOutput(s, b, d.outputs, cap);
+      addOutput(s, b, d.outputs);
       return null;
     }
     case 'hunter': {
       const forest = countInRadius(s, bCenter(b), d.radius, (i) => s.trees[i] > 0);
       if (forest < 8) return 'Not enough forest for game';
-      if (s.res.meat >= cap) return 'Storage full';
+      if (roomFor(s, 'meat') <= 0) return 'Storage full';
       const amount = Math.max(1, Math.round((d.outputs.meat ?? 0) * Math.min(1, forest / 40)));
-      addOutput(s, b, { meat: amount }, cap);
+      addOutput(s, b, { meat: amount });
       return null;
     }
     case 'fisher': {
       const water = countInRadius(s, bCenter(b), d.radius, (i) => s.terrain[i] === 1);
       if (water < 2) return 'No water nearby';
-      if (s.res.fish >= cap) return 'Storage full';
+      if (roomFor(s, 'fish') <= 0) return 'Storage full';
       const amount = Math.max(1, Math.round((d.outputs.fish ?? 0) * Math.min(1, water / 12) * (season === 3 ? 0.5 : 1)));
-      addOutput(s, b, { fish: amount }, cap);
+      addOutput(s, b, { fish: amount });
       return null;
     }
     default: {
@@ -547,12 +696,12 @@ function produce(s: GameState, b: Building, rng: StateRng, cap: number): string 
         const missing = Object.keys(d.inputs).filter((k) => s.res[k as ResourceId] < (d.inputs[k as ResourceId] ?? 0));
         return `Waiting for ${missing.join(', ')}`;
       }
+      if (fullFor(s, d.outputs)) return 'Storage full';
       for (const k in d.outputs) {
-        const id = k as ResourceId;
-        if (id !== 'gold' && s.res[id] >= cap) return 'Storage full';
+        if (k !== 'gold' && s.res[k as ResourceId] >= STOCK_TARGET) return `Enough ${k} in store`;
       }
       pay(s, d.inputs);
-      addOutput(s, b, d.outputs, cap);
+      addOutput(s, b, d.outputs);
       return null;
     }
   }
@@ -568,7 +717,7 @@ export const FARM_YIELD = 300;
 /** Converters leave this much timber in stock for firewood. */
 export const WOOD_RESERVE = 20;
 
-function stepFarm(s: GameState, b: Building, cap: number): void {
+function stepFarm(s: GameState, b: Building): void {
   const month = monthOf(s.day);
   const crew = b.workers / BUILDINGS.farm.workers;
   b.blocked = 0;
@@ -581,9 +730,7 @@ function stepFarm(s: GameState, b: Building, cap: number): void {
   } else if (month === 7 && s.day % DAYS_PER_MONTH === 0 && b.growth > 0) {
     if (crew > 0) {
       const amount = Math.round(FARM_YIELD * b.growth * (0.5 + 0.5 * farmFertility(s, b)) * (0.6 + 0.4 * crew));
-      const before = s.res.grain;
-      s.res.grain = Math.max(before, Math.min(cap, before + amount));
-      const gained = s.res.grain - before;
+      const gained = store(s, 'grain', amount);
       b.output += gained;
       if (gained === 0) log(s, `The harvest rotted in the field: no room left to store ${amount} grain.`, 'bad', b);
       else if (gained < amount) log(s, `Harvest! A farm brought in ${gained} grain; ${amount - gained} spoiled for lack of storage.`, 'bad', b);
@@ -628,29 +775,37 @@ function passiveStatus(s: GameState, b: Building): string {
       return homes ? `Cheering ${homes} home${homes > 1 ? 's' : ''} nearby` : 'No homes nearby yet';
     }
     case 'storehouse':
-      return `Storing goods (limit ${storageCap(s)} each)`;
+      return `Materials in store: ${Math.floor(stored(s, 'materials'))} / ${storageCap(s, 'materials')}`;
+    case 'granary':
+      return `Food in store: ${Math.floor(stored(s, 'food'))} / ${storageCap(s, 'food')}`;
     default:
       return 'Operating';
   }
 }
 
+/**
+ * Share of time spent working rather than walking: trips to storage and to
+ * the trees, rocks or bushes being gathered both slow a workplace down.
+ */
+export function workEfficiency(b: Building): number {
+  const d = BUILDINGS[b.type];
+  if (!d.cycle) return 1;
+  const toResource = d.gathers && d.gathers !== 'water' && d.gathers !== 'forest' ? (2 * (b.resDist ?? d.radius / 2)) / OFFROAD_TILES_PER_DAY : 0;
+  const walking = ((b.trip ?? 0) + toResource) / Math.max(1, d.workers);
+  return d.cycle / (d.cycle + TRAVEL_WEIGHT * walking);
+}
+
 export function dailyProduction(s: GameState, rng: StateRng): void {
-  const cap = storageCap(s);
   for (const b of s.buildings) {
     const d = BUILDINGS[b.type];
     if (b.build < 1) continue;
-    if (!b.connected && b.type !== 'townhall') {
-      b.status = 'No road to the manor';
-      b.blocked = 0;
-      continue;
-    }
     if (b.paused) {
       b.status = 'Paused';
       b.blocked = 0;
       continue;
     }
     if (b.type === 'farm') {
-      stepFarm(s, b, cap);
+      stepFarm(s, b);
       continue;
     }
     if (d.workers === 0 || d.cycle === 0) {
@@ -663,12 +818,13 @@ export function dailyProduction(s: GameState, rng: StateRng): void {
       if (!isBlocked(b)) b.status = 'No workers available';
       continue;
     }
-    b.work += b.workers / d.workers / d.cycle;
+    b.efficiency = workEfficiency(b);
+    b.work += ((b.workers / d.workers) * b.efficiency) / d.cycle;
     let status: string | null = null;
     let tried = false;
     while (b.work >= 1) {
       tried = true;
-      status = produce(s, b, rng, cap);
+      status = produce(s, b, rng);
       if (status) {
         b.work = 1;
         break;
@@ -677,7 +833,7 @@ export function dailyProduction(s: GameState, rng: StateRng): void {
     }
     if (tried) {
       // Winter rest and full storage are normal pauses, not problems to flag.
-      const idle = (b.type === 'forager' && seasonOf(s.day) === 3) || status === 'Storage full';
+      const idle = (b.type === 'forager' && seasonOf(s.day) === 3) || status === 'Storage full' || !!status?.startsWith('Enough');
       b.blocked = status ? (idle ? BLOCK_SEASONAL : BLOCK_PROBLEM) : 0;
     }
     if (status || !b.blocked) b.status = status ?? 'Working';
@@ -686,27 +842,78 @@ export function dailyProduction(s: GameState, rng: StateRng): void {
 
 // ---------------------------------------------------------------- construction
 
+/** Most builders that work one site at once. */
+export const MAX_BUILDERS = 4;
+
+/** Construction sites in the order builders attend to them. */
+export function constructionSites(s: GameState): Building[] {
+  return s.buildings.filter((b) => b.build < 1).sort((a, b) => a.id - b.id);
+}
+
+export function needsMaterials(b: Building): boolean {
+  if (!b.need) return false;
+  for (const k in b.need) if ((b.need[k as ResourceId] ?? 0) > 0) return true;
+  return false;
+}
+
+/**
+ * Builders first carry the materials over from storage, a load per trip,
+ * then raise the building.
+ */
 export function dailyConstruction(s: GameState): void {
-  let helpers = Math.max(0, s.population - employed(s));
-  const sites = s.buildings.filter((b) => b.build < 1).sort((a, b) => a.id - b.id);
-  for (const b of sites) {
-    if (!b.connected) {
-      b.status = 'Needs a road to the manor';
+  for (const b of constructionSites(s)) {
+    const n = b.workers;
+    const d = BUILDINGS[b.type];
+    if (needsMaterials(b)) {
+      if (n === 0) {
+        b.status = b.paused ? 'Paused' : 'Waiting for builders';
+        continue;
+      }
+      // Each builder brings one load per round trip.
+      b.work += (n * CARRY_LOAD) / ((b.trip ?? 0) + 0.5);
+      let missing = '';
+      for (const k in b.need) {
+        const id = k as ResourceId;
+        const want = b.need![id] ?? 0;
+        if (want <= 0) continue;
+        const take = Math.min(Math.floor(b.work), want, Math.floor(s.res[id]));
+        if (take > 0) {
+          s.res[id] -= take;
+          b.need![id] = want - take;
+          b.work -= take;
+        }
+        if ((b.need![id] ?? 0) > 0 && s.res[id] < 1) missing = RESOURCE_INFO_NAMES[id] ?? id;
+      }
+      // Loads cannot pile up beyond a trip's worth while waiting for goods.
+      b.work = Math.min(b.work, n * CARRY_LOAD);
+      b.status = missing ? `Waiting for ${missing} in storage` : `Carrying materials (${n} builder${n > 1 ? 's' : ''})`;
+      if (!needsMaterials(b)) b.work = 0;
       continue;
     }
-    const n = Math.min(helpers, 3);
-    helpers -= n;
-    b.workers = 0;
-    const d = BUILDINGS[b.type];
-    b.build = Math.min(1, b.build + (1 + n * 0.6) / d.buildDays);
-    b.status = `Under construction (${n} helping)`;
+    // Everything is on site: raise the building.
+    if (n === 0) {
+      b.status = b.paused ? 'Paused' : 'Waiting for builders';
+      continue;
+    }
+    b.build = Math.min(1, b.build + (n * 0.5) / d.buildDays);
+    b.status = `Raising the walls (${n} builder${n > 1 ? 's' : ''})`;
     if (b.build >= 1) {
       b.status = 'Completed';
+      b.need = undefined;
+      b.work = 0;
       log(s, `${d.name} completed.`, 'good', b);
       s.dirty = true;
     }
   }
 }
+
+const RESOURCE_INFO_NAMES: Partial<Record<ResourceId, string>> = {
+  wood: 'timber',
+  stone: 'stone',
+  planks: 'planks',
+  iron: 'iron',
+  tools: 'tools',
+};
 
 // ---------------------------------------------------------------- monthly
 

@@ -39,7 +39,7 @@ const ADVICE: Advice[] = [
   },
   {
     id: 'idle-jobs',
-    when: (s) => s.buildings.some((b) => b.build >= 1 && BUILDINGS[b.type].workers > 0 && b.workers === 0 && !b.paused && b.connected),
+    when: (s) => s.buildings.some((b) => b.build >= 1 && BUILDINGS[b.type].workers > 0 && b.workers === 0 && !b.paused),
     text: () => 'Steward: some workplaces stand empty for lack of hands. More houses bring more workers, or pause buildings you do not need.',
   },
 ];

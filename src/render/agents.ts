@@ -1,6 +1,6 @@
-import { BUILDINGS } from '../game/data';
+import { BUILDINGS, DAY_SECONDS, OFFROAD_TILES_PER_DAY, ROAD_TILES_PER_DAY, STORAGE_CAPACITY } from '../game/data';
 import { findPath } from '../game/path';
-import { doorTile, forTilesInRadius, bCenter, isWinter } from '../game/sim';
+import { doorTile, forTilesInRadius, bCenter, isWinter, needsMaterials } from '../game/sim';
 import type { Building, GameState, ResourceId } from '../game/types';
 import { getBuilding, idx, inBounds } from '../game/world';
 
@@ -22,7 +22,7 @@ export interface Agent {
   phase: Phase;
   timer: number;
   /** What to do after arriving. */
-  next: 'enter-work' | 'act' | 'return' | 'enter-home' | 'wander-done' | 'arrive-hall';
+  next: 'enter-work' | 'act' | 'return' | 'enter-home' | 'wander-done' | 'arrive-hall' | 'fetch' | 'drop';
   carry: ResourceId | null;
   tunic: string;
   hair: string;
@@ -34,12 +34,16 @@ export interface Agent {
   /** Animation hint while acting: chop, dig, pick, hammer, fish, plant. */
   act: string;
   fadeIn: number;
+  /** Resource a builder is fetching. */
+  want?: ResourceId;
 }
 
 const TUNICS = ['#8a3b2e', '#4a5e8a', '#6b7a3a', '#9a7a3a', '#5e4a6e', '#7a5a3a', '#3a6a6a', '#a05a3a', '#556070'];
 const HAIR = ['#3a2a1a', '#6a4a2a', '#c8a060', '#2a2420', '#8a5a2a', '#d8d0c0'];
 
-const SPEED = 1.7; // tiles per second at 1x
+/** Walking speed in tiles per game-second (game time already includes the speed setting). */
+const ROAD_SPEED = ROAD_TILES_PER_DAY / DAY_SECONDS;
+const OFFROAD_SPEED = OFFROAD_TILES_PER_DAY / DAY_SECONDS;
 const GATHERING = new Set(['market', 'well', 'church', 'maypole', 'garden', 'statue']);
 const MAX_AGENTS = 180;
 
@@ -69,16 +73,10 @@ export class AgentSystem {
   private desiredRoles(s: GameState): Role[] {
     const roles: Role[] = [];
     for (const b of s.buildings) {
-      if (b.build < 1) continue;
-      for (let k = 0; k < b.workers; k++) roles.push({ kind: 'work', id: b.id });
+      const kind = b.build < 1 ? 'build' : 'work';
+      for (let k = 0; k < b.workers; k++) roles.push({ kind, id: b.id });
     }
-    let idle = s.population - roles.length;
-    const sites = s.buildings.filter((b) => b.build < 1 && b.connected).sort((a, b) => a.id - b.id);
-    for (const b of sites) {
-      const n = Math.min(idle, 3);
-      for (let k = 0; k < n; k++) roles.push({ kind: 'build', id: b.id });
-      idle -= n;
-    }
+    const idle = s.population - roles.length;
     for (let k = 0; k < idle; k++) roles.push({ kind: 'idle' });
     return roles;
   }
@@ -217,7 +215,8 @@ export class AgentSystem {
   private tick(s: GameState, a: Agent, dt: number): void {
     if (a.fadeIn < 1) a.fadeIn = Math.min(1, a.fadeIn + dt * 2);
     if (a.phase === 'walk') {
-      let move = SPEED * dt * (s.road[idx(s, Math.floor(a.x), Math.floor(a.y))] ? 1.25 : 1);
+      const here = idx(s, Math.floor(a.x), Math.floor(a.y));
+      let move = dt * (s.road[here] ? ROAD_SPEED : OFFROAD_SPEED) * (a.carry ? 0.85 : 1);
       while (move > 0 && a.path.length) {
         const t = a.path[0];
         const tx = (t % s.width) + 0.5;
@@ -238,7 +237,7 @@ export class AgentSystem {
         // Screen-space facing: +1 right, -1 left.
         if (Math.abs(dx - dy) > 0.01) a.dir = dx - dy > 0 ? 1 : -1;
       }
-      a.step += dt * 9;
+      a.step += dt * 6;
       if (!a.path.length) this.arrive(s, a);
       return;
     }
@@ -254,11 +253,22 @@ export class AgentSystem {
         a.phase = 'inside';
         a.visible = false;
         a.carry = null;
-        a.timer = 2 + Math.random() * 3;
+        a.timer = 4 + Math.random() * 5;
         break;
       case 'act':
         a.phase = 'act';
-        a.timer = 2.5 + Math.random() * 2.5;
+        a.timer = 4 + Math.random() * 4;
+        break;
+      case 'fetch':
+        // Loading up at the store.
+        a.phase = 'pause';
+        a.timer = 1 + Math.random();
+        a.carry = a.want ?? null;
+        break;
+      case 'drop':
+        a.phase = 'pause';
+        a.timer = 1 + Math.random();
+        a.carry = null;
         break;
       case 'return':
         a.phase = 'pause';
@@ -299,6 +309,27 @@ export class AgentSystem {
         this.decideIdle(s, a);
         return;
       }
+      // Haul materials from storage while the site still needs them.
+      if (needsMaterials(b)) {
+        if (a.carry) {
+          this.goToSiteEdge(s, a, b, 'drop');
+          return;
+        }
+        const store = nearestStore(s, b);
+        const want = Object.keys(b.need!).find((k) => (b.need![k as ResourceId] ?? 0) > 0 && s.res[k as ResourceId] >= 1) as ResourceId | undefined;
+        if (store && want) {
+          this.exitIfInside(s, a);
+          a.want = want;
+          const d = doorTile(s, store);
+          this.walkTo(s, a, d.x, d.y, [store.id], 'fetch');
+          return;
+        }
+        // Nothing to carry yet: wait by the site.
+        a.phase = 'pause';
+        a.timer = 3;
+        if (!a.visible) this.goToSiteEdge(s, a, b, 'wander-done');
+        return;
+      }
       // Walk to a spot beside the site, then hammer.
       if (a.phase === 'act' || a.next === 'act') {
         a.phase = 'act';
@@ -315,7 +346,19 @@ export class AgentSystem {
     this.decideWork(s, a, b);
   }
 
-  private goToSiteEdge(s: GameState, a: Agent, b: Building): void {
+  /** An agent resting inside a building steps out of its door first. */
+  private exitIfInside(s: GameState, a: Agent): void {
+    if (a.visible) return;
+    const home = getBuilding(s, a.home);
+    if (home) {
+      const d = doorTile(s, home);
+      a.x = d.x + 0.5;
+      a.y = d.y + 0.5;
+    }
+    a.fadeIn = 0;
+  }
+
+  private goToSiteEdge(s: GameState, a: Agent, b: Building, next: Agent['next'] = 'act'): void {
     const spots: [number, number][] = [];
     for (let x = b.x - 1; x <= b.x + b.w; x++) {
       for (let y = b.y - 1; y <= b.y + b.h; y++) {
@@ -329,7 +372,8 @@ export class AgentSystem {
     if (!spots.length) return;
     const [x, y] = spots[Math.floor(Math.random() * spots.length)];
     a.act = 'hammer';
-    this.walkTo(s, a, x, y, [], 'act');
+    this.exitIfInside(s, a);
+    this.walkTo(s, a, x, y, [], next);
   }
 
   private decideIdle(s: GameState, a: Agent): void {
@@ -342,7 +386,7 @@ export class AgentSystem {
         if (s.road[i]) roads.push(i);
       });
       // Sometimes visit a gathering place: market, well, church or maypole.
-      const spots = s.buildings.filter((b) => GATHERING.has(b.type) && b.build >= 1 && b.connected);
+      const spots = s.buildings.filter((b) => GATHERING.has(b.type) && b.build >= 1);
       if (spots.length && Math.random() < 0.35) {
         const near = spots.filter((b) => {
           const bc = bCenter(b);
@@ -515,7 +559,7 @@ function nearestStore(s: GameState, b: Building): Building | null {
   let best: Building | null = null;
   let bestD = Infinity;
   for (const o of s.buildings) {
-    if ((o.type !== 'townhall' && o.type !== 'storehouse') || o.build < 1 || !o.connected) continue;
+    if (!STORAGE_CAPACITY[o.type] || o.build < 1) continue;
     const oc = bCenter(o);
     const d = Math.hypot(oc.x - c.x, oc.y - c.y);
     if (d < bestD) {

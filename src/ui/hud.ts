@@ -26,7 +26,10 @@ import {
   nextTierRequirements,
   seasonOf,
   setTax,
+  hasProblem,
+  roomFor,
   storageCap,
+  stored,
   totalFood,
   totalHousing,
   trade,
@@ -191,7 +194,6 @@ export class Hud {
   update(): void {
     const g = this.game;
     const s = g.state;
-    const cap = storageCap(s);
 
     // Top bar.
     const food = totalFood(s);
@@ -205,9 +207,16 @@ export class Hud {
       <div class="res ${months < 1.2 ? 'low' : ''}" data-tip="${esc(foodTip)}">${ICONS.bread}${Math.floor(food)}</div>`;
     for (const r of TOP_RES) {
       const v = Math.floor(s.res[r]);
-      const full = r !== 'gold' && v >= cap;
-      html += `<div class="res ${full ? 'full' : ''}" data-tip="<b>${RESOURCE_INFO[r].name}</b><br>${esc(RESOURCE_INFO[r].desc)}${r !== 'gold' ? `<br>Storage: ${v} / ${cap}` : ''}">${ICONS[r]}${v}</div>`;
+      const full = r !== 'gold' && roomFor(s, r) <= 0;
+      html += `<div class="res ${full ? 'full' : ''}" data-tip="<b>${RESOURCE_INFO[r].name}</b><br>${esc(RESOURCE_INFO[r].desc)}">${ICONS[r]}${v}</div>`;
     }
+    const matUsed = Math.floor(stored(s, 'materials'));
+    const matCap = storageCap(s, 'materials');
+    const foodUsed = Math.floor(stored(s, 'food'));
+    const foodCap = storageCap(s, 'food');
+    html += `<div class="sep"></div>
+      <div class="res ${matUsed >= matCap ? 'full' : ''}" data-tip="<b>Storehouses</b><br>Building materials: ${matUsed} of ${matCap}.<br>Build a Storehouse for more room.">${ICONS.storage}<span class="delta">${Math.round((100 * matUsed) / Math.max(1, matCap))}%</span></div>
+      <div class="res ${foodUsed >= foodCap ? 'full' : ''}" data-tip="<b>Granaries</b><br>Food: ${foodUsed} of ${foodCap}.<br>Build a Granary for more room.">${ICONS.granary}<span class="delta">${Math.round((100 * foodUsed) / Math.max(1, foodCap))}%</span></div>`;
     setHTML(this.el.topbar, html);
 
     // Clock.
@@ -265,7 +274,7 @@ export class Hud {
   private updateTown(): void {
     const g = this.game;
     const s = g.state;
-    const jobs = s.buildings.reduce((a, b) => a + (b.build >= 1 && b.connected && !b.paused ? BUILDINGS[b.type].workers : 0), 0);
+    const jobs = s.buildings.reduce((a, b) => a + (b.build >= 1 && !b.paused ? BUILDINGS[b.type].workers : 0), 0);
     const emp = employed(s);
     const factors = s.happinessFactors
       .map((f) => `<div><span>${f.label}</span><span class="${f.value >= 0 ? 'pos' : 'neg'}">${f.value > 0 ? '+' : ''}${f.value}</span></div>`)
@@ -321,7 +330,7 @@ export class Hud {
       if (Object.keys(d.inputs).length) rows.push(`<div class="kv"><span>Consumes</span><span class="costline">${costHtml(d.inputs)}</span></div>`);
       if (Object.keys(d.outputs).length) rows.push(`<div class="kv"><span>Produces</span><span class="costline">${costHtml(d.outputs)}</span></div>`);
     }
-    const warn = !b.connected || /No |Waiting|full|rotted|untended|Not enough/.test(b.status);
+    const warn = hasProblem(b) || /Waiting|rotted|untended/.test(b.status);
     const actions: string[] = [];
     if (b.build >= 1 && d.workers > 0) {
       actions.push(`<button data-action="pause-b">${b.paused ? '▶ Resume' : '❚❚ Pause'}</button>`);
@@ -339,7 +348,7 @@ export class Hud {
       <h2>${b.type === 'house' && b.level >= 2 ? 'Timber Townhouse' : d.name}</h2>
       <div class="desc">${d.desc}</div>
       ${rows.join('')}
-      <div class="status ${warn ? 'warn' : ''}">${b.connected || b.type === 'townhall' ? esc(b.status || 'Idle') : 'Not connected to the Manor Hall by road'}</div>
+      <div class="status ${warn ? 'warn' : ''}">${esc(b.status || 'Idle')}</div>
       <div class="actions">${actions.join('')}</div>`;
   }
 
@@ -459,7 +468,7 @@ export class Hud {
     const occ = s.occ[i];
     if (occ >= 0) {
       const b = s.buildings.find((o) => o.id === occ);
-      if (b) html = `<b>${BUILDINGS[b.type].name}</b><br>${esc(b.connected || b.type === 'townhall' ? b.status : 'Needs a road connection')}`;
+      if (b) html = `<b>${BUILDINGS[b.type].name}</b><br>${esc(b.status)}`;
     } else if (s.trees[i]) html = `<b>Forest</b><br>${s.trees[i]} tree${s.trees[i] > 1 ? 's' : ''} · ${s.trees[i] * 3} timber`;
     else if (s.rock[i]) html = `<b>Rock deposit</b><br>${s.rock[i]} loads of stone`;
     else if (s.ore[i]) html = `<b>Iron ore</b><br>${s.ore[i]} loads of ore`;
@@ -813,13 +822,12 @@ export class Hud {
 
   private showTrade(): void {
     const s = this.game.state;
-    const cap = storageCap(s);
     const rows = (Object.keys(TRADE_PRICES) as ResourceId[])
       .map((r) => {
         const price = TRADE_PRICES[r]!;
         const sell = Math.floor(price * SELL_FACTOR * 10);
         return `<tr><td>${ICONS[r]} ${RESOURCE_INFO[r].name}</td><td>${Math.floor(s.res[r])}</td>
-          <td><button data-action="trade-do" data-res="${r}" data-n="10" ${s.res.gold < price * 10 || s.res[r] + 10 > cap ? 'disabled' : ''}>Buy 10 (${price * 10})</button></td>
+          <td><button data-action="trade-do" data-res="${r}" data-n="10" ${s.res.gold < price * 10 || roomFor(s, r) < 10 ? 'disabled' : ''}>Buy 10 (${price * 10})</button></td>
           <td><button data-action="trade-do" data-res="${r}" data-n="-10" ${s.res[r] < 10 ? 'disabled' : ''}>Sell 10 (+${sell})</button></td></tr>`;
       })
       .join('');

@@ -1,5 +1,5 @@
 import { BUILDINGS } from '../game/data';
-import { hasProblem, monthOf, seasonOf } from '../game/sim';
+import { deliveredTo, hasProblem, monthOf, seasonOf } from '../game/sim';
 import type { Building, BuildingType, GameState, ResourceId, Season } from '../game/types';
 import { idx, inBounds } from '../game/world';
 import type { Agent } from './agents';
@@ -637,9 +637,7 @@ export class Renderer {
     }
     // Status markers.
     if (!this.showMarkers) return;
-    if (!b.connected && b.type !== 'townhall') {
-      this.drawMarker(b, '#d8462e', '!');
-    } else if (hasProblem(b)) {
+    if (hasProblem(b)) {
       this.drawMarker(b, '#e0a030', '?');
     }
     void s;
@@ -708,8 +706,18 @@ export class Renderer {
         p.line([a[0], a[1], zz], [bb[0], bb[1], zz], '#8a6a44', 1);
       }
     }
-    // Materials.
-    p.logPile(b.x + b.w - 0.1, b.y + b.h - 0.6, 2);
+    // Materials delivered so far, stacked beside the site.
+    const got = deliveredTo(b);
+    const wood = got.wood ?? 0;
+    const stone = got.stone ?? 0;
+    const planks = got.planks ?? 0;
+    if (wood > 0) p.logPile(b.x + b.w - 0.1, b.y + b.h - 0.6, Math.min(3, 1 + Math.floor(wood / 8)));
+    if (stone > 0) p.stonePile(b.x + 0.15, b.y + b.h - 0.35, Math.min(6, 1 + Math.floor(stone / 6)));
+    if (planks > 0) {
+      for (let i = 0; i < Math.min(4, 1 + Math.floor(planks / 6)); i++) {
+        p.box(b.x + b.w - 0.7, b.y + 0.15, b.x + b.w - 0.25, b.y + 0.35, i * 2.2, 2, i % 2 ? '#d7b47c' : '#c8a46c');
+      }
+    }
     // Progress bar.
     const [bx, by] = iso(b.x + b.w / 2, b.y + b.h / 2, h + 18);
     c.fillStyle = 'rgba(40,28,16,0.75)';

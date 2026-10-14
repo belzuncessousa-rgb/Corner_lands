@@ -1,11 +1,13 @@
 import './ui/styles.css';
 import { listSaves, loadGame, saveGame } from './api';
-import { BUILDINGS, BUILD_ORDER, MONTH_NAMES, TIERS } from './game/data';
+import { BUILDINGS, BUILD_ORDER, DAY_SECONDS, MONTH_NAMES, TIERS } from './game/data';
 import { playBot } from './game/autoplay';
 import { deserialize, serialize } from './game/save';
 import {
   BRIDGE_COST,
   buildRoad,
+  canAfford,
+  materialsOf,
   bCenter,
   isBridge,
   centerOf,
@@ -32,8 +34,6 @@ import { Hud } from './ui/hud';
 
 export type Tool = { kind: 'select' } | { kind: 'build'; type: BuildingType } | { kind: 'road' } | { kind: 'demolish' };
 
-/** Real seconds per game day at 1x speed. */
-const DAY_SECONDS = 1.5;
 const SPEEDS = [0, 1, 2, 4];
 
 export class Game {
@@ -340,7 +340,7 @@ export class Game {
       const b = placeOrder(s, tool.type, p.x, p.y);
       if (b) {
         this.hud.sound('place');
-        if (!b.connected) this.hud.flash('Connect it to the Manor Hall with a road to start construction.');
+        if (!canAfford(s, materialsOf(BUILDINGS[tool.type].cost))) this.hud.flash('Builders will start once the materials are in storage.');
         if (tool.type !== 'house' && tool.type !== 'well') {
           this.setTool({ kind: 'select' });
           this.select(b.id);
