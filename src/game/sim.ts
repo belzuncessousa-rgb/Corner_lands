@@ -12,6 +12,7 @@ import {
   TIERS,
   TRADE_PRICES,
 } from './data';
+import { advise } from './advisor';
 import { rollEvent } from './events';
 import { checkQuests } from './quests';
 import { StateRng } from './rng';
@@ -752,6 +753,7 @@ export function monthly(s: GameState, rng: StateRng): void {
 
   updateTier(s);
   checkQuests(s);
+  advise(s, month);
   s.history.push({ d: s.day, pop: s.population, food: Math.floor(totalFood(s)), happy: s.happiness, gold: Math.floor(s.res.gold) });
   if (s.history.length > MAX_HISTORY) s.history.splice(0, s.history.length - MAX_HISTORY);
 }
