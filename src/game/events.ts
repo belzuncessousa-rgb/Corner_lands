@@ -167,7 +167,20 @@ export const EVENTS: DecisionEvent[] = [
     text: () =>
       'Howling in the night. A shepherd swears he saw a pack of wolves at the forest edge, bold and hungry, eyeing the smokehouse.',
     weight: (s) => (s.population >= 10 ? 2 : 0),
-    choices: () => [
+    choices: (s) => [
+      ...(s.retinue
+        ? [
+            {
+              label: 'Send the retinue',
+              detail: 'The guard rides out. +15 meat, +2 prestige.',
+              apply: (st: GameState) => {
+                store(st, 'meat', 15);
+                st.res.prestige += 2;
+                return { text: "The lord's men ran the pack down by torchlight. The villages sing of it.", kind: 'good' as MessageKind };
+              },
+            },
+          ]
+        : []),
       {
         label: 'Organise a hunt',
         detail: 'Pay the hunters 25 coins. +20 meat.',
@@ -386,6 +399,20 @@ export const EVENTS: DecisionEvent[] = [
       'Carters report masked men on the forest road. Last night they took a wagon of goods and left the driver tied to a tree.',
     weight: (s) => (s.population >= 15 ? 2 : 0),
     choices: (s) => [
+      ...(s.retinue
+        ? [
+            {
+              label: 'Send the retinue',
+              detail: 'The guard clears the road. +30 coins of recovered goods, +3 prestige.',
+              apply: (st: GameState) => {
+                st.res.gold += 30;
+                st.res.prestige += 3;
+                addMood(st, 'Safe roads', 3, 6);
+                return { text: "The lord's men caught the bandits at their camp and brought back the stolen goods.", kind: 'good' as MessageKind };
+              },
+            },
+          ]
+        : []),
       {
         label: 'Raise a watch',
         detail: '−30 coins, −15 timber for watchtowers. Bandits stay away.',

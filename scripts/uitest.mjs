@@ -135,6 +135,15 @@ await page.evaluate(() => { const s = window.game.state; s.day = 6 * 10 + 1; s.r
 await page.waitForTimeout(300);
 await page.click('#inspector [data-action="feast"]');
 check('call a harvest feast', (await page.evaluate(() => window.game.state.lastFeast)) === 0);
+// Raise a retinue in a Borough.
+await page.evaluate(() => { const s = window.game.state; s.tier = 3; s.res.prestige = 100; s.res.weapons = 12; window.game.hud.update(); });
+await page.waitForTimeout(300);
+await page.mouse.move(200, 600);
+await page.waitForTimeout(200);
+await page.screenshot({ path: process.env.SHOT2 || '/tmp/claude-0/manor.png', clip: { x: 1440 - 420, y: 0, width: 420, height: 900 } });
+await page.click('#inspector [data-action="retinue"]');
+check('raise a retinue', (await page.evaluate(() => window.game.state.retinue)) === true);
+await page.evaluate(() => { window.game.state.tier = 1; });
 await page.evaluate(() => window.game.select(null));
 // Save through the menu, then load it back.
 await page.keyboard.press('Escape');

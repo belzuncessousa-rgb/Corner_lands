@@ -92,6 +92,9 @@ then fall back to the browser's localStorage.
 - **The manor** — raise the Manor Hall to a Manor House, Stone Manor,
   Lord's Keep and finally a Castle to become a Village, Town, Borough and
   City. Each rank unlocks buildings and adds storage.
+- **Retinue** — a Borough may raise men-at-arms at the manor (prestige and
+  arms, then 10 coins a month). They cheer the town and can be sent against
+  wolves and bandits.
 - **Harvest feast** — once each autumn the lord may call a feast from the
   manor: a meal for everyone and a cask for every eight. It cheers the town for
   half a year and brings prestige, more if there is drink for all.

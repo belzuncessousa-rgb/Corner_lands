@@ -799,3 +799,28 @@ describe('mead', () => {
     expect(t.status).toMatch(/mead/);
   });
 });
+
+describe('retinue', () => {
+  it('is raised in a Borough, is paid monthly and rides out against wolves', async () => {
+    const { raiseRetinue, retinueError, RETINUE_PAY } = await import('../src/game/sim');
+    const { EVENTS } = await import('../src/game/events');
+    const s = generateWorld(87);
+    s.res.prestige = 100;
+    s.res.weapons = 10;
+    expect(retinueError(s)).toMatch(/Borough/);
+    s.tier = 3;
+    expect(raiseRetinue(s)).toBeNull();
+    expect(s.retinue).toBe(true);
+    expect(s.res.weapons).toBe(0);
+    const wolves = EVENTS.find((e) => e.id === 'wolves')!;
+    expect(wolves.choices(s)[0].label).toBe('Send the retinue');
+    s.res.gold = RETINUE_PAY;
+    s.day = DAYS_PER_MONTH - 1;
+    run(s, 1);
+    expect(s.res.gold).toBeLessThan(RETINUE_PAY);
+    expect(s.retinue).toBe(true);
+    s.res.gold = 0;
+    run(s, DAYS_PER_MONTH);
+    expect(s.retinue).toBe(false);
+  });
+});

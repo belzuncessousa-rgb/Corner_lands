@@ -1922,8 +1922,50 @@ export function prestigeIncome(s: GameState): number {
   return n;
 }
 
+// ---------------------------------------------------------------- retinue
+
+/** Settlement rank (Borough) from which the lord may keep a retinue. */
+export const RETINUE_TIER = 3;
+/** Raising the guard: prestige to attract men-at-arms, and their arms. */
+export const RETINUE_COST: Cost = { prestige: 60, weapons: 10 };
+/** Coins the guard is paid each month. */
+export const RETINUE_PAY = 10;
+
+export function retinueError(s: GameState): string | null {
+  if (s.retinue) return 'The retinue is already raised';
+  if (s.tier < RETINUE_TIER) return `Requires ${TIERS[RETINUE_TIER].name}`;
+  if (s.res.prestige < (RETINUE_COST.prestige ?? 0)) return `Needs ${RETINUE_COST.prestige} prestige`;
+  if (s.res.weapons < (RETINUE_COST.weapons ?? 0)) return `Needs ${RETINUE_COST.weapons} arms`;
+  return null;
+}
+
+export function raiseRetinue(s: GameState): string | null {
+  const err = retinueError(s);
+  if (err) return err;
+  pay(s, RETINUE_COST);
+  s.retinue = true;
+  log(s, 'Men-at-arms take service with the lord. Wolves and bandits will find the roads guarded.', 'good');
+  return null;
+}
+
+export function dismissRetinue(s: GameState): void {
+  s.retinue = false;
+}
+
+/** Pays the guard; unpaid, the men-at-arms drift away. */
+function payRetinue(s: GameState): void {
+  if (!s.retinue) return;
+  if (s.res.gold >= RETINUE_PAY) {
+    s.res.gold -= RETINUE_PAY;
+    return;
+  }
+  s.retinue = false;
+  log(s, 'The treasury could not pay the retinue, and the men-at-arms have left.', 'bad');
+}
+
 function monthlyPrestige(s: GameState): void {
   s.res.prestige += prestigeIncome(s);
+  payRetinue(s);
   // The university's masters need books and machines to teach.
   if (hasCharter(s, 'learning3a')) {
     s.universityOk = s.res.books >= 1 && s.res.woodparts >= 2;
@@ -2036,6 +2078,7 @@ export function updateHappiness(s: GameState): void {
     if (luxury) factors.push({ label: 'Fine living (luxuries)', value: Math.round((10 * luxury) / residents) });
   }
   for (const m of s.moods ?? []) if (m.until > s.day) factors.push({ label: m.label, value: m.value });
+  if (s.retinue) factors.push({ label: "The lord's guard", value: 2 });
   if (s.charters?.length) {
     const c = (id: string, label: string, v: number) => hasCharter(s, id) && factors.push({ label, value: v });
     c('nature2', 'Love of the greenwood', 3);

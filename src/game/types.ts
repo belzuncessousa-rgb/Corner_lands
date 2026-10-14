@@ -262,6 +262,8 @@ export interface GameState {
   flow?: Partial<Record<ResourceId, number>>;
   /** Whether the university had its books and wood parts this month. */
   universityOk?: boolean;
+  /** The lord keeps an armed retinue (Borough and up). */
+  retinue?: boolean;
   /** Town charters granted (see charters.ts). */
   charters?: string[];
   /** Goods the settlement has ever held. */
