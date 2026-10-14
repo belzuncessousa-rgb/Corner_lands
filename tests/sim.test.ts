@@ -604,6 +604,44 @@ describe('charters', () => {
     expect(storageCap(s, 'food')).toBe(before + 300);
     const p = prestigeIncome(s);
     grantCharter(s, 'learning1');
-    expect(prestigeIncome(s)).toBe(p + 2);
+    expect(prestigeIncome(s)).toBe(p + 1);
+  });
+});
+
+describe('charter goods', () => {
+  it('charter buildings stay locked until granted', async () => {
+    const { grantCharter } = await import('../src/game/charters');
+    const { isUnlocked, chooseRecipe } = await import('../src/game/sim');
+    const s = generateWorld(61);
+    s.tier = 2;
+    s.res.prestige = 2000;
+    expect(isUnlocked(s, 'scriptorium')).toBe(false);
+    grantCharter(s, 'learning1');
+    expect(isUnlocked(s, 'scriptorium')).toBe(true);
+    // Vines only once the orchard charter allows them.
+    s.tier = 1;
+    const lodge = placeNearRoad(s, 'orchardist');
+    lodge.build = 1;
+    const o = placeNearRoad(s, 'house');
+    o.type = 'orchard';
+    o.recipe = 'grapes';
+    expect(chooseRecipe(s, o, true)?.id).not.toBe('grapes');
+    s.tier = 2;
+    grantCharter(s, 'orchard1');
+    grantCharter(s, 'orchard2');
+    expect(chooseRecipe(s, o, true)?.id).toBe('grapes');
+  });
+
+  it('townhouses enjoy luxuries and pay more for them', () => {
+    const s = generateWorld(62);
+    const h = placeNearRoad(s, 'house');
+    h.build = 1;
+    h.level = 3;
+    s.population = 17;
+    s.res.wine = 2;
+    recompute(s);
+    run(s, DAYS_PER_MONTH);
+    expect(s.res.wine).toBe(1);
+    expect(s.happinessFactors.some((f) => /luxur/.test(f.label))).toBe(true);
   });
 });

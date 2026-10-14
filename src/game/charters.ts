@@ -37,19 +37,19 @@ export const PATHS: CharterPath[] = [
 
 export const CHARTERS: Charter[] = [
   { id: 'metal1', path: 'metal', rank: 1, name: 'Deep Shafts', desc: 'Ore veins never run out.' },
-  { id: 'metal2', path: 'metal', rank: 2, name: 'Precious Veins', desc: 'Miners turn up silver and gold: each load of ore brings a coin.', excludes: ['nature3a', 'nature3b'] },
-  { id: 'metal3a', path: 'metal', rank: 3, name: "Jewellers' Guild", desc: 'Goldsmiths work the precious metal: +3 prestige and +20 coins a month.', excludes: ['metal3b'] },
-  { id: 'metal3b', path: 'metal', rank: 3, name: "Armourers' Guild", desc: 'Smiths forge half as many tools again, and merchants pay half again for tools.', excludes: ['metal3a'] },
+  { id: 'metal2', path: 'metal', rank: 2, name: 'Precious Veins', desc: 'Miners strike silver: now and then a load of silver ore comes up with the iron.', excludes: ['nature3a', 'nature3b'] },
+  { id: 'metal3a', path: 'metal', rank: 3, name: "Jewellers' Guild", desc: "Unlocks the Jeweller's Shop: silver into jewellery, the finest luxury. +1 prestige a month, +2 for each jeweller.", excludes: ['metal3b'] },
+  { id: 'metal3b', path: 'metal', rank: 3, name: "Armourers' Guild", desc: 'Armouries make half as many arms again, and merchants pay half again for them.', excludes: ['metal3a'] },
 
   { id: 'orchard1', path: 'orchard', rank: 1, name: 'Grafting', desc: 'Orchards and hives yield 30% more.' },
-  { id: 'orchard2', path: 'orchard', rank: 2, name: 'Nurseries', desc: 'Young trees bear fruit in a year instead of a year and a half.' },
-  { id: 'orchard3a', path: 'orchard', rank: 3, name: 'Cider Makers', desc: 'Brewhouses press half as much cider again; cider fetches double.', excludes: ['orchard3b'] },
+  { id: 'orchard2', path: 'orchard', rank: 2, name: 'Vines and Nurseries', desc: 'Orchards may be planted with vines for grapes, and young trees bear in a year instead of a year and a half.' },
+  { id: 'orchard3a', path: 'orchard', rank: 3, name: 'Vintners', desc: 'Unlocks the Winery: grapes into wine for taverns and Townhouses. Wine and cider are made and sold for a quarter to half more.', excludes: ['orchard3b'] },
   { id: 'orchard3b', path: 'orchard', rank: 3, name: 'Meadmakers', desc: 'Hives give twice the honey, and honey cakes cheer the town (+4 happiness).', excludes: ['orchard3a'] },
 
-  { id: 'learning1', path: 'learning', rank: 1, name: 'Scriptorium', desc: 'Monks copy books for the lord: +2 prestige a month.' },
+  { id: 'learning1', path: 'learning', rank: 1, name: 'Scriptorium', desc: 'Unlocks the Scriptorium: flax into paper, paper and leather into books, a luxury and a rich export. +1 prestige a month.' },
   { id: 'learning2', path: 'learning', rank: 2, name: 'Guild Schools', desc: 'Apprentices learn their trade: workshops work 10% faster.' },
-  { id: 'learning3a', path: 'learning', rank: 3, name: 'University', desc: 'Masters and machines: workshops work 25% faster.', excludes: ['learning3b'] },
-  { id: 'learning3b', path: 'learning', rank: 3, name: 'Cathedral School', desc: 'A choir and a library: +6 happiness and +2 prestige a month.', excludes: ['learning3a'] },
+  { id: 'learning3a', path: 'learning', rank: 3, name: 'University', desc: 'Masters and machines: workshops work 30% faster in every month the university gets a book and two wood parts.', excludes: ['learning3b'] },
+  { id: 'learning3b', path: 'learning', rank: 3, name: 'Cathedral School', desc: 'A choir and a library: +6 happiness, +2 prestige a month, and books fetch half again.', excludes: ['learning3a'] },
 
   { id: 'nature1', path: 'nature', rank: 1, name: 'Woodland Lore', desc: 'Foragers and hunters bring home 40% more.' },
   { id: 'nature2', path: 'nature', rank: 2, name: 'Greenwood', desc: 'Forests regrow twice as fast; the people love their woods (+3 happiness).' },

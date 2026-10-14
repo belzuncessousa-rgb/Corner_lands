@@ -10,6 +10,7 @@ export const RESOURCE_IDS = [
   'tiles',
   'ore',
   'iron',
+  'silver',
   // Food
   'bread',
   'meat',
@@ -22,6 +23,7 @@ export const RESOURCE_IDS = [
   'apples',
   'pears',
   'plums',
+  'grapes',
   'honey',
   'milk',
   'cheese',
@@ -39,9 +41,14 @@ export const RESOURCE_IDS = [
   'boots',
   'ale',
   'cider',
+  'wine',
   'herbs',
   'medicine',
   'tools',
+  'paper',
+  'books',
+  'jewellery',
+  'weapons',
   // Currency
   'gold',
   'prestige',
@@ -87,6 +94,10 @@ export type BuildingType =
   | 'stonemason'
   | 'carpenter'
   | 'bloomery'
+  | 'jeweller'
+  | 'winery'
+  | 'scriptorium'
+  | 'armoury'
   | 'well'
   | 'market'
   | 'church'
@@ -246,6 +257,8 @@ export interface GameState {
   /** Stock at the end of last month, and the change over that month. */
   lastMonth?: Partial<Record<ResourceId, number>>;
   flow?: Partial<Record<ResourceId, number>>;
+  /** Whether the university had its books and wood parts this month. */
+  universityOk?: boolean;
   /** Town charters granted (see charters.ts). */
   charters?: string[];
   /** Goods the settlement has ever held. */

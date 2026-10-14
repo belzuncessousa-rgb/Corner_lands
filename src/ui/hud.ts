@@ -31,6 +31,7 @@ import {
   recompute,
   seasonOf,
   setKeep,
+  lockReason,
   prestigeIncome,
   setTrade,
   workDef,
@@ -241,7 +242,7 @@ export class Hud {
           return `<div class="card ${sel ? 'sel' : ''} ${locked ? 'locked' : ''} ${poor ? 'poor' : ''}" data-action="build" data-type="${t}" data-tip="${esc(this.buildingTip(t))}">
             ${d.hotkey ? `<span class="key">${d.hotkey}</span>` : ''}
             <img src="${this.cardImage(t)}" alt="" draggable="false">
-            ${locked ? `<div class="lock">${TIERS[d.tier].name}</div>` : ''}
+            ${locked ? `<div class="lock">${d.tier > s.tier ? TIERS[d.tier].name : 'Charter'}</div>` : ''}
             <div class="name">${d.name}</div>
             <div class="cost">${d.zone ? ZONE_COST_NOTE[t] ?? '' : costHtml(d.cost, s.res)}</div>
           </div>`;
@@ -286,7 +287,8 @@ export class Hud {
     if (Object.keys(d.inputs).length) lines.push(`Uses: ${Object.entries(d.inputs).map(([k, v]) => `${v} ${RESOURCE_INFO[k as ResourceId].name}`).join(', ')}`);
     if (Object.keys(d.outputs).length) lines.push(`Makes: ${Object.entries(d.outputs).map(([k, v]) => `${v} ${RESOURCE_INFO[k as ResourceId].name}`).join(', ')}`);
     if (d.zone) lines.push('<i>Click one corner, then the opposite corner.</i>');
-    if (d.tier > this.game.state.tier) lines.push(`<span class="neg">Unlocks at ${TIERS[d.tier].name}</span>`);
+    const lock = lockReason(this.game.state, t);
+    if (lock) lines.push(`<span class="neg">${esc(lock)}</span>`);
     else if (!canAfford(this.game.state, d.cost)) lines.push('<i>You can place it now; builders wait until the materials are in storage.</i>');
     return lines.join('<br>');
   }
@@ -564,7 +566,8 @@ export class Hud {
       if (d.recipes) {
         // Fields, orchards and herds are always one thing; workshops may run on Auto.
         const fixed = !!d.zone || b.type === 'byre';
-        const opts = fixed ? d.recipes : [{ id: '', name: 'Auto' }, ...d.recipes];
+        const avail = d.recipes.filter((r) => !r.charter || hasCharter(s, r.charter));
+        const opts = fixed ? avail : [{ id: '', name: 'Auto' }, ...avail];
         const current = b.recipe ?? (fixed ? d.recipes[0].id : '');
         const label = b.type === 'field' ? 'Crop' : b.type === 'orchard' ? 'Fruit' : b.type === 'byre' ? 'Animals' : 'Product';
         rows.push(`<div class="kv product"><span>${label}</span><span class="seg">${opts
@@ -882,7 +885,7 @@ export class Hud {
     const g = this.game;
     const s = g.state;
     if (!isUnlocked(s, t)) {
-      this.flash(`${BUILDINGS[t].name} unlocks when you become a ${TIERS[BUILDINGS[t].tier].name}.`);
+      this.flash(`${BUILDINGS[t].name}: ${lockReason(s, t)}.`);
       return;
     }
     this.category = BUILDINGS[t].category;

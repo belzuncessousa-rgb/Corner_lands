@@ -39,7 +39,7 @@ export const MANOR_LEVELS: { name: string; cost?: Cost; days?: number }[] = [
   { name: 'Manor House', cost: { wood: 40, stone: 20, gold: 50 }, days: 20 },
   { name: 'Stone Manor', cost: { planks: 40, dressedstone: 40, stone: 20, gold: 150 }, days: 30 },
   { name: "Lord's Keep", cost: { dressedstone: 80, stone: 40, planks: 60, tools: 15, gold: 400 }, days: 40 },
-  { name: 'Castle', cost: { dressedstone: 160, stone: 80, planks: 60, tools: 25, gold: 800, prestige: 150 }, days: 60 },
+  { name: 'Castle', cost: { dressedstone: 160, stone: 80, planks: 60, tools: 25, weapons: 20, gold: 800, prestige: 150 }, days: 60 },
 ];
 
 /** Extra storage each manor level above the first provides. */

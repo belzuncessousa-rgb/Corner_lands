@@ -84,6 +84,13 @@ export const ICONS: Record<ResourceId | 'people' | 'happy' | 'materials' | 'good
   goods: svg(
     '<path d="M3 8h9v9H3z" fill="#a87a48" stroke="#5e3e22" stroke-width=".8"/><path d="M3 8l3-3h9l-3 3z" fill="#c8985a" stroke="#5e3e22" stroke-width=".8"/><path d="M12 8l3-3v9l-3 3z" fill="#8a5e34" stroke="#5e3e22" stroke-width=".8"/><path d="M3 12.5h9M7.5 8v9" stroke="#5e3e22" stroke-width=".6"/>',
   ),
+  silver: svg('<path d="M3 13l3-5h8l3 5z" fill="#b8bcc4"/><path d="M6 8h8l-1-2H7z" fill="#e0e4ea"/><path d="M3 13h14v2H3z" fill="#8a8e96"/><path d="M8 9.5l1.5 1" stroke="#fff" stroke-width=".8"/>'),
+  grapes: svg('<path d="M10 4c1-2 3-2 4-2" stroke="#5a3a20" stroke-width="1.2" fill="none"/><path d="M11 4c2-1 4 0 4 2-2 0-3-1-4-2z" fill="#4a8a3a"/><g fill="#6a3a80"><circle cx="7" cy="7" r="2"/><circle cx="11" cy="7" r="2"/><circle cx="9" cy="10" r="2"/><circle cx="13" cy="10" r="2"/><circle cx="7" cy="12" r="2"/><circle cx="11" cy="13" r="2"/><circle cx="9" cy="16" r="2"/></g>'),
+  wine: svg('<path d="M8 2h4v4c2 1 3 3 3 5v6c0 1-1 1-1 1H6s-1 0-1-1v-6c0-2 1-4 3-5z" fill="#5a1a2a" stroke="#2a0a14" stroke-width=".7"/><path d="M8 2h4" stroke="#7a5a3a" stroke-width="1.6"/><rect x="7" y="10" width="6" height="4" fill="#e8dcc4"/>'),
+  paper: svg('<path d="M5 3h8l3 3v11H5z" fill="#f4ecd8" stroke="#a89878" stroke-width=".7"/><path d="M13 3v3h3" fill="none" stroke="#a89878" stroke-width=".7"/><path d="M7 9h7M7 11.5h7M7 14h5" stroke="#c8b898" stroke-width=".7"/>'),
+  books: svg('<rect x="3" y="5" width="4" height="12" fill="#8a3b2e"/><rect x="7.5" y="3" width="4" height="14" fill="#3a5a8a"/><rect x="12" y="6" width="5" height="11" fill="#3d7a3a" transform="rotate(8 14 11)"/><path d="M3 8h4M7.5 6h4M3 14h4M7.5 14h4" stroke="#d8b84a" stroke-width=".8"/>'),
+  jewellery: svg('<circle cx="10" cy="11" r="5" fill="none" stroke="#d8a838" stroke-width="2.2"/><path d="M7 5l3-3 3 3-3 3z" fill="#6ab0e8" stroke="#3a6a9a" stroke-width=".6"/><circle cx="8" cy="9" r=".7" fill="#fff8d8"/>'),
+  weapons: svg('<path d="M4 17L15 4" stroke="#7a5230" stroke-width="1.6"/><path d="M15 4l2-2-.5 3z" fill="#b8bcc4"/><path d="M5 3c6 2 9 6 11 13" stroke="#6b4a2e" stroke-width="1.6" fill="none"/><path d="M5 3l11 13" stroke="#e8dcc4" stroke-width=".5"/><path d="M8 11l4 4-2 2-4-4z" fill="#9aa0a8"/>'),
   people: svg(
     '<circle cx="7" cy="6" r="2.6" fill="#e8c4a0"/><path d="M2.5 17c0-4 2-6 4.5-6s4.5 2 4.5 6z" fill="#8a3b2e"/><circle cx="13.5" cy="7" r="2.3" fill="#e8c4a0"/><path d="M9.5 17c0-3.5 1.8-5.2 4-5.2s4 1.7 4 5.2z" fill="#4a5e8a"/>',
   ),

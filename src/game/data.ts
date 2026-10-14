@@ -53,6 +53,7 @@ export const GOODS: Record<ResourceId, GoodDef> = {
   tiles: good('Roof Tiles', 'materials', 6, 'Fired clay tiles. Townhouses want a tiled roof.', { keep: 80 }),
   ore: good('Iron Ore', 'materials', 3, 'Rock rich in iron, smelted in a bloomery.'),
   iron: good('Iron', 'materials', 6, 'Iron for the blacksmith.', { keep: 60 }),
+  silver: good('Silver', 'materials', 15, 'Precious ore turned up by deep miners, for the jeweller.', { keep: 40 }),
 
   bread: good('Bread', 'food', 3, 'Baked from flour. Filling: feeds one and a half.', { food: 1.5, foodGroup: 'grain' }),
   meat: good('Meat', 'food', 3, 'Venison and beef.', { food: 1, foodGroup: 'meat' }),
@@ -65,6 +66,7 @@ export const GOODS: Record<ResourceId, GoodDef> = {
   apples: good('Apples', 'food', 2, 'From orchards; also pressed into cider.', { food: 1, foodGroup: 'produce' }),
   pears: good('Pears', 'food', 2, 'From orchards.', { food: 1, foodGroup: 'produce' }),
   plums: good('Plums', 'food', 2, 'From orchards.', { food: 1, foodGroup: 'produce' }),
+  grapes: good('Grapes', 'food', 3, 'From vines planted in orchards; pressed into wine.', { food: 1, foodGroup: 'produce' }),
   honey: good('Honey', 'food', 5, 'From backyard hives. A treat: feeds one and a half.', { food: 1.5, foodGroup: 'dairy' }),
   milk: good('Milk', 'food', 1, 'From cattle. Spoils quickly; better made into cheese.', { food: 0.5, foodGroup: 'dairy' }),
   cheese: good('Cheese', 'food', 4, 'Made from milk at a dairy. Feeds two.', { food: 2, foodGroup: 'dairy' }),
@@ -82,9 +84,14 @@ export const GOODS: Record<ResourceId, GoodDef> = {
   boots: good('Boots', 'goods', 12, 'Sturdy leather boots. Townhouses need them.', { keep: 60 }),
   ale: good('Ale', 'goods', 5, 'Brewed from barley and poured at the tavern.', { keep: 100 }),
   cider: good('Cider', 'goods', 5, 'Pressed from apples.', { keep: 100 }),
+  wine: good('Wine', 'goods', 12, 'From the winery. Taverns pour it, and Townhouses count it a luxury.', { keep: 60 }),
   herbs: good('Herbs', 'goods', 2, 'Gathered wild, made into medicine.'),
   medicine: good('Medicine', 'goods', 10, 'Salves and tinctures. Townhouses want them.', { keep: 40 }),
   tools: good('Tools', 'goods', 14, 'Needed for upgrades and grand buildings.', { keep: 40 }),
+  paper: good('Paper', 'goods', 6, 'Pressed from flax at the scriptorium.', { keep: 40 }),
+  books: good('Books', 'goods', 40, 'Copied and bound at the scriptorium. A luxury for Townhouses; universities need them.', { keep: 20 }),
+  jewellery: good('Jewellery', 'goods', 60, 'Rings and brooches of silver. The finest luxury.', { keep: 20 }),
+  weapons: good('Arms', 'goods', 20, "Bows, pikes and armour. The castle's garrison needs them; merchants pay well.", { keep: 30 }),
 
   gold: good('Coins', 'currency', 0, 'Collected from taxes and trade.'),
   prestige: good('Prestige', 'currency', 0, 'The renown of your house. Earned from a fine manor and a thriving town; spent on charters.'),
@@ -143,6 +150,8 @@ export interface Recipe {
   months?: number[];
   /** Whether Auto may pick it (false for goods nothing uses yet). */
   auto?: boolean;
+  /** Town charter needed before it can be made. */
+  charter?: string;
 }
 
 export interface BuildingDef {
@@ -172,6 +181,8 @@ export interface BuildingDef {
   months?: number[];
   /** Alternative products; the first is the default. */
   recipes?: Recipe[];
+  /** Town charter that unlocks it. */
+  charter?: string;
   /** Drawn areas worked from a nearby workplace (fields, pastures, orchards). */
   zone?: { owner: BuildingType; min: number; max: number };
   buildable: boolean;
@@ -383,6 +394,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
       { id: 'apples', name: 'Apples', inputs: {}, outputs: { apples: 1 } },
       { id: 'pears', name: 'Pears', inputs: {}, outputs: { pears: 1 } },
       { id: 'plums', name: 'Plums', inputs: {}, outputs: { plums: 1 } },
+      { id: 'grapes', name: 'Vines', inputs: {}, outputs: { grapes: 1 }, charter: 'orchard2' },
     ],
   }),
   windmill: def({
@@ -594,6 +606,69 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     outputs: { iron: 2 },
     tier: 2,
   }),
+  jeweller: def({
+    type: 'jeweller',
+    name: "Jeweller's Shop",
+    desc: 'Goldsmiths work silver into rings and brooches: the finest luxury, and the lord gains prestige from their fame.',
+    category: 'industry',
+    cost: { dressedstone: 15, planks: 10, gold: 80 },
+    buildDays: 14,
+    workers: 1,
+    cycle: 5,
+    inputs: { silver: 2 },
+    outputs: { jewellery: 1 },
+    tier: 2,
+    charter: 'metal3a',
+  }),
+  winery: def({
+    type: 'winery',
+    name: 'Winery',
+    desc: 'Treads and presses grapes and ages the wine in casks: a luxury for Townhouses and a drink for the taverns.',
+    category: 'food',
+    cost: { stone: 20, planks: 15, woodparts: 4 },
+    buildDays: 14,
+    workers: 2,
+    cycle: 4,
+    inputs: { grapes: 4 },
+    outputs: { wine: 3 },
+    tier: 2,
+    charter: 'orchard3a',
+  }),
+  scriptorium: def({
+    type: 'scriptorium',
+    name: 'Scriptorium',
+    desc: 'Monks press flax into paper, and copy and bind books with leather covers. Books are a luxury and a fine export.',
+    category: 'civic',
+    cost: { dressedstone: 15, planks: 15, gold: 60 },
+    buildDays: 16,
+    workers: 2,
+    cycle: 4,
+    inputs: { flax: 2 },
+    outputs: { paper: 2 },
+    tier: 2,
+    charter: 'learning1',
+    recipes: [
+      { id: 'paper', name: 'Paper', inputs: { flax: 2 }, outputs: { paper: 2 } },
+      { id: 'books', name: 'Books', inputs: { paper: 3, leather: 1 }, outputs: { books: 1 } },
+    ],
+  }),
+  armoury: def({
+    type: 'armoury',
+    name: 'Armoury',
+    desc: "Fletchers and armourers make bows from planks and armour from iron and leather. The castle's garrison needs arms.",
+    category: 'industry',
+    cost: { stone: 25, planks: 15, gold: 40 },
+    buildDays: 14,
+    workers: 2,
+    cycle: 4,
+    inputs: { planks: 3 },
+    outputs: { weapons: 1 },
+    tier: 3,
+    recipes: [
+      { id: 'bows', name: 'Bows', inputs: { planks: 3 }, outputs: { weapons: 1 } },
+      { id: 'armour', name: 'Armour', inputs: { iron: 2, leather: 1 }, outputs: { weapons: 2 } },
+    ],
+  }),
   well: def({
     type: 'well',
     name: 'Well',
@@ -729,6 +804,7 @@ export const BUILD_ORDER: BuildingType[] = [
   'bakery',
   'brewhouse',
   'dairy',
+  'winery',
   'sawmill',
   'tanner',
   'weaver',
@@ -738,12 +814,15 @@ export const BUILD_ORDER: BuildingType[] = [
   'kiln',
   'bloomery',
   'smithy',
+  'armoury',
+  'jeweller',
   'well',
   'storehouse',
   'granary',
   'market',
   'tavern',
   'apothecary',
+  'scriptorium',
   'church',
   'garden',
   'maypole',

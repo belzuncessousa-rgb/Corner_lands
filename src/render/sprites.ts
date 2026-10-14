@@ -756,6 +756,113 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       }
       break;
     }
+    case 'jeweller': {
+      p.shadow(0.35, 0.35, 1.6, 1.4);
+      p.box(0.4, 0.4, 1.45, 1.3, 0, 12, STONE);
+      p.box(0.37, 0.37, 1.48, 1.33, 12, 13, '#dfbd88');
+      p.timber(0.37, 0.37, 1.48, 1.33, 12, 13, BEAM);
+      // A shop window with a striped awning and a golden sign.
+      p.wallL(1.302, 0.5, 1.0, 3, 10, '#4a3020');
+      p.wallL(1.303, 0.53, 0.97, 4, 9, '#f2c25a');
+      p.poly(
+        [
+          [0.48, 1.31, 12],
+          [1.02, 1.31, 12],
+          [1.02, 1.5, 8],
+          [0.48, 1.5, 8],
+        ],
+        '#2e5e9a',
+      );
+      for (let x = 0.55; x < 1.0; x += 0.12) p.poly([[x, 1.31, 12], [x + 0.06, 1.31, 12], [x + 0.06, 1.5, 8], [x, 1.5, 8]], '#f1e8d6');
+      p.doorL(1.3, 1.1, 0.18, 10);
+      p.roofX(0.37, 0.37, 1.48, 1.33, 25, 15, 'slate', '#dfbd88', 0.1);
+      p.line([1.5, 1.2, 20], [1.66, 1.32, 20], '#3b2a1a', 1.2);
+      const [rx, ry] = iso(1.62, 1.3, 14);
+      p.ctx.strokeStyle = '#d8a838';
+      p.ctx.lineWidth = 1.8;
+      p.ctx.beginPath();
+      p.ctx.arc(rx, ry, 3.2, 0, Math.PI * 2);
+      p.ctx.stroke();
+      smoke.push(p.chimney(0.7, 0.8, 33, 9));
+      break;
+    }
+    case 'winery': {
+      p.shadow(0.25, 0.3, 1.75, 1.6);
+      p.box(0.3, 0.35, 1.5, 1.3, 0, 16, STONE);
+      p.wallL(1.302, 0.6, 1.05, 0, 12, '#3a2a1e');
+      p.roofX(0.3, 0.35, 1.5, 1.3, 16, 13, 'tile', STONE, 0.12);
+      // Casks racked outside, a treading vat and a press.
+      for (const [x, y] of [
+        [1.65, 0.55],
+        [1.75, 0.8],
+        [1.65, 1.05],
+      ]) p.barrel(x, y);
+      const [vx, vy] = iso(0.7, 1.65, 0);
+      p.ctx.fillStyle = '#7b5a36';
+      p.ctx.beginPath();
+      p.ctx.ellipse(vx, vy - 4, 12, 6, 0, 0, Math.PI * 2);
+      p.ctx.fill();
+      p.ctx.fillStyle = season === 3 ? '#8a7a8a' : '#5a2a4a';
+      p.ctx.beginPath();
+      p.ctx.ellipse(vx, vy - 6, 10, 4.4, 0, 0, Math.PI * 2);
+      p.ctx.fill();
+      p.line([1.3, 1.55, 0], [1.3, 1.55, 14], '#5e4129', 2);
+      p.line([1.3, 1.55, 14], [1.3, 1.85, 14], '#5e4129', 2);
+      p.box(1.22, 1.6, 1.4, 1.8, 0, 6, '#6b4a2e');
+      break;
+    }
+    case 'scriptorium': {
+      p.shadow(0.3, 0.3, 1.7, 1.6);
+      p.box(0.35, 0.35, 1.55, 1.45, 0, 24, '#b6ae9f');
+      // Tall arched windows.
+      for (const x of [0.55, 0.9, 1.25]) {
+        p.wallL(1.452, x, x + 0.14, 8, 19, '#3a3a52');
+        p.ellipse(x + 0.07, 1.453, 19, 2.2, 1.6, '#3a3a52');
+      }
+      p.windowR(1.55, 0.7, 10, 0.14, 9);
+      p.roofX(0.35, 0.35, 1.55, 1.45, 24, 18, 'slate', '#b6ae9f', 0.1);
+      // A little bell-cote.
+      p.box(1.38, 0.82, 1.5, 0.98, 42, 8, '#b6ae9f');
+      p.roofPyramid(1.38, 0.82, 1.5, 0.98, 50, 6, 'slate', 0.02);
+      // Flax drying for paper.
+      p.line([0.4, 1.7, 0], [0.4, 1.7, 9], '#5e4129', 1);
+      p.line([1.0, 1.7, 0], [1.0, 1.7, 9], '#5e4129', 1);
+      p.line([0.4, 1.7, 9], [1.0, 1.7, 9], '#5e4129', 1);
+      for (let x = 0.47; x < 1.0; x += 0.1) p.wallL(1.701, x, x + 0.06, 3, 9, '#f4ecd8');
+      break;
+    }
+    case 'armoury': {
+      p.shadow(0.3, 0.3, 1.7, 1.5);
+      p.box(0.35, 0.35, 1.5, 1.35, 0, 18, '#9d9488');
+      p.wallL(1.352, 0.55, 1.05, 0, 13, '#2a2522');
+      p.ctx.fillStyle = '#f08a2a';
+      const [fx, fy] = iso(0.8, 1.355, 3);
+      p.ctx.fillRect(fx - 6, fy - 3, 12, 3);
+      p.roofX(0.35, 0.35, 1.5, 1.35, 18, 14, 'slate', '#9d9488', 0.1);
+      smoke.push(p.chimney(1.2, 0.6, 26, 12));
+      // Racks of pikes, bows and a shield.
+      p.line([1.65, 0.5, 0], [1.65, 0.5, 10], '#5e4129', 1.2);
+      p.line([1.65, 1.2, 0], [1.65, 1.2, 10], '#5e4129', 1.2);
+      p.line([1.65, 0.5, 9], [1.65, 1.2, 9], '#5e4129', 1.2);
+      for (let y = 0.58; y < 1.2; y += 0.1) {
+        p.line([1.64, y, 0], [1.64, y + 0.02, 24], '#7a5230', 0.9);
+        p.line([1.64, y + 0.02, 24], [1.64, y + 0.03, 27], '#b8bcc4', 1.4);
+      }
+      const [sx, sy] = iso(1.55, 1.5, 6);
+      p.ctx.fillStyle = '#a8322d';
+      p.ctx.beginPath();
+      p.ctx.moveTo(sx - 5, sy - 6);
+      p.ctx.lineTo(sx + 5, sy - 6);
+      p.ctx.lineTo(sx + 4, sy + 2);
+      p.ctx.lineTo(sx, sy + 6);
+      p.ctx.lineTo(sx - 4, sy + 2);
+      p.ctx.closePath();
+      p.ctx.fill();
+      p.ctx.fillStyle = '#e8c860';
+      p.ctx.fillRect(sx - 1, sy - 5, 2, 9);
+      p.ctx.fillRect(sx - 4, sy - 2, 8, 2);
+      break;
+    }
     case 'claypit': {
       // A dug pit by the water, clay heaps and a drying shelter.
       p.poly(
@@ -2026,8 +2133,47 @@ export function drawSheep(c: CanvasRenderingContext2D, x: number, y: number, f: 
   c.fill();
 }
 
+/** A vine trained on a stake; stage 0..1 from cutting to mature. */
+function vineSprite(season: Season, stage: number, fruiting: boolean): Sprite {
+  return makeSprite(36, 40, 18, 34, (ctx) => {
+    const k = 0.5 + 0.5 * stage;
+    ctx.fillStyle = 'rgba(20,30,10,0.2)';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 8 * k, 3 * k, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#7b5a36';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0, -22 * k);
+    ctx.moveTo(-9 * k, -15 * k);
+    ctx.lineTo(9 * k, -15 * k);
+    ctx.stroke();
+    if (season === 3) return;
+    const rand = mulberry32(Math.round(stage * 10) + 7);
+    const leaf = season === 2 ? '#b8782a' : '#4f8a3a';
+    for (let i = 0; i < 9; i++) {
+      ctx.fillStyle = shade(leaf, 0.85 + rand() * 0.3);
+      ctx.beginPath();
+      ctx.arc((rand() - 0.5) * 18 * k, -12 * k - rand() * 10 * k, 3 * k, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (fruiting) {
+      ctx.fillStyle = '#5a2a6e';
+      for (const dx of [-5, 1, 6]) {
+        for (let j = 0; j < 4; j++) {
+          ctx.beginPath();
+          ctx.arc(dx * k + (j % 2) * 1.2, -12 * k + j * 1.6, 1.3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+  });
+}
+
 /** A small fruit tree; stage 0..1 from sapling to mature. */
 export function fruitTreeSprite(fruit: string, season: Season, stage: number, fruiting: boolean, blossom = false): Sprite {
+  if (fruit === 'grapes') return vineSprite(season, stage, fruiting);
   return makeSprite(36, 48, 18, 42, (ctx) => {
     const k = 0.45 + 0.55 * stage;
     const trunkH = 9 * k;
