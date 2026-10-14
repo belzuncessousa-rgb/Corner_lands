@@ -1,4 +1,4 @@
-import type { GameState } from './types';
+import type { GameState, ResourceId } from './types';
 import { emptyResources } from './world';
 
 const TYPED_KEYS = [
@@ -49,6 +49,14 @@ export function deserialize(json: string): GameState {
   }
   s.res = { ...emptyResources(), ...s.res };
   s.history ??= [];
+  if (s.exports) {
+    for (const k in s.exports) {
+      const id = k as ResourceId;
+      (s.targets ??= {})[id] = s.exports[id]!;
+      (s.sell ??= {})[id] = true;
+    }
+    delete s.exports;
+  }
   // Older saves ranked the settlement by population; carry that over to the manor.
   const hall = s.buildings.find((b) => b.type === 'townhall');
   if (hall) hall.level = Math.max(hall.level, s.tier + 1);

@@ -28,7 +28,10 @@ import {
   nextTierRequirements,
   recompute,
   seasonOf,
-  setExport,
+  setKeep,
+  setSell,
+  selling,
+  keepOf,
   setTax,
   hasProblem,
   roomFor,
@@ -40,7 +43,7 @@ import {
   yearOf,
 } from '../game/sim';
 import type { Building, BuildingType, Category, Cost, ResourceId } from '../game/types';
-import { FOOD_IDS } from '../game/types';
+import { FOOD_IDS } from '../game/data';
 import { idx, inBounds } from '../game/world';
 import type { Game } from '../main';
 import { CATEGORY_ICONS, ICONS, SEASON_ICONS } from './icons';
@@ -732,13 +735,13 @@ export class Hud {
       }
       case 'export-toggle': {
         const r = t.dataset.res as ResourceId;
-        setExport(s, r, s.exports?.[r] === undefined ? 50 : null);
+        setSell(s, r, !selling(s, r));
         this.showTrade();
         break;
       }
       case 'export-keep': {
         const r = t.dataset.res as ResourceId;
-        setExport(s, r, Math.max(0, (s.exports?.[r] ?? 0) + Number(t.dataset.d)));
+        setKeep(s, r, Math.max(0, keepOf(s, r) + Number(t.dataset.d)));
         this.showTrade();
         break;
       }
@@ -955,7 +958,7 @@ export class Hud {
         <p><b>Building:</b> pick a category at the bottom, then a building, then click the map. Builders carry the materials over from storage, one load per trip, and then raise the walls. You can plan buildings before you have the materials; they wait.</p>
         <p><b>Roads</b> are optional but villagers walk much faster on them. Click to start a road, click again to lay it, and keep clicking to continue. Roads over water become bridges (4 timber per tile).</p>
         <p><b>Storage:</b> goods live in the Manor Hall, Storehouses (materials) and Granaries (food). Workplaces close to storage and to their resources work faster.</p>
-        <p><b>Villagers</b> arrive when happiness is 50% or higher, there is free housing and nobody is going hungry. Each eats one food a month; several kinds of food make them happier.</p>
+        <p><b>Villagers</b> arrive when happiness is 50% or higher, there is free housing and nobody is going hungry. Each eats one food a month; meals from several food groups (grain, meat, produce, dairy) make them happier.</p>
         <p><b>Winter</b> stops foraging and farming, and each household burns one timber a month. Farms are sown in spring and harvested in autumn.</p>
         <p><b>Wells, markets, churches and decorations</b> make nearby homes happier. Your <b>steward</b> warns you when food or firewood runs low; the <b>Chronicle</b> (scroll button) keeps the full story.</p>
         <div class="ornament">❦</div>
@@ -992,12 +995,14 @@ export class Hud {
   private showTrade(): void {
     const s = this.game.state;
     const staffed = s.buildings.some((b) => b.type === 'market' && b.build >= 1 && b.workers > 0);
+    const basic: ResourceId[] = ['wood', 'stone', 'planks', 'tools', 'bread', 'meat', 'fish', 'grain'];
     const rows = (Object.keys(TRADE_PRICES) as ResourceId[])
+      .filter((r) => basic.includes(r) || s.seen?.includes(r))
       .map((r) => {
         const price = TRADE_PRICES[r]!;
         const sell = Math.floor(price * SELL_FACTOR * 10);
-        const keep = s.exports?.[r];
-        const on = keep !== undefined;
+        const keep = keepOf(s, r);
+        const on = selling(s, r);
         return `<tr><td>${ICONS[r]} ${RESOURCE_INFO[r].name}</td><td class="num">${Math.floor(s.res[r])}</td>
           <td><button data-action="trade-do" data-res="${r}" data-n="10" ${s.res.gold < price * 10 || roomFor(s, r) < 10 ? 'disabled' : ''}>Buy 10 <small>${price * 10}g</small></button></td>
           <td><button data-action="trade-do" data-res="${r}" data-n="-10" ${s.res[r] < 10 ? 'disabled' : ''}>Sell 10 <small>+${sell}g</small></button></td>

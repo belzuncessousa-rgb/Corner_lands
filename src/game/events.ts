@@ -2,7 +2,7 @@ import { DAYS_PER_MONTH, DAYS_PER_YEAR } from './data';
 import type { StateRng } from './rng';
 import { store, totalHousing } from './sim';
 import type { GameState, MessageKind, ResourceId } from './types';
-import { FOOD_IDS } from './types';
+import { FOOD_IDS } from './data';
 
 /**
  * Rare decision events. Every year or two something happens that pauses the
@@ -96,8 +96,8 @@ export const EVENTS: DecisionEvent[] = [
     choices: () => [
       {
         label: 'Buy his tools',
-        detail: '6 tools for 70 gold.',
-        blocked: (s) => need(s, 'gold', 70, 'gold'),
+        detail: '6 tools for 70 coins.',
+        blocked: (s) => need(s, 'gold', 70, 'coins'),
         apply: (s) => {
           s.res.gold -= 70;
           store(s, 'tools', 6);
@@ -106,7 +106,7 @@ export const EVENTS: DecisionEvent[] = [
       },
       {
         label: 'Sell him timber',
-        detail: '40 timber for 70 gold.',
+        detail: '40 timber for 70 coins.',
         blocked: (s) => need(s, 'wood', 40, 'timber'),
         apply: (s) => {
           s.res.wood -= 40;
@@ -130,8 +130,8 @@ export const EVENTS: DecisionEvent[] = [
     choices: () => [
       {
         label: 'Organise a hunt',
-        detail: 'Pay the hunters 25 gold. +20 meat.',
-        blocked: (s) => need(s, 'gold', 25, 'gold'),
+        detail: 'Pay the hunters 25 coins. +20 meat.',
+        blocked: (s) => need(s, 'gold', 25, 'coins'),
         apply: (s) => {
           s.res.gold -= 25;
           store(s, 'meat', 20);
@@ -198,26 +198,26 @@ export const EVENTS: DecisionEvent[] = [
     id: 'collector',
     title: "The King's Tax Collector",
     text: (s) =>
-      `A royal officer arrives with two soldiers and a ledger. "His Majesty requires his due." He eyes your coffers, which hold ${Math.floor(s.res.gold)} gold.`,
+      `A royal officer arrives with two soldiers and a ledger. "His Majesty requires his due." He eyes your coffers, which hold ${Math.floor(s.res.gold)} coins.`,
     weight: (s) => (s.res.gold >= 250 ? 2 : 0),
     choices: (s) => [
       {
         label: 'Pay the royal tax',
-        detail: `−${Math.floor(s.res.gold * 0.2)} gold (a fifth).`,
+        detail: `−${Math.floor(s.res.gold * 0.2)} coins (a fifth).`,
         apply: (st) => {
           const n = Math.floor(st.res.gold * 0.2);
           st.res.gold -= n;
-          return { text: `You paid ${n} gold to the crown. The officer rode off satisfied.`, kind: 'info' };
+          return { text: `You paid ${n} coins to the crown. The officer rode off satisfied.`, kind: 'info' };
         },
       },
       {
         label: 'Slip him a bribe',
-        detail: `−${Math.floor(s.res.gold * 0.08)} gold, but the villagers whisper. Happiness −5 for half a year.`,
+        detail: `−${Math.floor(s.res.gold * 0.08)} coins, but the villagers whisper. Happiness −5 for half a year.`,
         apply: (st) => {
           const n = Math.floor(st.res.gold * 0.08);
           st.res.gold -= n;
           addMood(st, 'Whispers of a bribe', -5, 6);
-          return { text: `The officer pocketed ${n} gold and found the ledger "in order".`, kind: 'info' };
+          return { text: `The officer pocketed ${n} coins and found the ledger "in order".`, kind: 'info' };
         },
       },
       {
@@ -227,7 +227,7 @@ export const EVENTS: DecisionEvent[] = [
           if (rng.next() < 0.5) {
             const n = Math.floor(st.res.gold * 0.33);
             st.res.gold -= n;
-            return { text: `The officer returned with a dozen soldiers and seized ${n} gold.`, kind: 'bad' };
+            return { text: `The officer returned with a dozen soldiers and seized ${n} coins.`, kind: 'bad' };
           }
           addMood(st, 'Stood up to the crown', 6, 6);
           return { text: 'The officer blustered, but never came back. The villagers cheer their lord.', kind: 'good' };
@@ -293,8 +293,8 @@ export const EVENTS: DecisionEvent[] = [
     choices: () => [
       {
         label: 'Send for a physician',
-        detail: '−50 gold. Everyone recovers.',
-        blocked: (st) => need(st, 'gold', 50, 'gold'),
+        detail: '−50 coins. Everyone recovers.',
+        blocked: (st) => need(st, 'gold', 50, 'coins'),
         apply: (st) => {
           st.res.gold -= 50;
           return { text: 'The physician from town brought bitter draughts. Everyone recovered.', kind: 'good' };
@@ -323,8 +323,8 @@ export const EVENTS: DecisionEvent[] = [
     choices: () => [
       {
         label: 'Host the fair',
-        detail: '−40 gold now, +90 gold from trade. Happiness +8 for half a year.',
-        blocked: (s) => need(s, 'gold', 40, 'gold'),
+        detail: '−40 coins now, +90 coins from trade. Happiness +8 for half a year.',
+        blocked: (s) => need(s, 'gold', 40, 'coins'),
         apply: (s) => {
           s.res.gold += 50;
           addMood(s, 'The country fair', 8, 6);
@@ -338,11 +338,257 @@ export const EVENTS: DecisionEvent[] = [
       },
     ],
   },
+  {
+    id: 'bandits',
+    title: 'Bandits on the Road',
+    text: () =>
+      'Carters report masked men on the forest road. Last night they took a wagon of goods and left the driver tied to a tree.',
+    weight: (s) => (s.population >= 15 ? 2 : 0),
+    choices: (s) => [
+      {
+        label: 'Raise a watch',
+        detail: '−30 coins, −15 timber for watchtowers. Bandits stay away.',
+        blocked: (st) => need(st, 'gold', 30, 'coins') ?? need(st, 'wood', 15, 'timber'),
+        apply: (st) => {
+          st.res.gold -= 30;
+          st.res.wood -= 15;
+          addMood(st, 'Safe roads', 3, 6);
+          return { text: 'Watchmen now walk the road at dusk. The bandits have gone elsewhere.', kind: 'good' };
+        },
+      },
+      {
+        label: 'Pay them off',
+        detail: `−${Math.max(20, Math.floor(s.res.gold * 0.1))} coins.`,
+        apply: (st) => {
+          const n = Math.min(st.res.gold, Math.max(20, Math.floor(st.res.gold * 0.1)));
+          st.res.gold -= n;
+          return { text: `A purse of ${n} coins left in a hollow oak. The robberies stopped, for now.`, kind: 'info' };
+        },
+      },
+      {
+        label: 'Ignore them',
+        detail: 'They may take a share of your goods.',
+        apply: (st, rng) => {
+          const lost: string[] = [];
+          for (const id of ['wood', 'stone', 'planks', 'tools'] as ResourceId[]) {
+            const n = Math.floor(st.res[id] * (0.1 + rng.next() * 0.15));
+            if (n > 0) {
+              st.res[id] -= n;
+              lost.push(`${n} ${id === 'wood' ? 'timber' : id}`);
+            }
+          }
+          addMood(st, 'Fear of bandits', -4, 4);
+          return { text: lost.length ? `The bandits raided the stores: ${lost.join(', ')} gone.` : 'The bandits found little worth taking.', kind: 'bad' };
+        },
+      },
+    ],
+  },
+  {
+    id: 'wedding',
+    title: 'A Village Wedding',
+    text: () => "The miller's daughter is to marry the woodcutter's son. The whole village is invited, and they hope the lord will bless the match.",
+    weight: (s) => (s.population >= 12 ? 2 : 0),
+    choices: () => [
+      {
+        label: 'Give a generous gift',
+        detail: '−30 coins, −10 food. Happiness +8 for half a year; the couple may bring kin.',
+        blocked: (st) => need(st, 'gold', 30, 'coins'),
+        apply: (st) => {
+          st.res.gold -= 30;
+          takeFood(st, 10);
+          addMood(st, 'A joyful wedding', 8, 6);
+          const beds = totalHousing(st) - st.population;
+          if (beds >= 2) {
+            st.population += 2;
+            return { text: "Dancing on the green until dawn. The bride's cousins liked it so much they stayed.", kind: 'good' };
+          }
+          return { text: 'Dancing on the green until dawn. A day to remember.', kind: 'good' };
+        },
+      },
+      {
+        label: 'Send your blessing',
+        detail: 'Happiness +3 for a season.',
+        apply: (st) => {
+          addMood(st, 'The lord’s blessing', 3, 3);
+          return { text: 'The couple were glad of your kind words.', kind: 'good' };
+        },
+      },
+    ],
+  },
+  {
+    id: 'noble',
+    title: 'A Neighbouring Lord Visits',
+    text: () =>
+      'Sir Aldric of the next valley rides up with his retinue, curious to see what you have made of this corner of the land. How will you receive him?',
+    weight: (s) => (s.tier >= 1 ? 2 : 0),
+    choices: (s) => [
+      {
+        label: 'A lavish reception',
+        detail: `−${Math.max(20, s.population)} food, −60 coins. +15 prestige.`,
+        blocked: (st) => need(st, 'gold', 60, 'coins') ?? (food(st) >= Math.max(20, st.population) ? null : 'Not enough food'),
+        apply: (st) => {
+          takeFood(st, Math.max(20, st.population));
+          st.res.gold -= 60;
+          st.res.prestige += 15;
+          return { text: 'Venison, music and fine ale. Sir Aldric left full of praise, and word of your hospitality spreads.', kind: 'good' };
+        },
+      },
+      {
+        label: 'A simple supper',
+        detail: '−10 food. +4 prestige.',
+        apply: (st) => {
+          takeFood(st, 10);
+          st.res.prestige += 4;
+          return { text: 'A plain but honest meal. Sir Aldric seemed content.', kind: 'info' };
+        },
+      },
+      {
+        label: 'Plead other business',
+        detail: '−3 prestige.',
+        apply: (st) => {
+          st.res.prestige = Math.max(0, st.res.prestige - 3);
+          return { text: 'Sir Aldric rode home muttering about rude upstarts.', kind: 'bad' };
+        },
+      },
+    ],
+  },
+  {
+    id: 'drought',
+    title: 'A Dry Summer',
+    text: () => 'Weeks without rain. The wheat is pale and the soil cracks. The farmers look to the sky, and to you.',
+    weight: (s, m) => (m >= 3 && m <= 5 && s.buildings.some((b) => b.type === 'farm' && b.build >= 1) ? 2 : 0),
+    choices: () => [
+      {
+        label: 'Carry water to the fields',
+        detail: 'Happiness −5 for a season from the hard work. Crops are saved.',
+        apply: (st) => {
+          addMood(st, 'Hauling water', -5, 3);
+          return { text: 'Bucket chains from the river all month. Aching backs, but green fields.', kind: 'info' };
+        },
+      },
+      {
+        label: 'Pray for rain',
+        detail: 'Crops suffer unless the heavens answer.',
+        apply: (st, rng) => {
+          if (rng.next() < 0.4) return { text: 'Thunder on the third night! The rain came in time.', kind: 'good' };
+          for (const b of st.buildings) if (b.type === 'farm') b.growth = Math.max(0, b.growth - 0.3);
+          return { text: 'No rain came. The harvest will be thin this year.', kind: 'bad' };
+        },
+      },
+    ],
+  },
+  {
+    id: 'minstrel',
+    title: 'A Travelling Minstrel',
+    text: () => 'A minstrel with a lute and a dozen songs about dragons offers to stay the season, for a fee and his supper.',
+    weight: (s) => (s.population >= 8 ? 2 : 0),
+    choices: () => [
+      {
+        label: 'Hire him for the season',
+        detail: '−20 coins. Happiness +5 for four months.',
+        blocked: (st) => need(st, 'gold', 20, 'coins'),
+        apply: (st) => {
+          st.res.gold -= 20;
+          addMood(st, 'Songs in the evening', 5, 4);
+          return { text: 'Every evening the tavern is full and the songs get longer.', kind: 'good' };
+        },
+      },
+      {
+        label: 'Just one song',
+        detail: 'Nothing happens.',
+        apply: () => ({ text: 'He sang a ballad of the old king and went on his way.', kind: 'info' }),
+      },
+    ],
+  },
+  {
+    id: 'herd',
+    title: 'A Great Herd of Deer',
+    text: () => 'Hunters bring word of a great herd of red deer grazing in the clearings beyond the woods.',
+    weight: (s, m) => (m >= 5 && m <= 9 && s.buildings.some((b) => b.type === 'hunter' && b.build >= 1) ? 2 : 0),
+    choices: () => [
+      {
+        label: 'A great hunt',
+        detail: '+40 meat, +10 hides. The herd will not return soon.',
+        apply: (st) => {
+          const n = store(st, 'meat', 40);
+          store(st, 'hides', 10);
+          return { text: `The hunters brought home ${n} meat. Smoke rises from every chimney.`, kind: 'good' };
+        },
+      },
+      {
+        label: 'Let them be',
+        detail: 'Happiness +3 for half a year. The forest stays rich in game.',
+        apply: (st) => {
+          addMood(st, 'Deer in the meadows', 3, 6);
+          return { text: 'Children sneak out at dawn to watch the deer graze.', kind: 'good' };
+        },
+      },
+    ],
+  },
+  {
+    id: 'fire',
+    title: 'Fire!',
+    text: () => 'A spark from a hearth caught the thatch. Flames leap from roof to roof while villagers shout for water.',
+    weight: (s) => (s.buildings.filter((b) => b.type === 'house' && b.build >= 1).length >= 6 ? 1 : 0),
+    choices: (s) => {
+      const wells = s.buildings.some((b) => b.type === 'well' && b.build >= 1);
+      return [
+        {
+          label: 'Everyone to the buckets',
+          detail: wells ? 'The wells are close by: little is lost. −10 timber.' : 'No well nearby: −30 timber of damage.',
+          apply: (st) => {
+            const n = Math.min(st.res.wood, wells ? 10 : 30);
+            st.res.wood -= n;
+            return { text: wells ? 'The wells saved the day. Only one roof needs rethatching.' : `The fire burned for hours. Repairs took ${n} timber.`, kind: wells ? 'info' : 'bad' };
+          },
+        },
+        {
+          label: 'Tear down the burning roofs',
+          detail: '−20 timber, happiness −4 for a season.',
+          apply: (st) => {
+            st.res.wood = Math.max(0, st.res.wood - 20);
+            addMood(st, 'Lost their roofs', -4, 3);
+            return { text: 'The fire was stopped, at the cost of a few roofs.', kind: 'bad' };
+          },
+        },
+      ];
+    },
+  },
+  {
+    id: 'winter',
+    title: 'A Bitter Winter',
+    text: () => 'The well froze solid overnight. The old folk say this winter will be the hardest in memory.',
+    weight: (_s, m) => (m === 9 || m === 10 ? 2 : 0),
+    choices: (s) => {
+      const homes = s.buildings.filter((b) => b.residents > 0).length;
+      return [
+        {
+          label: 'Hand out extra firewood',
+          detail: `−${homes * 2} timber. Happiness +4 for the winter.`,
+          blocked: (st) => need(st, 'wood', homes * 2, 'timber'),
+          apply: (st) => {
+            st.res.wood -= homes * 2;
+            addMood(st, 'Warm hearths', 4, 3);
+            return { text: 'Every hearth burned bright. The village sang through the long nights.', kind: 'good' };
+          },
+        },
+        {
+          label: 'They will manage',
+          detail: 'Happiness −6 for the winter.',
+          apply: (st) => {
+            addMood(st, 'A cold winter', -6, 3);
+            return { text: 'Families huddled together under every blanket they owned.', kind: 'bad' };
+          },
+        },
+      ];
+    },
+  },
 ];
 
 /** Days between decision events (randomised in this range). */
-const GAP_MIN = Math.round(DAYS_PER_YEAR * 1.3);
-const GAP_MAX = Math.round(DAYS_PER_YEAR * 2.3);
+/** One and a half to two events a year. */
+const GAP_MIN = Math.round(DAYS_PER_YEAR / 2);
+const GAP_MAX = Math.round(DAYS_PER_YEAR / 1.5);
 
 export function getEvent(id: string): DecisionEvent | undefined {
   return EVENTS.find((e) => e.id === id);
@@ -351,7 +597,7 @@ export function getEvent(id: string): DecisionEvent | undefined {
 /** At the start of a month, maybe raise a decision event for the player. */
 export function rollEvent(s: GameState, rng: StateRng, month: number): string | null {
   if (s.pendingEvent) return null;
-  s.nextEventDay ??= DAYS_PER_YEAR + rng.int(DAYS_PER_YEAR);
+  s.nextEventDay ??= Math.round(DAYS_PER_YEAR * 0.4) + rng.int(GAP_MAX - GAP_MIN);
   if (s.day < s.nextEventDay) return null;
   const options = EVENTS.map((e) => ({ e, w: e.weight(s, month) })).filter((o) => o.w > 0);
   const total = options.reduce((a, o) => a + o.w, 0);

@@ -27,7 +27,7 @@ import {
   yearOf,
 } from './game/sim';
 import type { BuildingType, GameState } from './game/types';
-import { FOOD_IDS } from './game/types';
+import { FOOD_IDS } from './game/data';
 import { generateWorld, idx, inBounds } from './game/world';
 import { AgentSystem } from './render/agents';
 import { Wildlife } from './render/wildlife';
@@ -36,7 +36,7 @@ import { Hud } from './ui/hud';
 
 export type Tool = { kind: 'select' } | { kind: 'build'; type: BuildingType } | { kind: 'road' } | { kind: 'demolish' };
 
-const SPEEDS = [0, 1, 2, 4];
+const SPEEDS = [0, 1, 3, 8];
 
 export class Game {
   state: GameState;

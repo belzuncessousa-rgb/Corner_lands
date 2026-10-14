@@ -126,7 +126,7 @@ export const QUESTS: Quest[] = [
   {
     id: 'upgrade',
     title: 'Upgrade 3 homes',
-    hint: 'Cottages near a well and a market, fed two kinds of food, can become Timber Houses.',
+    hint: 'Cottages near a well and a market, with two food groups on the table, can become Timber Houses.',
     reward: { gold: 80 },
     done: (s) => s.buildings.filter((b) => b.type === 'house' && b.level >= 2).length >= 3,
   },

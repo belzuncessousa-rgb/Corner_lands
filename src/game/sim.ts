@@ -13,7 +13,8 @@ import {
   SELL_FACTOR,
   EXPORT_FACTOR,
   EXPORT_PER_MARKET,
-  STOCK_TARGET,
+  FOOD_IDS,
+  GOODS,
   TAX_LEVELS,
   TIERS,
   TRADE_PRICES,
@@ -35,7 +36,7 @@ import { Heap } from './path';
 import { checkQuests } from './quests';
 import { StateRng } from './rng';
 import type { Building, BuildingType, Category, Cost, GameState, MessageKind, ResourceId, Season } from './types';
-import { FOOD_IDS } from './types';
+import { RESOURCE_IDS } from './types';
 import { getBuilding, idx, inBounds, makeBuilding, placeBuilding, removeBuilding, setRoad } from './world';
 
 // ---------------------------------------------------------------- time helpers
@@ -278,11 +279,50 @@ export function serveAle(s: GameState): void {
   }
 }
 
-/** Sets or clears an export rule: keep `keep` units, sell the surplus. */
+/** Units of a good to keep in store: producers rest and merchants buy above it. */
+export function keepOf(s: GameState, id: ResourceId): number {
+  return s.targets?.[id] ?? GOODS[id].keep;
+}
+
+export function setKeep(s: GameState, id: ResourceId, keep: number): void {
+  s.targets ??= {};
+  s.targets[id] = Math.max(0, Math.round(keep));
+}
+
+/** Whether visiting merchants may buy this good's surplus. */
+export function selling(s: GameState, id: ResourceId): boolean {
+  return !!s.sell?.[id];
+}
+
+export function setSell(s: GameState, id: ResourceId, on: boolean): void {
+  s.sell ??= {};
+  if (on) s.sell[id] = true;
+  else delete s.sell[id];
+}
+
+/** Sets an export rule: keep `keep` units and sell the surplus (null stops selling). */
 export function setExport(s: GameState, id: ResourceId, keep: number | null): void {
-  s.exports ??= {};
-  if (keep === null) delete s.exports[id];
-  else s.exports[id] = Math.max(0, Math.round(keep));
+  if (keep === null) return setSell(s, id, false);
+  setKeep(s, id, keep);
+  setSell(s, id, true);
+}
+
+/** True when every good a building makes is at or above its stock target. */
+export function enoughOf(s: GameState, out: Cost): ResourceId | null {
+  let first: ResourceId | null = null;
+  for (const k in out) {
+    const id = k as ResourceId;
+    if (id === 'gold' || id === 'prestige') return null;
+    if (s.res[id] < keepOf(s, id)) return null;
+    first ??= id;
+  }
+  return first;
+}
+
+/** Goods the settlement has ever held, for menus that hide unknown goods. */
+export function noteSeen(s: GameState): void {
+  s.seen ??= [];
+  for (const id of RESOURCE_IDS) if (s.res[id] > 0 && !s.seen.includes(id)) s.seen.push(id);
 }
 
 /** Monthly visit of merchants buying surplus goods at staffed markets. */
@@ -291,20 +331,20 @@ export function exportGoods(s: GameState): number {
   let budget = markets * EXPORT_PER_MARKET;
   let gold = 0;
   const sold: string[] = [];
-  for (const k in s.exports ?? {}) {
+  for (const k in s.sell ?? {}) {
     const id = k as ResourceId;
     const price = TRADE_PRICES[id];
     if (!price || budget <= 0) continue;
-    const n = Math.min(budget, Math.floor(s.res[id] - (s.exports![id] ?? 0)));
+    const n = Math.min(budget, Math.floor(s.res[id] - keepOf(s, id)));
     if (n <= 0) continue;
     s.res[id] -= n;
     budget -= n;
     const earned = Math.floor(n * price * EXPORT_FACTOR);
     gold += earned;
-    sold.push(`${n} ${id}`);
+    sold.push(`${n} ${GOODS[id].name.toLowerCase()}`);
   }
   s.res.gold += gold;
-  if (gold > 0) log(s, `Merchants bought ${sold.join(', ')} for ${gold} gold.`, 'info');
+  if (gold > 0) log(s, `Merchants bought ${sold.join(', ')} for ${gold} coins.`, 'info');
   return gold;
 }
 
@@ -670,6 +710,8 @@ function addOutput(s: GameState, b: Building, out: Cost): boolean {
 function produce(s: GameState, b: Building, rng: StateRng): string | null {
   const d = BUILDINGS[b.type];
   const season = seasonOf(s.day);
+  const enough = enoughOf(s, d.outputs);
+  if (enough) return `Enough ${GOODS[enough].name.toLowerCase()} in store`;
   switch (b.type) {
     case 'woodcutter': {
       if (fullFor(s, d.outputs)) return 'Storage full';
@@ -749,9 +791,6 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
         return `Waiting for ${missing.join(', ')}`;
       }
       if (fullFor(s, d.outputs)) return 'Storage full';
-      for (const k in d.outputs) {
-        if (k !== 'gold' && s.res[k as ResourceId] >= STOCK_TARGET) return `Enough ${k} in store`;
-      }
       pay(s, d.inputs);
       addOutput(s, b, d.outputs);
       return null;
@@ -897,7 +936,7 @@ export function dailyProduction(s: GameState, rng: StateRng): void {
 /** Most builders that work one site at once. */
 export const MAX_BUILDERS = 4;
 /** Share of a building-day of work one builder does per day. */
-export const LABOUR_PER_BUILDER = 0.4;
+export const LABOUR_PER_BUILDER = 0.7;
 
 /** Construction sites in the order builders attend to them. */
 export function constructionSites(s: GameState): Building[] {
@@ -988,6 +1027,30 @@ const RESOURCE_INFO_NAMES: Partial<Record<ResourceId, string>> = {
 
 const VARIETY_BONUS = [0, 0, 6, 12, 18];
 
+/**
+ * Feeds `mouths` villagers for a month from the stores, spreading meals
+ * across foods. Returns how many went hungry and how many food groups
+ * (grain, meat, produce, dairy) were on the table.
+ */
+export function eatFood(s: GameState, mouths: number): { hungry: number; groups: number } {
+  let need = mouths;
+  const groups = new Set<string>();
+  while (need > 0.001) {
+    let ate = false;
+    for (const f of FOOD_IDS) {
+      if (need <= 0.001) break;
+      if (s.res[f] >= 1) {
+        s.res[f] -= 1;
+        need -= GOODS[f].food ?? 1;
+        ate = true;
+        groups.add(GOODS[f].foodGroup ?? f);
+      }
+    }
+    if (!ate) break;
+  }
+  return { hungry: Math.max(0, Math.ceil(need - 0.001)), groups: groups.size };
+}
+
 export function monthly(s: GameState, rng: StateRng): void {
   const month = monthOf(s.day); // the month that just started
   const prevMonth = (month + MONTHS_PER_YEAR - 1) % MONTHS_PER_YEAR;
@@ -1006,25 +1069,13 @@ export function monthly(s: GameState, rng: StateRng): void {
     }
   }
 
-  // Eating: one unit per villager per month, spread across food types.
-  let need = s.population;
-  const eatenTypes = new Set<ResourceId>();
-  while (need > 0) {
-    let ate = false;
-    for (const f of FOOD_IDS) {
-      if (need <= 0) break;
-      if (s.res[f] >= 1) {
-        s.res[f] -= 1;
-        need--;
-        ate = true;
-        eatenTypes.add(f);
-      }
-    }
-    if (!ate) break;
-  }
-  report.eaten = s.population - need;
-  report.shortage = need;
-  report.variety = eatenTypes.size;
+  // Eating: each villager needs one unit of nourishment a month. Villagers
+  // take a little of every food in turn; richer foods go further.
+  const eaten = eatFood(s, s.population);
+  report.eaten = s.population - eaten.hungry;
+  report.shortage = eaten.hungry;
+  report.variety = eaten.groups;
+  const need = eaten.hungry;
   if (need > 0) log(s, `Food shortage! ${need} villagers went hungry.`, 'bad');
 
   // Firewood in winter: one log per household.
@@ -1122,7 +1173,7 @@ export function updateHappiness(s: GameState): void {
   const r = s.report;
   if (s.population > 0) {
     const variety = VARIETY_BONUS[Math.min(4, r.variety)];
-    if (variety) factors.push({ label: `Food variety (${r.variety} kinds)`, value: variety });
+    if (variety) factors.push({ label: `Food variety (${r.variety} food groups)`, value: variety });
     if (r.shortage > 0) factors.push({ label: 'Hunger', value: -Math.round(15 + 30 * (r.shortage / s.population)) });
   }
   if (r.cold) factors.push({ label: 'No firewood', value: -20 });
@@ -1226,6 +1277,7 @@ export function stepDay(s: GameState): void {
   recompute(s);
   dailyConstruction(s);
   dailyProduction(s, rng);
+  noteSeen(s);
   s.day++;
   if (s.day % DAYS_PER_MONTH === 0) monthly(s, rng);
   if (s.dirty) recompute(s);

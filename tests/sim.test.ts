@@ -145,7 +145,7 @@ describe('production chains', () => {
   it('mine and blacksmith turn ore into tools', () => {
     const s = generateWorld(77);
     s.tier = 2;
-    for (const k of Object.keys(s.res) as (keyof typeof s.res)[]) s.res[k] = 100;
+    for (const k of ['wood', 'stone', 'planks', 'gold', 'bread'] as const) s.res[k] = 100;
     // Find an ore tile and build a road from the hall to it.
     const ore = s.ore.findIndex((v) => v > 0);
     const ox = ore % s.width;
@@ -187,6 +187,7 @@ describe('production chains', () => {
     run(s, 60);
     expect(mine!.build).toBe(1);
     expect(smithy.build).toBe(1);
+    s.res.tools = 0;
     const tools = s.res.tools;
     run(s, 40);
     expect(s.res.tools).toBeGreaterThan(tools);
@@ -284,8 +285,8 @@ describe('decision events', () => {
     const ok = e.choices(s).findIndex((c) => !c.blocked?.(s));
     expect(resolveEvent(s, new StateRng(s), ok)).toBe(true);
     expect(s.pendingEvent).toBeUndefined();
-    // The next one is at least a year away.
-    expect(s.nextEventDay! - s.day).toBeGreaterThan(DAYS_PER_YEAR);
+    // The next one is at least half a year away.
+    expect(s.nextEventDay! - s.day).toBeGreaterThanOrEqual(DAYS_PER_YEAR / 2);
   });
 });
 

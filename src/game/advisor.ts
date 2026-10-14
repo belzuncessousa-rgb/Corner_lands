@@ -1,7 +1,7 @@
 import { BUILDINGS, DAYS_PER_MONTH } from './data';
 import { totalHousing } from './sim';
 import type { GameState } from './types';
-import { FOOD_IDS } from './types';
+import { FOOD_IDS } from './data';
 
 /** Minimum days between repeats of the same piece of advice. */
 const COOLDOWN = DAYS_PER_MONTH * 6;

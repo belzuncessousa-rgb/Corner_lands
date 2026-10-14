@@ -1,34 +1,110 @@
-import type { BuildingType, Category, Cost, ResourceId } from './types';
+import type { BuildingType, Category, Cost, FoodGroup, GoodsGroup, ResourceId } from './types';
+import { RESOURCE_IDS } from './types';
 
-/** Real seconds per game day at 1x speed. */
-export const DAY_SECONDS = 4;
+/** Real seconds per game day at 1x speed: a year lasts 45 minutes. */
+export const DAY_SECONDS = 22.5;
 
-/** Walking speed in tiles per game day, on roads and across open country. */
-export const ROAD_TILES_PER_DAY = 4;
-export const OFFROAD_TILES_PER_DAY = 2.2;
+/** Walking speed in tiles per game day: paved roads, dirt roads, open country. */
+export const STONE_ROAD_TILES_PER_DAY = 30;
+export const ROAD_TILES_PER_DAY = 22;
+export const OFFROAD_TILES_PER_DAY = 12;
 /** Units of goods a villager carries in one trip. */
 export const CARRY_LOAD = 5;
 /** How strongly walking time slows production (0 = ignored). */
-export const TRAVEL_WEIGHT = 0.5;
-/** Workshops rest once this much of their product is in store. */
-export const STOCK_TARGET = 150;
+export const TRAVEL_WEIGHT = 2;
 
 export type StorageKind = 'materials' | 'food';
 
-/** Which storage pool each resource lives in; gold sits in the manor's coffers. */
-export const RESOURCE_STORAGE: Record<ResourceId, StorageKind | null> = {
-  wood: 'materials',
-  stone: 'materials',
-  planks: 'materials',
-  iron: 'materials',
-  tools: 'materials',
-  berries: 'food',
-  meat: 'food',
-  fish: 'food',
-  grain: 'food',
-  bread: 'food',
-  gold: null,
+export interface GoodDef {
+  name: string;
+  desc: string;
+  group: GoodsGroup;
+  /** Storage pool; null for coins and prestige. */
+  storage: StorageKind | null;
+  /** Market buying price in coins (0 = cannot be traded). */
+  price: number;
+  /** Hunger one unit satisfies (villager-months); edible goods only. */
+  food?: number;
+  foodGroup?: FoodGroup;
+  /** Default amount kept in store before workers rest and merchants buy. */
+  keep: number;
+}
+
+function good(
+  name: string,
+  group: GoodsGroup,
+  price: number,
+  desc: string,
+  extra: Partial<GoodDef> = {},
+): GoodDef {
+  const storage: StorageKind | null = group === 'currency' ? null : group === 'food' ? 'food' : 'materials';
+  return { name, desc, group, storage, price, keep: group === 'food' ? 300 : 150, ...extra };
+}
+
+/** Every good in the game. Goods nobody has made yet stay hidden. */
+export const GOODS: Record<ResourceId, GoodDef> = {
+  wood: good('Timber', 'materials', 2, 'Felled logs for building, sawing and burning.'),
+  firewood: good('Firewood', 'materials', 2, 'Split logs. Keeps homes warm in winter at half the timber.'),
+  planks: good('Planks', 'materials', 5, 'Sawn boards for finer buildings.', { keep: 100 }),
+  woodparts: good('Wood Parts', 'materials', 9, 'Gears, axles and frames for mills and machines.', { keep: 40 }),
+  stone: good('Stone', 'materials', 3, 'Quarried stone for sturdier buildings.'),
+  dressedstone: good('Dressed Stone', 'materials', 8, 'Squared blocks for manors, churches and keeps.', { keep: 80 }),
+  clay: good('Clay', 'materials', 1, 'Dug from riverbanks, fired into tiles.'),
+  tiles: good('Roof Tiles', 'materials', 6, 'Fired clay tiles. Townhouses want a tiled roof.', { keep: 80 }),
+  ore: good('Iron Ore', 'materials', 3, 'Rock rich in iron, smelted in a bloomery.'),
+  iron: good('Iron', 'materials', 6, 'Iron for the blacksmith.', { keep: 60 }),
+
+  bread: good('Bread', 'food', 3, 'Baked from flour. Filling: feeds one and a half.', { food: 1.5, foodGroup: 'grain' }),
+  meat: good('Meat', 'food', 3, 'Venison and beef.', { food: 1, foodGroup: 'meat' }),
+  pork: good('Pork', 'food', 3, 'Salted pork from the autumn slaughter.', { food: 1, foodGroup: 'meat' }),
+  fish: good('Fish', 'food', 3, 'Caught from rivers and lakes.', { food: 1, foodGroup: 'meat' }),
+  eggs: good('Eggs', 'food', 2, 'From backyard hens.', { food: 0.75, foodGroup: 'meat' }),
+  berries: good('Berries', 'food', 2, 'Foraged in spring and summer.', { food: 1, foodGroup: 'produce' }),
+  mushrooms: good('Mushrooms', 'food', 2, 'Foraged in the autumn woods.', { food: 1, foodGroup: 'produce' }),
+  vegetables: good('Vegetables', 'food', 2, 'Cabbages, leeks and turnips from backyard plots.', { food: 1, foodGroup: 'produce' }),
+  apples: good('Apples', 'food', 2, 'From orchards; also pressed into cider.', { food: 1, foodGroup: 'produce' }),
+  pears: good('Pears', 'food', 2, 'From orchards.', { food: 1, foodGroup: 'produce' }),
+  plums: good('Plums', 'food', 2, 'From orchards.', { food: 1, foodGroup: 'produce' }),
+  honey: good('Honey', 'food', 5, 'From backyard hives. A treat: feeds one and a half.', { food: 1.5, foodGroup: 'dairy' }),
+  milk: good('Milk', 'food', 1, 'From cattle. Spoils quickly; better made into cheese.', { food: 0.5, foodGroup: 'dairy' }),
+  cheese: good('Cheese', 'food', 4, 'Made from milk at a dairy. Feeds two.', { food: 2, foodGroup: 'dairy' }),
+
+  grain: good('Wheat', 'goods', 2, 'Harvested in autumn, milled and baked into bread.', { storage: 'food', keep: 300 }),
+  barley: good('Barley', 'goods', 2, 'Brewed into ale.', { storage: 'food' }),
+  oats: good('Oats', 'goods', 1, 'Winter fodder for large herds.', { storage: 'food' }),
+  flour: good('Flour', 'goods', 3, 'Milled wheat, ready for the oven.', { storage: 'food' }),
+  flax: good('Flax', 'goods', 2, 'Retted and spun into linen.'),
+  wool: good('Wool', 'goods', 3, 'Shorn from sheep in spring.'),
+  hides: good('Hides', 'goods', 2, 'Skins from the hunt and the slaughter.'),
+  leather: good('Leather', 'goods', 6, 'Tanned hides for boots.'),
+  cloth: good('Cloth', 'goods', 7, 'Woven wool and linen.'),
+  clothes: good('Clothes', 'goods', 12, 'Tunics and cloaks. Finer homes need them.', { keep: 60 }),
+  boots: good('Boots', 'goods', 12, 'Sturdy leather boots. Townhouses need them.', { keep: 60 }),
+  ale: good('Ale', 'goods', 5, 'Brewed from barley and poured at the tavern.', { keep: 100 }),
+  cider: good('Cider', 'goods', 5, 'Pressed from apples.', { keep: 100 }),
+  herbs: good('Herbs', 'goods', 2, 'Gathered wild, made into medicine.'),
+  medicine: good('Medicine', 'goods', 10, 'Salves and tinctures. Townhouses want them.', { keep: 40 }),
+  tools: good('Tools', 'goods', 14, 'Needed for upgrades and grand buildings.', { keep: 40 }),
+
+  gold: good('Coins', 'currency', 0, 'Collected from taxes and trade.'),
+  prestige: good('Prestige', 'currency', 0, 'The renown of your house. Earned from a fine manor and a thriving town; spent on charters.'),
 };
+
+/** Edible goods, in the order villagers reach for them. */
+export const FOOD_IDS: ResourceId[] = RESOURCE_IDS.filter((r) => GOODS[r].food);
+
+export const GROUP_NAMES: Record<GoodsGroup, string> = {
+  food: 'Food',
+  materials: 'Materials',
+  goods: 'Goods',
+  currency: 'Treasury',
+};
+
+/** Back-compat views of the registry. */
+export const RESOURCE_INFO: Record<ResourceId, { name: string; desc: string }> = GOODS;
+export const RESOURCE_STORAGE: Record<ResourceId, StorageKind | null> = Object.fromEntries(
+  RESOURCE_IDS.map((r) => [r, GOODS[r].storage]),
+) as Record<ResourceId, StorageKind | null>;
 
 /** Storage capacity each building provides. */
 export const STORAGE_CAPACITY: Partial<Record<BuildingType, Partial<Record<StorageKind, number>>>> = {
@@ -56,20 +132,6 @@ export const MONTH_NAMES = [
   'Late Winter',
 ];
 export const SEASON_NAMES = ['Spring', 'Summer', 'Autumn', 'Winter'];
-
-export const RESOURCE_INFO: Record<ResourceId, { name: string; desc: string }> = {
-  wood: { name: 'Timber', desc: 'Felled logs. Used for building and as winter firewood.' },
-  stone: { name: 'Stone', desc: 'Quarried stone for sturdier buildings.' },
-  planks: { name: 'Planks', desc: 'Sawn boards for advanced construction.' },
-  iron: { name: 'Iron', desc: 'Iron ore from the mine, forged into tools.' },
-  tools: { name: 'Tools', desc: 'Needed for house upgrades and grand buildings.' },
-  berries: { name: 'Berries', desc: 'Foraged food. Not available in winter.' },
-  meat: { name: 'Meat', desc: 'Game hunted in the forests.' },
-  fish: { name: 'Fish', desc: 'Caught from rivers and lakes.' },
-  grain: { name: 'Grain', desc: 'Harvested in autumn. Baked into bread.' },
-  bread: { name: 'Bread', desc: 'Hearty food baked from grain.' },
-  gold: { name: 'Gold', desc: 'Collected from taxes and trade.' },
-};
 
 export interface BuildingDef {
   type: BuildingType;
@@ -438,19 +500,10 @@ export const TAX_LEVELS = [
 ];
 
 
-/** Prices in gold for one unit at the market (sell price is lower). */
-export const TRADE_PRICES: Partial<Record<ResourceId, number>> = {
-  wood: 2,
-  stone: 3,
-  planks: 5,
-  iron: 6,
-  tools: 14,
-  berries: 2,
-  meat: 3,
-  fish: 3,
-  grain: 2,
-  bread: 3,
-};
+/** Prices in coins for one unit at the market (sell price is lower). */
+export const TRADE_PRICES: Partial<Record<ResourceId, number>> = Object.fromEntries(
+  RESOURCE_IDS.filter((r) => GOODS[r].price > 0).map((r) => [r, GOODS[r].price]),
+);
 export const SELL_FACTOR = 0.5;
 /** Merchants pay a little better for regular exports. */
 export const EXPORT_FACTOR = 0.6;

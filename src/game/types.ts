@@ -1,23 +1,60 @@
 export const RESOURCE_IDS = [
+  // Materials
   'wood',
-  'stone',
+  'firewood',
   'planks',
+  'woodparts',
+  'stone',
+  'dressedstone',
+  'clay',
+  'tiles',
+  'ore',
   'iron',
-  'tools',
-  'berries',
-  'meat',
-  'fish',
-  'grain',
+  // Food
   'bread',
+  'meat',
+  'pork',
+  'fish',
+  'eggs',
+  'berries',
+  'mushrooms',
+  'vegetables',
+  'apples',
+  'pears',
+  'plums',
+  'honey',
+  'milk',
+  'cheese',
+  // Goods
+  'grain',
+  'barley',
+  'oats',
+  'flour',
+  'flax',
+  'wool',
+  'hides',
+  'leather',
+  'cloth',
+  'clothes',
+  'boots',
+  'ale',
+  'cider',
+  'herbs',
+  'medicine',
+  'tools',
+  // Currency
   'gold',
+  'prestige',
 ] as const;
 
 export type ResourceId = (typeof RESOURCE_IDS)[number];
 export type Resources = Record<ResourceId, number>;
 export type Cost = Partial<Resources>;
 
-/** Edible resources, in the order villagers prefer to eat them. */
-export const FOOD_IDS: ResourceId[] = ['bread', 'fish', 'meat', 'berries'];
+/** How the top bar groups goods. */
+export type GoodsGroup = 'food' | 'materials' | 'goods' | 'currency';
+/** Food groups count towards variety. */
+export type FoodGroup = 'grain' | 'meat' | 'produce' | 'dairy';
 
 export type BuildingType =
   | 'townhall'
@@ -162,8 +199,14 @@ export interface GameState {
   relaxed?: boolean;
   /** Day each piece of advisor advice was last given. */
   advice?: Record<string, number>;
-  /** Goods sold to visiting merchants: keep this many, sell the rest. */
+  /** Old export rules (pre stock targets); migrated on load. */
   exports?: Partial<Record<ResourceId, number>>;
+  /** Stock targets overriding each good's default keep amount. */
+  targets?: Partial<Record<ResourceId, number>>;
+  /** Goods visiting merchants may buy above their target. */
+  sell?: Partial<Record<ResourceId, boolean>>;
+  /** Goods the settlement has ever held. */
+  seen?: ResourceId[];
   /** Decision event waiting for the player's choice. */
   pendingEvent?: string;
   /** Earliest day the next decision event may happen. */

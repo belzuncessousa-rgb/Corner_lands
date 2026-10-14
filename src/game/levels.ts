@@ -87,12 +87,12 @@ export function houseNeeds(s: GameState, b: Building, level: number): Need[] {
   if (level >= 2) {
     out.push({ label: 'A well nearby', met: coveredBy(s, b, 'well') });
     out.push({ label: 'A market nearby', met: coveredBy(s, b, 'market') });
-    out.push({ label: 'Two kinds of food', met: s.report.variety >= 2 });
+    out.push({ label: 'Two food groups', met: s.report.variety >= 2 });
   }
   if (level >= 3) {
     out.push({ label: 'A church nearby', met: coveredBy(s, b, 'church') });
     out.push({ label: 'A tavern nearby', met: coveredBy(s, b, 'tavern') });
-    out.push({ label: 'Three kinds of food', met: s.report.variety >= 3 });
+    out.push({ label: 'Three food groups', met: s.report.variety >= 3 });
   }
   return out;
 }

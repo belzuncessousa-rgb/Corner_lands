@@ -71,7 +71,7 @@ export class AgentSystem {
     const month = Math.floor(s.day / 10);
     if (this.lastMonth >= 0 && month !== this.lastMonth && dt > 0) {
       for (const m of s.buildings) {
-        if (m.type === 'market' && m.build >= 1 && Object.keys(s.exports ?? {}).length) this.sendCart(s, m);
+        if (m.type === 'market' && m.build >= 1 && Object.keys(s.sell ?? {}).length) this.sendCart(s, m);
       }
     }
     this.lastMonth = month;
