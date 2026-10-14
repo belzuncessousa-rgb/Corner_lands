@@ -8,6 +8,7 @@ import { grantCharter } from './charters';
 import { startUpgrade, upgradeBlocker, upgradePlan } from './levels';
 import { StateRng } from './rng';
 import {
+  labourSummary,
   buildRoad,
   canAfford,
   centerOf,
@@ -280,6 +281,12 @@ function shop(s: GameState): void {
   const buy = (id: ResourceId, n: number, keep: number) => {
     if (s.res.gold > keep) trade(s, id, n);
   };
+  // Stores clogged with wares: sell some of the largest pile.
+  if (stored(s, 'materials') > storageCap(s, 'materials') * 0.9) {
+    const piles: ResourceId[] = ['planks', 'dressedstone', 'woodparts', 'tiles', 'iron', 'clay'];
+    const top = piles.reduce((a, c) => (s.res[c] > s.res[a] ? c : a));
+    if (s.res[top] >= 30) trade(s, top, -Math.floor(s.res[top] / 3));
+  }
   if (s.res.wood < 30) buy('wood', 20, 80);
   if (s.res.tools < 6 && s.tier >= 2) buy('tools', 5, 150);
   if (totalFood(s) < s.population * 2) buy('bread', 20, 80);
@@ -289,7 +296,7 @@ function shop(s: GameState): void {
   if (hasBuilt(s, 'tavern') && s.res.ale + s.res.cider < 8) buy('ale', 10, 100);
   if (s.tier >= 1 && s.res.clothes < 4) buy('clothes', Math.min(10, homes(2) + 3), 150);
   if (homes(3) && s.res.boots < 3) buy('boots', Math.min(8, homes(3)), 200);
-  if (s.tier >= 1 && count(s, 'windmill') === 0 && s.res.woodparts < 4) buy('woodparts', 4, 120);
+  if (s.tier >= 1 && (count(s, 'windmill') === 0 || s.res.grain > 60) && s.res.woodparts < 4) buy('woodparts', 4, 120);
   if (s.tier >= 2 && s.res.tiles < 15 && homes(2) > homes(3)) buy('tiles', 15, 250);
   if (homes(3) && s.res.medicine < 3) buy('medicine', Math.min(8, homes(3)), 200);
 }
@@ -366,12 +373,24 @@ function act(s: GameState, rand: () => number): void {
   if (s.tier >= 2) {
     for (const t of ['smithy', 'church'] as BuildingType[]) if (count(s, t) === 0) wants.push(t);
   }
+  // Jobs nobody fills: new workplaces would only spread the villagers thinner.
+  const short = labourSummary(s).short.reduce((a, x) => a + x.want - x.have, 0);
+  // Grain piling up: more mills and ovens before anything else.
+  if (s.tier >= 1 && s.res.grain > 60 && count(s, 'windmill') < 1 + Math.floor(s.res.grain / 60)) wants.push('windmill');
+  if (s.tier >= 1 && s.res.flour > 20 && count(s, 'bakery') < 1 + count(s, 'windmill')) wants.push('bakery');
   if (food < pop * 4 && foodMakers < 1 + pop / 6) {
+    if (s.tier >= 1 && count(s, 'farm') < 2 + Math.floor(pop / 25)) wants.push('farm');
     if (count(s, 'forager') < 2) wants.push('forager');
-    wants.push('fisher', 'hunter');
-    if (s.tier >= 1) wants.push('farm');
+    if (count(s, 'fisher') < 2 + Math.floor(pop / 30)) wants.push('fisher');
+    if (count(s, 'hunter') < 2 + Math.floor(pop / 30)) wants.push('hunter');
   }
-  if (count(s, 'woodcutter') < 2 + Math.floor(pop / 15) || s.res.wood < 25) wants.push('woodcutter');
+  if (short >= 8) {
+    // Fill the existing jobs first; homes still bring more hands.
+    if (totalHousing(s) - pop < 4) wants.push('house');
+    for (const t of wants) if (BUILDINGS[t].tier <= s.tier && tryPlace(s, t)) return;
+    return;
+  }
+  if (count(s, 'woodcutter') < 2 + Math.floor(pop / 15) || (s.res.wood < 25 && count(s, 'woodcutter') < 4 + Math.floor(pop / 10))) wants.push('woodcutter');
   if (totalHousing(s) - pop < 4 && idle >= 0) wants.push('house');
   if (count(s, 'quarry') < 1 + Math.floor(pop / 30)) {
     // Without stone nothing grand gets built: put the quarry first.
@@ -383,7 +402,11 @@ function act(s: GameState, rand: () => number): void {
   if (pop >= 10 && count(s, 'well') < Math.ceil(pop / 20)) wants.push('well');
   if (count(s, 'forester') < count(s, 'woodcutter')) wants.push('forester');
   const stores = 2 + Math.floor(pop / 50);
-  if (stored(s, 'materials') > storageCap(s, 'materials') * 0.8 && count(s, 'storehouse') < stores) wants.push('storehouse');
+  // Full stores stop the quarry and the woodcutters: a storehouse comes first.
+  if (stored(s, 'materials') > storageCap(s, 'materials') * 0.8 && count(s, 'storehouse') < stores) {
+    if (stored(s, 'materials') > storageCap(s, 'materials') * 0.85 && tryPlace(s, 'storehouse')) return;
+    wants.push('storehouse');
+  }
   if (stored(s, 'food') > storageCap(s, 'food') * 0.8 && count(s, 'granary') < stores) wants.push('granary');
   if (s.tier >= 1) {
     if (count(s, 'farm') < Math.ceil(pop / 16)) wants.push('farm');

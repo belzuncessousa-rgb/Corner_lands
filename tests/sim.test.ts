@@ -701,3 +701,33 @@ describe('batch work', () => {
     expect(k.workers).toBe(0);
   });
 });
+
+describe('full stores', () => {
+  it('a windmill grinds a full granary of grain into flour', async () => {
+    const { storageCap, stored } = await import('../src/game/sim');
+    const s = generateWorld(82);
+    s.tier = 1;
+    const m = placeNearRoad(s, 'windmill');
+    m.build = 1;
+    m.need = undefined;
+    s.population = 5;
+    s.res.grain += storageCap(s, 'food') - stored(s, 'food');
+    expect(stored(s, 'food')).toBe(storageCap(s, 'food'));
+    const grain = s.res.grain;
+    s.dirty = true;
+    run(s, 8);
+    expect(s.res.flour).toBeGreaterThan(0);
+    expect(s.res.grain).toBeLessThan(grain);
+  });
+
+  it('hungry villagers boil grain into pottage when nothing else is left', async () => {
+    const { eatFood } = await import('../src/game/sim');
+    const { FOOD_IDS } = await import('../src/game/data');
+    const s = generateWorld(83);
+    for (const f of FOOD_IDS) s.res[f] = 0;
+    s.res.grain = 20;
+    const fed = eatFood(s, 8);
+    expect(fed.hungry).toBe(0);
+    expect(s.res.grain).toBe(4);
+  });
+});

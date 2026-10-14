@@ -408,8 +408,8 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     buildDays: 14,
     workers: 1,
     cycle: 2,
-    inputs: { grain: 3 },
-    outputs: { flour: 3 },
+    inputs: { grain: 4 },
+    outputs: { flour: 4 },
     tier: 1,
   }),
   bakery: def({

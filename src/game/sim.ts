@@ -1237,9 +1237,13 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
         const missing = Object.keys(inputs).filter((k) => s.res[k as ResourceId] < (inputs[k as ResourceId] ?? 0));
         return `Waiting for ${missing.map((k) => GOODS[k as ResourceId].name.toLowerCase()).join(', ')}`;
       }
-      if (fullFor(s, outputs)) return 'Storage full';
+      // Inputs leave the store as the outputs arrive: milling a full granary's
+      // grain into flour must not stall for want of room.
       pay(s, inputs);
-      addOutput(s, b, outputs);
+      if (!addOutput(s, b, outputs)) {
+        for (const k in inputs) s.res[k as ResourceId] += inputs[k as ResourceId] ?? 0;
+        return 'Storage full';
+      }
       return null;
     }
   }
@@ -1775,6 +1779,10 @@ const VARIETY_BONUS = [0, 0, 6, 12, 18];
  * across foods. Returns how many went hungry and how many food groups
  * (grain, meat, produce, dairy) were on the table.
  */
+/** Famine food: a measure of grain or oats boiled into pottage feeds half a villager for a month. */
+const POTTAGE: ResourceId[] = ['grain', 'oats'];
+export const POTTAGE_FOOD = 0.5;
+
 export function eatFood(s: GameState, mouths: number): { hungry: number; groups: number } {
   let need = mouths;
   const groups = new Set<string>();
@@ -1790,6 +1798,13 @@ export function eatFood(s: GameState, mouths: number): { hungry: number; groups:
       }
     }
     if (!ate) break;
+  }
+  // With nothing else left, families boil grain or oats into pottage.
+  for (const f of POTTAGE) {
+    const n = Math.min(Math.floor(s.res[f]), Math.ceil((need - 0.001) / POTTAGE_FOOD));
+    if (n <= 0) continue;
+    s.res[f] -= n;
+    need -= n * POTTAGE_FOOD;
   }
   return { hungry: Math.max(0, Math.ceil(need - 0.001)), groups: groups.size };
 }

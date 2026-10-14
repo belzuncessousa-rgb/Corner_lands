@@ -68,7 +68,8 @@ then fall back to the browser's localStorage.
   patch, hens or beehives in the backyard.
 - **Food & seasons** — each villager eats one food per month (bread and cheese
   go further); meals from several food groups (grain, meat, produce, dairy)
-  raise happiness. Foragers pick berries, autumn mushrooms or herbs and rest in deep winter;
+  raise happiness. With nothing else left, families boil wheat or oats into
+  pottage, half as filling. Foragers pick berries, autumn mushrooms or herbs and rest in deep winter;
   every household burns a bundle of firewood (or two logs) each winter month.
 - **Workshops** — a Windmill grinds wheat for the Bakery; the Brewhouse brews
   ale from barley or cider from apples for the taverns; a Dairy makes cheese;
