@@ -1484,12 +1484,84 @@ function drawGood(p: Pen, id: ResourceId, x: number, y: number): void {
     }
     case 'meat':
     case 'fish':
+    case 'pork':
+    case 'ale':
+    case 'cider':
+    case 'milk':
       p.barrel(x - 0.06, y);
       p.barrel(x + 0.1, y + 0.08);
       break;
+    case 'firewood':
+      p.logPile(x - 0.12, y, 3);
+      break;
+    case 'dressedstone':
+      for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) p.box(x - 0.16 + i * 0.17, y - 0.12 + j * 0.13, x - 0.01 + i * 0.17, y + 0.0 + j * 0.13, 0, 5, '#cac4b6');
+      p.box(x - 0.08, y - 0.06, x + 0.08, y + 0.06, 5, 5, '#d4cec0');
+      break;
+    case 'ore':
+      p.stonePile(x - 0.15, y - 0.15, 4);
+      p.ellipse(x, y, 4, 2, 6, '#b4652e');
+      break;
+    case 'clay':
+      p.ellipse(x, y, 10, 5, 2, '#9a5a34');
+      p.ellipse(x - 0.02, y - 0.02, 7, 3.5, 4, '#b0643a');
+      break;
+    case 'tiles':
+      for (let i = 0; i < 4; i++) p.box(x - 0.18, y - 0.1, x + 0.18, y + 0.1, i * 2, 1.8, i % 2 ? '#b8483a' : '#a4402f');
+      break;
+    case 'woodparts':
+      p.crate(x - 0.12, y - 0.1, 0.18);
+      p.ellipse(x + 0.12, y + 0.08, 5, 5, 5, '#8a6236');
+      p.ellipse(x + 0.12, y + 0.08, 1.6, 1.6, 5, '#5e3e22');
+      break;
+    case 'wool':
+    case 'flax':
+    case 'hides':
+    case 'leather':
+    case 'cloth':
+    case 'clothes': {
+      const c = { wool: '#f2ece0', flax: '#c8b878', hides: '#b08458', leather: '#7a4a2a', cloth: '#5a7ab0', clothes: '#8a3b2e' }[id];
+      for (let i = 0; i < 3; i++) p.box(x - 0.16, y - 0.12, x + 0.16, y + 0.12, i * 2.6, 2.4, shadeHex(c, i % 2 ? 0.9 : 1));
+      break;
+    }
+    case 'flour':
+    case 'barley':
+    case 'oats':
+    case 'herbs':
+      p.sack(x - 0.08, y, id === 'flour' ? '#efe6d4' : '#d8c890');
+      p.sack(x + 0.08, y + 0.05, id === 'flour' ? '#e8dcc4' : '#cdbb8e');
+      break;
+    case 'cheese':
+      p.ellipse(x, y, 7, 3.4, 2.2, '#e8c040');
+      p.ellipse(x + 0.05, y + 0.06, 7, 3.4, 4.6, '#f0c850');
+      break;
+    case 'apples':
+    case 'pears':
+    case 'plums':
+    case 'mushrooms':
+    case 'vegetables':
+    case 'eggs': {
+      const fill = { apples: '#c4322a', pears: '#c8c040', plums: '#6a3a80', mushrooms: '#a8603a', vegetables: '#5d9a3a', eggs: '#f2e8d4' }[id];
+      const [bx, by] = iso(x, y, 0);
+      p.ctx.fillStyle = '#a07a40';
+      p.ctx.beginPath();
+      p.ctx.ellipse(bx, by - 3, 5, 4, 0, 0, Math.PI);
+      p.ctx.fill();
+      p.ctx.fillStyle = fill;
+      p.ctx.beginPath();
+      p.ctx.ellipse(bx, by - 3, 4.5, 2, 0, 0, Math.PI * 2);
+      p.ctx.fill();
+      break;
+    }
     default:
       p.crate(x - 0.1, y - 0.1, 0.18);
   }
+}
+
+function shadeHex(hex: string, f: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  const c = (v: number) => Math.round(Math.min(255, v * f));
+  return `rgb(${c((n >> 16) & 255)},${c((n >> 8) & 255)},${c(n & 255)})`;
 }
 
 const TREE_SLOTS: [number, number][][] = [

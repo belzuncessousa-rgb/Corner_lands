@@ -148,7 +148,7 @@ export const QUESTS: Quest[] = [
   {
     id: 'tools',
     title: 'Forge tools',
-    hint: 'Mine iron and build a Blacksmith.',
+    hint: 'Dig ore at an Iron Mine, smelt it at a Bloomery and forge tools at a Blacksmith.',
     reward: { gold: 50 },
     done: (s) => count(s, 'smithy') >= 1 && s.res.tools >= 1,
   },

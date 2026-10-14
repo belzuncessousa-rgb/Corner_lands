@@ -280,6 +280,8 @@ function shop(s: GameState): void {
   if (hasBuilt(s, 'tavern') && s.res.ale + s.res.cider < 8) buy('ale', 10, 100);
   if (s.tier >= 1 && s.res.clothes < 4) buy('clothes', Math.min(10, homes(2) + 3), 150);
   if (homes(3) && s.res.boots < 3) buy('boots', Math.min(8, homes(3)), 200);
+  if (s.tier >= 1 && count(s, 'windmill') === 0 && s.res.woodparts < 4) buy('woodparts', 4, 120);
+  if (s.tier >= 2 && s.res.tiles < 15 && homes(2) > homes(3)) buy('tiles', 15, 250);
   if (homes(3) && s.res.medicine < 3) buy('medicine', Math.min(8, homes(3)), 200);
 }
 
@@ -341,8 +343,8 @@ function act(s: GameState, rand: () => number): void {
   const wants: BuildingType[] = [];
   // Key buildings for progression come first once unlocked.
   if (s.tier >= 1) {
-    for (const t of ['sawmill', 'windmill', 'bakery', 'market'] as BuildingType[]) {
-      if (count(s, t) === 0 && (t === 'sawmill' || t === 'market' || count(s, 'farm') > 0)) wants.push(t);
+    for (const t of ['sawmill', 'carpenter', 'windmill', 'bakery', 'market', 'stonemason'] as BuildingType[]) {
+      if (count(s, t) === 0 && (t === 'sawmill' || t === 'market' || t === 'stonemason' || count(s, 'farm') > 0)) wants.push(t);
     }
   }
   if (s.tier >= 2) {
@@ -378,6 +380,9 @@ function act(s: GameState, rand: () => number): void {
     if (count(s, 'smithy') < 1) wants.push('smithy');
     if (count(s, 'church') < 1) wants.push('church');
     if (pop >= 60 && count(s, 'tanner') < 1) wants.push('tanner');
+    if (count(s, 'mine') > 0 && count(s, 'bloomery') < 1) wants.push('bloomery');
+    if (count(s, 'claypit') < 1) wants.push('claypit');
+    if (count(s, 'claypit') > 0 && count(s, 'kiln') < 1) wants.push('kiln');
   }
   if (s.tier >= 1 && count(s, 'tavern') < 1 + Math.floor(pop / 70)) wants.push('tavern');
   for (const t of wants) {

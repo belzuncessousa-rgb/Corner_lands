@@ -632,7 +632,7 @@ function carryFor(type: string): ResourceId | null {
     case 'quarry':
       return 'stone';
     case 'mine':
-      return 'iron';
+      return 'ore';
     case 'forager':
       return 'berries';
     case 'hunter':

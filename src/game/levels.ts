@@ -30,15 +30,15 @@ export const HOUSE_LEVELS: HouseLevel[] = [
   { name: '', housing: 0, tax: 0 },
   { name: 'Cottage', housing: 5, tax: 1 },
   { name: 'Timber House', housing: 7, tax: 1.5, cost: { planks: 10, stone: 5, gold: 20 }, tier: 1 },
-  { name: 'Townhouse', housing: 9, tax: 2, cost: { planks: 20, stone: 20, tools: 3, gold: 50 }, tier: 2 },
+  { name: 'Townhouse', housing: 9, tax: 2, cost: { planks: 20, tiles: 15, stone: 10, tools: 3, gold: 50 }, tier: 2 },
 ];
 
 export const MANOR_LEVELS: { name: string; cost?: Cost; days?: number }[] = [
   { name: '' },
   { name: 'Manor Hall' },
   { name: 'Manor House', cost: { wood: 40, stone: 20, gold: 50 }, days: 20 },
-  { name: 'Stone Manor', cost: { planks: 40, stone: 60, gold: 150 }, days: 30 },
-  { name: "Lord's Keep", cost: { stone: 120, planks: 60, tools: 15, gold: 400 }, days: 40 },
+  { name: 'Stone Manor', cost: { planks: 40, dressedstone: 40, stone: 20, gold: 150 }, days: 30 },
+  { name: "Lord's Keep", cost: { dressedstone: 80, stone: 40, planks: 60, tools: 15, gold: 400 }, days: 40 },
 ];
 
 /** Extra storage each manor level above the first provides. */
@@ -66,6 +66,11 @@ export const UPGRADABLE_WORK: BuildingType[] = [
   'orchardist',
   'sawmill',
   'smithy',
+  'claypit',
+  'kiln',
+  'stonemason',
+  'carpenter',
+  'bloomery',
   'market',
   'tavern',
 ];

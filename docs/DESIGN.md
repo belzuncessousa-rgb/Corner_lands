@@ -146,8 +146,8 @@ Every charter carries a small malus.
 - [x] New household needs and seasonal consumption of wares
 
 ### Phase 4 — Stone, clay, metal
-- [ ] Clay pit & kiln (tiles), stonemason, bloomery, carpenter
-- [ ] New construction costs (tiles for townhouses, dressed stone for manor)
+- [x] Clay pit & kiln (tiles), stonemason, bloomery, carpenter
+- [x] New construction costs (tiles for townhouses, dressed stone for manor)
 
 ### Phase 5 — Prestige and charters
 - [ ] Prestige income; charter tree UI; first ranks of every path

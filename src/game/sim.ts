@@ -151,7 +151,7 @@ export function placementError(s: GameState, type: BuildingType, x: number, y: n
   if (!isUnlocked(s, type)) return `Requires ${TIERS[d.tier].name}`;
   const clear = footprintClear(s, x, y, d.w, d.h);
   if (clear) return clear;
-  if (type === 'fisher' && countInRadius(s, centerOf(x, y, d.w, d.h), 2.5, (i) => s.terrain[i] === 1) < 2) {
+  if ((type === 'fisher' || type === 'claypit') && countInRadius(s, centerOf(x, y, d.w, d.h), 2.5, (i) => s.terrain[i] === 1) < 2) {
     return 'Must be next to water';
   }
   if ((d.cost.gold ?? 0) > s.res.gold) return 'Not enough coins';
@@ -1049,7 +1049,7 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
     case 'quarry':
     case 'mine': {
       const arr = b.type === 'quarry' ? s.rock : s.ore;
-      const out = b.type === 'quarry' ? 'stone' : 'iron';
+      const out = b.type === 'quarry' ? 'stone' : 'ore';
       if (roomFor(s, out) <= 0) return 'Storage full';
       const t = nearestTile(s, b, d.radius, (i, dist) => (arr[i] > 0 ? dist : null));
       if (t < 0) return b.type === 'quarry' ? 'No rock in range' : 'No ore in range';
@@ -1091,6 +1091,14 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
       addOutput(s, b, { meat: amount });
       // Every few kills bring a hide worth tanning.
       if (rng.next() < 0.5) store(s, 'hides', 1);
+      return null;
+    }
+    case 'claypit': {
+      const water = countInRadius(s, bCenter(b), d.radius, (i) => s.terrain[i] === 1);
+      if (water < 2) return 'No riverbank nearby';
+      if (roomFor(s, 'clay') <= 0) return 'Storage full';
+      const amount = Math.max(1, Math.round((d.outputs.clay ?? 0) * Math.min(1, water / 10) * (season === 3 ? 0.4 : 1)));
+      addOutput(s, b, { clay: amount });
       return null;
     }
     case 'fisher': {
@@ -1590,7 +1598,7 @@ export function dailyConstruction(s: GameState): void {
           b.need![id] = want - take;
           pool -= take;
         }
-        if ((b.need![id] ?? 0) > 0 && s.res[id] < 1) missing = RESOURCE_INFO_NAMES[id] ?? id;
+        if ((b.need![id] ?? 0) > 0 && s.res[id] < 1) missing = GOODS[id].name.toLowerCase();
       }
       // Loads cannot pile up beyond a trip's worth while waiting for goods.
       pool = Math.min(pool, n * CARRY_LOAD);
@@ -1624,13 +1632,6 @@ export function dailyConstruction(s: GameState): void {
   }
 }
 
-const RESOURCE_INFO_NAMES: Partial<Record<ResourceId, string>> = {
-  wood: 'timber',
-  stone: 'stone',
-  planks: 'planks',
-  iron: 'iron',
-  tools: 'tools',
-};
 
 // ---------------------------------------------------------------- monthly
 

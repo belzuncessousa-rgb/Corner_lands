@@ -142,10 +142,11 @@ describe('simulation', () => {
 });
 
 describe('production chains', () => {
-  it('mine and blacksmith turn ore into tools', () => {
+  it('mine, bloomery and blacksmith turn ore into tools', () => {
     const s = generateWorld(77);
     s.tier = 2;
     for (const k of ['wood', 'stone', 'planks', 'gold', 'bread'] as const) s.res[k] = 100;
+    s.population = 14;
     // Find an ore tile and build a road from the hall to it.
     const ore = s.ore.findIndex((v) => v > 0);
     const ox = ore % s.width;
@@ -184,8 +185,11 @@ describe('production chains', () => {
     s.dirty = true;
     s.ore[ore] = 30;
     const smithy = placeNearRoad(s, 'smithy');
+    const bloomery = placeNearRoad(s, 'bloomery');
+    s.res.firewood = 80;
     run(s, 60);
     expect(mine!.build).toBe(1);
+    expect(bloomery.build).toBe(1);
     expect(smithy.build).toBe(1);
     s.res.tools = 0;
     const tools = s.res.tools;

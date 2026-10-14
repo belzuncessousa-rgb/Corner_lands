@@ -756,6 +756,159 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       }
       break;
     }
+    case 'claypit': {
+      // A dug pit by the water, clay heaps and a drying shelter.
+      p.poly(
+        [
+          [0.3, 0.9, 0],
+          [1.3, 0.9, 0],
+          [1.3, 1.75, 0],
+          [0.3, 1.75, 0],
+        ],
+        season === 3 ? '#c8c2bc' : '#8a5a38',
+      );
+      p.poly(
+        [
+          [0.45, 1.05, 0],
+          [1.15, 1.05, 0],
+          [1.15, 1.6, 0],
+          [0.45, 1.6, 0],
+        ],
+        season === 3 ? '#b4aca4' : '#6e4428',
+      );
+      p.line([0.55, 1.3, 0], [0.75, 1.15, 9], '#6b4a2e', 1.2);
+      for (const [x, y] of [
+        [1.5, 1.2],
+        [1.65, 1.5],
+      ]) {
+        p.ellipse(x, y, 9, 5, 2, '#9a5a34');
+        p.ellipse(x - 0.03, y - 0.03, 6, 3, 4, '#b0643a');
+      }
+      for (const [x, y] of [
+        [0.3, 0.3],
+        [1.2, 0.3],
+        [0.3, 0.75],
+        [1.2, 0.75],
+      ]) p.line([x, y, 0], [x, y, 11], '#5e4129', 1.6);
+      p.roofX(0.3, 0.3, 1.2, 0.75, 11, 7, 'thatch', WOOD, 0.08);
+      for (let i = 0; i < 3; i++) p.box(0.4 + i * 0.25, 0.45, 0.55 + i * 0.25, 0.6, 0, 3, '#b0643a');
+      break;
+    }
+    case 'kiln': {
+      p.shadow(0.3, 0.3, 1.7, 1.6);
+      // Beehive kiln of brick with a glowing mouth.
+      const [kx, ky] = iso(0.9, 0.9, 0);
+      const c = p.ctx;
+      c.fillStyle = '#9a5a40';
+      c.beginPath();
+      c.ellipse(kx, ky - 4, 26, 13, 0, 0, Math.PI);
+      c.ellipse(kx, ky - 4, 26, 30, 0, Math.PI, 0);
+      c.fill();
+      c.strokeStyle = 'rgba(70,36,24,0.5)';
+      c.lineWidth = 0.6;
+      for (let r = 6; r < 34; r += 4) {
+        c.beginPath();
+        c.ellipse(kx, ky - 4, Math.sqrt(Math.max(0, 26 * 26 * (1 - (r * r) / (30 * 30)))), 2, 0, 0, Math.PI);
+        c.stroke();
+      }
+      c.fillStyle = '#b06848';
+      c.beginPath();
+      c.ellipse(kx - 8, ky - 22, 9, 8, 0, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = '#2a1a10';
+      c.beginPath();
+      c.ellipse(kx + 6, ky + 4, 7, 6, 0, Math.PI, 0);
+      c.fill();
+      c.fillStyle = '#f08a2a';
+      c.fillRect(kx + 1, ky + 1, 10, 3);
+      smoke.push([0.9, 0.9, 38]);
+      // Stacks of finished tiles and firewood.
+      for (let i = 0; i < 4; i++) p.box(1.35, 1.25, 1.75, 1.5, i * 2, 1.8, i % 2 ? '#b8483a' : '#a4402f');
+      for (let i = 0; i < 3; i++) p.box(1.35, 0.85, 1.75, 1.1, i * 2, 1.8, i % 2 ? '#b8483a' : '#a4402f');
+      p.logPile(0.4, 1.7, 2);
+      break;
+    }
+    case 'stonemason': {
+      p.shadow(0.2, 0.2, 1.7, 1.7);
+      for (const [x, y] of [
+        [0.3, 0.3],
+        [1.5, 0.3],
+        [0.3, 0.95],
+        [1.5, 0.95],
+      ]) p.line([x, y, 0], [x, y, 14], '#5e4129', 2);
+      p.roofX(0.3, 0.3, 1.5, 0.95, 14, 9, 'shingle', WOOD, 0.08);
+      // A block on the banker, finished blocks and rubble.
+      p.box(0.7, 0.55, 1.0, 0.8, 0, 6, '#7b5a36');
+      p.box(0.72, 0.57, 0.98, 0.78, 6, 6, '#cac4b6');
+      for (let i = 0; i < 2; i++) {
+        for (let j = 0; j < 2; j++) p.box(0.35 + i * 0.22, 1.2 + j * 0.2, 0.53 + i * 0.22, 1.36 + j * 0.2, 0, 6, '#cac4b6');
+      }
+      p.box(0.4, 1.25, 0.58, 1.41, 6, 6, '#d4cec0');
+      p.stonePile(1.25, 1.35, 5);
+      p.line([1.05, 1.6, 0], [1.2, 1.7, 8], '#6b4a2e', 1.3);
+      break;
+    }
+    case 'carpenter': {
+      p.shadow(0.3, 0.3, 1.65, 1.4);
+      p.box(0.3, 0.35, 1.45, 1.35, 0, 16, WOOD);
+      p.timber(0.3, 0.35, 1.45, 1.35, 0, 16, BEAM);
+      p.wallL(1.352, 0.5, 1.1, 0, 12, '#3a2a1e');
+      p.box(0.6, 1.2, 1.0, 1.33, 0, 5, '#8a6236');
+      p.roofX(0.3, 0.35, 1.45, 1.35, 16, 15, 'shingle', WOOD, 0.12);
+      smoke.push(p.chimney(1.15, 0.7, 24, 9));
+      // A cartwheel and a stack of beams.
+      const [wx, wy] = iso(1.65, 0.9, 7);
+      const c = p.ctx;
+      c.strokeStyle = '#5e3e22';
+      c.lineWidth = 1.6;
+      c.beginPath();
+      c.ellipse(wx, wy, 6, 7, 0, 0, Math.PI * 2);
+      c.stroke();
+      c.lineWidth = 0.8;
+      for (let k = 0; k < 6; k++) {
+        const a = (k * Math.PI) / 3;
+        c.beginPath();
+        c.moveTo(wx, wy);
+        c.lineTo(wx + Math.cos(a) * 6, wy + Math.sin(a) * 7);
+        c.stroke();
+      }
+      for (let i = 0; i < 3; i++) p.box(0.4, 1.55, 1.3, 1.68, i * 2.2, 2, i % 2 ? '#c8a46c' : '#b8945c');
+      break;
+    }
+    case 'bloomery': {
+      p.shadow(0.3, 0.3, 1.7, 1.6);
+      // A squat clay shaft furnace under an open shed, bellows and ore.
+      for (const [x, y] of [
+        [0.3, 0.3],
+        [1.4, 0.3],
+        [0.3, 1.2],
+        [1.4, 1.2],
+      ]) p.line([x, y, 0], [x, y, 18], '#5e4129', 2);
+      const [fx, fy] = iso(0.85, 0.75, 0);
+      const c = p.ctx;
+      c.fillStyle = '#8a5a40';
+      c.beginPath();
+      c.moveTo(fx - 11, fy);
+      c.lineTo(fx - 7, fy - 26);
+      c.lineTo(fx + 7, fy - 26);
+      c.lineTo(fx + 11, fy);
+      c.closePath();
+      c.fill();
+      c.fillStyle = '#6e4430';
+      c.fillRect(fx + 2, fy - 26, 5, 26);
+      c.fillStyle = '#f0a03a';
+      c.beginPath();
+      c.ellipse(fx, fy - 3, 3.5, 3, 0, 0, Math.PI * 2);
+      c.fill();
+      smoke.push([0.85, 0.75, 30]);
+      p.roofX(0.3, 0.3, 1.4, 1.2, 18, 8, 'plank', WOOD, 0.08);
+      // Bellows.
+      p.box(1.1, 0.65, 1.3, 0.85, 2, 4, '#6b4a2e');
+      p.stonePile(1.55, 1.3, 4);
+      p.ellipse(1.6, 1.35, 4, 2, 6, '#b4652e');
+      p.logPile(0.45, 1.6, 2);
+      break;
+    }
     case 'windmill': {
       // Post mill: a stone base, a boarded body and four lattice sails.
       p.shadow(0.4, 0.4, 1.6, 1.6);
