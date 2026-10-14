@@ -3,8 +3,10 @@ import { listSaves, loadGame, saveGame } from './api';
 import { BUILDINGS, BUILD_ORDER, MONTH_NAMES, TIERS } from './game/data';
 import { deserialize, serialize } from './game/save';
 import {
+  BRIDGE_COST,
   buildRoad,
   bCenter,
+  isBridge,
   centerOf,
   demolish,
   log,
@@ -227,8 +229,14 @@ export class Game {
       const tiles = this.roadTiles(tx, ty);
       ov.tiles = tiles.map((t) => ({ ...t, ok: !roadError(s, t.x, t.y) || s.road[idx(s, t.x, t.y)] === 1 }));
       ov.tileColor = 'road';
-      const n = tiles.filter((t) => !roadError(s, t.x, t.y)).length;
-      this.hud.setHint(this.dragTile ? `Road: ${n} tiles · release to build` : 'Click and drag to lay a road · Right-click to stop', false);
+      const fresh = tiles.filter((t) => !s.road[idx(s, t.x, t.y)]);
+      const n = fresh.filter((t) => !roadError(s, t.x, t.y)).length;
+      const bridges = fresh.filter((t) => isBridge(s, t.x, t.y)).length;
+      const cost = bridges ? ` · ${bridges} bridge tiles cost ${bridges * (BRIDGE_COST.wood ?? 0)} timber` : '';
+      this.hud.setHint(
+        this.dragTile ? `Road: ${n} tiles${cost} · release to build` : 'Click and drag to lay a road; roads over water become bridges · Right-click to stop',
+        bridges * (BRIDGE_COST.wood ?? 0) > s.res.wood,
+      );
     } else if (tool.kind === 'demolish') {
       const tiles = this.dragTile ? this.roadTiles(tx, ty) : inBounds(s, tx, ty) ? [{ x: tx, y: ty }] : [];
       ov.tiles = tiles.map((t) => ({ ...t, ok: true }));

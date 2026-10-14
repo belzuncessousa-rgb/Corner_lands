@@ -40,7 +40,7 @@ then fall back to the browser's localStorage.
 ### How the settlement works
 
 - **Roads** — every building must be connected to the Manor Hall by road to be
-  built or staffed.
+  built or staffed. Roads over water become bridges (4 timber per tile).
 - **Villagers** — settlers arrive when happiness is at least 50%, nobody went
   hungry and there is free housing. Unhappy or hungry villagers leave.
 - **Jobs** — villagers fill jobs automatically (food first). Idle villagers help
@@ -55,6 +55,10 @@ then fall back to the browser's localStorage.
   Borough (90 + church). Each tier unlocks new buildings.
 - **Events** — merchants, wandering families, good weather, wolves, rats and
   the king's tax collector keep things lively.
+- **Steward & ledger** — timely warnings about food, firewood and housing, plus
+  monthly charts of population, food, happiness and gold.
+- **Nature** — forests slowly regrow, deer graze at the woods' edge and birds
+  pass overhead; wind and birdsong change with the seasons.
 
 ## Project layout
 

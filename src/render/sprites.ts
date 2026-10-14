@@ -213,6 +213,73 @@ export function roadTile(season: Season, mask: number, layer: 'edge' | 'fill'): 
   });
 }
 
+/** Wooden bridge deck over water; mask bits like roadTile. */
+export function bridgeTile(season: Season, mask: number, layer: 'edge' | 'fill'): Sprite {
+  return makeSprite(TW + 4, TH + 24, TW / 2 + 2, 2, (ctx) => {
+    const cx = 0;
+    const cy = TH / 2;
+    const mids: [number, number, number][] = [
+      [1, TW / 4, (TH * 3) / 4],
+      [2, -TW / 4, (TH * 3) / 4],
+      [4, -TW / 4, TH / 4],
+      [8, TW / 4, TH / 4],
+    ];
+    let segs = mids.filter(([bit]) => mask & bit);
+    // A lone bridge tile still shows a short deck.
+    if (!segs.length) segs = [mids[0], mids[2]];
+    const stroke = (color: string, width: number, dy = 0) => {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.lineCap = 'butt';
+      ctx.beginPath();
+      for (const [, mx, my] of segs) {
+        ctx.moveTo(cx, cy + dy);
+        ctx.lineTo(mx, my + dy);
+      }
+      ctx.stroke();
+    };
+    if (layer === 'edge') {
+      // Shadow on the water and supporting posts.
+      stroke('rgba(20,40,50,0.35)', 18, 6);
+      ctx.fillStyle = '#4a3424';
+      for (const [, mx, my] of segs) {
+        ctx.fillRect((cx + mx) / 2 - 7, (cy + my) / 2 - 1, 2.5, 9);
+        ctx.fillRect((cx + mx) / 2 + 5, (cy + my) / 2 - 1, 2.5, 9);
+      }
+      return;
+    }
+    stroke('#5e4129', 16);
+    stroke(season === 3 ? '#d8d4cc' : '#a07a4a', 13);
+    // Planks across the deck.
+    ctx.strokeStyle = season === 3 ? '#b8b0a4' : '#7a5a36';
+    ctx.lineWidth = 0.8;
+    for (const [, mx, my] of segs) {
+      const len = Math.hypot(mx - cx, my - cy);
+      const ux = (mx - cx) / len;
+      const uy = (my - cy) / len;
+      for (let t = 2; t < len; t += 3.2) {
+        const px = cx + ux * t;
+        const py = cy + uy * t;
+        ctx.beginPath();
+        ctx.moveTo(px - uy * 6.5, py + ux * 6.5);
+        ctx.lineTo(px + uy * 6.5, py - ux * 6.5);
+        ctx.stroke();
+      }
+      // Rails.
+      ctx.strokeStyle = '#4a3424';
+      ctx.lineWidth = 1.2;
+      for (const side of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(cx - uy * 7 * side, cy + ux * 7 * side - 4);
+        ctx.lineTo(mx - uy * 7 * side, my + ux * 7 * side - 4);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = season === 3 ? '#b8b0a4' : '#7a5a36';
+      ctx.lineWidth = 0.8;
+    }
+  });
+}
+
 // ------------------------------------------------------------------ nature
 
 export type TreeKind = 'oak' | 'pine' | 'birch';

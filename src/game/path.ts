@@ -98,7 +98,7 @@ export function findPath(
   const goal = gy * W + gx;
   if (start === goal) return [];
   const passable = (i: number) => {
-    if (s.terrain[i] === 1) return false;
+    if (s.terrain[i] === 1 && !s.road[i]) return false;
     const o = s.occ[i];
     return o < 0 || allowIds.includes(o) || i === goal;
   };

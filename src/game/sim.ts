@@ -121,18 +121,26 @@ export function placeOrder(s: GameState, type: BuildingType, x: number, y: numbe
   return b;
 }
 
+/** Timber needed for each bridge tile laid over water. */
+export const BRIDGE_COST: Cost = { wood: 4 };
+
+export function isBridge(s: GameState, x: number, y: number): boolean {
+  return inBounds(s, x, y) && s.terrain[idx(s, x, y)] === 1;
+}
+
 export function roadError(s: GameState, x: number, y: number): string | null {
   if (!inBounds(s, x, y)) return 'Outside the map';
   const i = idx(s, x, y);
-  if (s.terrain[i] === 1) return 'Cannot build on water';
   if (s.occ[i] >= 0) return 'Occupied';
   if (s.rock[i] || s.ore[i]) return 'Rocky ground';
   if (s.road[i]) return 'Already a road';
+  if (s.terrain[i] === 1 && !canAfford(s, BRIDGE_COST)) return 'Not enough timber for a bridge';
   return null;
 }
 
 export function buildRoad(s: GameState, x: number, y: number): boolean {
   if (roadError(s, x, y)) return false;
+  if (isBridge(s, x, y)) pay(s, BRIDGE_COST);
   setRoad(s, x, y, true);
   return true;
 }

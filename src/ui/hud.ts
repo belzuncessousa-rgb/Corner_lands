@@ -742,12 +742,12 @@ export class Hud {
       `<h2>How to Play</h2>
       <div class="help">
         <p><b>Grow your settlement</b> from a Hamlet into a Borough. Follow the objectives on the left.</p>
-        <p><b>Roads</b> connect everything. Every building needs a road leading to the <b>Manor Hall</b>, or it cannot be built or staffed.</p>
+        <p><b>Roads</b> connect everything. Every building needs a road leading to the <b>Manor Hall</b>, or it cannot be built or staffed. Roads laid over water become wooden <b>bridges</b> (4 timber per tile).</p>
         <p><b>Houses</b> attract settlers. People arrive when happiness is 50% or higher, there is free housing and nobody is going hungry.</p>
         <p><b>Food:</b> each villager eats one food a month. Eating several kinds of food (berries, meat, fish, bread) makes people happier.</p>
         <p><b>Winter</b> stops foraging and farming, and each household burns one timber a month for warmth. Stock up in autumn!</p>
         <p><b>Farms</b> are sown in spring, grow through summer and are harvested in autumn. Bake the grain into bread.</p>
-        <p><b>Wells, markets and churches</b> make nearby homes happier. Taxes bring gold but upset people.</p>
+        <p><b>Wells, markets, churches and decorations</b> make nearby homes happier. Taxes bring gold but upset people. Your <b>steward</b> will warn you when food or firewood runs low, and the <b>Ledger</b> charts how the town is doing.</p>
         <p><b>Idle villagers</b> help build construction sites, so keep a few unemployed while expanding.</p>
         <div class="ornament">❦</div>
         <p><kbd>Left-drag</kbd> / <kbd>WASD</kbd> pan · <kbd>Wheel</kbd> zoom · <kbd>R</kbd> road · <kbd>X</kbd> demolish · <kbd>H</kbd> house · <kbd>Space</kbd> pause · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> speed · <kbd>Right-click</kbd>/<kbd>Esc</kbd> cancel</p>

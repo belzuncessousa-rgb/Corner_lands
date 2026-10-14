@@ -8,6 +8,7 @@ import { Pen, TH, TW, iso } from './pen';
 import {
   type Sprite,
   type TreeKind,
+  bridgeTile,
   bushSprite,
   makeSprite,
   buildingSprite,
@@ -238,7 +239,10 @@ export class Renderer {
           const [wx, wy] = iso(x, y);
           if (!visible(wx, wy)) continue;
           const mask = this.roadMask(s, x, y);
-          const sp = this.sprite(`r:${season}:${mask}:${layer}`, () => roadTile(season, mask, layer));
+          const sp =
+            s.terrain[i] === 1
+              ? this.sprite(`br:${season}:${mask}:${layer}`, () => bridgeTile(season, mask, layer))
+              : this.sprite(`r:${season}:${mask}:${layer}`, () => roadTile(season, mask, layer));
           this.blit(sp, wx, wy);
         }
       }

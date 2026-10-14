@@ -199,3 +199,19 @@ describe('events', () => {
     expect(s.population).toBeGreaterThanOrEqual(2);
   });
 });
+
+describe('bridges', () => {
+  it('roads over water cost timber and connect both banks', () => {
+    const s = generateWorld(777);
+    s.res.wood = 100;
+    const water = s.terrain.findIndex((t) => t === 1);
+    const x = water % s.width;
+    const y = Math.floor(water / s.width);
+    expect(buildRoad(s, x, y)).toBe(true);
+    expect(s.res.wood).toBe(96);
+    expect(s.road[water]).toBe(1);
+    s.res.wood = 2;
+    const next = s.terrain.findIndex((t, i) => t === 1 && i !== water);
+    expect(buildRoad(s, next % s.width, Math.floor(next / s.width))).toBe(false);
+  });
+});
