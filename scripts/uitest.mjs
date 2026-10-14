@@ -15,6 +15,8 @@ await page.click('text=Found the Settlement');
 await page.waitForTimeout(600);
 await page.evaluate(() => { const g = window.game; g.setSpeed(0); g.state.tier = 1; g.state.res.wood = 300; g.state.res.planks = 60; g.state.res.stone = 60; g.state.res.gold = 500; g.hud.update(); });
 const tileXY = (x, y) => page.evaluate(([x, y]) => window.game.renderer.tileToScreen(x + 0.5, y + 0.5), [x, y]);
+/** Clicks so that a size x size building lands with its corner on (x, y). */
+const placeAt = async (x, y, size) => { const [sx, sy] = await page.evaluate(([x, y, n]) => window.game.renderer.tileToScreen(x + n / 2, y + n / 2), [x, y, size]); await page.mouse.move(sx, sy); await page.mouse.click(sx, sy); await page.waitForTimeout(150); };
 const clickTile = async (x, y) => { const [sx, sy] = await tileXY(x, y); await page.mouse.move(sx, sy); await page.mouse.click(sx, sy); await page.waitForTimeout(150); };
 const hall = await page.evaluate(() => { const h = window.game.state.buildings.find((b) => b.type === 'townhall'); return { x: h.x, y: h.y }; });
 const pick = async (cat, type) => {
@@ -26,7 +28,7 @@ const check = (name, ok, info = '') => results.push(`${ok ? 'PASS' : 'FAIL'} ${n
 // Farmstead from the menu (search a free spot near the hall).
 await pick('farming', 'farm');
 const spot = await page.evaluate(([hx, hy]) => (() => { for (let r = 4; r < 14; r++) for (const [dx, dy] of [[r, -r], [r, 0], [0, -r], [-r, 0], [0, r]]) if (!window.cl.placementError(window.game.state, 'farm', hx + dx, hy + dy)) return [hx + dx, hy + dy]; return null; })(), [hall.x, hall.y]);
-await clickTile(spot[0], spot[1]);
+await placeAt(spot[0], spot[1], 2);
 const farm = await page.evaluate(() => window.game.state.buildings.find((b) => b.type === 'farm'));
 check('place farmstead from menu', !!farm);
 // Field: two corner clicks next to the farm.
@@ -47,7 +49,7 @@ await page.keyboard.press('Escape');
 // Woodcutter by hotkey, then its worker, priority and product controls.
 await page.keyboard.press('e');
 const ws = await page.evaluate(([hx, hy]) => { for (let r = 4; r < 16; r++) for (const [dx, dy] of [[-r, 0], [0, r], [-r, r], [r, r]]) if (!window.cl.placementError(window.game.state, 'woodcutter', hx + dx, hy + dy)) return [hx + dx, hy + dy]; return null; }, [hall.x, hall.y]);
-await clickTile(ws[0], ws[1]);
+await placeAt(ws[0], ws[1], 2);
 const wcId = await page.evaluate(() => { const b = window.game.state.buildings.find((x) => x.type === 'woodcutter'); if (b) { b.build = 1; b.need = undefined; window.game.select(b.id); } return b?.id; });
 check('place woodcutter with the E hotkey', !!wcId);
 await page.waitForTimeout(400);
@@ -71,6 +73,63 @@ await clickTile(hall.x + 1, hall.y + 3);
 await clickTile(hall.x + 4, hall.y + 3);
 check('pave a road with T', (await page.evaluate(() => window.game.state.road.filter((v) => v === 2).length)) >= 3);
 await page.keyboard.press('Escape');
+// Animal farm and a pasture; switch to cattle.
+await page.evaluate(() => { const s = window.game.state; s.tier = 2; s.res.prestige = 200; s.res.wood = 300; s.res.gold = 800; s.population = 30; });
+await pick('farming', 'byre');
+const bs = await page.evaluate(([hx, hy]) => { for (let r = 5; r < 16; r++) for (const [dx, dy] of [[r, 0], [0, r], [-r, 0], [0, -r]]) if (!window.cl.placementError(window.game.state, 'byre', hx + dx, hy + dy)) return [hx + dx, hy + dy]; return null; }, [hall.x, hall.y]);
+await placeAt(bs[0], bs[1], 2);
+const byreId = await page.evaluate(() => { const b = window.game.state.buildings.find((x) => x.type === 'byre'); if (b) { b.build = 1; b.need = undefined; window.game.state.dirty = true; } return b?.id; });
+check('place an animal farm', !!byreId);
+await page.keyboard.press('Escape');
+await pick('farming', 'pasture');
+const pz = await page.evaluate(([bx, by]) => { const s = window.game.state; for (let r = 1; r < 10; r++) for (const [dx, dy] of [[r + 1, 0], [0, r + 1], [-r - 5, 0], [0, -r - 5]]) { const x = bx + dx, y = by + dy; if (!window.cl.placementError(s, 'well', x, y)) { let ok = true; for (let yy = y; yy < y + 5; yy++) for (let xx = x; xx < x + 5; xx++) { const i = yy * s.width + xx; if (s.occ[i] >= 0 || s.terrain[i] || s.road[i] || s.rock[i] || s.ore[i]) ok = false; } if (ok) return [x, y]; } } return null; }, [bs[0], bs[1]]);
+await clickTile(pz[0], pz[1]);
+await clickTile(pz[0] + 4, pz[1] + 4);
+const past = await page.evaluate(() => { const s = window.game.state; window.cl.recompute(s); const p = s.buildings.find((b) => b.type === 'pasture'); return p && p.owner; });
+check('fence a pasture beside it', past === byreId);
+await page.evaluate((id) => window.game.select(id), byreId);
+await page.waitForTimeout(300);
+await page.click('#inspector [data-action="recipe"][data-r="cattle"]');
+await page.evaluate(() => { for (let i = 0; i < 3; i++) window.cl.stepDay(window.game.state); });
+const herd = await page.evaluate(() => { const b = window.game.state.buildings.find((x) => x.type === 'byre'); return { kind: b.herdKind, herd: b.herd }; });
+check('keep cattle', herd.kind === 'cattle' && herd.herd > 0, JSON.stringify(herd));
+await page.keyboard.press('Escape');
+// A house: backyard hens, then raise it and take up weaving at home.
+const houseId = await page.evaluate(([hx, hy]) => { const s = window.game.state; for (let r = 4; r < 16; r++) for (const [dx, dy] of [[-r, -r], [r, r], [-r, r]]) { const b = window.cl.placeOrder(s, 'house', hx + dx, hy + dy); if (b) { b.build = 1; b.need = undefined; window.game.select(b.id); return b.id; } } return null; }, [hall.x, hall.y]);
+await page.waitForTimeout(300);
+await page.click('#inspector [data-action="yard"][data-y="hens"]');
+check('keep hens in the backyard', (await page.evaluate((id) => window.game.state.buildings.find((b) => b.id === id).yard, houseId)) === 'hens');
+await page.evaluate((id) => { const b = window.game.state.buildings.find((x) => x.id === id); b.level = 2; window.game.hud.update(); }, houseId);
+await page.waitForTimeout(300);
+await page.click('#inspector [data-action="trade-home"][data-t="weaver"]');
+check('take up weaving at home', (await page.evaluate((id) => window.game.state.buildings.find((b) => b.id === id).trade, houseId)) === 'weaver');
+await page.keyboard.press('Escape');
+// Grant a charter through the charter screen.
+await page.click('[data-action="charters"]');
+await page.waitForTimeout(300);
+await page.click('[data-action="charter-sel"][data-id="farm1"]');
+await page.click('[data-action="charter-grant"]');
+check('grant a charter', (await page.evaluate(() => window.game.state.charters?.includes('farm1'))) === true);
+await page.click('[data-action="close-modal"]');
+// Save through the menu, then load it back.
+await page.keyboard.press('Escape');
+await page.click('[data-m="save"]');
+await page.fill('#slot', 'ui-test');
+await page.click('.modal [data-m="save"]');
+await page.waitForTimeout(600);
+check('save the game', /Saved/.test(await page.textContent('#save-msg')));
+await page.evaluate(() => { window.game.state.res.gold = 1; });
+await page.click('[data-m="back"]');
+await page.click('[data-m="load"]');
+await page.waitForTimeout(500);
+const loadBtn = await page.$$('.saves .save');
+let idx = -1;
+for (let i = 0; i < loadBtn.length; i++) if ((await loadBtn[i].textContent()).includes('ui-test')) idx = i;
+await page.click(`[data-load="${idx}"]`);
+await page.waitForTimeout(800);
+const loaded = await page.evaluate(() => ({ gold: window.game.state.res.gold, charters: window.game.state.charters, weaver: window.game.state.buildings.some((b) => b.trade === 'weaver') }));
+check('load it back', loaded.gold > 1 && loaded.charters?.includes('farm1') && loaded.weaver, JSON.stringify(loaded));
+await page.evaluate(() => fetch('/api/saves/ui-test', { method: 'DELETE' }));
 console.log(results.join('\n'));
 console.log('errors', errors);
 await browser.close();
