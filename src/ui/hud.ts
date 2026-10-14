@@ -11,6 +11,8 @@ import {
   TAX_LEVELS,
   TIERS,
   TRADE_PRICES,
+  GOODS,
+  GROUP_NAMES,
 } from '../game/data';
 import { getEvent, resolveEvent } from '../game/events';
 import { HOUSE_LEVELS, MANOR_LEVELS, buildingName, houseNeeds, startUpgrade, upgradeBlocker, upgradePlan, workersOf } from '../game/levels';
@@ -19,7 +21,6 @@ import { StateRng } from '../game/rng';
 import {
   canAfford,
   demolish,
-  employed,
   hasBuilt,
   housingOf,
   isUnlocked,
@@ -29,6 +30,7 @@ import {
   recompute,
   seasonOf,
   setKeep,
+  labourSummary,
   PAVING_TIER,
   setWorkers,
   setPriority,
@@ -46,8 +48,8 @@ import {
   trade,
   yearOf,
 } from '../game/sim';
-import type { Building, BuildingType, Category, Cost, ResourceId } from '../game/types';
-import { FOOD_IDS } from '../game/data';
+import type { Building, BuildingType, Category, Cost, GoodsGroup, ResourceId } from '../game/types';
+import { RESOURCE_IDS } from '../game/types';
 import { idx, inBounds } from '../game/world';
 import type { Game } from '../main';
 import { CATEGORY_ICONS, ICONS, SEASON_ICONS } from './icons';
@@ -89,13 +91,13 @@ function setHTML(el: HTMLElement, html: string): void {
   el.innerHTML = html;
 }
 
-const TOP_RES: ResourceId[] = ['wood', 'stone', 'planks', 'iron', 'tools', 'grain', 'gold'];
+/** Goods listed in the top bar panels even before the first one is made. */
+const ALWAYS_SHOWN: ResourceId[] = ['wood', 'stone', 'bread', 'berries', 'meat', 'fish'];
 
 export class Hud {
   private el: Record<string, HTMLElement> = {};
   /** Open build category, or null when the build menu is folded away. */
   private category: Category | null = null;
-  private townOpen = false;
   private lastSeason = -1;
   private hintText = '';
   private flashUntil = 0;
@@ -132,7 +134,6 @@ export class Hud {
         <div id="topbar" class="panel"></div>
         <div class="stack right">
           <div id="clock" class="panel"></div>
-          <div id="town" class="panel"></div>
         </div>
       </div>
       <div id="season-banner"></div>
@@ -140,14 +141,30 @@ export class Hud {
       <div id="inspector" class="panel" style="display:none"></div>
       <div id="hint" class="panel" style="display:none"></div>
       <div id="buildbar" class="panel"></div>
-      <div id="tooltip" class="panel"></div>`;
-    for (const id of ['topbar', 'clock', 'objectives', 'town', 'log', 'inspector', 'hint', 'buildbar', 'tooltip', 'season-banner']) {
+      <div id="tooltip" class="panel"></div>
+      <div id="chip-panel" class="panel" style="display:none"></div>`;
+    for (const id of ['chip-panel', 'topbar', 'clock', 'objectives', 'log', 'inspector', 'hint', 'buildbar', 'tooltip', 'season-banner']) {
       this.el[id] = root.querySelector(`#${id}`)!;
     }
     this.minimap = new Minimap(root, game.renderer, () => game.state);
     root.addEventListener('click', (e) => this.onClick(e));
     root.addEventListener('mousemove', (e) => this.onTipMove(e));
     root.addEventListener('mouseleave', () => (this.el.tooltip.style.display = 'none'));
+    // Category chips open their breakdown on hover; a click pins it open.
+    this.el.topbar.addEventListener('mouseover', (e) => {
+      const chip = (e.target as HTMLElement).closest('[data-chip]') as HTMLElement | null;
+      if (chip && !this.pinnedChip) this.showChip(chip.dataset.chip!);
+    });
+    const leave = () => {
+      if (this.pinnedChip) return;
+      clearTimeout(this.chipTimer);
+      this.chipTimer = window.setTimeout(() => this.showChip(null), 220);
+    };
+    const stay = () => clearTimeout(this.chipTimer);
+    this.el.topbar.addEventListener('mouseleave', leave);
+    this.el['chip-panel'].addEventListener('mouseleave', leave);
+    this.el['chip-panel'].addEventListener('mouseenter', stay);
+    this.el.topbar.addEventListener('mouseenter', stay);
     this.rebuild();
   }
 
@@ -248,37 +265,167 @@ export class Hud {
     return lines.join('<br>');
   }
 
+  // ---------------------------------------------------------------- top bar
+
+  private openChip: string | null = null;
+  private pinnedChip = false;
+  private chipTimer = 0;
+
+  private showChip(id: string | null, pin = false): void {
+    this.openChip = id;
+    this.pinnedChip = !!id && pin;
+    this.renderTopbar();
+    this.renderChipPanel();
+  }
+
+  /** Happiness · Population · Food · Materials · Goods · Treasury. */
+  private renderTopbar(): void {
+    const s = this.game.state;
+    const housing = totalHousing(s);
+    const food = totalFood(s);
+    const months = s.population ? food / s.population : 99;
+    const sum = (g: GoodsGroup) => RESOURCE_IDS.reduce((a, r) => a + (GOODS[r].group === g ? Math.floor(s.res[r]) : 0), 0);
+    const matFull = stored(s, 'materials') >= storageCap(s, 'materials');
+    const foodFull = stored(s, 'food') >= storageCap(s, 'food');
+    const chip = (id: string, cls: string, body: string) =>
+      `<div class="res chip ${cls} ${this.openChip === id ? 'open' : ''}" data-chip="${id}" data-action="chip">${body}</div>`;
+    const lab = labourSummary(s);
+    const html = [
+      chip('happy', s.happiness < 35 ? 'low' : '', `${ICONS.happy}${s.happiness}%`),
+      chip('pop', '', `${ICONS.people}${s.population}<span class="delta">/${housing}</span>${lab.idle > 0 ? `<span class="badge" title="idle">${lab.idle}</span>` : ''}`),
+      '<div class="sep"></div>',
+      chip('food', months < 1.2 ? 'low' : foodFull ? 'full' : '', `${ICONS.bread}${Math.floor(food)}`),
+      chip('materials', matFull ? 'full' : '', `${ICONS.materials}${sum('materials')}`),
+      chip('goods', '', `${ICONS.goods}${sum('goods')}`),
+      '<div class="sep"></div>',
+      chip('treasury', '', `${ICONS.gold}${Math.floor(s.res.gold)}${s.res.prestige > 0 || s.tier >= 1 ? `<span class="prestige">${ICONS.prestige}${Math.floor(s.res.prestige)}</span>` : ''}`),
+    ].join('');
+    setHTML(this.el.topbar, html);
+  }
+
+  private renderChipPanel(): void {
+    const panel = this.el['chip-panel'];
+    const id = this.openChip;
+    if (!id) {
+      panel.style.display = 'none';
+      return;
+    }
+    let html = '';
+    if (id === 'happy') html = this.happyPanel();
+    else if (id === 'pop') html = this.labourPanel();
+    else if (id === 'treasury') html = this.treasuryPanel();
+    else html = this.goodsPanel(id as GoodsGroup);
+    setHTML(panel, `${this.pinnedChip ? '<button class="close" data-action="chip-close">✕</button>' : ''}${html}`);
+    panel.style.display = 'block';
+    const anchor = this.el.topbar.querySelector(`[data-chip="${id}"]`) as HTMLElement | null;
+    if (anchor) {
+      const r = anchor.getBoundingClientRect();
+      const w = panel.offsetWidth;
+      panel.style.left = `${Math.max(6, Math.min(window.innerWidth - w - 6, r.left + r.width / 2 - w / 2))}px`;
+      panel.style.top = `${r.bottom + 6}px`;
+    }
+  }
+
+  private happyPanel(): string {
+    const s = this.game.state;
+    const factors = s.happinessFactors
+      .map((f) => `<div class="kv"><span>${esc(f.label)}</span><span class="${f.value >= 0 ? 'pos' : 'neg'}">${f.value > 0 ? '+' : ''}${f.value}</span></div>`)
+      .join('');
+    return `<h3>${ICONS.happy} Happiness ${s.happiness}%</h3>
+      <div class="bar"><i style="width:${s.happiness}%;background-position:${-220 + s.happiness * 2.2}px 0"></i></div>
+      ${factors || '<i>No villagers yet</i>'}
+      <p class="note">Above 50% settlers arrive; below 30% families leave.${s.happinessTarget !== s.happiness ? ` Heading towards ${s.happinessTarget}%.` : ''}</p>`;
+  }
+
+  private labourPanel(): string {
+    const s = this.game.state;
+    const l = labourSummary(s);
+    const housing = totalHousing(s);
+    const bar = (have: number, slots: number) =>
+      `<span class="lbar"><i style="width:${slots ? Math.min(100, (100 * have) / slots) : 0}%"></i></span>`;
+    const cats = l.byCategory
+      .filter((c) => c.slots > 0 || c.have > 0)
+      .map((c) => `<div class="kv"><span>${CATEGORY_ICONS[c.cat] ?? ''}${CATEGORY_NAMES[c.cat]}</span><span>${bar(c.have, c.slots)} ${c.have}/${c.slots}</span></div>`)
+      .join('');
+    const short = l.short
+      .slice(0, 5)
+      .map((x) => `<div class="kv link" data-action="goto-b" data-id="${x.b.id}"><span>${esc(buildingName(x.b))}</span><span class="neg">${x.have}/${x.want}</span></div>`)
+      .join('');
+    return `<h3>${ICONS.people} Villagers ${s.population} <small>of ${housing} beds</small></h3>
+      <div class="labour-sum">
+        <div><b>${l.workers}</b><span>at work</span></div>
+        <div><b>${l.builders}</b><span>building</span></div>
+        <div><b>${l.idle}</b><span>idle</span></div>
+        <div data-tip="Jobs resting for the season, or with stores already full"><b>${l.resting}</b><span>resting jobs</span></div>
+      </div>
+      ${cats ? `<div class="sub">Jobs filled</div>${cats}` : ''}
+      ${short ? `<div class="sub">Short of hands</div>${short}` : ''}
+      <p class="note">Select a workplace to set its workers and priority. Idle villagers help on building sites.</p>`;
+  }
+
+  private treasuryPanel(): string {
+    const s = this.game.state;
+    const r = s.report;
+    return `<h3>${ICONS.gold} Treasury</h3>
+      <div class="kv"><span>Coins</span><b>${Math.floor(s.res.gold)}</b></div>
+      <div class="kv"><span>Taxes last month</span><span class="pos">+${r.taxes}</span></div>
+      ${r.trade ? `<div class="kv"><span>Merchants last month</span><span class="pos">+${r.trade}</span></div>` : ''}
+      <div class="sub">Taxes</div>
+      <div class="tax">${TAX_LEVELS.map(
+        (t, i) =>
+          `<button data-action="tax" data-level="${i}" class="${s.taxLevel === i ? 'active' : ''}" data-tip="<b>${t.name} taxes</b><br>${t.perHead} coins per villager per month.<br>Happiness ${t.happiness >= 0 ? '+' : ''}${t.happiness}">${t.name}</button>`,
+      ).join('')}</div>
+      <div class="kv" style="margin-top:8px"><span>${ICONS.prestige} Prestige</span><b>${Math.floor(s.res.prestige)}</b></div>
+      <p class="note">${esc(GOODS.prestige.desc)}</p>
+      <div class="row">${hasBuilt(s, 'market') ? '<button data-action="trade">⚖ Trade</button>' : ''}<button data-action="ledger">Ledger</button></div>`;
+  }
+
+  private goodsPanel(group: GoodsGroup): string {
+    const s = this.game.state;
+    const market = hasBuilt(s, 'market');
+    const ids = RESOURCE_IDS.filter((r) => GOODS[r].group === group && (s.seen?.includes(r) || s.res[r] > 0 || ALWAYS_SHOWN.includes(r)));
+    const rows = ids
+      .map((r) => {
+        const g = GOODS[r];
+        const flow = s.flow?.[r] ?? 0;
+        const keep = keepOf(s, r);
+        const sell = selling(s, r);
+        return `<tr data-tip="<b>${g.name}</b><br>${esc(g.desc)}${g.food ? `<br>Feeds ${g.food} · ${g.foodGroup}` : ''}">
+          <td class="ic">${ICONS[r]}</td><td>${g.name}</td>
+          <td class="num"><b>${Math.floor(s.res[r])}</b></td>
+          <td class="num flow ${flow > 0 ? 'pos' : flow < 0 ? 'neg' : ''}">${flow > 0 ? '+' : ''}${flow || ''}</td>
+          <td class="keep" data-tip="<b>Keep in stock</b><br>Workers making ${g.name.toLowerCase()} rest once there are ${keep}${market ? '; merchants buy what is above it if you sell' : ''}."><button data-action="keep" data-res="${r}" data-d="-10">−</button><span>${keep}</span><button data-action="keep" data-res="${r}" data-d="10">+</button></td>
+          ${market && g.price ? `<td><button class="sell ${sell ? 'active' : ''}" data-action="sell" data-res="${r}" data-tip="${sell ? 'Selling the surplus above the target to merchants. Click to stop.' : 'Sell the surplus above the target to visiting merchants.'}">${ICONS.gold}</button></td>` : '<td></td>'}
+        </tr>`;
+      })
+      .join('');
+    const kind = group === 'food' ? 'food' : group === 'materials' ? 'materials' : null;
+    let storage = '';
+    if (group === 'goods') {
+      storage = `<div class="kv"><span>Stored with materials</span><span>${Math.floor(stored(s, 'materials'))} / ${storageCap(s, 'materials')}</span></div>`;
+    } else if (kind) {
+      const used = Math.floor(stored(s, kind));
+      const cap = storageCap(s, kind);
+      storage = `<div class="kv"><span>${kind === 'food' ? `${ICONS.granary} Granaries` : `${ICONS.storage} Storehouses`}</span><span class="${used >= cap ? 'neg' : ''}">${used} / ${cap}</span></div>
+        <div class="progress"><i style="width:${Math.min(100, (100 * used) / Math.max(1, cap))}%"></i></div>`;
+    }
+    const extra =
+      group === 'food'
+        ? `<p class="note">Villagers eat ${s.population} a month${s.report.variety ? `; last month from ${s.report.variety} food group${s.report.variety > 1 ? 's' : ''}` : ''}.</p>`
+        : '';
+    return `<h3>${group === 'food' ? ICONS.bread : group === 'materials' ? ICONS.materials : ICONS.goods} ${GROUP_NAMES[group]}</h3>
+      ${storage}
+      <table class="goods">${rows || '<tr><td><i>Nothing yet</i></td></tr>'}</table>${extra}`;
+  }
+
   // ---------------------------------------------------------------- update
 
   update(): void {
     const g = this.game;
     const s = g.state;
 
-    // Top bar.
-    const food = totalFood(s);
-    const foodTip = `<b>Food</b><br>${FOOD_IDS.map((f) => `${RESOURCE_INFO[f].name}: ${Math.floor(s.res[f])}`).join('<br>')}<br>Villagers eat ${s.population} per month.`;
-    const months = s.population ? food / s.population : 99;
-    const housing = totalHousing(s);
-    let html = `
-      <div class="res" data-tip="<b>Villagers</b><br>${s.population} living here, housing for ${housing}.<br>${employed(s)} employed.">${ICONS.people}${s.population}<span class="delta">/${housing}</span></div>
-      <div class="res ${s.happiness < 35 ? 'low' : ''}" data-tip="<b>Happiness</b><br>Above 50 attracts settlers. Below 30 drives them away.">${ICONS.happy}${s.happiness}%</div>
-      <div class="sep"></div>
-      <div class="res ${months < 1.2 ? 'low' : ''}" data-tip="${esc(foodTip)}">${ICONS.bread}${Math.floor(food)}</div>`;
-    for (const r of TOP_RES) {
-      const v = Math.floor(s.res[r]);
-      // Goods you have never had stay out of the way until they matter.
-      if (v <= 0 && r !== 'gold' && r !== 'wood' && r !== 'stone' && !(r === 'planks' && s.tier >= 1) && !(r === 'tools' && s.tier >= 2)) continue;
-      const full = r !== 'gold' && roomFor(s, r) <= 0;
-      html += `<div class="res ${full ? 'full' : ''}" data-tip="<b>${RESOURCE_INFO[r].name}</b><br>${esc(RESOURCE_INFO[r].desc)}">${ICONS[r]}${v}</div>`;
-    }
-    const matUsed = Math.floor(stored(s, 'materials'));
-    const matCap = storageCap(s, 'materials');
-    const foodUsed = Math.floor(stored(s, 'food'));
-    const foodCap = storageCap(s, 'food');
-    html += `<div class="sep"></div>
-      <div class="res ${matUsed >= matCap ? 'full' : ''}" data-tip="<b>Storehouses</b><br>Building materials: ${matUsed} of ${matCap}.<br>Build a Storehouse for more room.">${ICONS.storage}<span class="delta">${Math.round((100 * matUsed) / Math.max(1, matCap))}%</span></div>
-      <div class="res ${foodUsed >= foodCap ? 'full' : ''}" data-tip="<b>Granaries</b><br>Food: ${foodUsed} of ${foodCap}.<br>Build a Granary for more room.">${ICONS.granary}<span class="delta">${Math.round((100 * foodUsed) / Math.max(1, foodCap))}%</span></div>`;
-    setHTML(this.el.topbar, html);
+    this.renderTopbar();
+    this.renderChipPanel();
 
     // Clock.
     const season = seasonOf(s.day);
@@ -302,7 +449,6 @@ export class Hud {
     if (s.pendingEvent && !g.demo && !this.modal) this.showEvent();
     this.lastTier = s.tier;
     this.updateObjectives();
-    this.updateTown();
     if (this.buildBarState() !== this.buildBarKey) this.renderBuildBar();
     this.updateInspector();
     this.updateLog();
@@ -336,43 +482,6 @@ export class Hud {
         <h3>Objectives</h3>
         ${quests || '<div class="quest"><i>All objectives complete. Your lands flourish!</i></div>'}
       </div>`,
-    );
-  }
-
-  private updateTown(): void {
-    const g = this.game;
-    const s = g.state;
-    const jobs = s.buildings.reduce((a, b) => a + (b.build >= 1 && !b.paused ? BUILDINGS[b.type].workers : 0), 0);
-    const working = s.buildings.reduce((a, b) => a + (b.build >= 1 ? b.workers : 0), 0);
-    const building = s.buildings.reduce((a, b) => a + (b.build < 1 ? b.workers : 0), 0);
-    const factors = s.happinessFactors
-      .map((f) => `<div><span>${f.label}</span><span class="${f.value >= 0 ? 'pos' : 'neg'}">${f.value > 0 ? '+' : ''}${f.value}</span></div>`)
-      .join('');
-    const taxes = TAX_LEVELS.map(
-      (t, i) => `<button data-action="tax" data-level="${i}" class="${s.taxLevel === i ? 'active' : ''}" data-tip="<b>${t.name} taxes</b><br>${t.perHead} gold per villager per month.<br>Happiness ${t.happiness >= 0 ? '+' : ''}${t.happiness}">${t.name}</button>`,
-    ).join('');
-    const r = s.report;
-    const mood = s.happiness >= 65 ? '😊' : s.happiness >= 45 ? '🙂' : s.happiness >= 30 ? '😐' : '☹';
-    this.el.town.className = `panel pill-panel ${this.townOpen ? '' : 'min'}`;
-    const pill = `<button class="pill" data-action="toggle-town" data-tip="<b>Your people</b><br>Happiness, jobs and taxes">${mood} <b>${s.happiness}%</b><span class="sep-dot">·</span>${ICONS.people}${s.population}<span class="chev">${this.townOpen ? '▴' : '▾'}</span></button>`;
-    setHTML(
-      this.el.town,
-      this.townOpen
-        ? `${pill}
-      <div class="body">
-      <div class="bar"><i style="width:${s.happiness}%;background-position:${-220 + s.happiness * 2.2}px 0"></i></div>
-      <div class="factors">${factors || '<i>No villagers yet</i>'}</div>
-      <div class="row"><span>At work</span><span>${working} / ${jobs} jobs</span></div>
-      <div class="row"><span>Building</span><span>${building}</span></div>
-      <div class="row"><span>Idle</span><span>${Math.max(0, s.population - working - building)}</span></div>
-      <div class="row"><span>Last month</span><span>ate ${r.eaten}${r.shortage ? `, <span class="neg">${r.shortage} hungry</span>` : ''}</span></div>
-      <div class="row"><span>Taxes</span><span>+${r.taxes} ${ICONS.gold}</span></div>
-      <div class="tax">${taxes}</div>
-      <div class="town-actions">
-        <button data-action="ledger">Ledger</button>
-        ${hasBuilt(s, 'market') ? '<button data-action="trade">Trade</button>' : ''}
-      </div></div>`
-        : pill,
     );
   }
 
@@ -734,10 +843,6 @@ export class Hud {
         this.objectivesMin = !this.objectivesMin;
         this.update();
         break;
-      case 'toggle-town':
-        this.townOpen = !this.townOpen;
-        this.update();
-        break;
       case 'chronicle':
         this.showChronicle();
         break;
@@ -750,6 +855,35 @@ export class Hud {
           b.paused = !b.paused;
           s.dirty = true;
           this.update();
+        }
+        break;
+      }
+      case 'chip': {
+        const id = t.dataset.chip!;
+        if (this.pinnedChip && this.openChip === id) this.showChip(null);
+        else this.showChip(id, true);
+        break;
+      }
+      case 'chip-close':
+        this.showChip(null);
+        break;
+      case 'keep': {
+        const r = t.dataset.res as ResourceId;
+        setKeep(s, r, Math.max(0, keepOf(s, r) + Number(t.dataset.d) * (e.shiftKey ? 5 : 1)));
+        this.renderChipPanel();
+        break;
+      }
+      case 'sell': {
+        const r = t.dataset.res as ResourceId;
+        setSell(s, r, !selling(s, r));
+        this.renderChipPanel();
+        break;
+      }
+      case 'goto-b': {
+        const b = s.buildings.find((o) => o.id === Number(t.dataset.id));
+        if (b) {
+          g.renderer.centerOn(b.x + b.w / 2, b.y + b.h / 2);
+          g.select(b.id);
         }
         break;
       }

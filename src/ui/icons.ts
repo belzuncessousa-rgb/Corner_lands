@@ -3,7 +3,7 @@ import type { ResourceId } from '../game/types';
 const svg = (body: string) =>
   `<svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">${body}</svg>`;
 
-export const ICONS: Record<ResourceId | 'people' | 'happy' | 'storage' | 'granary' | 'road' | 'paved' | 'demolish' | 'cal', string> = {
+export const ICONS: Record<ResourceId | 'people' | 'happy' | 'materials' | 'goods' | 'storage' | 'granary' | 'road' | 'paved' | 'demolish' | 'cal', string> = {
   wood: svg(
     '<rect x="2" y="7" width="15" height="6" rx="3" fill="#7a5230"/><ellipse cx="16" cy="10" rx="2.4" ry="3" fill="#d8b47c"/><ellipse cx="16" cy="10" rx="1" ry="1.3" fill="#9a7346"/><path d="M4 9h8M5 11h7" stroke="#5a3a20" stroke-width=".8"/>',
   ),
@@ -78,6 +78,12 @@ export const ICONS: Record<ResourceId | 'people' | 'happy' | 'storage' | 'granar
   cider: svg('<path d="M7 3h6v3l2 3v8c0 1-1 1-1 1H6s-1 0-1-1V9l2-3z" fill="#d8a83a" stroke="#7a5a20" stroke-width=".7"/><path d="M7 3h6" stroke="#5a3a20" stroke-width="1.4"/><circle cx="10" cy="13" r="2.2" fill="#c4322a"/>'),
   herbs: svg('<path d="M10 18V6M10 10l-4-3M10 13l4-3M10 8l3-4" stroke="#4a7a3a" stroke-width="1.1"/><g fill="#6aa04a"><ellipse cx="6" cy="7" rx="2" ry="1.1"/><ellipse cx="14" cy="10" rx="2" ry="1.1"/><ellipse cx="13" cy="4" rx="1.8" ry="1"/><ellipse cx="10" cy="5" rx="1" ry="1.8"/></g>'),
   medicine: svg('<path d="M7 3h6v3l2 2v9c0 1-1 1-1 1H6s-1 0-1-1V8l2-2z" fill="#6aa0a0" stroke="#3a6060" stroke-width=".7"/><path d="M7 3h6" stroke="#5a3a20" stroke-width="1.6"/><path d="M10 10v5M7.5 12.5h5" stroke="#f8f4ea" stroke-width="1.6"/>'),
+  materials: svg(
+    '<rect x="2" y="11" width="10" height="4" rx="2" fill="#7a5230"/><ellipse cx="12" cy="13" rx="1.6" ry="2" fill="#d8b47c"/><rect x="4" y="7" width="9" height="4" rx="2" fill="#8a6236"/><ellipse cx="13" cy="9" rx="1.6" ry="2" fill="#d8b47c"/><path d="M12 16l2-5 3-1 2 3-1 3z" fill="#a8a49a"/>',
+  ),
+  goods: svg(
+    '<path d="M3 8h9v9H3z" fill="#a87a48" stroke="#5e3e22" stroke-width=".8"/><path d="M3 8l3-3h9l-3 3z" fill="#c8985a" stroke="#5e3e22" stroke-width=".8"/><path d="M12 8l3-3v9l-3 3z" fill="#8a5e34" stroke="#5e3e22" stroke-width=".8"/><path d="M3 12.5h9M7.5 8v9" stroke="#5e3e22" stroke-width=".6"/>',
+  ),
   people: svg(
     '<circle cx="7" cy="6" r="2.6" fill="#e8c4a0"/><path d="M2.5 17c0-4 2-6 4.5-6s4.5 2 4.5 6z" fill="#8a3b2e"/><circle cx="13.5" cy="7" r="2.3" fill="#e8c4a0"/><path d="M9.5 17c0-3.5 1.8-5.2 4-5.2s4 1.7 4 5.2z" fill="#4a5e8a"/>',
   ),

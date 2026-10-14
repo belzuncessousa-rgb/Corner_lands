@@ -707,6 +707,7 @@ export function restingNow(s: GameState, b: Building): boolean {
     const out = r ? r.outputs : BUILDINGS[b.type].outputs;
     if (enoughOf(s, out)) return true;
     b.blocked = 0;
+    b.status = 'Back to work';
   }
   return false;
 }
@@ -1296,6 +1297,14 @@ export function monthly(s: GameState, rng: StateRng): void {
   updateTier(s);
   checkQuests(s);
   advise(s, month);
+  // Monthly change of every stock, for the top bar.
+  const prev = s.lastMonth ?? {};
+  s.flow = {};
+  s.lastMonth = {};
+  for (const id of s.seen ?? []) {
+    s.flow[id] = Math.round(s.res[id] - (prev[id] ?? s.res[id]));
+    s.lastMonth[id] = Math.round(s.res[id]);
+  }
   s.history.push({ d: s.day, pop: s.population, food: Math.floor(totalFood(s)), happy: s.happiness, gold: Math.floor(s.res.gold) });
   if (s.history.length > MAX_HISTORY) s.history.splice(0, s.history.length - MAX_HISTORY);
 }

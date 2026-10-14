@@ -211,6 +211,9 @@ export interface GameState {
   targets?: Partial<Record<ResourceId, number>>;
   /** Goods visiting merchants may buy above their target. */
   sell?: Partial<Record<ResourceId, boolean>>;
+  /** Stock at the end of last month, and the change over that month. */
+  lastMonth?: Partial<Record<ResourceId, number>>;
+  flow?: Partial<Record<ResourceId, number>>;
   /** Goods the settlement has ever held. */
   seen?: ResourceId[];
   /** Decision event waiting for the player's choice. */

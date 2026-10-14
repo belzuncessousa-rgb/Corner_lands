@@ -1,5 +1,5 @@
-import { BUILDINGS, DAYS_PER_MONTH } from './data';
-import { totalHousing } from './sim';
+import { DAYS_PER_MONTH } from './data';
+import { labourSummary, totalHousing } from './sim';
 import type { GameState } from './types';
 import { FOOD_IDS } from './data';
 
@@ -39,8 +39,12 @@ const ADVICE: Advice[] = [
   },
   {
     id: 'idle-jobs',
-    when: (s) => s.buildings.some((b) => b.build >= 1 && BUILDINGS[b.type].workers > 0 && b.workers === 0 && !b.paused),
-    text: () => 'Steward: some workplaces stand empty for lack of hands. More houses bring more workers, or pause buildings you do not need.',
+    when: (s) => {
+      const l = labourSummary(s);
+      return l.idle === 0 && l.short.some((x) => x.have === 0);
+    },
+    text: () =>
+      'Steward: some workplaces stand empty for lack of hands. More houses bring more workers; or raise the priority of the work that matters and give less to the rest.',
   },
 ];
 
