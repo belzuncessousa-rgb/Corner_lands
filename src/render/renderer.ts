@@ -1019,6 +1019,31 @@ export class Renderer {
     c.beginPath();
     c.arc(wx, wy - 12.5 - bob, 2.2, 0, Math.PI * 2);
     c.fill();
+    if (a.role.kind === 'guard') {
+      // Men-at-arms: livery tabard stripe, kettle helmet and a pike.
+      c.fillStyle = '#e8d070';
+      c.fillRect(wx - 0.6, wy - 10.5 - bob, 1.2, 6.5);
+      c.fillStyle = '#8a9096';
+      c.beginPath();
+      c.arc(wx, wy - 13.2 - bob, 2.5, Math.PI, 0);
+      c.fill();
+      c.fillRect(wx - 3.4, wy - 13.4 - bob, 6.8, 0.9);
+      const px = wx + 3.2 * a.dir;
+      c.strokeStyle = '#5a3e26';
+      c.lineWidth = 1;
+      c.beginPath();
+      c.moveTo(px, wy - 1);
+      c.lineTo(px, wy - 22 - bob);
+      c.stroke();
+      c.fillStyle = '#b8bec4';
+      c.beginPath();
+      c.moveTo(px - 1.2, wy - 22 - bob);
+      c.lineTo(px, wy - 25.5 - bob);
+      c.lineTo(px + 1.2, wy - 22 - bob);
+      c.fill();
+      c.globalAlpha = 1;
+      return;
+    }
     c.fillStyle = a.hair;
     c.beginPath();
     c.arc(wx, wy - 13.2 - bob, 2.2, Math.PI, 0);

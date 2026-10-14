@@ -9,7 +9,9 @@ export type Role =
   | { kind: 'build'; id: number }
   | { kind: 'idle' }
   | { kind: 'settler' }
-  | { kind: 'cart'; id: number; leaving: boolean };
+  | { kind: 'cart'; id: number; leaving: boolean }
+  /** Men-at-arms of the lord's retinue, pacing before the manor. */
+  | { kind: 'guard' };
 
 type Phase = 'walk' | 'inside' | 'act' | 'pause';
 
@@ -94,6 +96,7 @@ export class AgentSystem {
     }
     const idle = s.population - roles.length;
     for (let k = 0; k < idle; k++) roles.push({ kind: 'idle' });
+    if (s.retinue) roles.push({ kind: 'guard' }, { kind: 'guard' });
     return roles;
   }
 
@@ -161,7 +164,7 @@ export class AgentSystem {
       timer: Math.random() * 2,
       next: 'enter-home',
       carry: null,
-      tunic: TUNICS[n % TUNICS.length],
+      tunic: role.kind === 'guard' ? '#7a1e22' : TUNICS[n % TUNICS.length],
       hair: HAIR[(n * 7) % HAIR.length],
       ox: ((n * 37) % 7) / 7 - 0.5,
       oy: ((n * 53) % 5) / 5 - 0.5,
@@ -350,6 +353,10 @@ export class AgentSystem {
       this.decideIdle(s, a);
       return;
     }
+    if (r.kind === 'guard') {
+      this.patrol(s, a);
+      return;
+    }
     const b = getBuilding(s, r.id);
     if (!b) {
       a.role = { kind: 'idle' };
@@ -427,6 +434,27 @@ export class AgentSystem {
     a.act = 'hammer';
     this.exitIfInside(s, a);
     this.walkTo(s, a, x, y, [], next);
+  }
+
+  /** Guards pace between free tiles in front of the manor. */
+  private patrol(s: GameState, a: Agent): void {
+    const door = this.hallDoor(s);
+    if (a.phase === 'inside') {
+      a.x = door.x + 0.5;
+      a.y = door.y + 0.5;
+    }
+    a.carry = null;
+    for (let tries = 0; tries < 8; tries++) {
+      const x = door.x + Math.floor(Math.random() * 7) - 3;
+      const y = door.y + Math.floor(Math.random() * 7) - 3;
+      if (!inBounds(s, x, y)) continue;
+      const i = idx(s, x, y);
+      if (s.occ[i] >= 0 || s.terrain[i]) continue;
+      this.walkTo(s, a, x, y, [], 'wander-done');
+      return;
+    }
+    a.phase = 'pause';
+    a.timer = 2;
   }
 
   private decideIdle(s: GameState, a: Agent): void {
