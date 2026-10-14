@@ -15,6 +15,7 @@ import {
   buildingSprite,
   grassTile,
   roadTile,
+  pavedTile,
   rockSprite,
   treeSprite,
   waterTile,
@@ -246,7 +247,9 @@ export class Renderer {
           const sp =
             s.terrain[i] === 1
               ? this.sprite(`br:${season}:${mask}:${layer}`, () => bridgeTile(season, mask, layer))
-              : this.sprite(`r:${season}:${mask}:${layer}`, () => roadTile(season, mask, layer));
+              : s.road[i] === 2
+                ? this.sprite(`rp:${season}:${mask}:${layer}`, () => pavedTile(season, mask, layer))
+                : this.sprite(`r:${season}:${mask}:${layer}`, () => roadTile(season, mask, layer));
           this.blit(sp, wx, wy);
         }
       }
@@ -387,7 +390,7 @@ export class Renderer {
     const road = (xx: number, yy: number) => {
       if (!inBounds(s, xx, yy)) return false;
       const i = idx(s, xx, yy);
-      return s.road[i] === 1;
+      return s.road[i] > 0;
     };
     return (road(x + 1, y) ? 1 : 0) | (road(x, y + 1) ? 2 : 0) | (road(x - 1, y) ? 4 : 0) | (road(x, y - 1) ? 8 : 0);
   }

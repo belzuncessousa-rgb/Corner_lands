@@ -347,3 +347,69 @@ describe('levels', () => {
     expect(workersOf(wc)).toBe(3);
   });
 });
+
+describe('labour', () => {
+  it('worker targets and priorities decide who is staffed', async () => {
+    const { setWorkers, setPriority } = await import('../src/game/sim');
+    const s = generateWorld(21);
+    const a = placeNearRoad(s, 'woodcutter');
+    const b = placeNearRoad(s, 'quarry');
+    a.build = b.build = 1;
+    a.need = b.need = undefined;
+    s.population = 3;
+    recompute(s);
+    // Woodcutters come before quarries by default.
+    expect(a.workers).toBe(2);
+    expect(b.workers).toBe(1);
+    setPriority(s, b, 2);
+    expect(b.workers).toBe(2);
+    expect(a.workers).toBe(1);
+    setWorkers(s, b, 1);
+    expect(b.workers).toBe(1);
+    expect(a.workers).toBe(2);
+    setWorkers(s, b, 0);
+    expect(b.workers).toBe(0);
+  });
+
+  it('seasonal workplaces release their workers out of season', () => {
+    const s = generateWorld(22);
+    const f = placeNearRoad(s, 'forager');
+    f.build = 1;
+    f.need = undefined;
+    s.day = DAYS_PER_MONTH * 11; // late winter
+    recompute(s);
+    expect(f.workers).toBe(0);
+    s.day = DAYS_PER_MONTH * 6;
+    recompute(s);
+    expect(f.workers).toBeGreaterThan(0);
+  });
+
+  it('foragers on auto turn to mushrooms in autumn', async () => {
+    const { chooseRecipe } = await import('../src/game/sim');
+    const s = generateWorld(23);
+    const f = placeNearRoad(s, 'forager');
+    f.build = 1;
+    s.day = DAYS_PER_MONTH * 8; // late autumn: no berries
+    expect(chooseRecipe(s, f)?.id).toBe('mushrooms');
+    f.recipe = 'herbs';
+    expect(chooseRecipe(s, f)?.id).toBe('herbs');
+  });
+});
+
+describe('paved roads', () => {
+  it('cost stone, need a village and make walking cheaper', async () => {
+    const { stepCost, roadError } = await import('../src/game/sim');
+    const s = generateWorld(24);
+    const h = hall(s);
+    const x = h.x + 1;
+    const y = h.y + 3;
+    expect(s.road[idx(s, x, y)]).toBe(1);
+    expect(roadError(s, x, y, true)).toMatch(/Village/);
+    s.tier = 1;
+    s.res.stone = 10;
+    expect(buildRoad(s, x, y, true)).toBe(true);
+    expect(s.res.stone).toBe(8);
+    expect(s.road[idx(s, x, y)]).toBe(2);
+    expect(stepCost(s, idx(s, x, y))).toBeLessThan(stepCost(s, idx(s, x + 1, y)));
+  });
+});

@@ -239,6 +239,68 @@ export function roadTile(season: Season, mask: number, layer: 'edge' | 'fill'): 
   });
 }
 
+/** Cobbled stone road; mask bits like roadTile. */
+export function pavedTile(season: Season, mask: number, layer: 'edge' | 'fill'): Sprite {
+  return makeSprite(TW + 4, TH + 4, TW / 2 + 2, 2, (ctx) => {
+    const cx = 0;
+    const cy = TH / 2;
+    const mids: [number, number, number][] = [
+      [1, TW / 4, (TH * 3) / 4],
+      [2, -TW / 4, (TH * 3) / 4],
+      [4, -TW / 4, TH / 4],
+      [8, TW / 4, TH / 4],
+    ];
+    let segs = mids.filter(([bit]) => mask & bit);
+    if (!segs.length) segs = [mids[0], mids[2]];
+    const draw = (color: string, width: number) => {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      for (const [, mx, my] of segs) {
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(mx, my);
+      }
+      ctx.stroke();
+    };
+    if (layer === 'edge') {
+      // Kerb stones and a strip of trodden earth.
+      draw(season === 3 ? '#a8a49c' : '#6e6658', 19);
+      return;
+    }
+    const mortar = season === 3 ? '#c4c0b8' : '#8a8274';
+    draw(mortar, 15);
+    // Cobbles laid in courses across the road.
+    const rand = mulberry32(mask * 17 + 3);
+    const stones = ['#b4ada0', '#a39b8c', '#c2bbad', '#998f80', '#aca594'];
+    for (const [, mx, my] of segs) {
+      const len = Math.hypot(mx - cx, my - cy);
+      const ux = (mx - cx) / len;
+      const uy = (my - cy) / len;
+      // Perpendicular in iso screen space (across the road).
+      const px = -uy * 2;
+      const py = ux * 0.5;
+      for (let t = 0; t <= len + 0.5; t += 3.2) {
+        const row = Math.round(t / 3.2);
+        for (let k = -2; k <= 2; k++) {
+          const off = k + (row % 2 ? 0.5 : 0);
+          if (Math.abs(off) > 2.2) continue;
+          const x = cx + ux * t + px * off * 1.35;
+          const y = cy + uy * t + py * off * 1.35;
+          ctx.fillStyle = season === 3 && rand() < 0.4 ? '#e8ecf0' : stones[Math.floor(rand() * stones.length)];
+          ctx.beginPath();
+          ctx.ellipse(x, y, 1.9, 1.15, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+    // A worn centre line where cartwheels run.
+    ctx.globalAlpha = 0.18;
+    draw('#4a4236', 3);
+    ctx.globalAlpha = 1;
+  });
+}
+
 /** Wooden bridge deck over water; mask bits like roadTile. */
 export function bridgeTile(season: Season, mask: number, layer: 'edge' | 'fill'): Sprite {
   return makeSprite(TW + 4, TH + 24, TW / 2 + 2, 2, (ctx) => {

@@ -1,4 +1,4 @@
-import { BUILDINGS, DAY_SECONDS, OFFROAD_TILES_PER_DAY, ROAD_TILES_PER_DAY, STORAGE_CAPACITY } from '../game/data';
+import { BUILDINGS, DAY_SECONDS, OFFROAD_TILES_PER_DAY, ROAD_TILES_PER_DAY, STONE_ROAD_TILES_PER_DAY, STORAGE_CAPACITY } from '../game/data';
 import { findPath } from '../game/path';
 import { doorTile, forTilesInRadius, bCenter, isWinter, needsMaterials } from '../game/sim';
 import type { Building, GameState, ResourceId } from '../game/types';
@@ -49,6 +49,7 @@ const HAIR = ['#3a2a1a', '#6a4a2a', '#c8a060', '#2a2420', '#8a5a2a', '#d8d0c0'];
 /** Walking speed in tiles per game-second (game time already includes the speed setting). */
 const ROAD_SPEED = ROAD_TILES_PER_DAY / DAY_SECONDS;
 const OFFROAD_SPEED = OFFROAD_TILES_PER_DAY / DAY_SECONDS;
+const PAVED_SPEED = STONE_ROAD_TILES_PER_DAY / DAY_SECONDS;
 const GATHERING = new Set(['market', 'well', 'church', 'maypole', 'garden', 'statue']);
 const MAX_AGENTS = 180;
 
@@ -256,7 +257,7 @@ export class AgentSystem {
     if (a.fadeIn < 1) a.fadeIn = Math.min(1, a.fadeIn + dt * 2);
     if (a.phase === 'walk') {
       const here = idx(s, Math.floor(a.x), Math.floor(a.y));
-      let move = dt * (s.road[here] ? ROAD_SPEED : OFFROAD_SPEED) * (a.carry ? 0.85 : 1);
+      let move = dt * (s.road[here] === 2 ? PAVED_SPEED : s.road[here] ? ROAD_SPEED : OFFROAD_SPEED) * (a.carry ? 0.85 : 1);
       while (move > 0 && a.path.length) {
         const t = a.path[0];
         const tx = (t % s.width) + 0.5;

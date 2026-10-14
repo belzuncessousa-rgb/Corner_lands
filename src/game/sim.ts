@@ -5,11 +5,14 @@ import {
   OFFROAD_TILES_PER_DAY,
   RESOURCE_STORAGE,
   ROAD_TILES_PER_DAY,
+  STONE_ROAD_TILES_PER_DAY,
   STORAGE_CAPACITY,
   type StorageKind,
   TRAVEL_WEIGHT,
   MAX_BEAUTY,
   MONTHS_PER_YEAR,
+  MONTH_NAMES,
+  type Recipe,
   SELL_FACTOR,
   EXPORT_FACTOR,
   EXPORT_PER_MARKET,
@@ -195,20 +198,34 @@ export function isBridge(s: GameState, x: number, y: number): boolean {
   return inBounds(s, x, y) && s.terrain[idx(s, x, y)] === 1;
 }
 
-export function roadError(s: GameState, x: number, y: number): string | null {
+/** Stone for each tile of paved road. */
+export const PAVING_COST: Cost = { stone: 2 };
+/** Settlement rank needed to pave roads (Village). */
+export const PAVING_TIER = 1;
+
+export function roadError(s: GameState, x: number, y: number, paved = false): string | null {
   if (!inBounds(s, x, y)) return 'Outside the map';
   const i = idx(s, x, y);
   if (s.occ[i] >= 0) return 'Occupied';
   if (s.rock[i] || s.ore[i]) return 'Rocky ground';
+  if (paved) {
+    if (s.tier < PAVING_TIER) return `Requires ${TIERS[PAVING_TIER].name}`;
+    if (s.road[i] === 2) return 'Already paved';
+    if (s.terrain[i] === 1) return s.road[i] ? 'Bridges stay timber' : 'Cannot pave water';
+    if (!canAfford(s, PAVING_COST)) return 'Not enough stone';
+    return null;
+  }
   if (s.road[i]) return 'Already a road';
   if (s.terrain[i] === 1 && !canAfford(s, BRIDGE_COST)) return 'Not enough timber for a bridge';
   return null;
 }
 
-export function buildRoad(s: GameState, x: number, y: number): boolean {
-  if (roadError(s, x, y)) return false;
-  if (isBridge(s, x, y)) pay(s, BRIDGE_COST);
-  setRoad(s, x, y, true);
+/** Lays a dirt road, or paves one (also laying it where there was none). */
+export function buildRoad(s: GameState, x: number, y: number, paved = false): boolean {
+  if (roadError(s, x, y, paved)) return false;
+  if (paved) pay(s, PAVING_COST);
+  else if (isBridge(s, x, y)) pay(s, BRIDGE_COST);
+  setRoad(s, x, y, true, paved ? 2 : 1);
   return true;
 }
 
@@ -464,6 +481,7 @@ export function reachableRoads(s: GameState): Uint8Array {
 
 /** Cost of stepping onto a tile, in road-tile units. */
 export function stepCost(s: GameState, i: number): number {
+  if (s.road[i] === 2) return ROAD_TILES_PER_DAY / STONE_ROAD_TILES_PER_DAY;
   if (s.road[i]) return 1;
   const off = ROAD_TILES_PER_DAY / OFFROAD_TILES_PER_DAY;
   return s.trees[i] ? off * 1.4 : off;
@@ -636,22 +654,28 @@ export function recompute(s: GameState): void {
   // Workers. Construction sites count as jobs (two builders each, right
   // after food and raw materials) so building never stalls completely.
   let free = s.population;
-  // Buildings that could not work last time go to the back of the queue, so
+  // Player priority first, then food before materials before services.
+  // Buildings that could not work last time go to the back of their band, so
   // villagers are not stuck at a forager with no berries while a hunter idles.
   const prio = (b: Building) =>
-    CATEGORY_PRIORITY[BUILDINGS[b.type].category] + (TYPE_PRIORITY[b.type] ?? 0) + (isBlocked(b) ? 10 : 0);
+    (2 - (b.priority ?? 1)) * 100 +
+    CATEGORY_PRIORITY[BUILDINGS[b.type].category] +
+    (TYPE_PRIORITY[b.type] ?? 0) +
+    (isBlocked(b) ? 10 : 0);
   type Job = { b: Building; site: boolean; p: number };
   const jobs: Job[] = [];
   for (const b of s.buildings) {
     b.workers = 0;
     b.builders = 0;
     if (b.paused) continue;
-    if (isProject(b)) jobs.push({ b, site: true, p: SITE_PRIORITY + b.id * 1e-6 });
-    if (b.build >= 1 && BUILDINGS[b.type].workers > 0) jobs.push({ b, site: false, p: prio(b) });
+    if (isProject(b)) jobs.push({ b, site: true, p: 100 + SITE_PRIORITY + b.id * 1e-6 });
+    if (b.build >= 1 && BUILDINGS[b.type].workers > 0 && (b.want ?? 1) > 0 && !restingNow(s, b)) {
+      jobs.push({ b, site: false, p: prio(b) });
+    }
   }
   jobs.sort((a, c) => a.p - c.p || a.b.id - c.b.id);
   for (const j of jobs) {
-    const n = Math.min(free, j.site ? SITE_BUILDERS : workersOf(j.b));
+    const n = Math.min(free, j.site ? SITE_BUILDERS : Math.min(workersOf(j.b), j.b.want ?? Infinity));
     if (j.site) j.b.builders = n;
     else j.b.workers = n;
     free -= n;
@@ -664,6 +688,120 @@ export function recompute(s: GameState): void {
     j.b.builders = (j.b.builders ?? 0) + n;
     free -= n;
   }
+}
+
+/** Whether a workplace needs hands this month. */
+export function inSeason(s: GameState, b: Building): boolean {
+  const months = BUILDINGS[b.type].months;
+  return !months || months.includes(monthOf(s.day));
+}
+
+/**
+ * True when a workplace sends its workers elsewhere for now: out of season,
+ * or everything it makes is already at its stock target.
+ */
+export function restingNow(s: GameState, b: Building): boolean {
+  if (!inSeason(s, b)) return true;
+  if (b.blocked === BLOCK_SEASONAL && b.status.startsWith('Enough')) {
+    const r = chooseRecipe(s, b, true);
+    const out = r ? r.outputs : BUILDINGS[b.type].outputs;
+    if (enoughOf(s, out)) return true;
+    b.blocked = 0;
+  }
+  return false;
+}
+
+/** The first month after `from` in which the workplace works again. */
+export function nextSeasonMonth(s: GameState, b: Building): number | null {
+  const months = BUILDINGS[b.type].months;
+  if (!months) return null;
+  const m = monthOf(s.day);
+  for (let k = 1; k <= 12; k++) if (months.includes((m + k) % 12)) return (m + k) % 12;
+  return null;
+}
+
+function recipeInMonth(r: Recipe, month: number): boolean {
+  return !r.months || r.months.includes(month);
+}
+
+/** Whether a recipe could run right now (season, inputs, map resources). */
+function recipeReady(s: GameState, b: Building, r: Recipe): boolean {
+  if (!recipeInMonth(r, monthOf(s.day))) return false;
+  if (!canAfford(s, r.inputs)) return false;
+  if (b.type === 'forager' && r.id === 'berries') {
+    return countInRadius(s, bCenter(b), BUILDINGS.forager.radius, (i) => s.berries[i] > 0) > 0;
+  }
+  return true;
+}
+
+/**
+ * The product a building makes now: its chosen recipe, or on Auto the first
+ * one that is in season, has its inputs and is below its stock target.
+ * `any` returns the chosen or first recipe regardless of readiness.
+ */
+export function chooseRecipe(s: GameState, b: Building, any = false): Recipe | null {
+  const list = BUILDINGS[b.type].recipes;
+  if (!list) return null;
+  const fixed = b.recipe ? list.find((r) => r.id === b.recipe) : undefined;
+  if (fixed) return any || recipeInMonth(fixed, monthOf(s.day)) ? fixed : null;
+  const auto = list.filter((r) => r.auto !== false);
+  const pick = auto.find((r) => recipeReady(s, b, r) && !enoughOf(s, r.outputs));
+  if (pick) return pick;
+  if (any) return auto.find((r) => recipeInMonth(r, monthOf(s.day))) ?? auto[0] ?? null;
+  return null;
+}
+
+export function setRecipe(_s: GameState, b: Building, id: string | undefined): void {
+  b.recipe = id;
+  b.work = Math.min(b.work, 0.99);
+  if (b.blocked) b.blocked = 0;
+}
+
+export function setWorkers(s: GameState, b: Building, want: number | undefined): void {
+  b.want = want === undefined ? undefined : Math.max(0, Math.min(workersOf(b), Math.round(want)));
+  if (b.want === workersOf(b)) b.want = undefined;
+  recompute(s);
+}
+
+export function setPriority(s: GameState, b: Building, p: number): void {
+  b.priority = Math.max(0, Math.min(2, p));
+  if (b.priority === 1) b.priority = undefined;
+  recompute(s);
+}
+
+export interface LabourSummary {
+  population: number;
+  workers: number;
+  builders: number;
+  idle: number;
+  /** Worker slots resting for the season or because stocks are full. */
+  resting: number;
+  /** Workplaces with fewer workers than they want. */
+  short: { b: Building; have: number; want: number }[];
+  byCategory: { cat: Category; have: number; slots: number }[];
+}
+
+export function labourSummary(s: GameState): LabourSummary {
+  const out: LabourSummary = { population: s.population, workers: 0, builders: 0, idle: 0, resting: 0, short: [], byCategory: [] };
+  const cats = new Map<Category, { have: number; slots: number }>();
+  for (const b of s.buildings) {
+    out.builders += b.builders ?? 0;
+    const d = BUILDINGS[b.type];
+    if (b.build < 1 || d.workers === 0) continue;
+    out.workers += b.workers;
+    const want = b.paused ? 0 : Math.min(workersOf(b), b.want ?? Infinity);
+    const resting = !b.paused && want > 0 && restingNow(s, b);
+    if (resting) out.resting += want;
+    const c = cats.get(d.category) ?? { have: 0, slots: 0 };
+    c.have += b.workers;
+    c.slots += resting ? 0 : want;
+    cats.set(d.category, c);
+    if (!resting && b.workers < want) out.short.push({ b, have: b.workers, want });
+  }
+  out.idle = Math.max(0, s.population - out.workers - out.builders);
+  for (const [cat, v] of cats) out.byCategory.push({ cat, ...v });
+  out.byCategory.sort((a, c) => CATEGORY_PRIORITY[a.cat] - CATEGORY_PRIORITY[c.cat]);
+  return out;
 }
 
 /** Builders each construction site employs before idle villagers join in. */
@@ -710,7 +848,7 @@ function addOutput(s: GameState, b: Building, out: Cost): boolean {
 function produce(s: GameState, b: Building, rng: StateRng): string | null {
   const d = BUILDINGS[b.type];
   const season = seasonOf(s.day);
-  const enough = enoughOf(s, d.outputs);
+  const enough = d.recipes ? null : enoughOf(s, d.outputs);
   if (enough) return `Enough ${GOODS[enough].name.toLowerCase()} in store`;
   switch (b.type) {
     case 'woodcutter': {
@@ -751,17 +889,28 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
       return null;
     }
     case 'forager': {
-      if (season === 3) return 'Bushes are bare in winter';
-      if (roomFor(s, 'berries') <= 0) return 'Storage full';
-      const t = nearestTile(s, b, d.radius, (i, dist) => (s.berries[i] > 0 ? dist : null));
-      if (t < 0) {
-        return countInRadius(s, bCenter(b), d.radius, (i) => s.berriesMax[i] > 0) > 0
-          ? 'Bushes picked clean for now'
-          : 'No berry bushes in range';
+      const r = chooseRecipe(s, b);
+      if (!r) return b.recipe ? 'Out of season' : 'Nothing to gather this season';
+      const fixedEnough = enoughOf(s, r.outputs);
+      if (fixedEnough) return `Enough ${GOODS[fixedEnough].name.toLowerCase()} in store`;
+      if (fullFor(s, r.outputs)) return 'Storage full';
+      if (r.id === 'berries') {
+        const t = nearestTile(s, b, d.radius, (i, dist) => (s.berries[i] > 0 ? dist : null));
+        if (t < 0) {
+          return countInRadius(s, bCenter(b), d.radius, (i) => s.berriesMax[i] > 0) > 0
+            ? 'Bushes picked clean for now'
+            : 'No berry bushes in range';
+        }
+        b.resDist = tileDist(s, b, t);
+        s.berries[t]--;
+      } else {
+        // Mushrooms and herbs grow in the woods.
+        const t = nearestTile(s, b, d.radius, (i, dist) => (s.trees[i] > 0 ? dist : null));
+        const woods = countInRadius(s, bCenter(b), d.radius, (i) => s.trees[i] > 0);
+        if (r.id === 'mushrooms' && woods < 6) return 'No woods nearby for mushrooms';
+        if (t >= 0) b.resDist = tileDist(s, b, t);
       }
-      b.resDist = tileDist(s, b, t);
-      s.berries[t]--;
-      addOutput(s, b, d.outputs);
+      addOutput(s, b, r.outputs);
       return null;
     }
     case 'hunter': {
@@ -783,16 +932,30 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
     default: {
       // Generic converter: inputs -> outputs. Timber is never used below a
       // small reserve so homes keep their firewood.
-      if ((d.inputs.wood ?? 0) > 0 && s.res.wood - (d.inputs.wood ?? 0) < WOOD_RESERVE) {
+      let inputs = d.inputs;
+      let outputs = d.outputs;
+      if (d.recipes) {
+        const r = chooseRecipe(s, b);
+        if (!r) {
+          const fixed = chooseRecipe(s, b, true);
+          const e = fixed && enoughOf(s, fixed.outputs);
+          return e ? `Enough ${GOODS[e].name.toLowerCase()} in store` : 'Waiting for materials';
+        }
+        inputs = r.inputs;
+        outputs = r.outputs;
+        const e = enoughOf(s, outputs);
+        if (e) return `Enough ${GOODS[e].name.toLowerCase()} in store`;
+      }
+      if ((inputs.wood ?? 0) > 0 && s.res.wood - (inputs.wood ?? 0) < WOOD_RESERVE) {
         return 'Waiting for wood (keeping firewood reserve)';
       }
-      if (!canAfford(s, d.inputs)) {
-        const missing = Object.keys(d.inputs).filter((k) => s.res[k as ResourceId] < (d.inputs[k as ResourceId] ?? 0));
-        return `Waiting for ${missing.join(', ')}`;
+      if (!canAfford(s, inputs)) {
+        const missing = Object.keys(inputs).filter((k) => s.res[k as ResourceId] < (inputs[k as ResourceId] ?? 0));
+        return `Waiting for ${missing.map((k) => GOODS[k as ResourceId].name.toLowerCase()).join(', ')}`;
       }
-      if (fullFor(s, d.outputs)) return 'Storage full';
-      pay(s, d.inputs);
-      addOutput(s, b, d.outputs);
+      if (fullFor(s, outputs)) return 'Storage full';
+      pay(s, inputs);
+      addOutput(s, b, outputs);
       return null;
     }
   }
@@ -903,6 +1066,17 @@ export function dailyProduction(s: GameState, rng: StateRng): void {
       b.status = passiveStatus(s, b);
       continue;
     }
+    if (!inSeason(s, b)) {
+      const next = nextSeasonMonth(s, b);
+      b.status = next === null ? 'Resting' : `Resting until ${MONTH_NAMES[next].toLowerCase()}`;
+      b.blocked = BLOCK_SEASONAL;
+      continue;
+    }
+    if (b.want === 0) {
+      b.status = 'No workers assigned';
+      b.blocked = 0;
+      continue;
+    }
     if (b.workers === 0) {
       // Keep a blocked status so the job queue does not flip-flop daily;
       // blocked buildings are retried at the start of each month.
@@ -924,7 +1098,11 @@ export function dailyProduction(s: GameState, rng: StateRng): void {
     }
     if (tried) {
       // Winter rest and full storage are normal pauses, not problems to flag.
-      const idle = (b.type === 'forager' && seasonOf(s.day) === 3) || status === 'Storage full' || !!status?.startsWith('Enough');
+      const idle =
+        status === 'Storage full' ||
+        status === 'Out of season' ||
+        status === 'Nothing to gather this season' ||
+        !!status?.startsWith('Enough');
       b.blocked = status ? (idle ? BLOCK_SEASONAL : BLOCK_PROBLEM) : 0;
     }
     if (status || !b.blocked) b.status = status ?? 'Working';

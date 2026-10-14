@@ -22,6 +22,8 @@ import {
   removeRoad,
   resourceInRange,
   roadError,
+  PAVING_COST,
+  PAVING_TIER,
   stepDay,
   updateHappiness,
   yearOf,
@@ -34,7 +36,11 @@ import { Wildlife } from './render/wildlife';
 import { type Overlay, Renderer } from './render/renderer';
 import { Hud } from './ui/hud';
 
-export type Tool = { kind: 'select' } | { kind: 'build'; type: BuildingType } | { kind: 'road' } | { kind: 'demolish' };
+export type Tool =
+  | { kind: 'select' }
+  | { kind: 'build'; type: BuildingType }
+  | { kind: 'road'; paved?: boolean }
+  | { kind: 'demolish' };
 
 const SPEEDS = [0, 1, 3, 8];
 
@@ -242,19 +248,33 @@ export class Game {
       }
       this.hud.setHint(this.buildHint(tool.type, p.x, p.y, err), !!err);
     } else if (tool.kind === 'road') {
+      const paved = !!tool.paved;
       const tiles = this.roadTiles(tx, ty);
-      ov.tiles = tiles.map((t) => ({ ...t, ok: !roadError(s, t.x, t.y) || s.road[idx(s, t.x, t.y)] === 1 }));
+      const done = (t: { x: number; y: number }) => s.road[idx(s, t.x, t.y)] === (paved ? 2 : 1) || (!paved && s.road[idx(s, t.x, t.y)] > 0);
+      ov.tiles = tiles.map((t) => ({ ...t, ok: !roadError(s, t.x, t.y, paved) || done(t) }));
       ov.tileColor = 'road';
-      const fresh = tiles.filter((t) => !s.road[idx(s, t.x, t.y)]);
-      const n = fresh.filter((t) => !roadError(s, t.x, t.y)).length;
-      const bridges = fresh.filter((t) => isBridge(s, t.x, t.y)).length;
-      const cost = bridges ? ` · ${bridges} bridge tiles cost ${bridges * (BRIDGE_COST.wood ?? 0)} timber` : '';
-      this.hud.setHint(
-        this.roadAnchor
-          ? `Road: ${n} new tiles${cost} · click to lay it, then keep clicking to continue · right-click to finish`
-          : 'Click where the road starts · roads over water become bridges · right-click to stop',
-        bridges * (BRIDGE_COST.wood ?? 0) > s.res.wood,
-      );
+      const fresh = tiles.filter((t) => !done(t));
+      const n = fresh.filter((t) => !roadError(s, t.x, t.y, paved)).length;
+      if (paved) {
+        const stone = n * (PAVING_COST.stone ?? 0);
+        this.hud.setHint(
+          s.tier < PAVING_TIER
+            ? 'Paved roads unlock when you become a Village'
+            : this.roadAnchor
+              ? `Paved road: ${n} tiles · ${stone} stone · click to lay it, keep clicking to continue · right-click to finish`
+              : 'Click where the paved road starts · paving an existing road upgrades it · 2 stone per tile',
+          s.tier < PAVING_TIER || fresh.length * (PAVING_COST.stone ?? 0) > s.res.stone,
+        );
+      } else {
+        const bridges = fresh.filter((t) => isBridge(s, t.x, t.y)).length;
+        const cost = bridges ? ` · ${bridges} bridge tiles cost ${bridges * (BRIDGE_COST.wood ?? 0)} timber` : '';
+        this.hud.setHint(
+          this.roadAnchor
+            ? `Road: ${n} new tiles${cost} · click to lay it, then keep clicking to continue · right-click to finish`
+            : 'Click where the road starts · roads over water become bridges · right-click to stop',
+          bridges * (BRIDGE_COST.wood ?? 0) > s.res.wood,
+        );
+      }
     } else if (tool.kind === 'demolish') {
       const tiles = this.dragTile ? this.roadTiles(tx, ty) : inBounds(s, tx, ty) ? [{ x: tx, y: ty }] : [];
       ov.tiles = tiles.map((t) => ({ ...t, ok: true }));
@@ -437,7 +457,8 @@ export class Game {
   private finishRoad(tx: number, ty: number): void {
     const s = this.state;
     let n = 0;
-    for (const t of this.roadTiles(tx, ty)) if (buildRoad(s, t.x, t.y)) n++;
+    const paved = this.tool.kind === 'road' && !!this.tool.paved;
+    for (const t of this.roadTiles(tx, ty)) if (buildRoad(s, t.x, t.y, paved)) n++;
     if (n) {
       recompute(s);
       this.hud.sound('road');
@@ -575,6 +596,8 @@ export class Game {
         this.setSpeed(Number(k));
       } else if (k === 'r') {
         this.setTool({ kind: 'road' });
+      } else if (k === 't') {
+        this.setTool({ kind: 'road', paved: true });
       } else if (k === 'x' || k === 'delete') {
         this.setTool({ kind: 'demolish' });
       } else if (k === '+' || k === '=') {

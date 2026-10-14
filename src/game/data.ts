@@ -133,6 +133,18 @@ export const MONTH_NAMES = [
 ];
 export const SEASON_NAMES = ['Spring', 'Summer', 'Autumn', 'Winter'];
 
+/** One product a building can make. */
+export interface Recipe {
+  id: string;
+  name: string;
+  inputs: Cost;
+  outputs: Cost;
+  /** Months (0-11) it can be made; all year when absent. */
+  months?: number[];
+  /** Whether Auto may pick it (false for goods nothing uses yet). */
+  auto?: boolean;
+}
+
 export interface BuildingDef {
   type: BuildingType;
   name: string;
@@ -156,6 +168,10 @@ export interface BuildingDef {
   gathers?: 'trees' | 'rock' | 'ore' | 'berries' | 'forest' | 'water';
   /** Happiness added to homes within `radius` (decorations). */
   beauty: number;
+  /** Months (0-11) the workplace needs workers; all year when absent. */
+  months?: number[];
+  /** Alternative products; the first is the default. */
+  recipes?: Recipe[];
   buildable: boolean;
 }
 
@@ -239,7 +255,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   forager: def({
     type: 'forager',
     name: "Forager's Hut",
-    desc: 'Gathers berries from wild bushes. Bushes fruit in spring and summer; idle in winter.',
+    desc: 'Gathers berries from wild bushes in spring and summer, mushrooms in the autumn woods, and wild herbs. Rests in deep winter.',
     category: 'food',
     cost: { wood: 10 },
     workers: 2,
@@ -247,6 +263,12 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     cycle: 2,
     outputs: { berries: 5 },
     gathers: 'berries',
+    months: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+    recipes: [
+      { id: 'berries', name: 'Berries', inputs: {}, outputs: { berries: 5 }, months: [0, 1, 2, 3, 4, 5, 6, 7] },
+      { id: 'mushrooms', name: 'Mushrooms', inputs: {}, outputs: { mushrooms: 4 }, months: [6, 7, 8, 9] },
+      { id: 'herbs', name: 'Herbs', inputs: {}, outputs: { herbs: 3 }, months: [0, 1, 2, 3, 4, 5, 6, 7, 8], auto: false },
+    ],
     hotkey: 'g',
   }),
   hunter: def({
@@ -284,6 +306,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     buildDays: 12,
     workers: 3,
     tier: 1,
+    months: [0, 1, 2, 3, 4, 5, 7],
   }),
   bakery: def({
     type: 'bakery',

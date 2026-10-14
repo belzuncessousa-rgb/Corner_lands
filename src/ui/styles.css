@@ -498,6 +498,41 @@ button.active {
 .pips i.on {
   background: var(--wood-2);
 }
+#inspector .pips i {
+  cursor: pointer;
+  width: 12px;
+  height: 16px;
+}
+#inspector .pips i:hover {
+  outline: 2px solid var(--gold, #c8a038);
+}
+.pips i.unwanted {
+  background: repeating-linear-gradient(135deg, rgba(91, 58, 34, 0.12) 0 3px, rgba(91, 58, 34, 0.28) 3px 5px);
+}
+.seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 2px;
+}
+.seg button {
+  padding: 2px 7px;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.seg button svg {
+  width: 14px;
+  height: 14px;
+}
+.seg button.active {
+  background: var(--wood-2);
+  color: #fff8e6;
+}
+#inspector .kv.product {
+  align-items: flex-start;
+}
 .progress {
   height: 8px;
   background: rgba(91, 58, 34, 0.2);

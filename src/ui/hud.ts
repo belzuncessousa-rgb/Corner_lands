@@ -29,6 +29,10 @@ import {
   recompute,
   seasonOf,
   setKeep,
+  PAVING_TIER,
+  setWorkers,
+  setPriority,
+  setRecipe,
   setSell,
   selling,
   keepOf,
@@ -63,6 +67,22 @@ function costHtml(cost: Cost, have?: Record<string, number>): string {
 
 const lastHtml = new WeakMap<HTMLElement, string>();
 /** Assigns innerHTML only when it changed, so buttons are not recreated mid-click. */
+/** "Early Spring – Harvest" style description of a set of months. */
+function seasonSpan(months: number[]): string {
+  const sorted = [...months].sort((a, b) => a - b);
+  const runs: [number, number][] = [];
+  for (const m of sorted) {
+    const last = runs[runs.length - 1];
+    if (last && m === last[1] + 1) last[1] = m;
+    else runs.push([m, m]);
+  }
+  // Join a run ending in late winter with one starting in early spring.
+  if (runs.length > 1 && runs[0][0] === 0 && runs[runs.length - 1][1] === 11) {
+    runs[0][0] = runs.pop()![0];
+  }
+  return runs.map(([a, b]) => (a === b ? MONTH_NAMES[a] : `${MONTH_NAMES[a]} – ${MONTH_NAMES[b]}`).toLowerCase()).join(', ');
+}
+
 function setHTML(el: HTMLElement, html: string): void {
   if (lastHtml.get(el) === html) return;
   lastHtml.set(el, html);
@@ -165,7 +185,8 @@ export class Hud {
       )
       .join('');
     const tools = `<span class="divider"></span>
-      <button data-action="road" class="tab ${tool.kind === 'road' ? 'active' : ''}" data-tip="<b>Road</b> (R)<br>Click to start, click again to lay it. Roads speed up walking; buildings work without them.">${ICONS.road}<span>Road</span></button>
+      <button data-action="road" class="tab ${tool.kind === 'road' && !tool.paved ? 'active' : ''}" data-tip="<b>Road</b> (R)<br>Click to start, click again to lay it. Roads speed up walking; buildings work without them.">${ICONS.road}<span>Road</span></button>
+      ${this.game.state.tier >= PAVING_TIER ? `<button data-action="road" data-paved="1" class="tab ${tool.kind === 'road' && tool.paved ? 'active' : ''}" data-tip="<b>Paved road</b> (T)<br>Cobbled stone: villagers walk a third faster than on dirt. 2 stone per tile; lay it over a dirt road to pave it.">${ICONS.paved}<span>Paving</span></button>` : ''}
       <button data-action="demolish" class="tab ${tool.kind === 'demolish' ? 'active' : ''}" data-tip="<b>Demolish</b> (X)<br>Remove buildings or roads. Finished buildings return half their cost.">${ICONS.demolish}<span>Demolish</span></button>`;
     let cards = '';
     if (this.category) {
@@ -209,7 +230,7 @@ export class Hud {
     return [
       this.category ?? '',
       t.kind,
-      t.kind === 'build' ? t.type : '',
+      t.kind === 'build' ? t.type : t.kind === 'road' && t.paved ? 'paved' : '',
       s.tier,
       ...BUILD_ORDER.map((b) => (canAfford(s, BUILDINGS[b].cost) ? 1 : 0)),
     ].join('|');
@@ -368,7 +389,7 @@ export class Hud {
     const plan = upgradePlan(s, b);
     const blocker = upgradeBlocker(s, b);
     const key = JSON.stringify([
-      b.id, b.status, b.workers, b.builders, b.residents, b.build.toFixed(2), b.paused, b.level, b.lastOutput, b.growth.toFixed(2),
+      b.id, b.status, b.workers, b.builders, b.residents, b.build.toFixed(2), b.paused, b.level, b.lastOutput, b.growth.toFixed(2), b.want, b.priority, b.recipe,
       s.tier, blocker, b.need, (b.upProgress ?? 0).toFixed(2), b.unmet, Math.floor(s.res.gold / 10), s.population,
     ]);
     if (key === this.lastInspectorKey) return;
@@ -388,8 +409,33 @@ export class Hud {
     } else {
       const slots = workersOf(b);
       if (slots) {
-        const pips = Array.from({ length: slots }, (_, i) => `<i class="${i < b.workers ? 'on' : ''}"></i>`).join('');
-        rows.push(`<div class="kv"><span>Workers</span><span class="pips">${pips}</span></div>`);
+        const want = Math.min(slots, b.want ?? slots);
+        const pips = Array.from(
+          { length: slots },
+          (_, i) => `<i class="${i < b.workers ? 'on' : ''} ${i >= want ? 'unwanted' : ''}" data-action="want" data-n="${i + 1 === want ? i : i + 1}"></i>`,
+        ).join('');
+        const prio = b.priority ?? 1;
+        rows.push(`<div class="kv labour" data-tip="Click the pips to choose how many villagers work here. Workers left free take other jobs or help build."><span>Workers ${b.workers}/${want}</span><span class="pips">${pips}</span></div>
+          <div class="kv"><span>Priority</span><span class="seg">${['Low', 'Normal', 'High']
+            .map((n, i) => `<button data-action="prio" data-p="${i}" class="${prio === i ? 'active' : ''}" data-tip="${['Staffed last', 'Staffed in the usual order', 'Staffed before everything else'][i]}">${n}</button>`)
+            .join('')}</span></div>`);
+        if (d.months) {
+          const names = d.months.length >= 12 ? '' : seasonSpan(d.months);
+          if (names) rows.push(`<div class="kv"><span>Works in</span><span>${names}</span></div>`);
+        }
+      }
+      if (d.recipes) {
+        const opts = [{ id: '', name: 'Auto' }, ...d.recipes];
+        rows.push(`<div class="kv product"><span>Product</span><span class="seg">${opts
+          .map((r) => {
+            const rec = d.recipes!.find((x) => x.id === r.id);
+            const tip = rec
+              ? `<b>${rec.name}</b><br>${rec.months ? `In ${seasonSpan(rec.months)}` : 'All year'}${rec.auto === false ? '<br>Auto never picks this; choose it to make it.' : ''}`
+              : '<b>Auto</b><br>Make whatever is in season and below its stock target.';
+            const icon = rec ? ICONS[Object.keys(rec.outputs)[0] as ResourceId] ?? '' : '';
+            return `<button data-action="recipe" data-r="${r.id}" class="${(b.recipe ?? '') === r.id ? 'active' : ''}" data-tip="${esc(tip)}">${icon}${r.name}</button>`;
+          })
+          .join('')}</span></div>`);
       }
       const cap = housingOf(b);
       if (cap) rows.push(`<div class="kv"><span>Residents</span><span>${b.residents} / ${cap}</span></div>`);
@@ -400,8 +446,8 @@ export class Hud {
       if (d.cycle && b.efficiency !== undefined && b.efficiency < 0.97) {
         rows.push(`<div class="kv" data-tip="Time lost walking to storage and to resources. Build closer to a storehouse or granary, or lay roads."><span>Walking time</span><span class="${b.efficiency < 0.7 ? 'neg' : ''}">${Math.round(b.efficiency * 100)}% efficient</span></div>`);
       }
-      if (Object.keys(d.inputs).length) rows.push(`<div class="kv"><span>Consumes</span><span class="costline">${costHtml(d.inputs)}</span></div>`);
-      if (Object.keys(d.outputs).length) rows.push(`<div class="kv"><span>Produces</span><span class="costline">${costHtml(d.outputs)}</span></div>`);
+      if (!d.recipes && Object.keys(d.inputs).length) rows.push(`<div class="kv"><span>Consumes</span><span class="costline">${costHtml(d.inputs)}</span></div>`);
+      if (!d.recipes && Object.keys(d.outputs).length) rows.push(`<div class="kv"><span>Produces</span><span class="costline">${costHtml(d.outputs)}</span></div>`);
       if (b.type === 'house') {
         const needs = houseNeeds(s, b, b.level);
         rows.push(`<div class="needs"><div class="needs-h">Needs</div>${needs.map((n) => `<span class="${n.met ? 'met' : 'unmet'}">${n.met ? '✓' : '✗'} ${n.label}</span>`).join('')}</div>`);
@@ -667,10 +713,12 @@ export class Hud {
       case 'build':
         this.pickBuilding(t.dataset.type as BuildingType);
         break;
-      case 'road':
+      case 'road': {
         this.category = null;
-        g.setTool(g.tool.kind === 'road' ? { kind: 'select' } : { kind: 'road' });
+        const paved = !!t.dataset.paved;
+        g.setTool(g.tool.kind === 'road' && !!g.tool.paved === paved ? { kind: 'select' } : { kind: 'road', paved });
         break;
+      }
       case 'demolish':
         this.category = null;
         g.setTool(g.tool.kind === 'demolish' ? { kind: 'select' } : { kind: 'demolish' });
@@ -701,6 +749,31 @@ export class Hud {
         if (b) {
           b.paused = !b.paused;
           s.dirty = true;
+          this.update();
+        }
+        break;
+      }
+      case 'want': {
+        const b = this.selectedBuilding();
+        if (b) {
+          setWorkers(s, b, Number(t.dataset.n));
+          this.update();
+        }
+        break;
+      }
+      case 'prio': {
+        const b = this.selectedBuilding();
+        if (b) {
+          setPriority(s, b, Number(t.dataset.p));
+          this.update();
+        }
+        break;
+      }
+      case 'recipe': {
+        const b = this.selectedBuilding();
+        if (b) {
+          setRecipe(s, b, t.dataset.r || undefined);
+          recompute(s);
           this.update();
         }
         break;

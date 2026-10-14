@@ -125,6 +125,12 @@ export interface Building {
    * 1 = blocked by a problem (no resources, storage full), 2 = seasonal rest.
    */
   blocked?: number;
+  /** Workers wanted here (undefined = as many as it takes). */
+  want?: number;
+  /** Job priority: 0 low, 1 normal (default), 2 high. */
+  priority?: number;
+  /** Chosen product (recipe id), or undefined for Auto. */
+  recipe?: string;
   /** Units produced in the last month, for display. */
   lastOutput: number;
   output: number;

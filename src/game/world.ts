@@ -273,9 +273,10 @@ export function removeBuilding(s: GameState, b: Building): void {
   s.dirty = true;
 }
 
-export function setRoad(s: GameState, x: number, y: number, on: boolean): void {
+/** Lays (1 = dirt, 2 = paved) or clears a road tile. */
+export function setRoad(s: GameState, x: number, y: number, on: boolean, kind = 1): void {
   const i = idx(s, x, y);
-  s.road[i] = on ? 1 : 0;
+  s.road[i] = on ? kind : 0;
   if (on) {
     s.trees[i] = 0;
     s.berries[i] = 0;
