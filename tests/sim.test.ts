@@ -512,3 +512,60 @@ describe('fields, herds, orchards and backyards', () => {
     expect(s.res.eggs).toBeGreaterThan(0);
   });
 });
+
+describe('workshops and household goods', () => {
+  it('taverns pour ale or cider and run dry without', async () => {
+    const { serveAle } = await import('../src/game/sim');
+    const s = generateWorld(41);
+    s.tier = 1;
+    const t = placeNearRoad(s, 'tavern');
+    t.build = 1;
+    const h = placeNearRoad(s, 'house');
+    h.build = 1;
+    s.population = 13;
+    recompute(s);
+    s.res.ale = 0;
+    s.res.cider = 0;
+    serveAle(s);
+    expect(t.status).toMatch(/dry/);
+    s.res.cider = 5;
+    serveAle(s);
+    expect(t.status).toMatch(/cider/);
+    expect(s.res.cider).toBeLessThan(5);
+  });
+
+  it('timber houses use up clothes every few months', () => {
+    const s = generateWorld(42);
+    const h = placeNearRoad(s, 'house');
+    h.build = 1;
+    h.level = 2;
+    // The manor hall fills first.
+    s.population = 15;
+    s.res.clothes = 3;
+    recompute(s);
+    run(s, DAYS_PER_MONTH * 7);
+    // Three months a set: the first set, then two more.
+    expect(s.res.clothes).toBe(0);
+    expect(h.supply?.clothes).toBeGreaterThan(s.day);
+  });
+
+  it('a family craft makes half as much again as a workshop', async () => {
+    const { setTrade } = await import('../src/game/sim');
+    const s = generateWorld(43);
+    s.tier = 1;
+    const h = placeNearRoad(s, 'house');
+    h.build = 1;
+    s.res.wood = 50;
+    s.res.planks = 20;
+    expect(setTrade(s, h, 'weaver')).toMatch(/Timber/);
+    h.level = 2;
+    expect(setTrade(s, h, 'weaver')).toBeNull();
+    s.population = 15;
+    s.res.wool = 30;
+    recompute(s);
+    expect(h.workers).toBe(2);
+    run(s, 9);
+    expect(s.res.cloth).toBeGreaterThan(0);
+    expect(s.res.cloth % 3).toBe(0);
+  });
+});

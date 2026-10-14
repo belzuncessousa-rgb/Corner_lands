@@ -30,6 +30,9 @@ import {
   recompute,
   seasonOf,
   setKeep,
+  setTrade,
+  workDef,
+  HOME_TRADES,
   setYard,
   YARDS,
   zonesOf,
@@ -518,13 +521,15 @@ export class Hud {
     const plan = upgradePlan(s, b);
     const blocker = upgradeBlocker(s, b);
     const key = JSON.stringify([
-      b.id, b.status, b.workers, b.builders, b.residents, b.build.toFixed(2), b.paused, b.level, b.lastOutput, b.growth.toFixed(2), b.want, b.priority, b.recipe, b.yard, b.herd, b.owner, Math.floor(b.growth),
+      b.id, b.status, b.workers, b.builders, b.residents, b.build.toFixed(2), b.paused, b.level, b.lastOutput, b.growth.toFixed(2), b.want, b.priority, b.recipe, b.yard, b.trade, b.herd, b.owner, Math.floor(b.growth),
       s.tier, blocker, b.need, (b.upProgress ?? 0).toFixed(2), b.unmet, Math.floor(s.res.gold / 10), s.population,
     ]);
     if (key === this.lastInspectorKey) return;
     this.lastInspectorKey = key;
     box.style.display = 'block';
-    const d = BUILDINGS[b.type];
+    // A family craft works like that workshop; name and description stay the home's.
+    const d = workDef(b);
+    const own = BUILDINGS[b.type];
     const rows: string[] = [];
     const needLine = () => {
       if (!b.need) return '';
@@ -612,8 +617,8 @@ export class Hud {
     if (b.type === 'market' && b.build >= 1) actions.push('<button data-action="trade">⚖ Trade</button>');
     box.innerHTML = `
       <button class="close" data-action="deselect">✕</button>
-      <h2>${esc(buildingName(b))}</h2>
-      <div class="desc">${d.desc}</div>
+      <h2>${esc(buildingName(b))}${b.trade ? ` <small>· ${esc(BUILDINGS[b.trade].name)}</small>` : ''}</h2>
+      <div class="desc">${own.desc}</div>
       ${rows.join('')}
       <div class="status ${warn ? 'warn' : ''}">${esc(b.status || 'Idle')}</div>
       <div class="actions">${actions.join('')}</div>`;
@@ -657,6 +662,12 @@ export class Hud {
     if (b.type === 'orchardist' && b.build >= 1) {
       const orchards = zonesOf(s, b);
       rows.push(`<div class="kv"><span>Orchards</span><span>${orchards.length} · ${zoneArea(orchards)} tiles</span></div>`);
+    }
+    if (b.type === 'house' && b.build >= 1 && b.level >= 2) {
+      const trades = HOME_TRADES.filter((t) => isUnlocked(s, t));
+      rows.push(`<div class="kv product" data-tip="<b>Home craft</b><br>Two of the family work a craft from home, making half as much again as a common workshop. Setting up costs 6 timber and 6 planks."><span>Home craft</span><span class="seg">${[undefined, ...trades]
+        .map((t) => `<button data-action="trade-home" data-t="${t ?? ''}" class="${(b.trade ?? '') === (t ?? '') ? 'active' : ''}" data-tip="${t ? `<b>${esc(BUILDINGS[t].name)}</b><br>${esc(BUILDINGS[t].desc)}` : 'No craft: the family works wherever it is needed.'}">${t ? (ICONS[Object.keys(BUILDINGS[t].outputs)[0] as ResourceId] ?? '') : ''}${t ? BUILDINGS[t].name.split(' ')[0] : 'None'}</button>`)
+        .join('')}</span></div>`);
     }
     if (b.type === 'house' && b.build >= 1) {
       const opts = [{ id: '', name: 'None', cost: {} as Cost, desc: 'Nothing but a woodpile.', tier: 0 }, ...Object.entries(YARDS).map(([id, y]) => ({ id, ...y }))];
@@ -975,6 +986,17 @@ export class Hud {
         const b = this.selectedBuilding();
         if (b) {
           setPriority(s, b, Number(t.dataset.p));
+          this.update();
+        }
+        break;
+      }
+      case 'trade-home': {
+        const b = this.selectedBuilding();
+        if (b) {
+          const err = setTrade(s, b, (t.dataset.t || undefined) as BuildingType | undefined);
+          if (err) this.flash(err);
+          else this.sound('place');
+          this.lastInspectorKey = '';
           this.update();
         }
         break;

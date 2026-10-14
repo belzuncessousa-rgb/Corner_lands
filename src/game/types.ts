@@ -72,6 +72,13 @@ export type BuildingType =
   | 'orchardist'
   | 'orchard'
   | 'bakery'
+  | 'windmill'
+  | 'brewhouse'
+  | 'dairy'
+  | 'tanner'
+  | 'weaver'
+  | 'tailor'
+  | 'apothecary'
   | 'sawmill'
   | 'mine'
   | 'smithy'
@@ -85,7 +92,7 @@ export type BuildingType =
   | 'maypole'
   | 'statue';
 
-export type Category = 'housing' | 'resources' | 'food' | 'industry' | 'civic' | 'decor';
+export type Category = 'housing' | 'resources' | 'farming' | 'food' | 'industry' | 'civic' | 'decor';
 
 export type Season = 0 | 1 | 2 | 3; // spring, summer, autumn, winter
 
@@ -145,6 +152,10 @@ export interface Building {
   age?: number;
   /** Fields: the crop harvested last year (for rotation). */
   lastCrop?: string;
+  /** Houses: a craft the family works from home. */
+  trade?: BuildingType;
+  /** Houses: goods the household has been supplied with, until which day. */
+  supply?: Partial<Record<ResourceId, number>>;
   /** Houses: what the family keeps in the backyard. */
   yard?: string;
   /** Units produced in the last month, for display. */

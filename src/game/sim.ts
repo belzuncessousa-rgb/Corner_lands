@@ -13,6 +13,7 @@ import {
   MONTHS_PER_YEAR,
   MONTH_NAMES,
   type Recipe,
+  type BuildingDef,
   SELL_FACTOR,
   EXPORT_FACTOR,
   EXPORT_PER_MARKET,
@@ -353,7 +354,7 @@ export function trade(s: GameState, id: ResourceId, amount: number): string | nu
   return null;
 }
 
-/** Taverns brew their ale from grain: one sack per ten villagers served. */
+/** Taverns pour ale or cider: a cask a month for every eight villagers they serve. */
 export function serveAle(s: GameState): void {
   for (const t of s.buildings) {
     if (t.type !== 'tavern' || t.build < 1 || t.workers === 0) continue;
@@ -364,14 +365,43 @@ export function serveAle(s: GameState): void {
       const hc = bCenter(h);
       if (Math.hypot(hc.x - c.x, hc.y - c.y) <= BUILDINGS.tavern.radius) served += h.residents;
     }
-    const grain = Math.ceil(served / 10);
-    if (s.res.grain >= grain) {
-      s.res.grain -= grain;
+    let casks = Math.ceil(served / 8);
+    const ale = Math.min(casks, Math.floor(s.res.ale));
+    s.res.ale -= ale;
+    casks -= ale;
+    const cider = Math.min(casks, Math.floor(s.res.cider));
+    s.res.cider -= cider;
+    casks -= cider;
+    if (casks <= 0) {
       t.blocked = 0;
-      t.status = served ? `Pouring ale for ${served} villagers` : 'No homes nearby yet';
+      t.status = served ? `Pouring ${ale ? 'ale' : ''}${ale && cider ? ' and ' : ''}${cider ? 'cider' : ''} for ${served} villagers` : 'No homes nearby yet';
     } else {
       t.blocked = BLOCK_PROBLEM;
-      t.status = 'Out of ale: needs grain to brew';
+      t.status = 'The casks are dry: needs ale or cider from a brewhouse';
+    }
+  }
+}
+
+/** Goods each home level uses up, one every three months. */
+export const HOUSE_GOODS: Record<number, ResourceId[]> = { 2: ['clothes'], 3: ['clothes', 'boots', 'medicine'] };
+const SUPPLY_DAYS = DAYS_PER_MONTH * 3;
+
+/** Whether a home has (or could get from store) a good it needs. */
+export function hasSupply(s: GameState, b: Building, id: ResourceId): boolean {
+  return (b.supply?.[id] ?? -1) > s.day || s.res[id] >= 1;
+}
+
+/** Homes take clothes, boots and medicine from the stores as theirs wear out. */
+function supplyHomes(s: GameState): void {
+  for (const b of s.buildings) {
+    if (b.type !== 'house' || b.residents === 0) continue;
+    for (const id of HOUSE_GOODS[Math.min(3, b.level)] ?? []) {
+      b.supply ??= {};
+      if ((b.supply[id] ?? -1) > s.day) continue;
+      if (s.res[id] >= 1) {
+        s.res[id] -= 1;
+        b.supply[id] = s.day + SUPPLY_DAYS;
+      }
     }
   }
 }
@@ -698,7 +728,7 @@ export function totalHousing(s: GameState): number {
   return n;
 }
 
-const CATEGORY_PRIORITY: Record<Category, number> = { food: 0, resources: 1, industry: 2, civic: 3, housing: 4, decor: 5 };
+const CATEGORY_PRIORITY: Record<Category, number> = { farming: 0, food: 0.5, resources: 1, industry: 2, civic: 3, housing: 4, decor: 5 };
 /** Fine ordering inside a category: staple food producers are staffed first. */
 const TYPE_PRIORITY: Partial<Record<BuildingType, number>> = {
   farm: 0,
@@ -742,7 +772,7 @@ export function recompute(s: GameState): void {
   // villagers are not stuck at a forager with no berries while a hunter idles.
   const prio = (b: Building) =>
     (2 - (b.priority ?? 1)) * 100 +
-    CATEGORY_PRIORITY[BUILDINGS[b.type].category] +
+    CATEGORY_PRIORITY[workDef(b).category] +
     (TYPE_PRIORITY[b.type] ?? 0) +
     (isBlocked(b) ? 10 : 0);
   type Job = { b: Building; site: boolean; p: number };
@@ -752,8 +782,9 @@ export function recompute(s: GameState): void {
     b.builders = 0;
     if (b.paused) continue;
     if (isProject(b)) jobs.push({ b, site: true, p: 100 + SITE_PRIORITY + b.id * 1e-6 });
-    if (b.build >= 1 && BUILDINGS[b.type].workers > 0 && (b.want ?? 1) > 0 && !restingNow(s, b)) {
-      jobs.push({ b, site: false, p: prio(b) });
+    if (b.build >= 1 && workDef(b).workers > 0 && (b.want ?? 1) > 0 && !restingNow(s, b)) {
+      // Families working a craft from home always tend to it first.
+      jobs.push({ b, site: false, p: b.trade ? -1 : prio(b) });
     }
   }
   jobs.sort((a, c) => a.p - c.p || a.b.id - c.b.id);
@@ -773,9 +804,45 @@ export function recompute(s: GameState): void {
   }
 }
 
+/** Crafts a family may take up at home. */
+export const HOME_TRADES: BuildingType[] = ['bakery', 'brewhouse', 'dairy', 'weaver', 'tailor', 'tanner', 'apothecary'];
+/** Setting up a home workshop. */
+export const HOME_TRADE_COST: Cost = { wood: 6, planks: 6 };
+/** A family working from home produces this much more than a common workshop. */
+export const HOME_TRADE_BONUS = 1.5;
+
+/** What a building works as: its own kind, or the craft a family keeps at home. */
+export function workDef(b: Building): BuildingDef {
+  return b.trade ? BUILDINGS[b.trade] : BUILDINGS[b.type];
+}
+
+/** Why a home cannot take up a craft, or null. */
+export function tradeError(s: GameState, b: Building, trade: BuildingType | undefined): string | null {
+  if (b.type !== 'house' || b.build < 1) return 'Only homes';
+  if (!trade) return null;
+  if (!HOME_TRADES.includes(trade)) return 'Not a home craft';
+  if (b.level < 2) return 'Only Timber Houses and Townhouses';
+  if (!isUnlocked(s, trade)) return `Requires ${TIERS[BUILDINGS[trade].tier].name}`;
+  if (b.trade !== trade && !canAfford(s, HOME_TRADE_COST)) return 'Needs 6 timber and 6 planks';
+  return null;
+}
+
+/** Sets the family to work a craft from home (or gives it up). */
+export function setTrade(s: GameState, b: Building, trade: BuildingType | undefined): string | null {
+  const err = tradeError(s, b, trade);
+  if (err) return err;
+  if (trade && trade !== b.trade) pay(s, HOME_TRADE_COST);
+  b.trade = trade;
+  b.recipe = undefined;
+  b.work = 0;
+  b.blocked = 0;
+  recompute(s);
+  return null;
+}
+
 /** Whether a workplace needs hands this month. */
 export function inSeason(s: GameState, b: Building): boolean {
-  const months = BUILDINGS[b.type].months;
+  const months = workDef(b).months;
   return !months || months.includes(monthOf(s.day));
 }
 
@@ -787,7 +854,7 @@ export function restingNow(s: GameState, b: Building): boolean {
   if (!inSeason(s, b)) return true;
   if (b.blocked === BLOCK_SEASONAL && b.status.startsWith('Enough')) {
     const r = chooseRecipe(s, b, true);
-    const out = r ? r.outputs : BUILDINGS[b.type].outputs;
+    const out = r ? r.outputs : workDef(b).outputs;
     if (enoughOf(s, out)) return true;
     b.blocked = 0;
     b.status = 'Back to work';
@@ -797,7 +864,7 @@ export function restingNow(s: GameState, b: Building): boolean {
 
 /** The first month after `from` in which the workplace works again. */
 export function nextSeasonMonth(s: GameState, b: Building): number | null {
-  const months = BUILDINGS[b.type].months;
+  const months = workDef(b).months;
   if (!months) return null;
   const m = monthOf(s.day);
   for (let k = 1; k <= 12; k++) if (months.includes((m + k) % 12)) return (m + k) % 12;
@@ -833,7 +900,7 @@ function recipeReady(s: GameState, b: Building, r: Recipe): boolean {
  * `any` returns the chosen or first recipe regardless of readiness.
  */
 export function chooseRecipe(s: GameState, b: Building, any = false): Recipe | null {
-  const list = BUILDINGS[b.type].recipes;
+  const list = workDef(b).recipes;
   if (!list) return null;
   const fixed = b.recipe ? list.find((r) => r.id === b.recipe) : undefined;
   if (fixed) return any || recipeInMonth(fixed, monthOf(s.day)) ? fixed : null;
@@ -881,7 +948,7 @@ export function labourSummary(s: GameState): LabourSummary {
   const cats = new Map<Category, { have: number; slots: number }>();
   for (const b of s.buildings) {
     out.builders += b.builders ?? 0;
-    const d = BUILDINGS[b.type];
+    const d = workDef(b);
     if (b.build < 1 || d.workers === 0) continue;
     out.workers += b.workers;
     const want = b.paused ? 0 : Math.min(workersOf(b), b.want ?? Infinity);
@@ -935,13 +1002,14 @@ function fullFor(s: GameState, out: Cost): boolean {
 
 function addOutput(s: GameState, b: Building, out: Cost): boolean {
   if (fullFor(s, out)) return false;
-  for (const k in out) b.output += store(s, k as ResourceId, out[k as ResourceId] ?? 0);
+  const bonus = b.trade ? HOME_TRADE_BONUS : 1;
+  for (const k in out) b.output += store(s, k as ResourceId, (out[k as ResourceId] ?? 0) * bonus);
   return true;
 }
 
 /** Performs one production cycle. Returns a status string on failure. */
 function produce(s: GameState, b: Building, rng: StateRng): string | null {
-  const d = BUILDINGS[b.type];
+  const d = workDef(b);
   const season = seasonOf(s.day);
   const enough = d.recipes ? null : enoughOf(s, d.outputs);
   if (enough) return `Enough ${GOODS[enough].name.toLowerCase()} in store`;
@@ -1396,7 +1464,7 @@ function passiveStatus(s: GameState, b: Building): string {
  * the trees, rocks or bushes being gathered both slow a workplace down.
  */
 export function workEfficiency(b: Building): number {
-  const d = BUILDINGS[b.type];
+  const d = workDef(b);
   if (!d.cycle) return 1;
   const toResource = d.gathers && d.gathers !== 'water' && d.gathers !== 'forest' ? (2 * (b.resDist ?? d.radius / 2)) / OFFROAD_TILES_PER_DAY : 0;
   const walking = ((b.trip ?? 0) + toResource) / Math.max(1, d.workers);
@@ -1405,7 +1473,7 @@ export function workEfficiency(b: Building): number {
 
 export function dailyProduction(s: GameState, rng: StateRng): void {
   for (const b of s.buildings) {
-    const d = BUILDINGS[b.type];
+    const d = workDef(b);
     if (b.build < 1) continue;
     if (b.paused) {
       b.status = 'Paused';
@@ -1648,6 +1716,7 @@ export function monthly(s: GameState, rng: StateRng): void {
   report.taxes = Math.floor(taxes);
   s.res.gold += report.taxes;
   serveAle(s);
+  supplyHomes(s);
   monthlyHerds(s, month);
   monthlyYards(s, month);
   report.trade = exportGoods(s);

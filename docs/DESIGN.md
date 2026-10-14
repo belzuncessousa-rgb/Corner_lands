@@ -141,9 +141,9 @@ Every charter carries a small malus.
 - [x] Backyard extensions (vegetables, chickens, bees)
 
 ### Phase 3 — Workshops and needs
-- [ ] Windmill → bakery; brewhouse; dairy; tanner; weaver; tailor & cobbler; apothecary
-- [ ] Specialised homes (family trades with higher yield)
-- [ ] New household needs and seasonal consumption of wares
+- [x] Windmill → bakery; brewhouse; dairy; tanner; weaver; tailor & cobbler; apothecary
+- [x] Specialised homes (family trades with higher yield)
+- [x] New household needs and seasonal consumption of wares
 
 ### Phase 4 — Stone, clay, metal
 - [ ] Clay pit & kiln (tiles), stonemason, bloomery, carpenter

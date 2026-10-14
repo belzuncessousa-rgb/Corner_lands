@@ -70,12 +70,21 @@ then fall back to the browser's localStorage.
   go further); meals from several food groups (grain, meat, produce, dairy)
   raise happiness. Foragers pick berries, autumn mushrooms or herbs and rest in deep winter;
   every household burns a bundle of firewood (or two logs) each winter month.
-- **Homes grow** — Cottage → Timber House (well, market, two kinds of food) →
-  Townhouse (church, tavern, three kinds of food). Unmet needs sour the mood.
+- **Workshops** — a Windmill grinds wheat for the Bakery; the Brewhouse brews
+  ale from barley or cider from apples for the taverns; a Dairy makes cheese;
+  the Tannery, Weaver and Tailor & Cobbler turn hides, wool and flax into
+  leather, cloth, clothes and boots; the Apothecary makes medicine from herbs.
+- **Homes grow** — Cottage → Timber House (well, market, a tavern with ale or
+  cider, clothes, two food groups) → Townhouse (church, boots, medicine, three
+  food groups). Clothes, boots and medicine wear out every three months.
+  Unmet needs sour the mood.
+- **Home crafts** — a Timber House or Townhouse can take up a craft (baker,
+  brewer, weaver, tailor...). Two of the family work it from home and make
+  half as much again as a common workshop.
 - **The manor** — raise the Manor Hall to a Manor House, Stone Manor and
   Lord's Keep to become a Village, Town and Borough. Each rank unlocks
   buildings and adds storage.
-- **Workshops** — can be expanded once for half as many workers again.
+- **Expansions** — workshops can be expanded once for half as many workers again.
 - **Trade** — at the marketplace buy and sell goods; mark goods for sale in the
   top bar and a merchant's cart visits each month to buy what is above the
   stock target.

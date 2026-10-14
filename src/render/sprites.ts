@@ -1,4 +1,5 @@
 import { mulberry32 } from '../game/rng';
+import { HOME_TRADES } from '../game/sim';
 import type { BuildingType, Season } from '../game/types';
 import { type Material, Pen, TH, TW, iso, mix, shade, type V3 } from './pen';
 
@@ -634,7 +635,8 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
     }
     case 'house': {
       const hv = HOUSE_VARIANTS[variant % HOUSE_VARIANTS.length];
-      const yard = YARD_CODES[Math.floor(variant / HOUSE_VARIANTS.length)] ?? null;
+      const yard = YARD_CODES[Math.floor(variant / HOUSE_VARIANTS.length) % YARD_CODES.length] ?? null;
+      const trade = HOME_TRADES[Math.floor(variant / 16) - 1] ?? null;
       const WALL = hv.wall;
       p.roofTint = hv.tint;
       if (level >= 3) {
@@ -718,6 +720,7 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
         if (!yard) drawHouseProp(p, hv.prop === 'hive' ? 'logs' : hv.prop, season);
       }
       if (yard) drawYard(p, yard, level, season);
+      if (trade) drawHomeCraft(p, trade, level, season);
       p.roofTint = null;
       break;
     }
@@ -750,6 +753,221 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
         const t = fruitTreeSprite('apples', season, 1, true);
         const [tx, ty] = iso(0.5, 0.5);
         p.ctx.drawImage(t.canvas, tx - t.ax, ty - t.ay, t.w, t.h);
+      }
+      break;
+    }
+    case 'windmill': {
+      // Post mill: a stone base, a boarded body and four lattice sails.
+      p.shadow(0.4, 0.4, 1.6, 1.6);
+      p.box(0.55, 0.55, 1.45, 1.45, 0, 10, STONE);
+      p.box(0.62, 0.62, 1.38, 1.38, 10, 30, WOOD);
+      p.doorL(1.38, 0.9, 0.18, 9);
+      p.windowL(1.38, 0.8, 26, 0.12, 5);
+      p.roofX(0.62, 0.62, 1.38, 1.38, 40, 14, 'shingle', WOOD, 0.06);
+      // Sails turn on a hub at the front face.
+      const [hx, hy] = iso(1.0, 1.42, 34);
+      const c = p.ctx;
+      for (let k = 0; k < 4; k++) {
+        const a = Math.PI / 4 + (k * Math.PI) / 2;
+        const ex = hx + Math.cos(a) * 30;
+        const ey = hy + Math.sin(a) * 30;
+        c.strokeStyle = '#5e4129';
+        c.lineWidth = 1.6;
+        c.beginPath();
+        c.moveTo(hx, hy);
+        c.lineTo(ex, ey);
+        c.stroke();
+        // Lattice sail cloth along one side of each arm.
+        const nx = -Math.sin(a) * 6;
+        const ny = Math.cos(a) * 6;
+        c.fillStyle = season === 3 ? 'rgba(230,236,240,0.85)' : 'rgba(240,232,214,0.9)';
+        c.beginPath();
+        c.moveTo(hx + Math.cos(a) * 8, hy + Math.sin(a) * 8);
+        c.lineTo(ex, ey);
+        c.lineTo(ex + nx, ey + ny);
+        c.lineTo(hx + Math.cos(a) * 8 + nx, hy + Math.sin(a) * 8 + ny);
+        c.closePath();
+        c.fill();
+        c.strokeStyle = 'rgba(94,65,41,0.6)';
+        c.lineWidth = 0.5;
+        for (let t = 0.35; t < 1; t += 0.16) {
+          c.beginPath();
+          c.moveTo(hx + Math.cos(a) * 30 * t, hy + Math.sin(a) * 30 * t);
+          c.lineTo(hx + Math.cos(a) * 30 * t + nx, hy + Math.sin(a) * 30 * t + ny);
+          c.stroke();
+        }
+      }
+      c.fillStyle = '#3b2a1a';
+      c.beginPath();
+      c.arc(hx, hy, 2.4, 0, Math.PI * 2);
+      c.fill();
+      p.sack(1.65, 1.3, '#efe6d4');
+      p.sack(1.75, 1.5, '#e8dcc4');
+      break;
+    }
+    case 'brewhouse': {
+      p.shadow(0.25, 0.3, 1.7, 1.4);
+      p.box(0.3, 0.35, 1.45, 1.35, 0, 8, STONE);
+      p.box(0.3, 0.35, 1.45, 1.35, 8, 12, PLASTER);
+      p.timber(0.3, 0.35, 1.45, 1.35, 8, 12, BEAM);
+      p.doorL(1.35, 0.75, 0.2, 10);
+      p.windowL(1.35, 0.45, 12, 0.13, 5, season === 3);
+      p.windowR(1.45, 0.7, 12, 0.13, 5);
+      p.roofX(0.3, 0.35, 1.45, 1.35, 20, 15, 'tile', PLASTER, 0.12);
+      // A tall louvred vent lets the steam out of the copper.
+      p.box(0.85, 0.75, 1.05, 0.95, 30, 6, WOOD);
+      p.roofPyramid(0.85, 0.75, 1.05, 0.95, 36, 5, 'tile', 0.03);
+      smoke.push([0.95, 0.85, 40]);
+      for (const [x, y] of [
+        [1.6, 0.6],
+        [1.7, 0.85],
+        [1.55, 1.1],
+        [1.75, 1.4],
+      ]) p.barrel(x, y);
+      p.sack(0.45, 1.65, '#d8c070');
+      break;
+    }
+    case 'dairy': {
+      p.shadow(0.35, 0.35, 1.55, 1.35);
+      p.box(0.4, 0.4, 1.45, 1.3, 0, 14, STONE);
+      p.doorL(1.3, 0.8, 0.18, 10);
+      p.windowR(1.45, 0.7, 6, 0.12, 4);
+      p.roofX(0.4, 0.4, 1.45, 1.3, 14, 13, 'slate', STONE, 0.1);
+      // Cheese wheels maturing on a rack and milk churns.
+      p.box(0.45, 1.5, 1.05, 1.65, 0, 2, '#7b5a36');
+      p.box(0.45, 1.5, 1.05, 1.65, 6, 1.5, '#7b5a36');
+      for (const x of [0.55, 0.75, 0.95]) {
+        p.ellipse(x, 1.57, 2, 4, 2.2, '#f0c850');
+        p.ellipse(x, 1.57, 7.5, 3.6, 2, '#e8c040');
+      }
+      for (const [x, y] of [
+        [1.6, 1.0],
+        [1.7, 1.2],
+      ]) {
+        p.box(x - 0.05, y - 0.05, x + 0.05, y + 0.05, 0, 8, '#b8bcc0');
+        p.ellipse(x, y, 8, 2.5, 1.2, '#8a8e94');
+      }
+      break;
+    }
+    case 'tanner': {
+      p.shadow(0.2, 0.2, 1.7, 1.7);
+      // Lean-to over the pits.
+      for (const [x, y] of [
+        [0.3, 0.3],
+        [1.4, 0.3],
+        [0.3, 0.9],
+        [1.4, 0.9],
+      ]) p.line([x, y, 0], [x, y, 13], '#5e4129', 2);
+      p.roofX(0.3, 0.3, 1.4, 0.9, 13, 7, 'plank', WOOD, 0.08);
+      // Tanning pits in the yard.
+      for (const [x, y, c] of [
+        [0.35, 1.15, '#5a3a20'],
+        [0.8, 1.15, '#6e4a26'],
+        [0.35, 1.5, '#4a5a3a'],
+        [0.8, 1.5, '#5a3a20'],
+      ] as [number, number, string][]) {
+        p.poly(
+          [
+            [x, y, 0],
+            [x + 0.32, y, 0],
+            [x + 0.32, y + 0.28, 0],
+            [x, y + 0.28, 0],
+          ],
+          '#7b6a54',
+        );
+        p.poly(
+          [
+            [x + 0.04, y + 0.04, 0],
+            [x + 0.28, y + 0.04, 0],
+            [x + 0.28, y + 0.24, 0],
+            [x + 0.04, y + 0.24, 0],
+          ],
+          c,
+        );
+      }
+      // Hides stretched on frames.
+      for (const y of [1.2, 1.5]) {
+        p.line([1.45, y - 0.12, 0], [1.45, y - 0.12, 14], '#5e4129', 1.2);
+        p.line([1.45, y + 0.12, 0], [1.45, y + 0.12, 14], '#5e4129', 1.2);
+        p.wallR(1.45, y - 0.1, y + 0.1, 3, 13, y > 1.3 ? '#b88a5a' : '#9a6a40');
+      }
+      p.barrel(0.6, 0.6);
+      break;
+    }
+    case 'weaver': {
+      p.shadow(0.3, 0.3, 1.65, 1.4);
+      p.box(0.3, 0.35, 1.5, 1.35, 0, 16, PLASTER);
+      p.timber(0.3, 0.35, 1.5, 1.35, 0, 16, BEAM);
+      // A wide window to weave by.
+      p.wallL(1.352, 0.42, 0.95, 5, 12, '#4a3020');
+      p.wallL(1.353, 0.45, 0.92, 6, 11, season === 3 ? '#e0b04e' : '#3a3540');
+      p.line([0.55, 1.354, 6], [0.55, 1.354, 11], '#c8b890', 0.6);
+      p.line([0.8, 1.354, 6], [0.8, 1.354, 11], '#c8b890', 0.6);
+      p.doorL(1.35, 1.1, 0.18, 10);
+      p.roofX(0.3, 0.35, 1.5, 1.35, 16, 15, 'thatch', PLASTER, 0.12);
+      smoke.push(p.chimney(1.25, 0.8, 24, 10));
+      // Bolts of cloth and bales of wool.
+      for (const [x, y, c] of [
+        [1.65, 0.7, '#5a7ab0'],
+        [1.75, 0.95, '#8a3b2e'],
+        [1.6, 1.2, '#c8b890'],
+      ] as [number, number, string][]) {
+        p.line([x, y - 0.12, 3], [x, y + 0.12, 3], c, 5);
+      }
+      p.sack(0.45, 1.65, '#f2ece0');
+      p.sack(0.65, 1.75, '#ece4d4');
+      break;
+    }
+    case 'tailor': {
+      p.shadow(0.35, 0.3, 1.65, 1.4);
+      p.box(0.4, 0.4, 1.4, 1.3, 0, 12, STONE);
+      p.box(0.35, 0.35, 1.45, 1.35, 12, 12, '#dfbd88');
+      p.timber(0.35, 0.35, 1.45, 1.35, 12, 12, BEAM);
+      p.doorL(1.3, 0.75, 0.2, 10);
+      p.windowL(1.3, 0.48, 4, 0.14, 5, true);
+      p.windowL(1.35, 0.55, 15, 0.12, 5);
+      p.windowL(1.35, 1.05, 15, 0.12, 5);
+      p.roofX(0.35, 0.35, 1.45, 1.35, 24, 15, 'shingle', '#dfbd88', 0.12);
+      smoke.push(p.chimney(0.65, 0.85, 32, 10));
+      // Shop sign: a boot.
+      p.line([1.46, 1.3, 18], [1.62, 1.42, 18], '#3b2a1a', 1.2);
+      const [bx, by] = iso(1.58, 1.4, 12);
+      p.ctx.fillStyle = '#6a3e22';
+      p.ctx.fillRect(bx - 2, by - 5, 3, 5);
+      p.ctx.fillRect(bx - 2, by - 1, 6, 2);
+      // Market trestle with cloth.
+      p.box(1.55, 0.5, 1.9, 0.9, 6, 1.5, '#8a6236');
+      p.line([1.6, 0.85, 0], [1.6, 0.85, 6], '#5e4129', 1);
+      p.line([1.85, 0.85, 0], [1.85, 0.85, 6], '#5e4129', 1);
+      p.box(1.6, 0.55, 1.75, 0.85, 7.5, 2, '#8a3b2e');
+      p.box(1.76, 0.55, 1.88, 0.85, 7.5, 2, '#4a6a9a');
+      break;
+    }
+    case 'apothecary': {
+      p.shadow(0.4, 0.3, 1.5, 1.3);
+      p.box(0.45, 0.35, 1.35, 1.25, 0, 11, STONE);
+      p.box(0.42, 0.32, 1.38, 1.28, 11, 14, PLASTER);
+      p.timber(0.42, 0.32, 1.38, 1.28, 11, 14, BEAM);
+      p.wallL(1.252, 0.75, 0.95, 0, 10, '#2e5a3a');
+      p.windowL(1.25, 0.5, 4, 0.13, 5, true);
+      p.windowL(1.28, 0.6, 16, 0.12, 5);
+      p.windowR(1.38, 0.7, 16, 0.12, 5);
+      p.roofX(0.42, 0.32, 1.38, 1.28, 25, 17, 'slate', PLASTER, 0.1);
+      smoke.push(p.chimney(1.0, 0.7, 33, 9));
+      // A physic garden of herb beds.
+      for (let i = 0; i < 3; i++) {
+        p.poly(
+          [
+            [0.4 + i * 0.4, 1.45, 0],
+            [0.7 + i * 0.4, 1.45, 0],
+            [0.7 + i * 0.4, 1.85, 0],
+            [0.4 + i * 0.4, 1.85, 0],
+          ],
+          season === 3 ? '#cfd4d4' : '#6e5038',
+        );
+        if (season !== 3) {
+          for (let j = 0; j < 2; j++) p.bush(0.55 + i * 0.4, 1.55 + j * 0.18, 2.2, ['#6aa04a', '#8a9a5a', '#a07ab8'][i]);
+        }
       }
       break;
     }
@@ -1553,6 +1771,76 @@ function drawYard(p: Pen, yard: string, level: number, season: Season): void {
     if (season === 1 || season === 0) p.bush(x0 + 0.1, 1.0, 3, '#b97ae0');
   }
 }
+
+/** The sign and a telltale prop of a craft worked from home. */
+function drawHomeCraft(p: Pen, trade: BuildingType, level: number, season: Season): void {
+  const front = level >= 3 ? 1.72 : 1.65;
+  // Hanging sign on a bracket at the front corner.
+  const sx = level >= 3 ? 1.88 : 1.8;
+  p.line([sx, front, 22], [sx + 0.18, front + 0.12, 22], '#3b2a1a', 1.3);
+  p.wallR(sx + 0.13, front + 0.04, front + 0.24, 13, 21, '#e8d8b0');
+  p.wallR(sx + 0.131, front + 0.06, front + 0.22, 14, 20, TRADE_COLORS[trade] ?? '#8a3b2e');
+  const yx = level >= 3 ? 1.95 : 1.9;
+  switch (trade) {
+    case 'bakery': {
+      const [ox, oy] = iso(yx, 1.2, 0);
+      p.ctx.fillStyle = '#b39a80';
+      p.ctx.beginPath();
+      p.ctx.ellipse(ox, oy - 1, 8, 6, 0, Math.PI, 0);
+      p.ctx.lineTo(ox + 8, oy + 1);
+      p.ctx.lineTo(ox - 8, oy + 1);
+      p.ctx.fill();
+      p.ctx.fillStyle = '#f08a2a';
+      p.ctx.fillRect(ox - 1.5, oy - 2.5, 3, 2);
+      break;
+    }
+    case 'brewhouse':
+      p.barrel(yx, 1.0);
+      p.barrel(yx + 0.05, 1.25);
+      p.barrel(yx - 0.12, 1.15);
+      break;
+    case 'dairy':
+      p.box(yx - 0.1, 1.0, yx + 0.08, 1.3, 0, 5, '#7b5a36');
+      for (const y of [1.06, 1.18]) p.ellipse(yx - 0.01, y, 7, 2.6, 1.6, '#f0c850');
+      break;
+    case 'weaver':
+      // A loom frame with a half-woven cloth.
+      p.line([yx, 0.95, 0], [yx, 0.95, 13], '#6b4a2e', 1.4);
+      p.line([yx, 1.35, 0], [yx, 1.35, 13], '#6b4a2e', 1.4);
+      p.line([yx, 0.95, 13], [yx, 1.35, 13], '#6b4a2e', 1.4);
+      p.wallR(yx, 1.0, 1.3, 4, 11, season === 3 ? '#9aaac8' : '#5a7ab0');
+      break;
+    case 'tailor':
+      p.box(yx - 0.12, 1.0, yx + 0.08, 1.35, 0, 6, '#7b5a36');
+      p.wallR(yx + 0.081, 1.05, 1.15, 6, 10, '#8a3b2e');
+      p.wallR(yx + 0.081, 1.2, 1.3, 6, 9, '#6a3e22');
+      break;
+    case 'tanner':
+      p.line([yx, 0.95, 0], [yx, 0.95, 12], '#5e4129', 1.3);
+      p.line([yx, 1.4, 0], [yx, 1.4, 12], '#5e4129', 1.3);
+      p.line([yx, 0.95, 12], [yx, 1.4, 12], '#5e4129', 1.3);
+      p.wallR(yx, 1.0, 1.17, 3, 11, '#9a6a40');
+      p.wallR(yx, 1.22, 1.37, 4, 11, '#b88a5a');
+      break;
+    case 'apothecary':
+      for (const y of [1.0, 1.12, 1.24]) {
+        p.line([yx, y, 13], [yx, y, 8], '#6b4a2e', 0.6);
+        p.ellipse(yx, y, 7.5, 1.6, 2.4, season === 3 ? '#8a9a7a' : '#6aa04a');
+      }
+      p.line([yx, 0.95, 13], [yx, 1.3, 13], '#5e4129', 1.2);
+      break;
+  }
+}
+
+const TRADE_COLORS: Partial<Record<BuildingType, string>> = {
+  bakery: '#c8904a',
+  brewhouse: '#a87a3a',
+  dairy: '#e8c850',
+  weaver: '#4a6a9a',
+  tailor: '#8a3b2e',
+  tanner: '#6a3e22',
+  apothecary: '#3a7a5a',
+};
 
 /** A grazing sheep at a screen point; `f` is the facing (1 or -1). */
 export function drawSheep(c: CanvasRenderingContext2D, x: number, y: number, f: number, white = '#f2ece0'): void {

@@ -1,6 +1,6 @@
 import { BUILDINGS, RESOURCE_STORAGE, STORAGE_CAPACITY, type StorageKind } from '../game/data';
 import { upgradeBlocker } from '../game/levels';
-import { deliveredTo, hasProblem, monthOf, orchardMaturity, seasonOf, storageCap } from '../game/sim';
+import { HOME_TRADES, deliveredTo, hasProblem, monthOf, orchardMaturity, seasonOf, storageCap } from '../game/sim';
 import type { Building, BuildingType, GameState, ResourceId, Season } from '../game/types';
 import { idx, inBounds } from '../game/world';
 import type { Agent } from './agents';
@@ -1437,7 +1437,8 @@ function drawBeast(c: CanvasRenderingContext2D, x: number, y: number, f: number,
 
 function variantOf(b: Building): number {
   if (b.type !== 'house') return 0;
-  return ((b.id * 7 + b.x) % 4) + 4 * Math.max(0, YARD_CODES.indexOf(b.yard ?? null));
+  const trade = b.trade ? HOME_TRADES.indexOf(b.trade) + 1 : 0;
+  return ((b.id * 7 + b.x) % 4) + 4 * Math.max(0, YARD_CODES.indexOf(b.yard ?? null)) + 16 * trade;
 }
 
 /** A small pile of one kind of goods. */

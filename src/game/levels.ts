@@ -1,6 +1,7 @@
 import { BUILDINGS, TIERS } from './data';
 import {
   coveredBy,
+  hasSupply,
   hasBuilt,
   log,
   materialsOf,
@@ -54,6 +55,15 @@ export const UPGRADABLE_WORK: BuildingType[] = [
   'fisher',
   'farm',
   'bakery',
+  'windmill',
+  'brewhouse',
+  'dairy',
+  'tanner',
+  'weaver',
+  'tailor',
+  'apothecary',
+  'byre',
+  'orchardist',
   'sawmill',
   'smithy',
   'market',
@@ -62,6 +72,8 @@ export const UPGRADABLE_WORK: BuildingType[] = [
 
 /** Worker slots, including the expansion of a level 2 workplace. */
 export function workersOf(b: Building): number {
+  // A family craft is worked by two of the household.
+  if (b.trade) return Math.min(2, b.residents);
   const base = BUILDINGS[b.type].workers;
   return b.level >= 2 && UPGRADABLE_WORK.includes(b.type) ? base + Math.ceil(base / 2) : base;
 }
@@ -87,12 +99,15 @@ export function houseNeeds(s: GameState, b: Building, level: number): Need[] {
   if (level >= 2) {
     out.push({ label: 'A well nearby', met: coveredBy(s, b, 'well') });
     out.push({ label: 'A market nearby', met: coveredBy(s, b, 'market') });
+    out.push({ label: 'A tavern with ale or cider', met: coveredBy(s, b, 'tavern') });
     out.push({ label: 'Two food groups', met: s.report.variety >= 2 });
+    out.push({ label: 'Clothes', met: hasSupply(s, b, 'clothes') });
   }
   if (level >= 3) {
     out.push({ label: 'A church nearby', met: coveredBy(s, b, 'church') });
-    out.push({ label: 'A tavern nearby', met: coveredBy(s, b, 'tavern') });
     out.push({ label: 'Three food groups', met: s.report.variety >= 3 });
+    out.push({ label: 'Boots', met: hasSupply(s, b, 'boots') });
+    out.push({ label: 'Medicine', met: hasSupply(s, b, 'medicine') });
   }
   return out;
 }

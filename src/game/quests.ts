@@ -127,9 +127,16 @@ export const QUESTS: Quest[] = [
   {
     id: 'tavern',
     title: 'Open a tavern',
-    hint: 'Ale and company cheer nearby homes. Taverns brew from a little grain.',
+    hint: 'Ale and company cheer nearby homes. A Brewhouse brews ale from barley fields, or cider from apples.',
     reward: { gold: 40 },
     done: (s) => count(s, 'tavern') >= 1,
+  },
+  {
+    id: 'clothes',
+    title: 'Clothe your people',
+    hint: 'Timber Houses need clothes: shear sheep or grow flax, weave cloth at a Weaver and sew it at a Tailor & Cobbler.',
+    reward: { gold: 60 },
+    done: (s) => s.res.clothes >= 5,
   },
   {
     id: 'town',

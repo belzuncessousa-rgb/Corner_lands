@@ -76,14 +76,41 @@ function tryPlace(s: GameState, type: BuildingType): boolean {
   return !!placeOrder(s, type, best.x, best.y);
 }
 
-/** Gives each farmstead about 40 tiles of fields on the best soil nearby. */
+/** Finds the best clear rectangle for a zone near a workplace. */
+function zoneSpot(s: GameState, type: BuildingType, near: { x: number; y: number; w: number; h: number }, sizes: [number, number][]) {
+  const c = bCenter(near as never);
+  for (const [w, h] of sizes) {
+    let best = null as { x: number; y: number; w: number; h: number; score: number } | null;
+    for (let y = Math.floor(c.y - 9); y <= c.y + 9; y++) {
+      for (let x = Math.floor(c.x - 9); x <= c.x + 9; x++) {
+        if (zoneError(s, type, x, y, x + w - 1, y + h - 1)) continue;
+        let blocks = false;
+        let fert = 0;
+        for (let yy = y; yy < y + h && !blocks; yy++) {
+          for (let xx = x; xx < x + w; xx++) {
+            if (onGrid(s, xx, yy)) blocks = true;
+            fert += s.fertility[idx(s, xx, yy)];
+          }
+        }
+        if (blocks) continue;
+        const d = Math.hypot(x + w / 2 - c.x, y + h / 2 - c.y);
+        const score = ((type === 'field' ? 4 : 0) * fert) / (w * h) - d * 0.4;
+        if (!best || score > best.score) best = { x, y, w, h, score };
+      }
+    }
+    if (best) return best;
+  }
+  return null;
+}
+
+/** Gives each farmstead about 40 tiles of fields, wheat first, then barley and flax. */
 function drawFields(s: GameState): void {
+  const crops = ['wheat', 'barley', 'wheat', 'flax'];
   for (const farm of s.buildings) {
     if (farm.type !== 'farm' || farm.build < 1) continue;
-    if (zoneArea(zonesOf(s, farm)) >= 36) continue;
-    const c = bCenter(farm);
-    let best = null as { x: number; y: number; w: number; h: number; score: number } | null;
-    for (const [w, h] of [
+    const fields = zonesOf(s, farm);
+    if (zoneArea(fields) >= 36) continue;
+    const spot = zoneSpot(s, 'field', farm, [
       [5, 5],
       [6, 4],
       [4, 6],
@@ -91,27 +118,25 @@ function drawFields(s: GameState): void {
       [3, 4],
       [4, 3],
       [3, 3],
-    ]) {
-      for (let y = Math.floor(c.y - 9); y <= c.y + 9; y++) {
-        for (let x = Math.floor(c.x - 9); x <= c.x + 9; x++) {
-          if (zoneError(s, 'field', x, y, x + w - 1, y + h - 1)) continue;
-          let blocks = false;
-          let fert = 0;
-          for (let yy = y; yy < y + h && !blocks; yy++) {
-            for (let xx = x; xx < x + w; xx++) {
-              if (onGrid(s, xx, yy)) blocks = true;
-              fert += s.fertility[idx(s, xx, yy)];
-            }
-          }
-          if (blocks) continue;
-          const d = Math.hypot(x + w / 2 - c.x, y + h / 2 - c.y);
-          const score = fert / (w * h) * 4 + w * h * 0.15 - d * 0.4;
-          if (!best || score > best.score) best = { x, y, w, h, score };
-        }
-      }
-      if (best) break;
+    ]);
+    if (!spot) continue;
+    const f = placeZone(s, 'field', spot.x, spot.y, spot.x + spot.w - 1, spot.y + spot.h - 1);
+    if (f) {
+      const farms = s.buildings.filter((b) => b.type === 'farm').indexOf(farm);
+      f.recipe = crops[(fields.length + farms) % crops.length];
     }
-    if (best) placeZone(s, 'field', best.x, best.y, best.x + best.w - 1, best.y + best.h - 1);
+  }
+  for (const byre of s.buildings) {
+    if (byre.type !== 'byre' || byre.build < 1 || zonesOf(s, byre).length) continue;
+    if (s.res.wood < 25) continue;
+    const spot = zoneSpot(s, 'pasture', byre, [
+      [6, 6],
+      [5, 6],
+      [5, 5],
+      [4, 5],
+      [4, 4],
+    ]);
+    if (spot) placeZone(s, 'pasture', spot.x, spot.y, spot.x + spot.w - 1, spot.y + spot.h - 1);
   }
 }
 
@@ -250,6 +275,12 @@ function shop(s: GameState): void {
   if (s.res.tools < 6 && s.tier >= 2) buy('tools', 5, 150);
   if (totalFood(s) < s.population * 2) buy('bread', 20, 80);
   if (s.res.stone < 30) buy('stone', 20, 120);
+  // Finer homes and the tavern use up wares; buy them when our own run short.
+  const homes = (lvl: number) => s.buildings.filter((b) => b.type === 'house' && b.level >= lvl).length;
+  if (hasBuilt(s, 'tavern') && s.res.ale + s.res.cider < 8) buy('ale', 10, 100);
+  if (s.tier >= 1 && s.res.clothes < 4) buy('clothes', Math.min(10, homes(2) + 3), 150);
+  if (homes(3) && s.res.boots < 3) buy('boots', Math.min(8, homes(3)), 200);
+  if (homes(3) && s.res.medicine < 3) buy('medicine', Math.min(8, homes(3)), 200);
 }
 
 /** Materials still owed to every unfinished site and renovation. */
@@ -310,8 +341,8 @@ function act(s: GameState, rand: () => number): void {
   const wants: BuildingType[] = [];
   // Key buildings for progression come first once unlocked.
   if (s.tier >= 1) {
-    for (const t of ['sawmill', 'bakery', 'market'] as BuildingType[]) {
-      if (count(s, t) === 0 && (t !== 'bakery' || count(s, 'farm') > 0)) wants.push(t);
+    for (const t of ['sawmill', 'windmill', 'bakery', 'market'] as BuildingType[]) {
+      if (count(s, t) === 0 && (t === 'sawmill' || t === 'market' || count(s, 'farm') > 0)) wants.push(t);
     }
   }
   if (s.tier >= 2) {
@@ -331,7 +362,12 @@ function act(s: GameState, rand: () => number): void {
   if (stored(s, 'food') > storageCap(s, 'food') * 0.8 && count(s, 'granary') < 3) wants.push('granary');
   if (s.tier >= 1) {
     if (count(s, 'farm') < Math.ceil(pop / 18)) wants.push('farm');
+    if (count(s, 'windmill') < Math.ceil(count(s, 'farm') / 2)) wants.push('windmill');
     if (count(s, 'bakery') < Math.ceil(count(s, 'farm') / 2)) wants.push('bakery');
+    if (count(s, 'tavern') > 0 && count(s, 'brewhouse') < 1) wants.push('brewhouse');
+    if (pop >= 30 && count(s, 'byre') < 1) wants.push('byre');
+    if (count(s, 'byre') > 0 && count(s, 'weaver') < 1) wants.push('weaver');
+    if (count(s, 'weaver') > 0 && count(s, 'tailor') < 1) wants.push('tailor');
     if (count(s, 'sawmill') < 1 + Math.floor(pop / 50)) wants.push('sawmill');
     if (count(s, 'market') < 1) wants.push('market');
   }
@@ -341,6 +377,7 @@ function act(s: GameState, rand: () => number): void {
     }
     if (count(s, 'smithy') < 1) wants.push('smithy');
     if (count(s, 'church') < 1) wants.push('church');
+    if (pop >= 60 && count(s, 'tanner') < 1) wants.push('tanner');
   }
   if (s.tier >= 1 && count(s, 'tavern') < 1 + Math.floor(pop / 70)) wants.push('tavern');
   for (const t of wants) {

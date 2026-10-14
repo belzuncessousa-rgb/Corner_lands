@@ -6,6 +6,7 @@ import type { Renderer } from '../render/renderer';
 const CAT_COLORS: Record<Category, [number, number, number]> = {
   housing: [214, 170, 96],
   resources: [150, 100, 60],
+  farming: [200, 176, 90],
   food: [222, 196, 90],
   industry: [130, 120, 130],
   civic: [180, 60, 50],

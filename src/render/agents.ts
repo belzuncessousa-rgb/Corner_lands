@@ -651,7 +651,9 @@ function carryFor(type: string): ResourceId | null {
       return 'planks';
     case 'smithy':
       return 'tools';
-    default:
-      return null;
+    default: {
+      const out = Object.keys(BUILDINGS[type as keyof typeof BUILDINGS]?.outputs ?? {})[0];
+      return (out as ResourceId) ?? null;
+    }
   }
 }
