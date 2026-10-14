@@ -782,6 +782,7 @@ button.active {
 
 /* ------------------------------------------------------------ tier banner */
 
+#ui > .banner,
 .banner {
   position: absolute;
   top: 18%;
@@ -794,7 +795,8 @@ button.active {
   max-width: calc(100vw - 32px);
   animation: bannerIn 0.6s cubic-bezier(0.2, 1.4, 0.4, 1);
   transition: opacity 1s, transform 1s;
-  cursor: pointer;
+  /* Purely a flourish: clicks go through to the map. */
+  pointer-events: none;
 }
 .banner h1 {
   font-size: 40px;

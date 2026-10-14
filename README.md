@@ -139,6 +139,7 @@ npm run typecheck
 npm test                         # unit tests + balance bot
 BALANCE_LOG=1 npx vitest run tests/balance.test.ts   # print bot progress
 node scripts/showcase.mjs out    # screenshots of every building per season
+node scripts/uitest.mjs          # drives the real UI: build, draw fields, workers, targets
 ```
 
 The screenshot scripts expect the game at `http://localhost:3001` and a
