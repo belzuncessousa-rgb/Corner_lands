@@ -1222,7 +1222,7 @@ export class Hud {
     const latest = saves[0];
     const m = this.openModal(
       `<h1>Corner Lands</h1>
-      <div class="sub">Raise a humble hamlet into a thriving medieval borough</div>
+      <div class="sub">Raise a humble hamlet into a thriving medieval city</div>
       <div class="ornament">❦ ❦ ❦</div>
       <div class="menu">
         ${latest ? `<button class="primary" data-m="continue">Continue <small>(${esc(latest.summary)})</small></button>` : ''}

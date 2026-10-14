@@ -583,6 +583,159 @@ export const EVENTS: DecisionEvent[] = [
       ];
     },
   },
+  {
+    id: 'murrain',
+    title: 'Murrain in the Herds',
+    text: () => 'A sickness has come among the animals. Several stand listless in the pasture and will not eat.',
+    weight: (s) => (s.buildings.some((b) => b.type === 'byre' && (b.herd ?? 0) >= 6) ? 2 : 0),
+    choices: () => [
+      {
+        label: 'Cull the sick beasts at once',
+        detail: 'Each herd loses a third, but the sickness stops. +hides.',
+        apply: (st) => {
+          let lost = 0;
+          for (const b of st.buildings) {
+            if (b.type !== 'byre' || !b.herd) continue;
+            const n = Math.ceil(b.herd / 3);
+            b.herd -= n;
+            lost += n;
+          }
+          store(st, 'hides', lost);
+          return { text: `${lost} animals were culled and burned. The rest are healthy.`, kind: 'info' };
+        },
+      },
+      {
+        label: 'Call the herb-wife',
+        detail: '−5 herbs or medicine. Most of the herds recover.',
+        blocked: (st) => (st.res.herbs + st.res.medicine >= 5 ? null : 'Needs 5 herbs or medicine'),
+        apply: (st) => {
+          const m = Math.min(5, Math.floor(st.res.medicine));
+          st.res.medicine -= m;
+          st.res.herbs -= 5 - m;
+          for (const b of st.buildings) if (b.type === 'byre' && b.herd) b.herd = Math.max(1, b.herd - 1);
+          return { text: 'Bitter draughts and smoke in the byres. Only a few animals were lost.', kind: 'good' };
+        },
+      },
+      {
+        label: 'Let it run its course',
+        detail: 'Herds may lose half their animals.',
+        apply: (st, rng) => {
+          let lost = 0;
+          for (const b of st.buildings) {
+            if (b.type !== 'byre' || !b.herd) continue;
+            const n = Math.floor(b.herd * (0.2 + rng.next() * 0.3));
+            b.herd -= n;
+            lost += n;
+          }
+          return { text: `The murrain took ${lost} animals before it passed.`, kind: 'bad' };
+        },
+      },
+    ],
+  },
+  {
+    id: 'scholar',
+    title: 'A Travelling Scholar',
+    text: () => 'A scholar from the university in the south stops at the manor, his mule loaded with books. He would teach for a season, for board and a fee.',
+    weight: (s) => (s.tier >= 2 ? 1.5 : 0),
+    choices: () => [
+      {
+        label: 'Let him teach',
+        detail: '−60 coins. +10 prestige, happiness +4 for half a year.',
+        blocked: (st) => need(st, 'gold', 60, 'coins'),
+        apply: (st) => {
+          st.res.gold -= 60;
+          st.res.prestige += 10;
+          addMood(st, 'Lessons from the scholar', 4, 6);
+          return { text: 'Children and clerks crowded the hall to hear him. Your house gains renown for learning.', kind: 'good' };
+        },
+      },
+      {
+        label: 'Buy his books',
+        detail: '3 books for 90 coins.',
+        blocked: (st) => need(st, 'gold', 90, 'coins'),
+        apply: (st) => {
+          st.res.gold -= 90;
+          store(st, 'books', 3);
+          return { text: 'Three fine books, bound in calfskin, now sit in the manor.', kind: 'good' };
+        },
+      },
+      {
+        label: 'No need for book-learning',
+        detail: 'Nothing happens.',
+        apply: () => ({ text: 'The scholar went on his way, muttering in Latin.', kind: 'info' }),
+      },
+    ],
+  },
+  {
+    id: 'wool',
+    title: 'The Wool Merchant',
+    text: () => 'A Flemish wool merchant has heard of your flocks. He offers a fine price for fleeces, paid in silver.',
+    weight: (s) => (s.res.wool >= 20 || s.res.cloth >= 10 ? 2 : 0),
+    choices: (s) => [
+      {
+        label: 'Sell him wool',
+        detail: `${Math.min(40, Math.floor(s.res.wool))} wool for ${Math.min(40, Math.floor(s.res.wool)) * 6} coins.`,
+        blocked: (st) => (st.res.wool >= 5 ? null : 'Not enough wool'),
+        apply: (st) => {
+          const n = Math.min(40, Math.floor(st.res.wool));
+          st.res.wool -= n;
+          st.res.gold += n * 6;
+          return { text: `The merchant paid ${n * 6} coins for ${n} fleeces.`, kind: 'good' };
+        },
+      },
+      {
+        label: 'Sell him cloth instead',
+        detail: `${Math.min(20, Math.floor(s.res.cloth))} cloth for ${Math.min(20, Math.floor(s.res.cloth)) * 14} coins, +3 prestige.`,
+        blocked: (st) => (st.res.cloth >= 5 ? null : 'Not enough cloth'),
+        apply: (st) => {
+          const n = Math.min(20, Math.floor(st.res.cloth));
+          st.res.cloth -= n;
+          st.res.gold += n * 14;
+          st.res.prestige += 3;
+          return { text: `Your weavers' cloth will be sold in Bruges. ${n * 14} coins, and some fame.`, kind: 'good' };
+        },
+      },
+      {
+        label: 'Keep it for our own looms',
+        detail: 'Nothing happens.',
+        apply: () => ({ text: 'The merchant shrugged and rode on.', kind: 'info' }),
+      },
+    ],
+  },
+  {
+    id: 'mason',
+    title: 'A Master Mason',
+    text: () => 'A master mason who worked on the cathedral at the capital seeks a new commission. He could teach your stonemasons, or build something fine.',
+    weight: (s) => (s.tier >= 2 && s.buildings.some((b) => b.type === 'stonemason' && b.build >= 1) ? 1.5 : 0),
+    choices: () => [
+      {
+        label: 'Commission a fine gateway',
+        detail: '−30 dressed stone, −80 coins. +15 prestige.',
+        blocked: (st) => need(st, 'dressedstone', 30, 'dressed stone') ?? need(st, 'gold', 80, 'coins'),
+        apply: (st) => {
+          st.res.dressedstone -= 30;
+          st.res.gold -= 80;
+          st.res.prestige += 15;
+          return { text: 'A carved gateway with your arms now greets every traveller.', kind: 'good' };
+        },
+      },
+      {
+        label: 'Have him teach the masons',
+        detail: '−50 coins. +30 dressed stone now.',
+        blocked: (st) => need(st, 'gold', 50, 'coins'),
+        apply: (st) => {
+          st.res.gold -= 50;
+          store(st, 'dressedstone', 30);
+          return { text: 'Under his eye the masons squared a whole stack of blocks in a month.', kind: 'good' };
+        },
+      },
+      {
+        label: 'Not now',
+        detail: 'Nothing happens.',
+        apply: () => ({ text: 'The master mason went to look for work elsewhere.', kind: 'info' }),
+      },
+    ],
+  },
 ];
 
 /** Days between decision events (randomised in this range). */
