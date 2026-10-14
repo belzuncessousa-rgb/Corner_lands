@@ -3,7 +3,6 @@ import {
   BUILDINGS,
   BUILD_ORDER,
   CATEGORY_NAMES,
-  HOUSE_UPGRADE_COST,
   MONTH_NAMES,
   RESOURCE_INFO,
   SEASON_NAMES,
@@ -14,11 +13,11 @@ import {
   TRADE_PRICES,
 } from '../game/data';
 import { getEvent, resolveEvent } from '../game/events';
+import { HOUSE_LEVELS, MANOR_LEVELS, buildingName, houseNeeds, startUpgrade, upgradeBlocker, upgradePlan, workersOf } from '../game/levels';
 import { activeQuests } from '../game/quests';
 import { StateRng } from '../game/rng';
 import {
   canAfford,
-  canUpgrade,
   demolish,
   employed,
   hasBuilt,
@@ -38,7 +37,6 @@ import {
   totalFood,
   totalHousing,
   trade,
-  upgradeHouse,
   yearOf,
 } from '../game/sim';
 import type { Building, BuildingType, Category, Cost, ResourceId } from '../game/types';
@@ -364,17 +362,30 @@ export class Hud {
       this.lastInspectorKey = '';
       return;
     }
-    const key = JSON.stringify([b.id, b.status, b.workers, b.residents, b.build.toFixed(2), b.paused, b.level, b.lastOutput, b.growth.toFixed(2), s.tier, canUpgrade(s, b)]);
+    const plan = upgradePlan(s, b);
+    const blocker = upgradeBlocker(s, b);
+    const key = JSON.stringify([
+      b.id, b.status, b.workers, b.builders, b.residents, b.build.toFixed(2), b.paused, b.level, b.lastOutput, b.growth.toFixed(2),
+      s.tier, blocker, b.need, (b.upProgress ?? 0).toFixed(2), b.unmet, Math.floor(s.res.gold / 10), s.population,
+    ]);
     if (key === this.lastInspectorKey) return;
     this.lastInspectorKey = key;
     box.style.display = 'block';
     const d = BUILDINGS[b.type];
     const rows: string[] = [];
+    const needLine = () => {
+      if (!b.need) return '';
+      const left = Object.entries(b.need).filter(([, v]) => (v ?? 0) > 0);
+      return left.length ? `<div class="kv"><span>Still to carry</span><span class="costline">${costHtml(Object.fromEntries(left))}</span></div>` : '';
+    };
     if (b.build < 1) {
+      rows.push(needLine());
       rows.push(`<div class="kv"><span>Construction</span><span>${Math.floor(b.build * 100)}%</span></div><div class="progress"><i style="width:${b.build * 100}%"></i></div>`);
+      rows.push(`<div class="kv"><span>Builders</span><span>${b.builders ?? 0}</span></div>`);
     } else {
-      if (d.workers) {
-        const pips = Array.from({ length: d.workers }, (_, i) => `<i class="${i < b.workers ? 'on' : ''}"></i>`).join('');
+      const slots = workersOf(b);
+      if (slots) {
+        const pips = Array.from({ length: slots }, (_, i) => `<i class="${i < b.workers ? 'on' : ''}"></i>`).join('');
         rows.push(`<div class="kv"><span>Workers</span><span class="pips">${pips}</span></div>`);
       }
       const cap = housingOf(b);
@@ -383,25 +394,43 @@ export class Hud {
       if (Object.keys(d.outputs).length || b.type === 'farm' || b.type === 'forester') {
         rows.push(`<div class="kv"><span>${b.type === 'forester' ? 'Trees planted' : 'Produced'} last month</span><span>${b.lastOutput}</span></div>`);
       }
+      if (d.cycle && b.efficiency !== undefined && b.efficiency < 0.97) {
+        rows.push(`<div class="kv" data-tip="Time lost walking to storage and to resources. Build closer to a storehouse or granary, or lay roads."><span>Walking time</span><span class="${b.efficiency < 0.7 ? 'neg' : ''}">${Math.round(b.efficiency * 100)}% efficient</span></div>`);
+      }
       if (Object.keys(d.inputs).length) rows.push(`<div class="kv"><span>Consumes</span><span class="costline">${costHtml(d.inputs)}</span></div>`);
       if (Object.keys(d.outputs).length) rows.push(`<div class="kv"><span>Produces</span><span class="costline">${costHtml(d.outputs)}</span></div>`);
+      if (b.type === 'house') {
+        const needs = houseNeeds(s, b, b.level);
+        rows.push(`<div class="needs"><div class="needs-h">Needs</div>${needs.map((n) => `<span class="${n.met ? 'met' : 'unmet'}">${n.met ? '✓' : '✗'} ${n.label}</span>`).join('')}</div>`);
+      }
+      if (b.upgrading) {
+        rows.push(`<div class="upgrade-box"><b>Upgrading to ${esc(upgradeName(b))}</b>${needLine()}
+          <div class="kv"><span>Work</span><span>${Math.floor((b.upProgress ?? 0) * 100)}% · ${b.builders ?? 0} builders</span></div>
+          <div class="progress"><i style="width:${(b.upProgress ?? 0) * 100}%"></i></div></div>`);
+      } else if (plan) {
+        const label = b.type === 'townhall' ? `Raise the manor to a ${plan.name}` : `Upgrade to ${plan.name}`;
+        const what =
+          b.type === 'townhall'
+            ? `Your settlement becomes a ${TIERS[plan.to - 1].name}, unlocking new buildings. More storage.`
+            : b.type === 'house'
+              ? `Houses ${HOUSE_LEVELS[plan.to].housing} villagers and pays more taxes.`
+              : `Room for ${Math.ceil(d.workers / 2)} more worker${Math.ceil(d.workers / 2) > 1 ? 's' : ''}.`;
+        rows.push(`<div class="upgrade-box"><b>${label}</b><div class="desc">${what}</div>
+          <div class="reqs">${plan.reqs.map((r) => `<span class="${r.met ? 'met' : 'unmet'}">${r.met ? '✓' : '✗'} ${esc(r.label)}</span>`).join('')}</div>
+          <div class="costline">${costHtml(plan.cost, s.res)}</div>
+          <button class="primary" data-action="upgrade" ${blocker ? 'disabled' : ''}>⬆ ${b.type === 'townhall' ? 'Raise the manor' : 'Upgrade'}</button></div>`);
+      }
     }
     const warn = hasProblem(b) || /Waiting|rotted|untended/.test(b.status);
     const actions: string[] = [];
     if (b.build >= 1 && d.workers > 0) {
       actions.push(`<button data-action="pause-b">${b.paused ? '▶ Resume' : '❚❚ Pause'}</button>`);
     }
-    if (b.type === 'house' && b.level < 2) {
-      const err = canUpgrade(s, b);
-      actions.push(
-        `<button data-action="upgrade" ${err ? 'disabled' : ''} data-tip="${esc(`<b>Upgrade to a two-storey house</b><br>Houses 8 villagers and pays more taxes.<br>${err ? `<span class='neg'>${err}</span>` : ''}<div class='costline'>${costHtml(HOUSE_UPGRADE_COST, s.res)}</div>`)}">⬆ Upgrade</button>`,
-      );
-    }
     if (b.type !== 'townhall') actions.push(`<button data-action="demolish-b">✖ ${b.build < 1 ? 'Cancel' : 'Demolish'}</button>`);
     if (b.type === 'market' && b.build >= 1) actions.push('<button data-action="trade">⚖ Trade</button>');
     box.innerHTML = `
       <button class="close" data-action="deselect">✕</button>
-      <h2>${b.type === 'house' && b.level >= 2 ? 'Timber Townhouse' : d.name}</h2>
+      <h2>${esc(buildingName(b))}</h2>
       <div class="desc">${d.desc}</div>
       ${rows.join('')}
       <div class="status ${warn ? 'warn' : ''}">${esc(b.status || 'Idle')}</div>
@@ -675,7 +704,7 @@ export class Hud {
       }
       case 'upgrade': {
         const b = this.selectedBuilding();
-        if (b && upgradeHouse(s, b)) this.sound('place');
+        if (b && startUpgrade(s, b)) this.sound('place');
         this.update();
         break;
       }
@@ -1071,6 +1100,13 @@ export class Hud {
         break;
     }
   }
+}
+
+function upgradeName(b: Building): string {
+  const to = b.upgrading ?? b.level + 1;
+  if (b.type === 'house') return HOUSE_LEVELS[to]?.name ?? '';
+  if (b.type === 'townhall') return MANOR_LEVELS[to]?.name ?? '';
+  return `Expanded ${BUILDINGS[b.type].name}`;
 }
 
 // ------------------------------------------------------------------ charts

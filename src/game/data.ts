@@ -305,6 +305,19 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     cost: { wood: 30 },
     buildDays: 12,
   }),
+  tavern: def({
+    type: 'tavern',
+    name: 'Tavern',
+    desc: 'Ale and good company. Homes nearby are happier; Townhouses need one. Pours ale from a little grain each month.',
+    category: 'civic',
+    w: 3,
+    h: 3,
+    cost: { wood: 25, planks: 10, gold: 20 },
+    buildDays: 12,
+    workers: 1,
+    radius: 10,
+    tier: 1,
+  }),
   market: def({
     type: 'market',
     name: 'Marketplace',
@@ -393,6 +406,7 @@ export const BUILD_ORDER: BuildingType[] = [
   'storehouse',
   'granary',
   'market',
+  'tavern',
   'church',
   'garden',
   'maypole',
@@ -408,13 +422,11 @@ export const CATEGORY_NAMES: Record<Category, string> = {
   decor: 'Decor',
 };
 
-export const HOUSE_UPGRADE_COST: Cost = { planks: 10, stone: 5, tools: 2, gold: 20 };
-export const HOUSE_L2_HOUSING = 8;
 
 export const TIERS = [
   { name: 'Hamlet', pop: 0, desc: 'A handful of families clearing the land.' },
-  { name: 'Village', pop: 20, desc: 'Unlocks farms, bakeries, sawpits and markets.' },
-  { name: 'Town', pop: 45, desc: 'Unlocks mines, blacksmiths, churches and house upgrades.' },
+  { name: 'Village', pop: 20, desc: 'Unlocks farms, bakeries, sawpits, markets, taverns, Timber Houses and workshop expansions.' },
+  { name: 'Town', pop: 45, desc: 'Unlocks mines, blacksmiths, churches and Townhouses.' },
   { name: 'Borough', pop: 90, desc: 'Your lands prosper. A true seat of a lord!' },
 ];
 

@@ -8,8 +8,6 @@ import {
   STORAGE_CAPACITY,
   type StorageKind,
   TRAVEL_WEIGHT,
-  HOUSE_L2_HOUSING,
-  HOUSE_UPGRADE_COST,
   MAX_BEAUTY,
   MONTHS_PER_YEAR,
   SELL_FACTOR,
@@ -22,6 +20,17 @@ import {
 } from './data';
 import { advise } from './advisor';
 import { rollEvent } from './events';
+import {
+  HOUSE_LEVELS,
+  MANOR_STORAGE_PER_LEVEL,
+  finishUpgrade,
+  houseNeeds,
+  isProject,
+  upgradeCost,
+  upgradeDays,
+  upgradePlan,
+  workersOf,
+} from './levels';
 import { Heap } from './path';
 import { checkQuests } from './quests';
 import { StateRng } from './rng';
@@ -55,7 +64,11 @@ export function log(s: GameState, text: string, kind: MessageKind = 'info', at?:
 
 export function storageCap(s: GameState, kind: StorageKind): number {
   let n = 0;
-  for (const b of s.buildings) if (b.build >= 1) n += STORAGE_CAPACITY[b.type]?.[kind] ?? 0;
+  for (const b of s.buildings) {
+    if (b.build < 1) continue;
+    n += STORAGE_CAPACITY[b.type]?.[kind] ?? 0;
+    if (b.type === 'townhall') n += (b.level - 1) * MANOR_STORAGE_PER_LEVEL[kind];
+  }
   return n;
 }
 
@@ -166,7 +179,7 @@ export function placeOrder(s: GameState, type: BuildingType, x: number, y: numbe
 export function deliveredTo(b: Building): Cost {
   const d = BUILDINGS[b.type];
   const out: Cost = {};
-  const mats = materialsOf(d.cost);
+  const mats = materialsOf(b.upgrading ? upgradeCost(b) : d.cost);
   for (const k in mats) {
     const id = k as ResourceId;
     out[id] = (mats[id] ?? 0) - (b.need?.[id] ?? 0);
@@ -219,25 +232,6 @@ export function demolish(s: GameState, b: Building): boolean {
   return true;
 }
 
-export function canUpgrade(s: GameState, b: Building): string | null {
-  if (b.type !== 'house') return 'Only houses can be upgraded';
-  if (b.level >= 2) return 'Already upgraded';
-  if (b.build < 1) return 'Still under construction';
-  if (s.tier < 2) return `Requires ${TIERS[2].name}`;
-  if (!coveredBy(s, b, 'market')) return 'Needs a marketplace nearby';
-  if (!canAfford(s, HOUSE_UPGRADE_COST)) return 'Not enough resources';
-  return null;
-}
-
-export function upgradeHouse(s: GameState, b: Building): boolean {
-  if (canUpgrade(s, b)) return false;
-  pay(s, HOUSE_UPGRADE_COST);
-  b.level = 2;
-  s.dirty = true;
-  log(s, 'A family has upgraded their home.', 'info', b);
-  return true;
-}
-
 export function hasBuilt(s: GameState, type: BuildingType): boolean {
   return s.buildings.some((b) => b.type === type && b.build >= 1);
 }
@@ -259,6 +253,29 @@ export function trade(s: GameState, id: ResourceId, amount: number): string | nu
     s.res.gold += Math.floor(price * SELL_FACTOR * n);
   }
   return null;
+}
+
+/** Taverns brew their ale from grain: one sack per ten villagers served. */
+export function serveAle(s: GameState): void {
+  for (const t of s.buildings) {
+    if (t.type !== 'tavern' || t.build < 1 || t.workers === 0) continue;
+    const c = bCenter(t);
+    let served = 0;
+    for (const h of s.buildings) {
+      if (h.residents === 0) continue;
+      const hc = bCenter(h);
+      if (Math.hypot(hc.x - c.x, hc.y - c.y) <= BUILDINGS.tavern.radius) served += h.residents;
+    }
+    const grain = Math.ceil(served / 10);
+    if (s.res.grain >= grain) {
+      s.res.grain -= grain;
+      t.blocked = 0;
+      t.status = served ? `Pouring ale for ${served} villagers` : 'No homes nearby yet';
+    } else {
+      t.blocked = BLOCK_PROBLEM;
+      t.status = 'Out of ale: needs grain to brew';
+    }
+  }
 }
 
 /** Sets or clears an export rule: keep `keep` units, sell the surplus. */
@@ -357,12 +374,12 @@ export function resourceInRange(s: GameState, type: BuildingType, c: { x: number
   }
 }
 
-function coveredBy(s: GameState, b: Building, type: BuildingType): boolean {
+export function coveredBy(s: GameState, b: Building, type: BuildingType): boolean {
   const r = BUILDINGS[type].radius;
   const c = bCenter(b);
   for (const o of s.buildings) {
     if (o.type !== type || o.build < 1) continue;
-    if (BUILDINGS[type].workers > 0 && o.workers === 0) continue;
+    if (BUILDINGS[type].workers > 0 && (o.workers === 0 || o.blocked === BLOCK_PROBLEM)) continue;
     const oc = bCenter(o);
     if (Math.hypot(oc.x - c.x, oc.y - c.y) <= r) return true;
   }
@@ -531,7 +548,7 @@ export function hasProblem(b: Building): boolean {
 
 export function housingOf(b: Building): number {
   if (b.build < 1) return 0;
-  if (b.type === 'house') return b.level >= 2 ? HOUSE_L2_HOUSING : BUILDINGS.house.housing;
+  if (b.type === 'house') return HOUSE_LEVELS[b.level]?.housing ?? BUILDINGS.house.housing;
   return BUILDINGS[b.type].housing;
 }
 
@@ -556,7 +573,7 @@ const TYPE_PRIORITY: Partial<Record<BuildingType, number>> = {
 
 export function employed(s: GameState): number {
   let n = 0;
-  for (const b of s.buildings) n += b.workers;
+  for (const b of s.buildings) n += b.workers + (b.builders ?? 0);
   return n;
 }
 
@@ -582,26 +599,29 @@ export function recompute(s: GameState): void {
   // Buildings that could not work last time go to the back of the queue, so
   // villagers are not stuck at a forager with no berries while a hunter idles.
   const prio = (b: Building) =>
-    b.build < 1
-      ? SITE_PRIORITY + b.id * 1e-6
-      : CATEGORY_PRIORITY[BUILDINGS[b.type].category] + (TYPE_PRIORITY[b.type] ?? 0) + (isBlocked(b) ? 10 : 0);
-  const jobs = s.buildings
-    .filter((b) => b.build < 1 || BUILDINGS[b.type].workers > 0)
-    .sort((a, b) => prio(a) - prio(b) || a.id - b.id);
-  for (const b of s.buildings) b.workers = 0;
-  for (const b of jobs) {
+    CATEGORY_PRIORITY[BUILDINGS[b.type].category] + (TYPE_PRIORITY[b.type] ?? 0) + (isBlocked(b) ? 10 : 0);
+  type Job = { b: Building; site: boolean; p: number };
+  const jobs: Job[] = [];
+  for (const b of s.buildings) {
+    b.workers = 0;
+    b.builders = 0;
     if (b.paused) continue;
-    const slots = b.build < 1 ? SITE_BUILDERS : BUILDINGS[b.type].workers;
-    const n = Math.min(free, slots);
-    b.workers = n;
+    if (isProject(b)) jobs.push({ b, site: true, p: SITE_PRIORITY + b.id * 1e-6 });
+    if (b.build >= 1 && BUILDINGS[b.type].workers > 0) jobs.push({ b, site: false, p: prio(b) });
+  }
+  jobs.sort((a, c) => a.p - c.p || a.b.id - c.b.id);
+  for (const j of jobs) {
+    const n = Math.min(free, j.site ? SITE_BUILDERS : workersOf(j.b));
+    if (j.site) j.b.builders = n;
+    else j.b.workers = n;
     free -= n;
   }
   // Anyone left over lends a hand on construction sites.
-  for (const b of jobs) {
+  for (const j of jobs) {
     if (free <= 0) break;
-    if (b.build >= 1 || b.paused) continue;
-    const n = Math.min(free, MAX_BUILDERS - b.workers);
-    b.workers += n;
+    if (!j.site) continue;
+    const n = Math.min(free, MAX_BUILDERS - (j.b.builders ?? 0));
+    j.b.builders = (j.b.builders ?? 0) + n;
     free -= n;
   }
 }
@@ -879,7 +899,7 @@ export const MAX_BUILDERS = 4;
 
 /** Construction sites in the order builders attend to them. */
 export function constructionSites(s: GameState): Building[] {
-  return s.buildings.filter((b) => b.build < 1).sort((a, b) => a.id - b.id);
+  return s.buildings.filter(isProject).sort((a, b) => a.id - b.id);
 }
 
 export function needsMaterials(b: Building): boolean {
@@ -890,41 +910,56 @@ export function needsMaterials(b: Building): boolean {
 
 /**
  * Builders first carry the materials over from storage, a load per trip,
- * then raise the building.
+ * then raise the building (or carry out the renovation).
  */
 export function dailyConstruction(s: GameState): void {
   for (const b of constructionSites(s)) {
-    const n = b.workers;
+    const n = b.builders ?? 0;
     const d = BUILDINGS[b.type];
+    const renovating = b.build >= 1;
+    const setStatus = (text: string) => {
+      if (!renovating) b.status = text;
+    };
     if (needsMaterials(b)) {
       if (n === 0) {
-        b.status = b.paused ? 'Paused' : 'Waiting for builders';
+        setStatus(b.paused ? 'Paused' : 'Waiting for builders');
         continue;
       }
-      // Each builder brings one load per round trip.
-      b.work += (n * CARRY_LOAD) / ((b.trip ?? 0) + 0.5);
+      // Each builder brings one load per round trip. Renovations keep their
+      // own tally so they do not disturb production.
+      const carry = (n * CARRY_LOAD) / ((b.trip ?? 0) + 0.5);
+      let pool = (renovating ? (b.carry ?? 0) : b.work) + carry;
       let missing = '';
       for (const k in b.need) {
         const id = k as ResourceId;
         const want = b.need![id] ?? 0;
         if (want <= 0) continue;
-        const take = Math.min(Math.floor(b.work), want, Math.floor(s.res[id]));
+        const take = Math.min(Math.floor(pool), want, Math.floor(s.res[id]));
         if (take > 0) {
           s.res[id] -= take;
           b.need![id] = want - take;
-          b.work -= take;
+          pool -= take;
         }
         if ((b.need![id] ?? 0) > 0 && s.res[id] < 1) missing = RESOURCE_INFO_NAMES[id] ?? id;
       }
       // Loads cannot pile up beyond a trip's worth while waiting for goods.
-      b.work = Math.min(b.work, n * CARRY_LOAD);
-      b.status = missing ? `Waiting for ${missing} in storage` : `Carrying materials (${n} builder${n > 1 ? 's' : ''})`;
-      if (!needsMaterials(b)) b.work = 0;
+      pool = Math.min(pool, n * CARRY_LOAD);
+      if (!needsMaterials(b)) pool = 0;
+      if (renovating) b.carry = pool;
+      else b.work = pool;
+      setStatus(missing ? `Waiting for ${missing} in storage` : `Carrying materials (${n} builder${n > 1 ? 's' : ''})`);
       continue;
     }
-    // Everything is on site: raise the building.
     if (n === 0) {
-      b.status = b.paused ? 'Paused' : 'Waiting for builders';
+      setStatus(b.paused ? 'Paused' : 'Waiting for builders');
+      continue;
+    }
+    if (renovating) {
+      b.upProgress = Math.min(1, (b.upProgress ?? 0) + (n * 0.5) / upgradeDays(b));
+      if (b.upProgress >= 1) {
+        b.carry = 0;
+        finishUpgrade(s, b);
+      }
       continue;
     }
     b.build = Math.min(1, b.build + (n * 0.5) / d.buildDays);
@@ -1008,10 +1043,11 @@ export function monthly(s: GameState, rng: StateRng): void {
   let taxes = 0;
   for (const b of s.buildings) {
     if (b.residents === 0) continue;
-    taxes += b.residents * tax.perHead * (b.type === 'house' && b.level >= 2 ? 1.5 : 1);
+    taxes += b.residents * tax.perHead * (b.type === 'house' ? (HOUSE_LEVELS[b.level]?.tax ?? 1) : 1);
   }
   report.taxes = Math.floor(taxes);
   s.res.gold += report.taxes;
+  serveAle(s);
   report.trade = exportGoods(s);
 
   updateHappiness(s);
@@ -1097,10 +1133,20 @@ export function updateHappiness(s: GameState): void {
   let church = 0;
   let upgraded = 0;
   let beauty = 0;
+  let tavern = 0;
+  let unmet = 0;
   for (const b of s.buildings) {
     if (b.residents === 0) continue;
     residents += b.residents;
     beauty += beautyAt(s, b) * b.residents;
+    if (coveredBy(s, b, 'tavern')) tavern += b.residents;
+    if (b.type === 'house') {
+      // Finer homes expect more; unmet needs sour the mood inside.
+      b.unmet = houseNeeds(s, b, b.level)
+        .filter((n) => !n.met)
+        .map((n) => n.label);
+      if (b.level >= 2 && b.unmet.some((u) => u !== 'Enough food' && u !== 'Firewood in winter')) unmet += b.residents;
+    }
     if (coveredBy(s, b, 'well')) well += b.residents;
     if (coveredBy(s, b, 'market')) market += b.residents;
     if (coveredBy(s, b, 'church')) church += b.residents;
@@ -1111,7 +1157,9 @@ export function updateHappiness(s: GameState): void {
     if (well) factors.push({ label: 'Wells nearby', value: Math.round((8 * well) / residents) });
     if (market) factors.push({ label: 'Market nearby', value: Math.round((10 * market) / residents) });
     if (church) factors.push({ label: 'Church nearby', value: Math.round((15 * church) / residents) });
+    if (tavern) factors.push({ label: 'Tavern nearby', value: Math.round((8 * tavern) / residents) });
     if (upgraded) factors.push({ label: 'Fine houses', value: Math.round((6 * upgraded) / residents) });
+    if (unmet) factors.push({ label: 'Homes lacking what they need', value: -Math.round((14 * unmet) / residents) });
     if (beauty) factors.push({ label: 'Beautiful surroundings', value: Math.round(beauty / residents) });
   }
   for (const m of s.moods ?? []) if (m.until > s.day) factors.push({ label: m.label, value: m.value });
@@ -1154,25 +1202,19 @@ function migrate(s: GameState, rng: StateRng): void {
   recompute(s);
 }
 
+/** The settlement's rank follows the manor's level. */
 export function updateTier(s: GameState): void {
-  while (s.tier < TIERS.length - 1) {
-    const next = TIERS[s.tier + 1];
-    if (s.population < next.pop) break;
-    if (s.tier + 1 === 2 && !hasBuilt(s, 'market')) break;
-    if (s.tier + 1 === 3 && !hasBuilt(s, 'church')) break;
-    s.tier++;
-    log(s, `Your settlement is now a ${next.name}! ${next.desc}`, 'good');
-  }
+  const hall = s.buildings.find((b) => b.type === 'townhall');
+  if (hall) s.tier = Math.max(0, Math.min(TIERS.length - 1, hall.level - 1));
 }
 
-/** Requirements for reaching the next tier, for the UI. */
+/** Requirements for raising the manor (and so the settlement), for the UI. */
 export function nextTierRequirements(s: GameState): string[] {
-  if (s.tier >= TIERS.length - 1) return [];
-  const next = TIERS[s.tier + 1];
-  const req = [`${next.pop} villagers (${s.population})`];
-  if (s.tier + 1 === 2) req.push(`A marketplace${hasBuilt(s, 'market') ? ' ✓' : ''}`);
-  if (s.tier + 1 === 3) req.push(`A church${hasBuilt(s, 'church') ? ' ✓' : ''}`);
-  return req;
+  const hall = s.buildings.find((b) => b.type === 'townhall');
+  if (!hall || s.tier >= TIERS.length - 1) return [];
+  const plan = upgradePlan(s, hall);
+  if (!plan) return [];
+  return [...plan.reqs.map((r) => `${r.label}${r.met ? ' ✓' : ''}`), `then raise the manor`];
 }
 
 // ---------------------------------------------------------------- main step

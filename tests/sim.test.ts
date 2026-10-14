@@ -307,3 +307,42 @@ describe('exports', () => {
     expect(s.res.gold).toBeGreaterThan(gold);
   });
 });
+
+describe('levels', () => {
+  it('raising the manor promotes the settlement once requirements are met', async () => {
+    const { startUpgrade, upgradeBlocker } = await import('../src/game/levels');
+    const s = generateWorld(14);
+    const h = hall(s);
+    expect(upgradeBlocker(s, h)).toMatch(/villagers/);
+    s.population = 20;
+    for (let k = 0; k < 3; k++) placeNearRoad(s, 'house').build = 1;
+    s.res.wood = 100;
+    s.res.stone = 40;
+    s.dirty = true;
+    expect(startUpgrade(s, h)).toBe(true);
+    run(s, 60);
+    expect(h.level).toBe(2);
+    expect(s.tier).toBe(1);
+  });
+
+  it('a cottage needs a well and a market before becoming a Timber House', async () => {
+    const { upgradeBlocker, houseNeeds } = await import('../src/game/levels');
+    const s = generateWorld(15);
+    s.tier = 1;
+    hall(s).level = 2;
+    const house = placeNearRoad(s, 'house');
+    house.build = 1;
+    expect(upgradeBlocker(s, house)).toMatch(/well/);
+    expect(houseNeeds(s, house, 2).filter((n) => !n.met).length).toBeGreaterThan(0);
+  });
+
+  it('expanded workplaces take more workers', async () => {
+    const { workersOf } = await import('../src/game/levels');
+    const s = generateWorld(16);
+    const wc = placeNearRoad(s, 'woodcutter');
+    wc.build = 1;
+    expect(workersOf(wc)).toBe(2);
+    wc.level = 2;
+    expect(workersOf(wc)).toBe(3);
+  });
+});

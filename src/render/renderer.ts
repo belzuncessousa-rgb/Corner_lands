@@ -1,4 +1,5 @@
 import { BUILDINGS, RESOURCE_STORAGE, STORAGE_CAPACITY, type StorageKind } from '../game/data';
+import { upgradeBlocker } from '../game/levels';
 import { deliveredTo, hasProblem, monthOf, seasonOf, storageCap } from '../game/sim';
 import type { Building, BuildingType, GameState, ResourceId, Season } from '../game/types';
 import { idx, inBounds } from '../game/world';
@@ -674,6 +675,7 @@ export class Renderer {
     }
     this.blit(sp, wx, wy);
     if (STORAGE_CAPACITY[b.type]) this.drawStock(s, b, season);
+    if (b.upgrading) this.drawScaffold(b);
     if (selected) {
       c.save();
       c.globalCompositeOperation = 'lighter';
@@ -685,6 +687,8 @@ export class Renderer {
     if (!this.showMarkers) return;
     if (hasProblem(b)) {
       this.drawMarker(b, '#e0a030', '?');
+    } else if ((b.type === 'house' || b.type === 'townhall') && !b.upgrading && !upgradeBlocker(s, b)) {
+      this.drawMarker(b, b.type === 'townhall' ? '#c89a38' : '#4f8a3a', '↑');
     }
     void s;
   }
@@ -735,6 +739,26 @@ export class Renderer {
       }
       slot += per;
     }
+  }
+
+  /** Poles and planks around a building being renovated. */
+  private drawScaffold(b: Building): void {
+    const p = new Pen(this.ctx);
+    const h = b.type === 'townhall' ? 60 : 44;
+    const corners: [number, number][] = [
+      [b.x + 0.1, b.y + 0.1],
+      [b.x + b.w - 0.1, b.y + 0.1],
+      [b.x + b.w - 0.1, b.y + b.h - 0.1],
+      [b.x + 0.1, b.y + b.h - 0.1],
+    ];
+    for (const [x, y] of corners) p.line([x, y, 0], [x, y, h], '#7b5a36', 1.6);
+    for (const z of [h * 0.35, h * 0.7, h]) {
+      p.line([corners[3][0], corners[3][1], z], [corners[2][0], corners[2][1], z], '#8a6a44', 1.2);
+      p.line([corners[2][0], corners[2][1], z], [corners[1][0], corners[1][1], z], '#8a6a44', 1.2);
+    }
+    const got = deliveredTo(b);
+    if ((got.planks ?? 0) + (got.wood ?? 0) > 0) p.logPile(b.x + b.w + 0.05, b.y + b.h - 0.5, 2);
+    if ((got.stone ?? 0) > 0) p.stonePile(b.x + 0.2, b.y + b.h + 0.05, 3);
   }
 
   private drawMarker(b: Building, color: string, glyph: string): void {

@@ -542,46 +542,63 @@ const HOUSE_VARIANTS: { wall: string; tint: { color: string; t: number } | null;
 
 function drawBuilding(p: Pen, type: BuildingType, level: number, season: Season, variant = 0): V3[] {
   const smoke: V3[] = [];
+  // Expanded workshops get fired-clay roofs and a guild banner.
+  const expanded = level >= 2 && type !== 'house' && type !== 'townhall';
+  if (expanded) p.roofTint = { color: '#a4523a', t: 0.55 };
+  const out = drawBuildingBody(p, type, level, season, variant, smoke);
+  if (expanded) {
+    p.roofTint = null;
+    p.flag(0.12, 0.12, 0, 34, '#2e5e9a');
+  }
+  return out;
+}
+
+function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Season, variant: number, smoke: V3[]): V3[] {
   switch (type) {
     case 'townhall': {
-      p.shadow(0.3, 0.2, 2.7, 2.6);
-      // Courtyard paving.
-      p.poly(
-        [
-          [0.2, 0.15, 0],
-          [2.85, 0.15, 0],
-          [2.85, 2.85, 0],
-          [0.2, 2.85, 0],
-        ],
-        '#b9ad94',
-      );
-      // Stone tower at the back.
-      p.box(0.35, 0.2, 1.15, 0.95, 0, 54, STONE);
-      for (let i = 0; i < 4; i++) p.line([0.35, 0.95, 4 + i * 13], [1.15, 0.95, 4 + i * 13], shade(STONE, 0.8), 0.6);
-      p.windowL(0.95, 0.68, 36, 0.12, 8);
-      p.windowR(1.15, 0.5, 36, 0.12, 8);
-      p.roofPyramid(0.35, 0.2, 1.15, 0.95, 54, 26, 'slate');
-      p.flag(0.75, 0.575, 80, 20, '#a8322d');
-      // Main hall.
-      p.box(0.5, 0.75, 2.6, 2.25, 0, 6, STONE);
-      p.box(0.5, 0.75, 2.6, 2.25, 6, 24, PLASTER);
-      p.timber(0.5, 0.75, 2.6, 2.25, 6, 24, BEAM);
-      for (const x of [0.7, 1.05, 1.95, 2.3]) p.windowL(2.25, x, 16, 0.14, 8, season === 3);
-      p.windowR(2.6, 1.0, 16, 0.14, 8);
-      p.windowR(2.6, 1.7, 16, 0.14, 8);
-      p.wallL(2.252, 1.38, 1.72, 0, 16, '#5b3a22');
-      p.line([1.55, 2.253, 0], [1.55, 2.253, 16], '#3d2614', 0.8);
-      p.roofX(0.5, 0.75, 2.6, 2.25, 30, 28, 'slate', PLASTER, 0.12);
-      smoke.push(p.chimney(2.15, 1.65, 34, 18, '#8d8274'));
-      // Steps and barrels.
-      p.box(1.32, 2.25, 1.78, 2.5, 0, 3, '#9b9284');
+      drawManor(p, level, season, smoke);
       break;
     }
     case 'house': {
       const hv = HOUSE_VARIANTS[variant % HOUSE_VARIANTS.length];
       const WALL = hv.wall;
       p.roofTint = hv.tint;
-      if (level >= 2) {
+      if (level >= 3) {
+        // Townhouse: stone ground floor, two jettied timber storeys.
+        p.shadow(0.15, 0.2, 1.85, 1.7);
+        p.box(0.22, 0.28, 1.78, 1.62, 0, 12, STONE);
+        p.box(0.17, 0.23, 1.83, 1.67, 12, 13, WALL);
+        p.timber(0.17, 0.23, 1.83, 1.67, 12, 13, BEAM);
+        p.box(0.12, 0.18, 1.88, 1.72, 25, 12, WALL);
+        p.timber(0.12, 0.18, 1.88, 1.72, 25, 12, BEAM);
+        p.doorL(1.62, 0.85, 0.22, 11);
+        p.windowL(1.62, 0.38, 4, 0.16, 5, season === 3);
+        p.windowL(1.62, 1.4, 4, 0.16, 5);
+        for (const x of [0.35, 0.85, 1.4]) {
+          p.windowL(1.67, x, 15, 0.14, 6, season === 3 && x > 1);
+          p.windowL(1.72, x, 28, 0.14, 6);
+        }
+        p.windowR(1.83, 0.55, 15, 0.14, 6);
+        p.windowR(1.88, 0.95, 28, 0.14, 6);
+        // Flower boxes under the upper windows.
+        if (season !== 3) {
+          for (const x of [0.35, 0.85, 1.4]) {
+            p.box(x - 0.02, 1.72, x + 0.16, 1.78, 26, 2, '#7b5a36');
+            const [fx, fy] = iso(x + 0.07, 1.78, 29);
+            p.ctx.fillStyle = ['#e84a6a', '#f2d34a', '#b97ae0'][Math.floor(x * 3) % 3];
+            p.ctx.beginPath();
+            p.ctx.arc(fx, fy, 2.2, 0, Math.PI * 2);
+            p.ctx.fill();
+          }
+        }
+        p.roofTint = null;
+        p.roofX(0.12, 0.18, 1.88, 1.72, 37, 22, 'tile', WALL, 0.12);
+        smoke.push(p.chimney(0.5, 1.15, 46, 16, '#8f8476'));
+        smoke.push(p.chimney(1.45, 1.15, 46, 16, '#8f8476'));
+        // Hanging sign.
+        p.line([1.9, 1.75, 20], [2.0, 1.85, 20], '#3b2a1a', 1.2);
+        p.wallR(1.95, 1.72, 1.92, 12, 18, '#c49a52');
+      } else if (level >= 2) {
         p.shadow(0.2, 0.25, 1.8, 1.65);
         p.box(0.25, 0.3, 1.75, 1.6, 0, 12, STONE);
         p.box(0.2, 0.25, 1.8, 1.65, 12, 16, WALL);
@@ -976,6 +993,45 @@ function drawBuilding(p: Pen, type: BuildingType, level: number, season: Season,
       p.roofX(0.15, 0.3, 0.85, 0.7, 26, 9, 'shingle', WOOD, 0.06);
       break;
     }
+    case 'tavern': {
+      p.shadow(0.3, 0.3, 2.5, 1.9);
+      // Beer garden in front.
+      p.poly(
+        [
+          [0.2, 2.0, 0],
+          [2.8, 2.0, 0],
+          [2.8, 2.85, 0],
+          [0.2, 2.85, 0],
+        ],
+        season === 3 ? '#d4d8d6' : '#a89870',
+      );
+      p.box(0.35, 0.35, 2.4, 1.85, 0, 8, STONE);
+      p.box(0.3, 0.3, 2.45, 1.9, 8, 18, '#e8d4b0');
+      p.timber(0.3, 0.3, 2.45, 1.9, 8, 18, BEAM);
+      p.doorL(1.85, 1.15, 0.24, 13);
+      for (const x of [0.5, 0.8, 1.7, 2.05]) p.windowL(1.85, x, 4, 0.16, 6, true);
+      for (const x of [0.5, 0.9, 1.5, 1.95]) p.windowL(1.9, x, 14, 0.14, 6);
+      p.windowR(2.4, 0.7, 4, 0.16, 6, true);
+      p.windowR(2.45, 1.2, 14, 0.14, 6);
+      p.roofX(0.3, 0.3, 2.45, 1.9, 26, 22, 'thatch', '#e8d4b0', 0.14);
+      smoke.push(p.chimney(0.7, 1.25, 32, 16, '#8a7d70'));
+      // Hanging sign with a tankard.
+      p.line([2.45, 1.95, 22], [2.7, 2.1, 22], '#3b2a1a', 1.4);
+      p.wallR(2.6, 1.98, 2.24, 11, 20, '#7a4a28');
+      const [sx, sy] = iso(2.6, 2.11, 15.5);
+      p.ctx.fillStyle = '#e8c860';
+      p.ctx.fillRect(sx - 2, sy - 3, 4, 5);
+      // Benches, tables and barrels.
+      for (const x of [0.55, 1.55]) {
+        p.box(x, 2.25, x + 0.6, 2.45, 6, 2, '#8a6236');
+        p.line([x + 0.05, 2.35, 0], [x + 0.05, 2.35, 6], '#5e4129', 1.2);
+        p.line([x + 0.55, 2.35, 0], [x + 0.55, 2.35, 6], '#5e4129', 1.2);
+        p.box(x, 2.55, x + 0.6, 2.62, 3, 1.5, '#7b5a36');
+      }
+      p.barrel(2.55, 2.3);
+      p.barrel(2.65, 2.55);
+      break;
+    }
     case 'storehouse': {
       // Barn at the back, open stacking yard in front (piles drawn live).
       p.poly(
@@ -1322,6 +1378,73 @@ function drawHouseProp(p: Pen, prop: 'logs' | 'hive' | 'cart' | 'well', season: 
       p.barrel(1.8, 0.7);
       p.barrel(1.85, 0.9);
       break;
+  }
+}
+
+/** The manor grows with the settlement: hall, manor house, stone manor, keep. */
+function drawManor(p: Pen, level: number, season: Season, smoke: V3[]): void {
+  p.shadow(0.3, 0.2, 2.7, 2.6);
+  p.poly(
+    [
+      [0.2, 0.15, 0],
+      [2.85, 0.15, 0],
+      [2.85, 2.85, 0],
+      [0.2, 2.85, 0],
+    ],
+    level >= 3 ? '#b4ad9e' : '#b9ad94',
+  );
+  const towerH = level >= 4 ? 78 : level >= 3 ? 64 : 54;
+  const towerStone = level >= 4 ? '#9d978c' : STONE;
+  // Tower at the back.
+  p.box(0.3, 0.15, 1.2, 1.0, 0, towerH, towerStone);
+  for (let z = 6; z < towerH; z += 9) p.line([0.3, 1.0, z], [1.2, 1.0, z], shade(towerStone, 0.8), 0.6);
+  p.windowL(1.0, 0.68, towerH - 18, 0.12, 8, season === 3);
+  p.windowR(1.2, 0.5, towerH - 18, 0.12, 8);
+  if (level >= 4) {
+    // Crenellations instead of a roof.
+    for (let i = 0; i < 4; i++) {
+      p.box(0.3 + i * 0.25, 0.92, 0.42 + i * 0.25, 1.0, towerH, 7, towerStone);
+      p.box(1.12, 0.15 + i * 0.25, 1.2, 0.27 + i * 0.25, towerH, 7, towerStone);
+    }
+    p.flag(0.75, 0.575, towerH, 26, '#a8322d');
+  } else {
+    p.roofPyramid(0.3, 0.15, 1.2, 1.0, towerH, 26, 'slate');
+    p.flag(0.75, 0.575, towerH + 26, 20, '#a8322d');
+  }
+  if (level >= 2) {
+    // East wing.
+    p.box(1.95, 0.3, 2.75, 0.95, 0, level >= 3 ? 10 : 5, STONE);
+    p.box(1.95, 0.3, 2.75, 0.95, level >= 3 ? 10 : 5, 18, PLASTER);
+    p.timber(1.95, 0.3, 2.75, 0.95, level >= 3 ? 10 : 5, 18, BEAM);
+    p.windowR(2.75, 0.5, 12, 0.14, 7, season === 3);
+    p.roofY(1.95, 0.3, 2.75, 0.95, level >= 3 ? 28 : 23, 18, level >= 3 ? 'slate' : 'shingle', PLASTER, 0.08);
+  }
+  // Main hall.
+  const base = level >= 3 ? 14 : 6;
+  const wallH = level >= 3 ? 20 : 24;
+  p.box(0.5, 0.75, 2.6, 2.25, 0, base, STONE);
+  p.box(0.5, 0.75, 2.6, 2.25, base, wallH, level >= 4 ? '#c8c0b0' : PLASTER);
+  if (level < 4) p.timber(0.5, 0.75, 2.6, 2.25, base, wallH, BEAM);
+  for (const x of [0.7, 1.05, 1.95, 2.3]) p.windowL(2.25, x, base + 6, 0.14, 8, season === 3);
+  if (level >= 3) for (const x of [0.7, 1.05, 1.95, 2.3]) p.windowL(2.25, x, 3, 0.12, 6);
+  p.windowR(2.6, 1.0, base + 6, 0.14, 8);
+  p.windowR(2.6, 1.7, base + 6, 0.14, 8);
+  p.wallL(2.252, 1.38, 1.72, 0, 16, '#5b3a22');
+  p.line([1.55, 2.253, 0], [1.55, 2.253, 16], '#3d2614', 0.8);
+  const roofZ = base + wallH;
+  p.roofX(0.5, 0.75, 2.6, 2.25, roofZ, 28, 'slate', PLASTER, 0.12);
+  smoke.push(p.chimney(2.15, 1.65, roofZ + 4, 18, '#8d8274'));
+  if (level >= 3) smoke.push(p.chimney(0.8, 1.65, roofZ + 4, 18, '#8d8274'));
+  p.box(1.32, 2.25, 1.78, 2.5, 0, 3, '#9b9284');
+  if (level >= 2) {
+    // Banners either side of the door.
+    p.wallL(2.255, 1.18, 1.3, 8, 22, '#a8322d');
+    p.wallL(2.255, 1.8, 1.92, 8, 22, '#a8322d');
+  }
+  if (level >= 4) {
+    // A curtain wall stub with a gate tower at the front corner.
+    p.box(2.55, 2.45, 2.9, 2.85, 0, 34, '#9d978c');
+    for (let i = 0; i < 2; i++) p.box(2.55 + i * 0.2, 2.77, 2.67 + i * 0.2, 2.85, 34, 6, '#9d978c');
   }
 }
 

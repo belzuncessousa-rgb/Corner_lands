@@ -4,11 +4,11 @@
  */
 import { BUILDINGS, DAYS_PER_MONTH } from './data';
 import { autoResolve } from './events';
+import { startUpgrade, upgradeBlocker, upgradePlan } from './levels';
 import { StateRng } from './rng';
 import {
   buildRoad,
   canAfford,
-  canUpgrade,
   centerOf,
   reachableRoads,
   monthOf,
@@ -21,8 +21,8 @@ import {
   stored,
   totalFood,
   totalHousing,
-  upgradeHouse,
   hasBuilt,
+  roomFor,
   trade,
 } from './sim';
 import type { BuildingType, Cost, GameState, ResourceId } from './types';
@@ -33,12 +33,7 @@ const count = (s: GameState, t: BuildingType) => s.buildings.filter((b) => b.typ
 function tryPlace(s: GameState, type: BuildingType): boolean {
   const d = BUILDINGS[type];
   // Count materials already promised to unfinished sites.
-  const promised: Cost = { ...d.cost };
-  for (const o of s.buildings) {
-    if (!o.need) continue;
-    for (const k in o.need) promised[k as ResourceId] = (promised[k as ResourceId] ?? 0) + (o.need[k as ResourceId] ?? 0);
-  }
-  if (!canAfford(s, promised)) return false;
+  if (!affordsWithPromises(s, d.cost)) return false;
   const reached = reachableRoads(s);
   let best: { x: number; y: number; score: number } | null = null;
   const hall = s.buildings.find((b) => b.type === 'townhall')!;
@@ -213,11 +208,56 @@ function shop(s: GameState): void {
   if (s.res.stone < 30) buy('stone', 20, 120);
 }
 
+/** Materials still owed to every unfinished site and renovation. */
+function promisedMaterials(s: GameState): Cost {
+  const out: Cost = {};
+  for (const o of s.buildings) {
+    if (!o.need) continue;
+    for (const k in o.need) out[k as ResourceId] = (out[k as ResourceId] ?? 0) + (o.need[k as ResourceId] ?? 0);
+  }
+  return out;
+}
+
+function affordsWithPromises(s: GameState, cost: Cost): boolean {
+  const all: Cost = { ...cost };
+  const p = promisedMaterials(s);
+  for (const k in p) all[k as ResourceId] = (all[k as ResourceId] ?? 0) + (p[k as ResourceId] ?? 0);
+  return canAfford(s, all);
+}
+
+/** Raises the manor when possible, and a couple of homes at a time. */
+function renovate(s: GameState): void {
+  const hall = s.buildings.find((b) => b.type === 'townhall');
+  const plan = hall ? upgradePlan(s, hall) : null;
+  if (hall && plan && !hall.upgrading && plan.reqs.every((r) => r.met)) {
+    if (!upgradeBlocker(s, hall) && affordsWithPromises(s, plan.cost)) {
+      startUpgrade(s, hall);
+    } else {
+      // Save up for the manor: buy what is missing, and hold off on homes.
+      for (const k in plan.cost) {
+        const id = k as ResourceId;
+        if (id === 'gold') continue;
+        const short = (plan.cost[id] ?? 0) - s.res[id];
+        if (short > 0 && hasBuilt(s, 'market') && s.res.gold > (plan.cost.gold ?? 0) + 60) trade(s, id, Math.min(short, roomFor(s, id)));
+      }
+      return;
+    }
+  }
+  let busy = s.buildings.filter((b) => b.upgrading).length;
+  for (const b of s.buildings) {
+    if (busy >= 2) break;
+    if (b.type !== 'house' || upgradeBlocker(s, b)) continue;
+    if (!affordsWithPromises(s, upgradePlan(s, b)!.cost)) continue;
+    if (startUpgrade(s, b)) busy++;
+  }
+}
+
 function act(s: GameState, rand: () => number): void {
   if (s.pendingEvent) autoResolve(s, new StateRng(s));
   shop(s);
   const pop = s.population;
   const food = totalFood(s);
+  renovate(s);
   const sites = s.buildings.filter((b) => b.build < 1).length;
   if (sites >= 3) return;
   const idle = pop - s.buildings.reduce((a, b) => a + b.workers, 0);
@@ -256,8 +296,8 @@ function act(s: GameState, rand: () => number): void {
     }
     if (count(s, 'smithy') < 1) wants.push('smithy');
     if (count(s, 'church') < 1) wants.push('church');
-    for (const b of s.buildings) if (b.type === 'house' && !canUpgrade(s, b)) upgradeHouse(s, b);
   }
+  if (s.tier >= 1 && count(s, 'tavern') < 1 + Math.floor(pop / 70)) wants.push('tavern');
   for (const t of wants) {
     if (BUILDINGS[t].tier > s.tier) continue;
     if (tryPlace(s, t)) return;

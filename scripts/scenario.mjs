@@ -33,7 +33,7 @@ const result = await page.evaluate(() => {
       ]) {
         if (!cl.placementError(s, type, x, y)) {
           const b = cl.placeOrder(s, type, x, y);
-          if (b && b.connected) { placed.push(type); done = true; break; }
+          if (b) { placed.push(type); done = true; break; }
         }
       }
     }

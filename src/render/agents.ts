@@ -88,8 +88,8 @@ export class AgentSystem {
   private desiredRoles(s: GameState): Role[] {
     const roles: Role[] = [];
     for (const b of s.buildings) {
-      const kind = b.build < 1 ? 'build' : 'work';
-      for (let k = 0; k < b.workers; k++) roles.push({ kind, id: b.id });
+      for (let k = 0; k < (b.builders ?? 0); k++) roles.push({ kind: 'build', id: b.id });
+      if (b.build >= 1) for (let k = 0; k < b.workers; k++) roles.push({ kind: 'work', id: b.id });
     }
     const idle = s.population - roles.length;
     for (let k = 0; k < idle; k++) roles.push({ kind: 'idle' });
@@ -356,7 +356,7 @@ export class AgentSystem {
       return;
     }
     if (r.kind === 'build') {
-      if (b.build >= 1) {
+      if (b.build >= 1 && !b.upgrading) {
         a.role = { kind: 'idle' };
         this.decideIdle(s, a);
         return;

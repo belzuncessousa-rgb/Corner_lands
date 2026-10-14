@@ -49,6 +49,12 @@ export function deserialize(json: string): GameState {
   }
   s.res = { ...emptyResources(), ...s.res };
   s.history ??= [];
+  // Older saves ranked the settlement by population; carry that over to the manor.
+  const hall = s.buildings.find((b) => b.type === 'townhall');
+  if (hall) hall.level = Math.max(hall.level, s.tier + 1);
+  for (const b of s.buildings) {
+    if (b.type === 'house' && b.level >= 2) b.level = Math.min(b.level, 3);
+  }
   s.dirty = true;
   return s;
 }

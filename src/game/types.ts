@@ -38,6 +38,7 @@ export type BuildingType =
   | 'church'
   | 'storehouse'
   | 'granary'
+  | 'tavern'
   | 'garden'
   | 'maypole'
   | 'statue';
@@ -64,6 +65,16 @@ export interface Building {
   growth: number;
   paused: boolean;
   status: string;
+  /** Builders working on this site or renovation. */
+  builders?: number;
+  /** Level a renovation is raising the building to. */
+  upgrading?: number;
+  /** Materials being carried for a renovation (fractional loads). */
+  carry?: number;
+  /** Renovation progress 0..1 once materials are delivered. */
+  upProgress?: number;
+  /** House needs that are not met (for the inspector). */
+  unmet?: string[];
   /** Construction materials still to be carried to the site. */
   need?: Cost;
   /** Days a round trip to the nearest storage takes, refreshed by recompute. */

@@ -70,7 +70,7 @@ export const QUESTS: Quest[] = [
   {
     id: 'village',
     title: 'Become a Village',
-    hint: 'Reach 20 villagers.',
+    hint: 'Reach 20 villagers, then select the Manor Hall and raise it to a Manor House.',
     reward: { gold: 60 },
     done: (s) => s.tier >= 1,
   },
@@ -103,9 +103,16 @@ export const QUESTS: Quest[] = [
     done: (s) => count(s, 'market') >= 1,
   },
   {
+    id: 'tavern',
+    title: 'Open a tavern',
+    hint: 'Ale and company cheer nearby homes. Taverns brew from a little grain.',
+    reward: { gold: 40 },
+    done: (s) => count(s, 'tavern') >= 1,
+  },
+  {
     id: 'town',
     title: 'Become a Town',
-    hint: 'Reach 45 villagers with a marketplace.',
+    hint: 'With 45 villagers and a marketplace, raise the manor to a Stone Manor.',
     reward: { gold: 100 },
     done: (s) => s.tier >= 2,
   },
@@ -118,8 +125,8 @@ export const QUESTS: Quest[] = [
   },
   {
     id: 'upgrade',
-    title: 'Upgrade 3 houses',
-    hint: 'Select a house near a market and upgrade it.',
+    title: 'Upgrade 3 homes',
+    hint: 'Cottages near a well and a market, fed two kinds of food, can become Timber Houses.',
     reward: { gold: 80 },
     done: (s) => s.buildings.filter((b) => b.type === 'house' && b.level >= 2).length >= 3,
   },
@@ -133,7 +140,7 @@ export const QUESTS: Quest[] = [
   {
     id: 'borough',
     title: 'Become a Borough',
-    hint: 'Reach 90 villagers with a church.',
+    hint: "With 90 villagers and a church, raise the manor to a Lord's Keep.",
     reward: { gold: 200 },
     done: (s) => s.tier >= 3,
   },

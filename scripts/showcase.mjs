@@ -24,7 +24,7 @@ const placed = await page.evaluate(() => {
   const ry = hall.y + 3;
   for (let x = hall.x - 16; x <= hall.x + 16; x++) cl.buildRoad(s, x, ry);
   for (let y = ry - 12; y <= ry + 12; y++) { cl.buildRoad(s, hall.x + 5, y); cl.buildRoad(s, hall.x - 6, y); }
-  const want = ['farm', 'market', 'church', 'storehouse', 'house', 'house', 'house', 'bakery', 'sawmill', 'smithy', 'mine', 'quarry', 'woodcutter', 'forester', 'forager', 'hunter', 'fisher', 'well', 'garden', 'maypole', 'statue', 'garden', 'house', 'house', 'house', 'house'];
+  const want = ['farm', 'market', 'church', 'storehouse', 'house', 'house', 'house', 'bakery', 'sawmill', 'smithy', 'mine', 'quarry', 'woodcutter', 'forester', 'forager', 'hunter', 'fisher', 'well', 'garden', 'maypole', 'statue', 'garden', 'tavern', 'granary', 'house', 'house', 'house', 'house'];
   const placed = [];
   for (const type of want) {
     let done = false;
@@ -37,7 +37,7 @@ const placed = await page.evaluate(() => {
       ]) {
         if (!cl.placementError(s, type, x, y)) {
           const b = cl.placeOrder(s, type, x, y);
-          if (b && b.connected) { placed.push(type); done = true; break; }
+          if (b) { placed.push(type); done = true; break; }
           if (b) { s.buildings = s.buildings.filter((o) => o !== b); for (let yy = b.y; yy < b.y + b.h; yy++) for (let xx = b.x; xx < b.x + b.w; xx++) s.occ[yy * s.width + xx] = -1; }
         }
       }
@@ -45,7 +45,13 @@ const placed = await page.evaluate(() => {
   }
   // Finish construction except two sites.
   s.buildings.forEach((b, i) => { if (i < s.buildings.length - 2) b.build = 1; });
-  s.buildings.filter((b) => b.type === 'house').slice(0, 3).forEach((b) => (b.level = 2));
+  s.buildings.forEach((b) => { if (b.build >= 1) b.need = undefined; });
+  const houses = s.buildings.filter((b) => b.type === 'house');
+  houses.slice(0, 3).forEach((b) => (b.level = 2));
+  houses.slice(3, 6).forEach((b) => (b.level = 3));
+  if (houses[6]) { houses[6].upgrading = 2; houses[6].need = { planks: 4 }; }
+  hall.level = 4;
+  s.buildings.filter((b) => ['woodcutter', 'quarry', 'bakery'].includes(b.type)).forEach((b) => (b.level = 2));
   s.dirty = true;
   cl.recompute(s);
   return placed;
