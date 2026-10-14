@@ -31,41 +31,52 @@ then fall back to the browser's localStorage.
 | --- | --- |
 | Pan | Left-drag, right-drag, `WASD` / arrow keys, or the minimap |
 | Zoom | Mouse wheel, pinch, `+` / `-` |
-| Build | Pick a card in the bottom bar (`H` house, `E` woodcutter, `Q` quarry, `G` forager) |
-| Roads | `R`, then click and drag |
+| Build | Pick a category at the bottom, then a building (`H` house, `E` woodcutter, `Q` quarry, `G` forager) |
+| Roads | `R`, click where the road starts, click where it ends; keep clicking to continue |
 | Demolish | `X`, then click a building or drag across roads |
 | Cancel / deselect | Right-click or `Esc` |
 | Pause / speed | `Space`, `1` `2` `3` |
 
 ### How the settlement works
 
-- **Roads** — every building must be connected to the Manor Hall by road to be
-  built or staffed. Roads over water become bridges (4 timber per tile).
+- **Pace** — a day lasts four seconds at normal speed, a year about eight
+  minutes. Villagers stroll; they walk faster on roads.
+- **Building** — place a plan and builders carry the materials from storage,
+  one load per trip, then raise the walls. Plans can wait for materials.
+  Construction is a job: each site takes two builders before other work, and
+  idle villagers lend a hand.
+- **Roads** — optional. They speed up walking, which makes everything nearby
+  work faster. Roads over water become bridges (4 timber per tile).
+- **Storage** — goods live in the Manor Hall, Storehouses (materials) and
+  Granaries (food); their yards visibly fill up. Workplaces close to storage and
+  to their resources work faster (the inspector shows their efficiency).
 - **Villagers** — settlers arrive when happiness is at least 50%, nobody went
-  hungry and there is free housing. Unhappy or hungry villagers leave.
-- **Jobs** — villagers fill jobs automatically (food first). Idle villagers help
-  on construction sites. Pause buildings to free up workers.
-- **Food** — each villager eats one food per month. Berries, meat, fish and
-  bread all count; variety raises happiness.
-- **Seasons** — farms are sown in spring and harvested in autumn; foragers rest
-  in winter and every household burns one timber per winter month.
-- **Happiness** — food variety, wells, markets, churches, decorations, fine
-  houses and low taxes all help.
-- **Growth tiers** — Hamlet → Village (20 villagers) → Town (45 + market) →
-  Borough (90 + church). Each tier unlocks new buildings.
-- **Events** — merchants, wandering families, good weather, wolves, rats and
-  the king's tax collector keep things lively.
-- **Steward & ledger** — timely warnings about food, firewood and housing, plus
-  monthly charts of population, food, happiness and gold.
-- **Nature** — forests slowly regrow, deer graze at the woods' edge and birds
-  pass overhead; wind and birdsong change with the seasons.
+  hungry and there is free housing.
+- **Food & seasons** — each villager eats one food per month; variety raises
+  happiness. Farms are sown in spring and harvested in autumn; foragers rest in
+  winter and every household burns one timber per winter month.
+- **Homes grow** — Cottage → Timber House (well, market, two kinds of food) →
+  Townhouse (church, tavern, three kinds of food). Unmet needs sour the mood.
+- **The manor** — raise the Manor Hall to a Manor House, Stone Manor and
+  Lord's Keep to become a Village, Town and Borough. Each rank unlocks
+  buildings and adds storage.
+- **Workshops** — can be expanded once for half as many workers again.
+- **Trade** — at the marketplace buy and sell goods, or set exports: a
+  merchant's cart visits each month and buys your surplus.
+- **Events** — every year or two something happens (wanderers, a merchant,
+  wolves, a harvest feast, the king's tax collector...) and you choose what to
+  do.
+- **Steward, chronicle & ledger** — timely advice, the full story of your lands
+  and monthly charts.
+- **Relaxed mode** — double starting supplies and nobody ever leaves in anger.
 
 ## Project layout
 
 ```
 src/game/      Simulation (pure TypeScript, no DOM): world generation,
-               economy, quests, events, advisor, pathfinding, save format,
-               and an autoplayer that grows the title-screen village
+               economy, building levels, quests, events, advisor,
+               pathfinding, save format, and an autoplayer that grows the
+               title-screen village
 src/render/    Canvas renderer, procedural sprites, villager agents
 src/ui/        HUD, minimap, icons and styles
 src/main.ts    Game loop and input handling

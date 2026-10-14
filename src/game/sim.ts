@@ -896,6 +896,8 @@ export function dailyProduction(s: GameState, rng: StateRng): void {
 
 /** Most builders that work one site at once. */
 export const MAX_BUILDERS = 4;
+/** Share of a building-day of work one builder does per day. */
+export const LABOUR_PER_BUILDER = 0.4;
 
 /** Construction sites in the order builders attend to them. */
 export function constructionSites(s: GameState): Building[] {
@@ -955,14 +957,14 @@ export function dailyConstruction(s: GameState): void {
       continue;
     }
     if (renovating) {
-      b.upProgress = Math.min(1, (b.upProgress ?? 0) + (n * 0.5) / upgradeDays(b));
+      b.upProgress = Math.min(1, (b.upProgress ?? 0) + (n * LABOUR_PER_BUILDER) / upgradeDays(b));
       if (b.upProgress >= 1) {
         b.carry = 0;
         finishUpgrade(s, b);
       }
       continue;
     }
-    b.build = Math.min(1, b.build + (n * 0.5) / d.buildDays);
+    b.build = Math.min(1, b.build + (n * LABOUR_PER_BUILDER) / d.buildDays);
     b.status = `Raising the walls (${n} builder${n > 1 ? 's' : ''})`;
     if (b.build >= 1) {
       b.status = 'Completed';
