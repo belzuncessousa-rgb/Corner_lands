@@ -983,7 +983,8 @@ export function monthly(s: GameState, rng: StateRng): void {
 
   updateHappiness(s);
   migrate(s, rng);
-  if (rollEvent(s, rng, month)) recompute(s);
+  s.moods = (s.moods ?? []).filter((m) => m.until > s.day);
+  rollEvent(s, rng, month);
 
   if (month <= 5) regrowForests(s, rng);
 
@@ -1080,6 +1081,7 @@ export function updateHappiness(s: GameState): void {
     if (upgraded) factors.push({ label: 'Fine houses', value: Math.round((6 * upgraded) / residents) });
     if (beauty) factors.push({ label: 'Beautiful surroundings', value: Math.round(beauty / residents) });
   }
+  for (const m of s.moods ?? []) if (m.until > s.day) factors.push({ label: m.label, value: m.value });
   if (homeless > 0 && s.population > 0) {
     factors.push({ label: 'Homelessness', value: -Math.round(5 + (20 * homeless) / s.population) });
   }

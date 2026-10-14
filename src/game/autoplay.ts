@@ -3,6 +3,8 @@
  * tune balance; the title screen uses it to grow a demo village.
  */
 import { BUILDINGS, DAYS_PER_MONTH } from './data';
+import { autoResolve } from './events';
+import { StateRng } from './rng';
 import {
   buildRoad,
   canAfford,
@@ -212,6 +214,7 @@ function shop(s: GameState): void {
 }
 
 function act(s: GameState, rand: () => number): void {
+  if (s.pendingEvent) autoResolve(s, new StateRng(s));
   shop(s);
   const pop = s.population;
   const food = totalFood(s);

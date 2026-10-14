@@ -270,3 +270,21 @@ describe('job queue', () => {
     expect(farm.workers).toBe(3);
   });
 });
+
+describe('decision events', () => {
+  it('a rare event pauses for a choice and applies it', async () => {
+    const { resolveEvent, EVENTS } = await import('../src/game/events');
+    const { StateRng } = await import('../src/game/rng');
+    const s = generateWorld(12);
+    s.res.gold = 500;
+    let day = 0;
+    while (!s.pendingEvent && day++ < DAYS_PER_YEAR * 3) stepDay(s);
+    expect(s.pendingEvent).toBeDefined();
+    const e = EVENTS.find((x) => x.id === s.pendingEvent)!;
+    const ok = e.choices(s).findIndex((c) => !c.blocked?.(s));
+    expect(resolveEvent(s, new StateRng(s), ok)).toBe(true);
+    expect(s.pendingEvent).toBeUndefined();
+    // The next one is at least a year away.
+    expect(s.nextEventDay! - s.day).toBeGreaterThan(DAYS_PER_YEAR);
+  });
+});

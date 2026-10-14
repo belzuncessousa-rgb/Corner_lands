@@ -149,6 +149,12 @@ export interface GameState {
   relaxed?: boolean;
   /** Day each piece of advisor advice was last given. */
   advice?: Record<string, number>;
+  /** Decision event waiting for the player's choice. */
+  pendingEvent?: string;
+  /** Earliest day the next decision event may happen. */
+  nextEventDay?: number;
+  /** Temporary happiness effects from events. */
+  moods?: { label: string; value: number; until: number }[];
   /** Monthly snapshots, oldest first. */
   history: HistoryPoint[];
   /** Set when buildings/roads change; cleared after recompute. */

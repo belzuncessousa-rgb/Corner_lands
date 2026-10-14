@@ -12,7 +12,9 @@ import {
   TIERS,
   TRADE_PRICES,
 } from '../game/data';
+import { getEvent, resolveEvent } from '../game/events';
 import { activeQuests } from '../game/quests';
+import { StateRng } from '../game/rng';
 import {
   canAfford,
   canUpgrade,
@@ -24,6 +26,7 @@ import {
   log,
   monthOf,
   nextTierRequirements,
+  recompute,
   seasonOf,
   setTax,
   hasProblem,
@@ -272,6 +275,7 @@ export class Hud {
     if (bar) bar.style.width = `${progress}%`;
 
     if (this.lastTier >= 0 && s.tier > this.lastTier && !g.demo) this.celebrate(s.tier);
+    if (s.pendingEvent && !g.demo && !this.modal) this.showEvent();
     this.lastTier = s.tier;
     this.updateObjectives();
     this.updateTown();
@@ -466,6 +470,40 @@ export class Hud {
     el.classList.remove('show');
     void el.offsetWidth;
     el.classList.add('show');
+  }
+
+  /** A decision event: the game waits until the lord chooses. */
+  private showEvent(): void {
+    const s = this.game.state;
+    const e = s.pendingEvent ? getEvent(s.pendingEvent) : undefined;
+    if (!e) return;
+    const text = e.text(s);
+    const choices = e.choices(s)
+      .map((c, i) => {
+        const why = c.blocked?.(s);
+        return `<button class="choice" data-i="${i}" ${why ? 'disabled' : ''}>
+          <b>${esc(c.label)}</b><small>${esc(c.detail)}${why ? ` <span class="neg">— ${esc(why)}</span>` : ''}</small></button>`;
+      })
+      .join('');
+    const m = this.openModal(
+      `<div class="event">
+        <div class="ornament">❦ ❦ ❦</div>
+        <h2>${esc(e.title)}</h2>
+        <p class="tale"><span class="initial">${esc(text[0])}</span>${esc(text.slice(1))}</p>
+        <div class="choices">${choices}</div>
+      </div>`,
+      false,
+    );
+    this.sound('good');
+    m.querySelectorAll<HTMLButtonElement>('.choice').forEach((btn) =>
+      btn.addEventListener('click', () => {
+        if (resolveEvent(s, new StateRng(s), Number(btn.dataset.i))) {
+          recompute(s);
+          this.closeModal(true);
+          this.update();
+        }
+      }),
+    );
   }
 
   private showChronicle(): void {

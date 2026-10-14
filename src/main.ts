@@ -2,6 +2,8 @@ import './ui/styles.css';
 import { listSaves, loadGame, saveGame } from './api';
 import { BUILDINGS, BUILD_ORDER, DAY_SECONDS, MONTH_NAMES, TIERS } from './game/data';
 import { playBot } from './game/autoplay';
+import { autoResolve } from './game/events';
+import { StateRng } from './game/rng';
 import { deserialize, serialize } from './game/save';
 import {
   BRIDGE_COST,
@@ -155,7 +157,10 @@ export class Game {
     const dt = Math.min(0.1, (t - this.lastTime) / 1000);
     this.lastTime = t;
     const running = (!this.modalOpen || this.demo) && this.speed > 0;
-    if (this.demo) this.driftCamera(dt);
+    if (this.demo) {
+      this.driftCamera(dt);
+      if (this.state.pendingEvent) autoResolve(this.state, new StateRng(this.state));
+    }
     const gameDt = running ? dt * this.speed : 0;
     this.panByKeys(dt);
     if (running) {
