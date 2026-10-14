@@ -46,7 +46,7 @@ export const GOODS: Record<ResourceId, GoodDef> = {
   wood: good('Timber', 'materials', 2, 'Felled logs for building, sawing and burning.'),
   firewood: good('Firewood', 'materials', 2, 'Split logs. Homes burn one bundle a winter month instead of two logs of timber.', { keep: 100 }),
   planks: good('Planks', 'materials', 5, 'Sawn boards for finer buildings.', { keep: 100 }),
-  woodparts: good('Wood Parts', 'materials', 9, 'Gears, axles and frames for mills and machines.', { keep: 40 }),
+  woodparts: good('Wood Parts', 'materials', 9, 'Gears, axles and frames for mills and machines.', { keep: 20 }),
   stone: good('Stone', 'materials', 3, 'Quarried stone for sturdier buildings.'),
   dressedstone: good('Dressed Stone', 'materials', 8, 'Squared blocks for manors, churches and keeps.', { keep: 80 }),
   clay: good('Clay', 'materials', 1, 'Dug from riverbanks, fired into tiles.'),

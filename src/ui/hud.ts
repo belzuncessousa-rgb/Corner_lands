@@ -1374,15 +1374,17 @@ export class Hud {
     const m = this.openModal(
       `<h2>How to Play</h2>
       <div class="help">
-        <p><b>Grow your settlement</b> from a Hamlet into a Borough. Open the objectives pill (top left) for guidance.</p>
-        <p><b>Building:</b> pick a category at the bottom, then a building, then click the map. Builders carry the materials over from storage, one load per trip, and then raise the walls. You can plan buildings before you have the materials; they wait.</p>
-        <p><b>Roads</b> are optional but villagers walk much faster on them. Click to start a road, click again to lay it, and keep clicking to continue. Roads over water become bridges (4 timber per tile).</p>
-        <p><b>Storage:</b> goods live in the Manor Hall, Storehouses (materials) and Granaries (food). Workplaces close to storage and to their resources work faster.</p>
-        <p><b>Villagers</b> arrive when happiness is 50% or higher, there is free housing and nobody is going hungry. Each eats one food a month; meals from several food groups (grain, meat, produce, dairy) make them happier.</p>
-        <p><b>Winter</b> stops foraging and farming, and each household burns one timber a month. Farms are sown in spring and harvested in autumn.</p>
-        <p><b>Wells, markets, churches and decorations</b> make nearby homes happier. Your <b>steward</b> warns you when food or firewood runs low; the <b>Chronicle</b> (scroll button) keeps the full story.</p>
+        <p><b>Grow your settlement</b> from a Hamlet into a City. Open the objectives pill (top left) for guidance; raise the Manor Hall to climb the ranks.</p>
+        <p><b>Building:</b> pick a category at the bottom, then a building, then click the map. Builders carry the materials over from storage, one load per trip, and then raise the walls. Plans can wait for materials.</p>
+        <p><b>Fields, pastures and orchards</b> (Farming) are drawn: click one corner, then the opposite one, near a Farmstead, Animal Farm or Orchard Keeper's Lodge. Choose each field's crop and each farm's animals in the panel.</p>
+        <p><b>Roads</b> are optional but villagers walk faster on them, faster still on paved stone (T). Click to start, click again to lay it, keep clicking to continue.</p>
+        <p><b>The top bar</b> shows happiness, villagers, food, materials, goods and the treasury. Hover a chip for the details, click to pin it: set how much of each good to keep and whether merchants may buy the surplus. Workers rest when their goods reach the target.</p>
+        <p><b>Workers:</b> select a workplace to choose how many villagers work there, its priority and its product. Seasonal work frees hands in the off season. Hover the villagers chip to see who is idle and where hands are short.</p>
+        <p><b>Homes</b> eat one food a month each; several food groups (grain, meat, produce, dairy) cheer them. Each winter month a home burns firewood. Finer homes need clothes, a tavern, boots and medicine, and enjoy luxuries; families in them can work a craft from home.</p>
+        <p><b>Prestige</b> comes from a fine manor, a church and monuments. From Town on, spend it on <b>charters</b> (crown button) to specialise your town.</p>
+        <p>Your <b>steward</b> warns you when things go wrong; the <b>Chronicle</b> (scroll button) keeps the full story.</p>
         <div class="ornament">❦</div>
-        <p><kbd>Left-drag</kbd> / <kbd>WASD</kbd> pan · <kbd>Wheel</kbd> zoom · <kbd>R</kbd> road (click, click) · <kbd>X</kbd> demolish · <kbd>H</kbd> house · <kbd>Space</kbd> pause · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> speed · <kbd>Right-click</kbd>/<kbd>Esc</kbd> cancel</p>
+        <p><kbd>Left-drag</kbd> / <kbd>WASD</kbd> pan · <kbd>Wheel</kbd> zoom · <kbd>R</kbd> road (click, click) · <kbd>X</kbd> demolish · <kbd>H</kbd> house · <kbd>T</kbd> paved road · <kbd>Space</kbd> pause · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> speed · <kbd>Right-click</kbd>/<kbd>Esc</kbd> cancel</p>
       </div>
       <div class="row" style="justify-content:flex-end"><button class="primary" data-m="back">Back</button></div>`,
       !fromMain,

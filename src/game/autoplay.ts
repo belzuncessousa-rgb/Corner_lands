@@ -26,6 +26,7 @@ import {
   roomFor,
   trade,
   bCenter,
+  countInRadius,
   placeZone,
   zoneArea,
   zoneError,
@@ -63,7 +64,12 @@ function tryPlace(s: GameState, type: BuildingType): boolean {
       if (!touches) continue;
       const c = centerOf(x, y, d.w, d.h);
       let score = -Math.hypot(c.x - hall.x, c.y - hall.y);
-      if (d.gathers) score += resourceInRange(s, type, c) * (d.gathers === 'rock' || d.gathers === 'ore' ? 3 : 1);
+      if (d.gathers) {
+        const res = resourceInRange(s, type, c);
+        // Only spots with something to gather are worth considering.
+        if (res < 3) continue;
+        score += res * (d.gathers === 'rock' || d.gathers === 'ore' ? 3 : 1);
+      }
       if (type === 'farm') {
         let f = 0;
         for (let yy = y; yy < y + d.h; yy++) for (let xx = x; xx < x + d.w; xx++) f += s.fertility[idx(s, xx, yy)];
@@ -142,13 +148,15 @@ function drawFields(s: GameState): void {
 }
 
 /** Lays a road from the network towards the nearest ore deposit. */
-function roadToOre(s: GameState): void {
+function roadToOre(s: GameState, deposits: Uint8Array = s.ore): void {
   const reached = reachableRoads(s);
   const hall = s.buildings.find((b) => b.type === 'townhall')!;
   let ore = -1;
   let best = Infinity;
-  s.ore.forEach((v, i) => {
+  deposits.forEach((v, i) => {
     if (!v) return;
+    // Aim for a real outcrop, not a lone boulder.
+    if (countInRadius(s, { x: (i % s.width) + 0.5, y: Math.floor(i / s.width) + 0.5 }, 3, (j) => deposits[j] > 0) < 4) return;
     const d = Math.hypot((i % s.width) - hall.x, Math.floor(i / s.width) - hall.y);
     if (d < best) {
       best = d;
@@ -168,11 +176,11 @@ function roadToOre(s: GameState): void {
       start = i;
     }
   });
-  if (start < 0 || best < 4) return;
-  // Walk greedily toward the ore, stopping a few tiles short.
+  if (start < 0 || best < 2.5) return;
+  // Walk greedily toward the deposit (bridging rivers), stopping just short.
   let x = start % s.width;
   let y = Math.floor(start / s.width);
-  for (let k = 0; k < 60 && Math.hypot(x - ox, y - oy) > 3; k++) {
+  for (let k = 0; k < 60 && Math.hypot(x - ox, y - oy) > 2; k++) {
     const dx = Math.sign(ox - x);
     const dy = Math.sign(oy - y);
     const tryStep = (nx: number, ny: number) => {
@@ -342,6 +350,8 @@ function act(s: GameState, rand: () => number): void {
   renovate(s);
   drawFields(s);
   const sites = s.buildings.filter((b) => b.build < 1).length;
+  // Sites waiting for stone must not block the quarry that would supply it.
+  if (s.res.stone < 10 && count(s, 'quarry') === 0 && tryPlace(s, 'quarry')) return;
   if (sites >= 3) return;
   const idle = pop - s.buildings.reduce((a, b) => a + b.workers, 0);
   const foodMakers = count(s, 'forager') + count(s, 'hunter') + count(s, 'fisher') + count(s, 'bakery') * 2;
@@ -349,7 +359,8 @@ function act(s: GameState, rand: () => number): void {
   // Key buildings for progression come first once unlocked.
   if (s.tier >= 1) {
     for (const t of ['sawmill', 'carpenter', 'windmill', 'bakery', 'market', 'stonemason'] as BuildingType[]) {
-      if (count(s, t) === 0 && (t === 'sawmill' || t === 'market' || t === 'stonemason' || count(s, 'farm') > 0)) wants.push(t);
+      const ready = t === 'sawmill' || t === 'market' || (t === 'stonemason' ? hasBuilt(s, 'market') : count(s, 'farm') > 0);
+      if (count(s, t) === 0 && ready) wants.push(t);
     }
   }
   if (s.tier >= 2) {
@@ -362,20 +373,27 @@ function act(s: GameState, rand: () => number): void {
   }
   if (count(s, 'woodcutter') < 2 + Math.floor(pop / 15) || s.res.wood < 25) wants.push('woodcutter');
   if (totalHousing(s) - pop < 4 && idle >= 0) wants.push('house');
-  if (count(s, 'quarry') < 1 + Math.floor(pop / 40)) wants.push('quarry');
+  if (count(s, 'quarry') < 1 + Math.floor(pop / 30)) {
+    // Without stone nothing grand gets built: put the quarry first.
+    if (s.res.stone < 20) wants.unshift('quarry');
+    else wants.push('quarry');
+  }
+  // No rock beside the roads yet: lay a road towards the nearest outcrop.
+  if (count(s, 'quarry') === 0 && pop >= 8 && s.day % DAYS_PER_MONTH === 0) roadToOre(s, s.rock);
   if (pop >= 10 && count(s, 'well') < Math.ceil(pop / 20)) wants.push('well');
   if (count(s, 'forester') < count(s, 'woodcutter')) wants.push('forester');
-  if (stored(s, 'materials') > storageCap(s, 'materials') * 0.8 && count(s, 'storehouse') < 3) wants.push('storehouse');
-  if (stored(s, 'food') > storageCap(s, 'food') * 0.8 && count(s, 'granary') < 3) wants.push('granary');
+  const stores = 2 + Math.floor(pop / 50);
+  if (stored(s, 'materials') > storageCap(s, 'materials') * 0.8 && count(s, 'storehouse') < stores) wants.push('storehouse');
+  if (stored(s, 'food') > storageCap(s, 'food') * 0.8 && count(s, 'granary') < stores) wants.push('granary');
   if (s.tier >= 1) {
-    if (count(s, 'farm') < Math.ceil(pop / 18)) wants.push('farm');
+    if (count(s, 'farm') < Math.ceil(pop / 16)) wants.push('farm');
     if (count(s, 'windmill') < Math.ceil(count(s, 'farm') / 2)) wants.push('windmill');
     if (count(s, 'bakery') < Math.ceil(count(s, 'farm') / 2)) wants.push('bakery');
     if (count(s, 'tavern') > 0 && count(s, 'brewhouse') < 1) wants.push('brewhouse');
     if (pop >= 30 && count(s, 'byre') < 1) wants.push('byre');
     if (count(s, 'byre') > 0 && count(s, 'weaver') < 1) wants.push('weaver');
     if (count(s, 'weaver') > 0 && count(s, 'tailor') < 1) wants.push('tailor');
-    if (count(s, 'sawmill') < 1 + Math.floor(pop / 50)) wants.push('sawmill');
+    if (count(s, 'sawmill') < 1 + Math.floor(pop / 35)) wants.push('sawmill');
     if (count(s, 'market') < 1) wants.push('market');
   }
   if (s.tier >= 2) {
