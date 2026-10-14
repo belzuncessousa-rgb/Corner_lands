@@ -909,6 +909,12 @@ export function inSeason(s: GameState, b: Building): boolean {
  */
 export function restingNow(s: GameState, b: Building): boolean {
   if (!inSeason(s, b)) return true;
+  // Batch workshops wait, without workers, until a full batch of inputs is in store.
+  const def = workDef(b);
+  if (def.batch && !b.batchOn) {
+    if (!batchReady(s, b)) return true;
+    b.batchOn = true;
+  }
   // The harvest is brought in on the first day of its month; then farmers are free.
   if (b.type === 'farm' && monthOf(s.day) === 7 && s.day % DAYS_PER_MONTH !== 0) return true;
   if (b.blocked === BLOCK_SEASONAL && b.status.startsWith('Enough')) {
@@ -919,6 +925,14 @@ export function restingNow(s: GameState, b: Building): boolean {
     b.status = 'Back to work';
   }
   return false;
+}
+
+/** Whether inputs for a whole batch of cycles are waiting in store. */
+export function batchReady(s: GameState, b: Building): boolean {
+  const d = workDef(b);
+  const n = d.batch ?? 1;
+  for (const k in d.inputs) if (s.res[k as ResourceId] < (d.inputs[k as ResourceId] ?? 0) * n) return false;
+  return true;
 }
 
 /** The first month after `from` in which the workplace works again. */
@@ -1215,6 +1229,11 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
         return 'Waiting for wood (keeping firewood reserve)';
       }
       if (!canAfford(s, inputs)) {
+        // A batch ends when the inputs run out; workers go back to other jobs.
+        if (d.batch) {
+          b.batchOn = false;
+          return 'Batch done: waiting for the next load';
+        }
         const missing = Object.keys(inputs).filter((k) => s.res[k as ResourceId] < (inputs[k as ResourceId] ?? 0));
         return `Waiting for ${missing.map((k) => GOODS[k as ResourceId].name.toLowerCase()).join(', ')}`;
       }
@@ -1612,6 +1631,12 @@ export function dailyProduction(s: GameState, rng: StateRng): void {
       else if (b.workers === 0) b.status = 'No workers available';
       continue;
     }
+    if (d.batch && !b.batchOn && inSeason(s, b) && !batchReady(s, b)) {
+      const need = Object.entries(d.inputs).map(([k, v]) => `${Math.floor(s.res[k as ResourceId])}/${(v ?? 0) * (d.batch ?? 1)} ${GOODS[k as ResourceId].name.toLowerCase()}`);
+      b.status = `Waiting for a full batch (${need.join(', ')})`;
+      b.blocked = BLOCK_SEASONAL;
+      continue;
+    }
     if (!inSeason(s, b)) {
       const next = nextSeasonMonth(s, b);
       b.status = next === null ? 'Resting' : `Resting until ${MONTH_NAMES[next].toLowerCase()}`;
@@ -1648,6 +1673,7 @@ export function dailyProduction(s: GameState, rng: StateRng): void {
         status === 'Storage full' ||
         status === 'Out of season' ||
         status === 'Nothing to gather this season' ||
+        !!status?.startsWith('Batch done') ||
         !!status?.startsWith('Enough');
       b.blocked = status ? (idle ? BLOCK_SEASONAL : BLOCK_PROBLEM) : 0;
     }

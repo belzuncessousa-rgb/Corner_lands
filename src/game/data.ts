@@ -183,6 +183,8 @@ export interface BuildingDef {
   recipes?: Recipe[];
   /** Town charter that unlocks it. */
   charter?: string;
+  /** Works in batches: workers are only called once inputs for this many cycles wait. */
+  batch?: number;
   /** Drawn areas worked from a nearby workplace (fields, pastures, orchards). */
   zone?: { owner: BuildingType; min: number; max: number };
   buildable: boolean;
@@ -453,13 +455,14 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   tanner: def({
     type: 'tanner',
     name: 'Tannery',
-    desc: 'Tans hides into leather in stinking pits. Best kept away from homes.',
+    desc: 'Tans hides into leather in stinking pits, a batch at a time once enough hides are waiting.',
     category: 'industry',
     cost: { wood: 20, stone: 5 },
     workers: 1,
     cycle: 3,
     inputs: { hides: 2 },
     outputs: { leather: 2 },
+    batch: 3,
     tier: 1,
   }),
   weaver: def({
@@ -561,13 +564,14 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   kiln: def({
     type: 'kiln',
     name: 'Tile Kiln',
-    desc: 'Fires clay into roof tiles over a firewood blaze. Townhouses are roofed with tiles.',
+    desc: 'Fires clay into roof tiles over a firewood blaze. The kiln is fired in batches: workers come once clay for three firings is waiting. Townhouses are roofed with tiles.',
     category: 'industry',
     cost: { stone: 15, wood: 10 },
     workers: 2,
     cycle: 3,
     inputs: { clay: 4, firewood: 2 },
     outputs: { tiles: 4 },
+    batch: 3,
     tier: 1,
   }),
   stonemason: def({
@@ -597,13 +601,14 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   bloomery: def({
     type: 'bloomery',
     name: 'Bloomery',
-    desc: 'Smelts iron ore into iron in a clay furnace fed with firewood.',
+    desc: 'Smelts iron ore into iron in a clay furnace fed with firewood, lit once there is ore for two smeltings.',
     category: 'industry',
     cost: { stone: 20, wood: 10 },
     workers: 2,
     cycle: 3,
     inputs: { ore: 2, firewood: 2 },
     outputs: { iron: 2 },
+    batch: 2,
     tier: 2,
   }),
   jeweller: def({
