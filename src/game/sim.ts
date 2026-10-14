@@ -721,6 +721,15 @@ export function nextSeasonMonth(s: GameState, b: Building): number | null {
   return null;
 }
 
+/** Products Auto should make first: firewood ahead of winter. */
+function recipeUrgent(s: GameState, r: Recipe): boolean {
+  if (r.id !== 'firewood') return false;
+  const m = monthOf(s.day);
+  if (m < 5 || m > 10) return false;
+  const homes = s.buildings.filter((b) => b.residents > 0).length;
+  return s.res.firewood < homes * 3;
+}
+
 function recipeInMonth(r: Recipe, month: number): boolean {
   return !r.months || r.months.includes(month);
 }
@@ -746,6 +755,8 @@ export function chooseRecipe(s: GameState, b: Building, any = false): Recipe | n
   const fixed = b.recipe ? list.find((r) => r.id === b.recipe) : undefined;
   if (fixed) return any || recipeInMonth(fixed, monthOf(s.day)) ? fixed : null;
   const auto = list.filter((r) => r.auto !== false);
+  const urgent = auto.find((r) => recipeUrgent(s, r) && recipeReady(s, b, r) && !enoughOf(s, r.outputs));
+  if (urgent) return urgent;
   const pick = auto.find((r) => recipeReady(s, b, r) && !enoughOf(s, r.outputs));
   if (pick) return pick;
   if (any) return auto.find((r) => recipeInMonth(r, monthOf(s.day))) ?? auto[0] ?? null;
@@ -853,12 +864,19 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
   if (enough) return `Enough ${GOODS[enough].name.toLowerCase()} in store`;
   switch (b.type) {
     case 'woodcutter': {
-      if (fullFor(s, d.outputs)) return 'Storage full';
+      const r = chooseRecipe(s, b);
+      if (!r) {
+        const e = enoughOf(s, chooseRecipe(s, b, true)?.outputs ?? d.outputs);
+        return e ? `Enough ${GOODS[e].name.toLowerCase()} in store` : 'Waiting';
+      }
+      const e = enoughOf(s, r.outputs);
+      if (e) return `Enough ${GOODS[e].name.toLowerCase()} in store`;
+      if (fullFor(s, r.outputs)) return 'Storage full';
       const t = nearestTile(s, b, d.radius, (i, dist) => (s.trees[i] > 0 ? dist - s.trees[i] * 1.2 : null));
       if (t < 0) return 'No trees in range';
       b.resDist = tileDist(s, b, t);
       s.trees[t]--;
-      addOutput(s, b, d.outputs);
+      addOutput(s, b, r.outputs);
       return null;
     }
     case 'forester': {
@@ -920,6 +938,8 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
       if (roomFor(s, 'meat') <= 0) return 'Storage full';
       const amount = Math.max(1, Math.round((d.outputs.meat ?? 0) * Math.min(1, forest / 40)));
       addOutput(s, b, { meat: amount });
+      // Every few kills bring a hide worth tanning.
+      if (rng.next() < 0.5) store(s, 'hides', 1);
       return null;
     }
     case 'fisher': {
@@ -1257,18 +1277,24 @@ export function monthly(s: GameState, rng: StateRng): void {
   const need = eaten.hungry;
   if (need > 0) log(s, `Food shortage! ${need} villagers went hungry.`, 'bad');
 
-  // Firewood in winter: one log per household.
+  // Heating in winter: each household burns a bundle of split firewood, or
+  // twice as much raw timber.
   report.cold = false;
   if (Math.floor(prevMonth / 3) === 3) {
-    const homes = s.buildings.filter((b) => b.residents > 0).length;
-    if (s.res.wood >= homes) {
-      s.res.wood -= homes;
+    let homes = s.buildings.filter((b) => b.residents > 0).length;
+    const split = Math.min(homes, Math.floor(s.res.firewood));
+    s.res.firewood -= split;
+    homes -= split;
+    if (s.res.wood >= homes * 2) {
+      s.res.wood -= homes * 2;
     } else {
       s.res.wood = 0;
       report.cold = true;
       log(s, 'Not enough firewood! Families are freezing.', 'bad');
     }
   }
+  // Fresh milk does not keep.
+  if (s.res.milk > 0) s.res.milk = Math.floor(s.res.milk * 0.7);
 
   // Taxes.
   const tax = TAX_LEVELS[s.taxLevel];

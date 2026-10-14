@@ -44,7 +44,7 @@ function good(
 /** Every good in the game. Goods nobody has made yet stay hidden. */
 export const GOODS: Record<ResourceId, GoodDef> = {
   wood: good('Timber', 'materials', 2, 'Felled logs for building, sawing and burning.'),
-  firewood: good('Firewood', 'materials', 2, 'Split logs. Keeps homes warm in winter at half the timber.'),
+  firewood: good('Firewood', 'materials', 2, 'Split logs. Homes burn one bundle a winter month instead of two logs of timber.', { keep: 100 }),
   planks: good('Planks', 'materials', 5, 'Sawn boards for finer buildings.', { keep: 100 }),
   woodparts: good('Wood Parts', 'materials', 9, 'Gears, axles and frames for mills and machines.', { keep: 40 }),
   stone: good('Stone', 'materials', 3, 'Quarried stone for sturdier buildings.'),
@@ -75,7 +75,7 @@ export const GOODS: Record<ResourceId, GoodDef> = {
   flour: good('Flour', 'goods', 3, 'Milled wheat, ready for the oven.', { storage: 'food' }),
   flax: good('Flax', 'goods', 2, 'Retted and spun into linen.'),
   wool: good('Wool', 'goods', 3, 'Shorn from sheep in spring.'),
-  hides: good('Hides', 'goods', 2, 'Skins from the hunt and the slaughter.'),
+  hides: good('Hides', 'goods', 2, 'Skins from the hunt and the slaughter, for the tanner.', { keep: 60 }),
   leather: good('Leather', 'goods', 6, 'Tanned hides for boots.'),
   cloth: good('Cloth', 'goods', 7, 'Woven wool and linen.'),
   clothes: good('Clothes', 'goods', 12, 'Tunics and cloaks. Finer homes need them.', { keep: 60 }),
@@ -218,7 +218,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   woodcutter: def({
     type: 'woodcutter',
     name: "Woodcutter's Lodge",
-    desc: 'Fells nearby trees for timber.',
+    desc: 'Fells nearby trees for timber, or splits them into firewood. A household burns one bundle of firewood each winter month, or two logs of timber.',
     category: 'resources',
     cost: { wood: 10 },
     workers: 2,
@@ -227,6 +227,10 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     outputs: { wood: 4 },
     gathers: 'trees',
     hotkey: 'e',
+    recipes: [
+      { id: 'logs', name: 'Timber', inputs: {}, outputs: { wood: 4 } },
+      { id: 'firewood', name: 'Firewood', inputs: {}, outputs: { firewood: 6 } },
+    ],
   }),
   forester: def({
     type: 'forester',

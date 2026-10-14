@@ -655,7 +655,7 @@ export class Hud {
     this.lastSeason = season;
     if (this.game.demo) return;
     const el = this.el['season-banner'];
-    el.innerHTML = `<div>${SEASON_NAMES[season]}</div><small>Year ${yearOf(s.day)}${season === 3 ? ' · keep timber for firewood' : season === 0 ? ' · time to sow the fields' : season === 2 ? ' · harvest is near' : ''}</small>`;
+    el.innerHTML = `<div>${SEASON_NAMES[season]}</div><small>Year ${yearOf(s.day)}${season === 3 ? ' · keep firewood for the hearths' : season === 0 ? ' · time to sow the fields' : season === 2 ? ' · harvest is near' : ''}</small>`;
     el.classList.remove('show');
     void el.offsetWidth;
     el.classList.add('show');

@@ -24,8 +24,9 @@ const ADVICE: Advice[] = [
   },
   {
     id: 'firewood',
-    when: (s, m) => m >= 6 && m <= 8 && s.res.wood < homes(s) * 3 + 10,
-    text: (s) => `Steward: winter is coming and each home burns a log a month. We need about ${homes(s) * 3} timber in store.`,
+    when: (s, m) => m >= 6 && m <= 8 && s.res.firewood + s.res.wood / 2 < homes(s) * 3 + 5,
+    text: (s) =>
+      `Steward: winter is coming. Each home burns a bundle of firewood a month, or two logs of timber. We need about ${homes(s) * 3} firewood; set a woodcutter to split firewood.`,
   },
   {
     id: 'housing',
