@@ -1131,6 +1131,7 @@ export class Hud {
             const lock = lockReason(s, t);
             const mine = s.buildings.filter((b) => b.type === t && b.build >= 1);
             const staff = mine.reduce((a, b) => a + b.workers, 0);
+            const stuck = mine.filter((b) => hasProblem(b));
             const slots = mine.reduce((a, b) => a + workersOf(b), 0);
             const recipes = (d.recipes ?? [{ id: '', name: '', inputs: d.inputs, outputs: d.outputs }]).filter((r) => !r.charter || hasCharter(s, r.charter));
             const icons = (ids: ResourceId[]) => ids.map((k) => `<span class="pg" data-tip="${GOODS[k].name}">${ICONS[k] ?? ''}</span>`).join('');
@@ -1152,7 +1153,7 @@ export class Hud {
               <td class="pimg"><img src="${this.cardImage(t)}" alt=""></td>
               <td><b>${esc(d.name)}</b>${lock ? `<div class="neg small">${esc(lock)}</div>` : ''}</td>
               <td><div class="plines">${lines || '<i>—</i>'}</div></td>
-              <td class="num">${mine.length ? `${mine.length}${slots ? `<div class="small">${staff}/${slots} at work</div>` : ''}` : ''}</td>
+              <td class="num">${mine.length ? `${mine.length}${slots ? `<div class="small">${staff}/${slots} at work</div>` : ''}${stuck.length ? `<div class="small neg" data-tip="${esc([...new Set(stuck.map((b) => b.status))].join('<br>'))}">${stuck.length} stalled</div>` : ''}` : ''}</td>
             </tr>`;
           })
           .join('');
