@@ -40,6 +40,14 @@ export const ROOF_COLORS: Record<RoofKind, string> = {
 /** Draws 3D primitives in isometric projection onto a 2D context. */
 export class Pen {
   snow = false;
+  /** Optional tint mixed into roof colours for variety. */
+  roofTint: { color: string; t: number } | null = null;
+
+  roofColor(kind: RoofKind): string {
+    const base = ROOF_COLORS[kind];
+    return this.roofTint ? mix(base, this.roofTint.color, this.roofTint.t) : base;
+  }
+
   constructor(public ctx: CanvasRenderingContext2D) {}
 
   path(pts: V3[]): void {
@@ -144,7 +152,7 @@ export class Pen {
   /** Gable roof with the ridge running along the x axis. */
   roofX(x0: number, y0: number, x1: number, y1: number, h: number, rh: number, kind: RoofKind, wall: string, o = 0.1): void {
     const ym = (y0 + y1) / 2;
-    const col = ROOF_COLORS[kind];
+    const col = this.roofColor(kind);
     const back: V3[] = [
       [x0 - o, y0 - o, h - 2],
       [x1 + o, y0 - o, h - 2],
@@ -179,7 +187,7 @@ export class Pen {
   /** Gable roof with the ridge running along the y axis. */
   roofY(x0: number, y0: number, x1: number, y1: number, h: number, rh: number, kind: RoofKind, wall: string, o = 0.1): void {
     const xm = (x0 + x1) / 2;
-    const col = ROOF_COLORS[kind];
+    const col = this.roofColor(kind);
     const back: V3[] = [
       [x0 - o, y0 - o, h - 2],
       [x0 - o, y1 + o, h - 2],
@@ -211,7 +219,7 @@ export class Pen {
 
   /** Four-sided pyramid roof (towers, wells). */
   roofPyramid(x0: number, y0: number, x1: number, y1: number, h: number, rh: number, kind: RoofKind, o = 0.08): void {
-    const col = ROOF_COLORS[kind];
+    const col = this.roofColor(kind);
     const apex: V3 = [(x0 + x1) / 2, (y0 + y1) / 2, h + rh];
     const a: V3 = [x0 - o, y0 - o, h];
     const b: V3 = [x1 + o, y0 - o, h];
@@ -224,7 +232,7 @@ export class Pen {
   }
 
   private roofTexture(plane: V3[], kind: RoofKind, alongX: boolean): void {
-    const col = ROOF_COLORS[kind];
+    const col = this.roofColor(kind);
     const [e0, e1, r1, r0] = plane;
     const rows = kind === 'thatch' ? 7 : kind === 'slate' ? 6 : 5;
     for (let i = 1; i < rows; i++) {

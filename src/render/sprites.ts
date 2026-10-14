@@ -422,23 +422,32 @@ export function bushSprite(berries: boolean, season: Season, variant: number): S
 
 // ------------------------------------------------------------------ buildings
 
-const PLASTER = '#eadcbf';
+const PLASTER_BASE = '#eadcbf';
+const PLASTER = PLASTER_BASE;
 const STONE = '#a8a093';
 const WOOD = '#9a7247';
 const BEAM = '#4a3020';
 
-export function buildingSprite(type: BuildingType, w: number, h: number, level: number, season: Season): Sprite {
+export function buildingSprite(type: BuildingType, w: number, h: number, level: number, season: Season, variant = 0): Sprite {
   const top = 150;
   const sw = (w + h) * (TW / 2) + 30;
   const sh = (w + h) * (TH / 2) + top + 14;
   return makeSprite(sw, sh, h * (TW / 2) + 15, top, (ctx) => {
     const p = new Pen(ctx);
     p.snow = season === 3;
-    return drawBuilding(p, type, level, season);
+    return drawBuilding(p, type, level, season, variant);
   });
 }
 
-function drawBuilding(p: Pen, type: BuildingType, level: number, season: Season): V3[] {
+/** Wall colour, roof tint and yard prop for each house variant. */
+const HOUSE_VARIANTS: { wall: string; tint: { color: string; t: number } | null; roof2: 'shingle' | 'tile' | 'slate'; prop: 'logs' | 'hive' | 'cart' | 'well' }[] = [
+  { wall: PLASTER_BASE, tint: null, roof2: 'shingle', prop: 'logs' },
+  { wall: '#dfbd88', tint: { color: '#5a3a1a', t: 0.35 }, roof2: 'tile', prop: 'hive' },
+  { wall: '#f6f2ea', tint: { color: '#f2d070', t: 0.32 }, roof2: 'slate', prop: 'cart' },
+  { wall: '#dcb6a4', tint: { color: '#6a665e', t: 0.42 }, roof2: 'shingle', prop: 'logs' },
+];
+
+function drawBuilding(p: Pen, type: BuildingType, level: number, season: Season, variant = 0): V3[] {
   const smoke: V3[] = [];
   switch (type) {
     case 'townhall': {
@@ -479,10 +488,13 @@ function drawBuilding(p: Pen, type: BuildingType, level: number, season: Season)
       break;
     }
     case 'house': {
+      const hv = HOUSE_VARIANTS[variant % HOUSE_VARIANTS.length];
+      const WALL = hv.wall;
+      p.roofTint = hv.tint;
       if (level >= 2) {
         p.shadow(0.2, 0.25, 1.8, 1.65);
         p.box(0.25, 0.3, 1.75, 1.6, 0, 12, STONE);
-        p.box(0.2, 0.25, 1.8, 1.65, 12, 16, PLASTER);
+        p.box(0.2, 0.25, 1.8, 1.65, 12, 16, WALL);
         p.timber(0.2, 0.25, 1.8, 1.65, 12, 16, BEAM);
         p.doorL(1.6, 0.9, 0.2, 11);
         p.windowL(1.6, 0.42, 4, 0.14, 5);
@@ -491,7 +503,8 @@ function drawBuilding(p: Pen, type: BuildingType, level: number, season: Season)
         p.windowL(1.65, 1.35, 17, 0.14, 6);
         p.windowR(1.8, 0.6, 17, 0.14, 6);
         p.windowR(1.75, 0.8, 4, 0.14, 5);
-        p.roofX(0.2, 0.25, 1.8, 1.65, 28, 18, 'shingle', PLASTER, 0.12);
+        p.roofTint = null;
+        p.roofX(0.2, 0.25, 1.8, 1.65, 28, 18, hv.roof2, WALL, 0.12);
         smoke.push(p.chimney(1.35, 1.12, 34, 16, '#8f8476'));
         p.bush(1.85, 1.85, 4, season === 3 ? '#8d9a86' : '#4d8a3a');
         p.barrel(0.3, 1.85);
@@ -513,16 +526,17 @@ function drawBuilding(p: Pen, type: BuildingType, level: number, season: Season)
           }
         }
         p.fence([0.2, 1.97], [1.05, 1.97]);
-        p.box(0.35, 0.45, 1.65, 1.45, 0, 17, PLASTER);
+        p.box(0.35, 0.45, 1.65, 1.45, 0, 17, WALL);
         p.timber(0.35, 0.45, 1.65, 1.45, 0, 17, BEAM);
         p.windowL(1.45, 0.52, 7, 0.14, 5, season === 3);
         p.windowL(1.45, 1.32, 7, 0.14, 5);
         p.doorL(1.45, 0.9, 0.18, 11);
         p.windowR(1.65, 0.8, 7, 0.14, 5);
-        p.roofX(0.35, 0.45, 1.65, 1.45, 17, 15, 'thatch', PLASTER, 0.13);
+        p.roofX(0.35, 0.45, 1.65, 1.45, 17, 15, 'thatch', WALL, 0.13);
         smoke.push(p.chimney(1.3, 1.08, 24, 14, '#8a7d70'));
-        p.logPile(1.75, 0.75, 2);
+        drawHouseProp(p, hv.prop, season);
       }
+      p.roofTint = null;
       break;
     }
     case 'woodcutter': {
@@ -1139,6 +1153,51 @@ function drawBuilding(p: Pen, type: BuildingType, level: number, season: Season)
     }
   }
   return smoke;
+}
+
+function drawHouseProp(p: Pen, prop: 'logs' | 'hive' | 'cart' | 'well', season: Season): void {
+  switch (prop) {
+    case 'logs':
+      p.logPile(1.75, 0.75, 2);
+      break;
+    case 'hive': {
+      // Straw beehives on a little bench.
+      p.box(1.7, 0.6, 1.95, 0.75, 0, 4, '#7b5a36');
+      for (const y of [0.62, 0.72]) {
+        const [x, yy] = iso(1.82, y, 4);
+        p.ctx.fillStyle = season === 3 ? '#e8ecee' : '#c9a050';
+        p.ctx.beginPath();
+        p.ctx.ellipse(x, yy - 4, 4, 5, 0, Math.PI, 0);
+        p.ctx.lineTo(x + 4, yy);
+        p.ctx.lineTo(x - 4, yy);
+        p.ctx.fill();
+        p.ctx.strokeStyle = '#8a6a30';
+        p.ctx.lineWidth = 0.5;
+        p.ctx.beginPath();
+        p.ctx.moveTo(x - 3.6, yy - 3);
+        p.ctx.lineTo(x + 3.6, yy - 3);
+        p.ctx.stroke();
+      }
+      break;
+    }
+    case 'cart': {
+      // A handcart with sacks.
+      p.box(1.68, 0.5, 1.95, 0.85, 4, 4, '#8a6236');
+      const [wx, wy] = iso(1.82, 0.88, 4);
+      p.ctx.strokeStyle = '#4a3020';
+      p.ctx.lineWidth = 1.2;
+      p.ctx.beginPath();
+      p.ctx.ellipse(wx, wy, 3, 4, 0, 0, Math.PI * 2);
+      p.ctx.stroke();
+      p.line([1.68, 0.67, 6], [1.55, 0.67, 2], '#6b4a2e', 1.2);
+      p.sack(1.8, 0.62, '#d8c79c');
+      break;
+    }
+    case 'well':
+      p.barrel(1.8, 0.7);
+      p.barrel(1.85, 0.9);
+      break;
+  }
 }
 
 /** Ground tile for building yards drawn under some buildings. */

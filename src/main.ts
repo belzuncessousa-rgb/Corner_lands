@@ -23,6 +23,7 @@ import type { BuildingType, GameState } from './game/types';
 import { FOOD_IDS } from './game/types';
 import { generateWorld, idx, inBounds } from './game/world';
 import { AgentSystem } from './render/agents';
+import { Wildlife } from './render/wildlife';
 import { type Overlay, Renderer } from './render/renderer';
 import { Hud } from './ui/hud';
 
@@ -36,6 +37,7 @@ export class Game {
   state: GameState;
   renderer: Renderer;
   agents = new AgentSystem();
+  wildlife = new Wildlife();
   hud: Hud;
   tool: Tool = { kind: 'select' };
   selected: number | null = null;
@@ -99,6 +101,7 @@ export class Game {
 
   private afterLoad(): void {
     this.agents.reset();
+    this.wildlife.reset();
     this.selected = null;
     this.tool = { kind: 'select' };
     this.simAcc = 0;
@@ -158,7 +161,8 @@ export class Game {
       }
     }
     this.agents.update(this.state, gameDt);
-    this.renderer.render(this.state, this.agents.agents, this.overlay(), running ? dt : 0);
+    this.wildlife.update(this.state, gameDt);
+    this.renderer.render(this.state, this.agents.agents, this.overlay(), running ? dt : 0, this.wildlife.animals);
     this.hud.minimap.update(dt);
     this.hudTimer -= dt;
     if (this.hudTimer <= 0) {

@@ -3,6 +3,7 @@ import { monthOf, seasonOf } from '../game/sim';
 import type { Building, BuildingType, GameState, ResourceId, Season } from '../game/types';
 import { idx, inBounds } from '../game/world';
 import type { Agent } from './agents';
+import type { Animal } from './wildlife';
 import { Pen, TH, TW, iso } from './pen';
 import {
   type Sprite,
@@ -135,9 +136,9 @@ export class Renderer {
     return sp;
   }
 
-  buildingSprite(type: BuildingType, level: number, season: Season): Sprite {
+  buildingSprite(type: BuildingType, level: number, season: Season, variant = 0): Sprite {
     const d = BUILDINGS[type];
-    return this.sprite(`b:${type}:${level}:${season}`, () => buildingSprite(type, d.w, d.h, level, season));
+    return this.sprite(`b:${type}:${level}:${season}:${variant}`, () => buildingSprite(type, d.w, d.h, level, season, variant));
   }
 
   private lodCache = [new WeakMap<HTMLCanvasElement, HTMLCanvasElement>(), new WeakMap<HTMLCanvasElement, HTMLCanvasElement>()];
@@ -181,7 +182,7 @@ export class Renderer {
 
   // ---------------------------------------------------------------- main
 
-  render(s: GameState, agents: Agent[], ov: Overlay, dt: number): void {
+  render(s: GameState, agents: Agent[], ov: Overlay, dt: number, animals: Animal[] = []): void {
     this.time += dt;
     const c = this.ctx;
     const season = seasonOf(s.day);
@@ -278,13 +279,23 @@ export class Renderer {
       this.buckets[Math.min(nb - 1, d)].push(ai * 4 + 2);
     });
     this.mark('bucketing');
+    animals.forEach((a, ai) => {
+      const tx = Math.floor(a.x);
+      const ty = Math.floor(a.y);
+      if (!inBounds(s, tx, ty)) return;
+      const [wx, wy] = iso(a.x, a.y);
+      if (!visible(wx, wy)) return;
+      const d = Math.max(tx + ty, this.boost[ty * W + tx]);
+      this.buckets[Math.min(nb - 1, d)].push(ai * 4 + 3);
+    });
     for (const bucket of this.buckets) {
       for (const code of bucket) {
         const kind = code & 3;
         const n = code >> 2;
         if (kind === 0) this.drawTileObjects(s, n, season);
         else if (kind === 1) this.drawBuilding(s, s.buildings[n], season, ov.selected === s.buildings[n].id);
-        else this.drawAgent(agents[n]);
+        else if (kind === 2) this.drawAgent(agents[n]);
+        else this.drawAnimal(animals[n], season);
       }
     }
 
@@ -602,7 +613,7 @@ export class Renderer {
   }
 
   private drawBuilding(s: GameState, b: Building, season: Season, selected: boolean): void {
-    const sp = this.buildingSprite(b.type, b.level, season);
+    const sp = this.buildingSprite(b.type, b.level, season, variantOf(b));
     const [wx, wy] = iso(b.x, b.y);
     const c = this.ctx;
     if (b.build < 1) {
@@ -796,6 +807,64 @@ export class Renderer {
     c.globalAlpha = 1;
   }
 
+  private drawAnimal(a: Animal, season: Season): void {
+    const c = this.ctx;
+    const [wx, wy] = iso(a.x, a.y);
+    const f = a.dir;
+    const run = a.grazing ? 0 : Math.sin(a.step) * 1.6;
+    c.globalAlpha = a.alpha;
+    c.fillStyle = 'rgba(20,20,10,0.25)';
+    c.beginPath();
+    c.ellipse(wx, wy, 6, 2, 0, 0, Math.PI * 2);
+    c.fill();
+    const coat = season === 3 ? '#7a5e46' : '#9a6a3e';
+    // Legs.
+    c.strokeStyle = '#4a3424';
+    c.lineWidth = 1;
+    c.beginPath();
+    for (const [lx, ph] of [
+      [-3.5, 1],
+      [-2, -1],
+      [2.5, -1],
+      [4, 1],
+    ]) {
+      c.moveTo(wx + lx * f, wy - 6);
+      c.lineTo(wx + lx * f + run * ph, wy);
+    }
+    c.stroke();
+    // Body.
+    c.fillStyle = coat;
+    c.beginPath();
+    c.ellipse(wx, wy - 7.5, 6, 3, 0, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = '#f2e8d8';
+    c.beginPath();
+    c.ellipse(wx - 5.5 * f, wy - 8, 1.4, 1.6, 0, 0, Math.PI * 2);
+    c.fill();
+    // Neck and head: lowered while grazing.
+    const hx = wx + 6 * f;
+    const hy = a.grazing ? wy - 4 : wy - 13;
+    c.strokeStyle = coat;
+    c.lineWidth = 2.6;
+    c.beginPath();
+    c.moveTo(wx + 4 * f, wy - 8.5);
+    c.lineTo(hx, hy);
+    c.stroke();
+    c.fillStyle = coat;
+    c.beginPath();
+    c.ellipse(hx + 1.2 * f, hy, 2.2, 1.6, 0, 0, Math.PI * 2);
+    c.fill();
+    c.strokeStyle = '#5a3e26';
+    c.lineWidth = 0.8;
+    c.beginPath();
+    c.moveTo(hx - 0.5 * f, hy - 1.2);
+    c.lineTo(hx - 1.5 * f, hy - 4.5);
+    c.moveTo(hx + 0.8 * f, hy - 1.2);
+    c.lineTo(hx + 0.6 * f, hy - 4.5);
+    c.stroke();
+    c.globalAlpha = 1;
+  }
+
   // ---------------------------------------------------------------- effects
 
   private updateSmoke(s: GameState, dt: number, season: Season): void {
@@ -807,7 +876,7 @@ export class Renderer {
         if (b.build < 1) continue;
         const active = b.residents > 0 || b.workers > 0;
         if (!active || Math.random() > 0.35) continue;
-        const sp = this.buildingSprite(b.type, b.level, season);
+        const sp = this.buildingSprite(b.type, b.level, season, variantOf(b));
         for (const [x, y, z] of sp.smoke) {
           const [wx, wy] = iso(b.x + x, b.y + y, z);
           this.particles.push({
@@ -846,6 +915,7 @@ export class Renderer {
       c.ellipse(x, y, 260, 110, 0.2, 0, Math.PI * 2);
       c.fill();
     }
+    this.drawBirds(season, dt);
     if (season === 3) {
       if (this.snow.length < 220) {
         for (let k = 0; k < 220; k++) this.snow.push({ x: Math.random() * 2000, y: Math.random() * 1200, s: 0.5 + Math.random() });
@@ -879,6 +949,47 @@ export class Renderer {
       this.snow = [];
     }
     void s;
+  }
+
+  private birds: { x: number; y: number; vx: number; vy: number; n: number; seed: number }[] = [];
+  private birdTimer = 3;
+
+  /** Small flocks flying across the screen outside winter. */
+  private drawBirds(season: Season, dt: number): void {
+    const c = this.ctx;
+    this.birdTimer -= dt;
+    if (season !== 3 && this.birdTimer <= 0 && this.birds.length < 2) {
+      this.birdTimer = 12 + Math.random() * 20;
+      const fromLeft = Math.random() < 0.5;
+      this.birds.push({
+        x: fromLeft ? -60 : this.width + 60,
+        y: 60 + Math.random() * this.height * 0.5,
+        vx: (fromLeft ? 1 : -1) * (45 + Math.random() * 25),
+        vy: (Math.random() - 0.5) * 12,
+        n: 3 + Math.floor(Math.random() * 5),
+        seed: Math.random() * 100,
+      });
+    }
+    c.strokeStyle = 'rgba(40,36,30,0.75)';
+    c.lineWidth = 1.3;
+    for (const f of this.birds) {
+      f.x += f.vx * dt;
+      f.y += f.vy * dt;
+      for (let k = 0; k < f.n; k++) {
+        // V formation with a little wobble.
+        const row = Math.ceil(k / 2);
+        const side = k % 2 ? 1 : -1;
+        const bx = f.x - Math.sign(f.vx) * row * 14 + Math.sin(this.time * 2 + k) * 2;
+        const by = f.y + side * row * 9 + Math.cos(this.time * 1.7 + k + f.seed) * 2;
+        const flap = Math.sin(this.time * 9 + k * 1.3 + f.seed) * 2.5;
+        c.beginPath();
+        c.moveTo(bx - 4, by - flap);
+        c.quadraticCurveTo(bx - 2, by - 1, bx, by);
+        c.quadraticCurveTo(bx + 2, by - 1, bx + 4, by - flap);
+        c.stroke();
+      }
+    }
+    this.birds = this.birds.filter((f) => f.x > -200 && f.x < this.width + 200);
   }
 
   private drawAtmosphere(season: Season, day: number): void {
@@ -933,6 +1044,11 @@ export class Renderer {
     ctx.drawImage(src, x0, y0, w, h, (size - w * scale) / 2, (size - h * scale) / 2, w * scale, h * scale);
     return cv.toDataURL();
   }
+}
+
+/** Visual variant of a building (houses come in several styles). */
+function variantOf(b: Building): number {
+  return b.type === 'house' ? (b.id * 7 + b.x) % 4 : 0;
 }
 
 const TREE_SLOTS: [number, number][][] = [
