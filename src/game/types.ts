@@ -78,6 +78,8 @@ export interface Message {
   day: number;
   text: string;
   kind: 'info' | 'good' | 'bad';
+  /** Tile the message is about; clicking it centres the camera there. */
+  at?: { x: number; y: number };
 }
 
 export interface MonthReport {

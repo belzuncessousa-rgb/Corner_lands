@@ -1020,3 +1020,15 @@ button.active {
   opacity: 0;
   pointer-events: none;
 }
+
+.msg.link {
+  pointer-events: auto;
+  cursor: pointer;
+}
+.msg.link:hover {
+  background: linear-gradient(180deg, #fff6dc, #ecd9a8);
+}
+.msg.link::after {
+  content: ' ➜';
+  color: var(--wood-2);
+}

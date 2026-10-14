@@ -350,8 +350,16 @@ export class Hud {
     for (let i = this.shownMessages; i < msgs.length; i++) {
       const m = msgs[i];
       const div = document.createElement('div');
-      div.className = `msg panel ${m.kind}`;
+      div.className = `msg panel ${m.kind}${m.at ? ' link' : ''}`;
       div.textContent = m.text;
+      if (m.at) {
+        const at = m.at;
+        div.title = 'Show me';
+        div.addEventListener('click', () => {
+          this.game.renderer.centerOn(at.x, at.y);
+          this.game.renderer.clampCamera(this.game.state);
+        });
+      }
       this.el.log.appendChild(div);
       setTimeout(() => div.classList.add('old'), 9000);
       setTimeout(() => div.remove(), 10000);

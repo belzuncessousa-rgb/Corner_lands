@@ -37,8 +37,8 @@ export function isWinter(day: number): boolean {
 
 // ---------------------------------------------------------------- messages
 
-export function log(s: GameState, text: string, kind: 'info' | 'good' | 'bad' = 'info'): void {
-  s.messages.push({ day: s.day, text, kind });
+export function log(s: GameState, text: string, kind: 'info' | 'good' | 'bad' = 'info', at?: Building): void {
+  s.messages.push({ day: s.day, text, kind, ...(at ? { at: { x: at.x + at.w / 2, y: at.y + at.h / 2 } } : {}) });
   if (s.messages.length > 40) s.messages.splice(0, s.messages.length - 40);
 }
 
@@ -584,11 +584,12 @@ function stepFarm(s: GameState, b: Building, cap: number): void {
       s.res.grain = Math.max(before, Math.min(cap, before + amount));
       const gained = s.res.grain - before;
       b.output += gained;
-      if (gained < amount) log(s, `Harvest! A farm brought in ${gained} grain; ${amount - gained} spoiled for lack of storage.`, 'bad');
-      else log(s, `Harvest! A farm brought in ${gained} grain.`, 'good');
+      if (gained === 0) log(s, `The harvest rotted in the field: no room left to store ${amount} grain.`, 'bad', b);
+      else if (gained < amount) log(s, `Harvest! A farm brought in ${gained} grain; ${amount - gained} spoiled for lack of storage.`, 'bad', b);
+      else log(s, `Harvest! A farm brought in ${gained} grain.`, 'good', b);
       b.status = 'Harvest gathered';
     } else {
-      log(s, 'Crops rotted in an unstaffed field.', 'bad');
+      log(s, 'Crops rotted in an unstaffed field.', 'bad', b);
       b.status = 'Crops rotted';
     }
     b.growth = 0;
@@ -699,7 +700,7 @@ export function dailyConstruction(s: GameState): void {
     b.status = `Under construction (${n} helping)`;
     if (b.build >= 1) {
       b.status = 'Completed';
-      log(s, `${d.name} completed.`, 'good');
+      log(s, `${d.name} completed.`, 'good', b);
       s.dirty = true;
     }
   }

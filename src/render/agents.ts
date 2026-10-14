@@ -40,6 +40,7 @@ const TUNICS = ['#8a3b2e', '#4a5e8a', '#6b7a3a', '#9a7a3a', '#5e4a6e', '#7a5a3a'
 const HAIR = ['#3a2a1a', '#6a4a2a', '#c8a060', '#2a2420', '#8a5a2a', '#d8d0c0'];
 
 const SPEED = 1.7; // tiles per second at 1x
+const GATHERING = new Set(['market', 'well', 'church', 'maypole', 'garden', 'statue']);
 const MAX_AGENTS = 180;
 
 export class AgentSystem {
@@ -260,9 +261,12 @@ export class AgentSystem {
         a.timer = 2.5 + Math.random() * 2.5;
         break;
       case 'return':
-      case 'wander-done':
         a.phase = 'pause';
         a.timer = 0.5 + Math.random() * 2;
+        break;
+      case 'wander-done':
+        a.phase = 'pause';
+        a.timer = 1.5 + Math.random() * 4;
         break;
       case 'arrive-hall': {
         const real = (a as Agent & { realRole?: Role }).realRole;
@@ -337,6 +341,35 @@ export class AgentSystem {
       forTilesInRadius(s, c, 7, (i) => {
         if (s.road[i]) roads.push(i);
       });
+      // Sometimes visit a gathering place: market, well, church or maypole.
+      const spots = s.buildings.filter((b) => GATHERING.has(b.type) && b.build >= 1 && b.connected);
+      if (spots.length && Math.random() < 0.35) {
+        const near = spots.filter((b) => {
+          const bc = bCenter(b);
+          return Math.hypot(bc.x - c.x, bc.y - c.y) < 18;
+        });
+        const spot = near[Math.floor(Math.random() * near.length)];
+        if (spot) {
+          if (home) {
+            const d = doorTile(s, home);
+            a.x = d.x + 0.5;
+            a.y = d.y + 0.5;
+          }
+          a.carry = null;
+          // Linger on a free tile right beside it.
+          const around: [number, number][] = [];
+          for (let x = spot.x - 1; x <= spot.x + spot.w; x++) {
+            for (let y = spot.y - 1; y <= spot.y + spot.h; y++) {
+              if (!inBounds(s, x, y)) continue;
+              const i = idx(s, x, y);
+              if (s.occ[i] < 0 && !s.terrain[i]) around.push([x, y]);
+            }
+          }
+          const [tx, ty] = around.length ? around[Math.floor(Math.random() * around.length)] : [spot.x, spot.y];
+          this.walkTo(s, a, tx, ty, [], 'wander-done');
+          return;
+        }
+      }
       if (roads.length && Math.random() < 0.7) {
         const t = roads[Math.floor(Math.random() * roads.length)];
         if (home) {
