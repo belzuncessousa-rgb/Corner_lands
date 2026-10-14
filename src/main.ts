@@ -32,6 +32,7 @@ import {
   stepDay,
   updateHappiness,
   yearOf,
+  keepOf,
 } from './game/sim';
 import type { BuildingType, GameState } from './game/types';
 import { FOOD_IDS } from './game/data';
@@ -762,4 +763,4 @@ function rangeHighlighter(s: GameState, type: BuildingType): ((i: number) => boo
 const game = new Game();
 // Handy hooks for debugging and automated screenshots.
 (window as unknown as Record<string, unknown>).game = game;
-(window as unknown as Record<string, unknown>).cl = { placeOrder, buildRoad, stepDay, recompute, placementError, playBot, placeZone, setYard };
+(window as unknown as Record<string, unknown>).cl = { placeOrder, buildRoad, stepDay, recompute, placementError, playBot, placeZone, setYard, keepOf };

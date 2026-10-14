@@ -12,6 +12,8 @@ import {
   TRADE_PRICES,
   GOODS,
   GROUP_NAMES,
+  RESOURCE_STORAGE,
+  STORAGE_CAPACITY,
 } from '../game/data';
 import { getEvent, resolveEvent } from '../game/events';
 import { CHARTERS, CHARTER_TIER, PATHS, charterCost, charterError, grantCharter, hasCharter } from '../game/charters';
@@ -64,6 +66,7 @@ import {
   yearOf,
 } from '../game/sim';
 import type { Building, BuildingType, Category, Cost, GoodsGroup, ResourceId } from '../game/types';
+import type { StorageKind } from '../game/data';
 import { RESOURCE_IDS } from '../game/types';
 import { idx, inBounds } from '../game/world';
 import type { Game } from '../main';
@@ -542,6 +545,7 @@ export class Hud {
     const key = JSON.stringify([
       b.id, b.status, b.workers, b.builders, b.residents, b.build.toFixed(2), b.paused, b.level, b.lastOutput, b.growth.toFixed(2), b.want, b.priority, b.recipe, b.yard, b.trade, b.herd, b.owner, Math.floor(b.growth),
       s.tier, blocker, b.need, (b.upProgress ?? 0).toFixed(2), b.unmet, Math.floor(s.res.gold / 10), s.population,
+      STORAGE_CAPACITY[b.type] ? RESOURCE_IDS.map((r) => (RESOURCE_STORAGE[r] ? Math.floor(s.res[r]) : 0)).join() : '',
     ]);
     if (key === this.lastInspectorKey) return;
     this.lastInspectorKey = key;
@@ -596,6 +600,7 @@ export class Hud {
           .join('')}</span></div>`);
       }
       rows.push(...this.zoneRows(b));
+      rows.push(...this.storeRows(b));
       const cap = housingOf(b);
       if (cap) rows.push(`<div class="kv"><span>Residents</span><span>${b.residents} / ${cap}</span></div>`);
       if (Object.keys(d.outputs).length || b.type === 'farm' || b.type === 'forester') {
@@ -645,6 +650,34 @@ export class Hud {
   }
 
   /** Inspector rows for farms, herds, orchards, their zones and backyards. */
+  /** What the town's stores of this kind hold, biggest piles first, with a quick sale of the surplus. */
+  private storeRows(b: Building): string[] {
+    const s = this.game.state;
+    const kinds = Object.keys(STORAGE_CAPACITY[b.type] ?? {}) as StorageKind[];
+    const market = hasBuilt(s, 'market');
+    const rows: string[] = [];
+    for (const kind of kinds) {
+      const used = Math.floor(stored(s, kind));
+      const cap = storageCap(s, kind);
+      const goods = RESOURCE_IDS.filter((r) => RESOURCE_STORAGE[r] === kind && s.res[r] >= 1).sort((a, c) => s.res[c] - s.res[a]);
+      const list = goods
+        .slice(0, 8)
+        .map((r) => {
+          const surplus = Math.floor(s.res[r] - keepOf(s, r));
+          const sell =
+            market && TRADE_PRICES[r] && surplus >= 1
+              ? `<button data-action="store-sell" data-res="${r}" data-n="${surplus}" data-tip="Sell what is above the stock target (${keepOf(s, r)})">Sell ${surplus} <small>+${sellPrice(s, r, surplus)}c</small></button>`
+              : '';
+          return `<div class="kv store-row"><span>${ICONS[r] ?? ''} ${GOODS[r].name}</span><span>${Math.floor(s.res[r])} ${sell}</span></div>`;
+        })
+        .join('');
+      rows.push(`<div class="needs-h">${kind === 'food' ? 'All granaries' : 'All storehouses'} · ${used} / ${cap}</div>
+        <div class="progress"><i style="width:${Math.min(100, (used / Math.max(1, cap)) * 100)}%"></i></div>${list}`);
+    }
+    if (kinds.length && !market) rows.push('<div class="note">Build a marketplace to sell surplus from here.</div>');
+    return rows;
+  }
+
   private zoneRows(b: Building): string[] {
     const s = this.game.state;
     const rows: string[] = [];
@@ -1083,6 +1116,13 @@ export class Hud {
       case 'ledger':
         this.showLedger();
         break;
+      case 'store-sell': {
+        const err = trade(s, t.dataset.res as ResourceId, -Number(t.dataset.n));
+        if (err) this.flash(err);
+        else this.sound('coin');
+        this.lastInspectorKey = '';
+        break;
+      }
       case 'trade-do': {
         const err = trade(s, t.dataset.res as ResourceId, Number(t.dataset.n));
         if (err) this.flash(err);

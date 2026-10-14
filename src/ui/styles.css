@@ -1855,3 +1855,14 @@ table.prod td.num {
     padding: 12px;
   }
 }
+
+/* Store panel: what the storehouses and granaries hold. */
+#inspector .needs-h + .progress { margin-bottom: 4px; }
+#inspector .kv + .needs-h { margin-top: 10px; }
+#inspector .kv.store-row { min-height: 26px; align-items: center; }
+#inspector .kv.store-row button {
+  margin-left: 6px;
+  padding: 1px 7px;
+  font-size: 12px;
+  line-height: 1.5;
+}

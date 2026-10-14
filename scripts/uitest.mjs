@@ -111,6 +111,26 @@ await page.click('[data-action="charter-sel"][data-id="farm1"]');
 await page.click('[data-action="charter-grant"]');
 check('grant a charter', (await page.evaluate(() => window.game.state.charters?.includes('farm1'))) === true);
 await page.click('[data-action="close-modal"]');
+// The manor's store panel sells planks above the stock target.
+const sale = await page.evaluate(() => {
+  const s = window.game.state;
+  const h = s.buildings.find((b) => b.type === 'townhall');
+  let m = null;
+  for (let r = 3; r < 20 && !m; r++) for (const [dx, dy] of [[r, 0], [0, r], [-r, 0], [0, -r], [r, r], [-r, -r]]) if (!m && !window.cl.placementError(s, 'market', h.x + dx, h.y + dy)) m = window.cl.placeOrder(s, 'market', h.x + dx, h.y + dy);
+  m.build = 1;
+  m.need = undefined;
+  window.cl.recompute(s);
+  s.res.planks = window.cl.keepOf(s, 'planks') + 40;
+  window.game.select(s.buildings.find((b) => b.type === 'townhall').id);
+  window.game.hud.update();
+  return { planks: s.res.planks, gold: s.res.gold };
+});
+await page.waitForTimeout(300);
+await page.screenshot({ path: process.env.SHOT || '/tmp/claude-0/store.png', clip: { x: 1440 - 420, y: 0, width: 420, height: 900 } });
+await page.click('#inspector [data-action="store-sell"][data-res="planks"]');
+const after = await page.evaluate(() => ({ planks: window.game.state.res.planks, gold: window.game.state.res.gold }));
+check('sell surplus from the store panel', after.planks === sale.planks - 40 && after.gold > sale.gold, JSON.stringify([sale, after]));
+await page.evaluate(() => window.game.select(null));
 // Save through the menu, then load it back.
 await page.keyboard.press('Escape');
 await page.click('[data-m="save"]');

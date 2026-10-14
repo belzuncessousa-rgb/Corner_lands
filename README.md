@@ -57,6 +57,8 @@ then fall back to the browser's localStorage.
 - **Storage** — goods live in the Manor Hall, Storehouses (materials) and
   Granaries (food); their yards visibly fill up. Workplaces close to storage and
   to their resources work faster (the inspector shows their efficiency).
+  Select a storehouse, granary or the manor to see what the stores hold and
+  sell whatever is above its stock target.
 - **Villagers** — settlers arrive when happiness is at least 50%, nobody went
   hungry and there is free housing.
 - **Farming** — a Farmstead tends the fields you draw near it (click one
