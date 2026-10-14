@@ -1354,7 +1354,8 @@ function stepByre(s: GameState, b: Building): void {
     s.res.gold += extra * 3;
   }
   const H = HERDS[kind];
-  for (const z of pastures) z.status = `${b.herd} ${b.herd === 1 ? H.name : H.plural} grazing`;
+  const winter = monthOf(s.day) >= 10;
+  for (const z of pastures) z.status = winter ? `${b.herd} ${H.plural} sheltering in the byre` : `${b.herd} ${b.herd === 1 ? H.name : H.plural} grazing`;
   b.blocked = 0;
   if (!pastures.length) {
     b.status = 'Fence pastures nearby for the animals';

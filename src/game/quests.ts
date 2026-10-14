@@ -62,6 +62,27 @@ export const QUESTS: Quest[] = [
     done: (s) => count(s, 'forester') >= 1,
   },
   {
+    id: 'workers',
+    title: 'Put people where they matter',
+    hint: 'Select a workplace and click its worker pips or priority. Hover the villagers in the top bar to see who is idle.',
+    reward: { wood: 15 },
+    done: (s) => s.buildings.some((b) => b.want !== undefined || b.priority !== undefined),
+  },
+  {
+    id: 'firewood',
+    title: 'Split firewood for winter',
+    hint: "Select a Woodcutter's Lodge and choose Firewood: a bundle warms a home for a winter month, half the timber of logs.",
+    reward: { gold: 20 },
+    done: (s) => s.res.firewood >= 10,
+  },
+  {
+    id: 'targets',
+    title: 'Set a stock target',
+    hint: 'Click Materials in the top bar and change how much timber to keep. Workers rest at the target, freeing hands for other work.',
+    reward: { gold: 20 },
+    done: (s) => Object.keys(s.targets ?? {}).length > 0,
+  },
+  {
     id: 'garden',
     title: 'Plant a flower garden',
     hint: 'Decorations from the Decor tab make nearby homes happier.',
@@ -78,9 +99,9 @@ export const QUESTS: Quest[] = [
   {
     id: 'bread',
     title: 'Bake bread',
-    hint: 'Build a Farmstead, draw wheat fields beside it (Food menu), and a Bakery bakes the harvest into bread.',
+    hint: 'Build a Farmstead and draw wheat fields beside it (Farming menu). A Windmill grinds the harvest and a Bakery bakes the flour.',
     reward: { gold: 40 },
-    done: (s) => count(s, 'farm') >= 1 && count(s, 'bakery') >= 1,
+    done: (s) => count(s, 'farm') >= 1 && count(s, 'windmill') >= 1 && count(s, 'bakery') >= 1,
   },
   {
     id: 'yard',

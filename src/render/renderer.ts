@@ -591,7 +591,9 @@ export class Renderer {
     p.fence([x0 + 0.05, y0 + 0.05], [x0 + 0.05, y1 - 0.05], post);
     // Animals, shared out between the owner's pastures by area.
     const owner = s.buildings.find((o) => o.id === b.owner);
-    if (owner && owner.herd) {
+    // In deep winter the herd shelters in the byre.
+    const sheltered = monthOf(s.day) >= 10;
+    if (owner && owner.herd && !sheltered) {
       const zones = s.buildings.filter((z) => z.owner === owner.id && z.type === 'pasture');
       const total = zones.reduce((a, z) => a + z.w * z.h, 0);
       let n = Math.round(((owner.herd ?? 0) * b.w * b.h) / Math.max(1, total));
