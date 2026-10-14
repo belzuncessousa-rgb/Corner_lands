@@ -152,3 +152,12 @@ Every charter carries a small malus.
 ### Phase 5 — Prestige and charters
 - [x] Prestige income; charter tree UI; first ranks of every path
 - [x] Castle levels above the Keep
+
+### Phase 6 — Charter goods and polish
+Charter rewards were first implemented as bonuses; these add the goods the
+designer asked for.
+- [ ] Precious veins: silver and gold ore from mines; Jewellers' Guild makes jewellery (luxury export, prestige)
+- [ ] Vines: vineyards (drawn zone) and a winery; wine as a tavern drink and luxury
+- [ ] Erudition: paper (from flax/rags) and books at a scriptorium/bookbinder; University eats wood parts
+- [ ] Arms: bows and pikes (carpenter), armour (armourer) for the castle's retinue and export
+- [ ] Help screen and tutorial objectives for the new systems; balance pass at the 45-minute year
