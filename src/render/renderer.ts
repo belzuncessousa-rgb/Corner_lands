@@ -223,7 +223,7 @@ export class Renderer {
         const top = (x0 + y0) * (TH / 2);
         const bottom = (x0 + y0 + CHUNK * 2) * (TH / 2);
         if (right < vx0 || left > vx1 || bottom < vy0 || top > vy1) continue;
-        const chunk = this.groundChunk(s, cx, cy, season, gs);
+        const chunk = this.groundChunk(s, cx, cy, monthOf(s.day), gs);
         c.drawImage(chunk, left - 4, top - 4, right - left + 8, bottom - top + 8);
       }
     }
@@ -326,12 +326,13 @@ export class Renderer {
   private chunks = new Map<string, HTMLCanvasElement>();
   private chunkSeed = -1;
 
-  private groundChunk(s: GameState, cx: number, cy: number, season: Season, scale: number): HTMLCanvasElement {
+  private groundChunk(s: GameState, cx: number, cy: number, month: number, scale: number): HTMLCanvasElement {
+    const season = Math.floor(month / 3) as Season;
     if (this.chunkSeed !== s.seed) {
       this.chunks.clear();
       this.chunkSeed = s.seed;
     }
-    const key = `${cx}:${cy}:${season}:${scale}`;
+    const key = `${cx}:${cy}:${month}:${scale}`;
     let cv = this.chunks.get(key);
     if (cv) {
       // Refresh LRU position.
@@ -361,7 +362,7 @@ export class Renderer {
         } else {
           const f = Math.min(3, Math.floor(s.fertility[i] * 4));
           const v = s.variant[i] % GRASS_VARIANTS;
-          sp = this.sprite(`g:${season}:${f}:${v}`, () => grassTile(season, f, v));
+          sp = this.sprite(`g:${month}:${f}:${v}`, () => grassTile(month, f, v));
         }
         const [wx, wy] = iso(x, y);
         g.drawImage(sp.canvas, wx - sp.ax, wy - sp.ay, sp.w, sp.h);

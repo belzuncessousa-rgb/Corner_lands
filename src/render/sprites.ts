@@ -52,10 +52,36 @@ function diamond(ctx: CanvasRenderingContext2D, grow = 0.6): void {
   ctx.closePath();
 }
 
-export function grassTile(season: Season, fert: number, variant: number): Sprite {
+/** How each month's grass leans toward the next season's colours. */
+const MONTH_BLEND: [number, string | null][] = [
+  [0.25, '#8a8a52'], // early spring: still a little muddy
+  [0, null],
+  [0.25, 'next'], // late spring greening into summer
+  [0, null],
+  [0, null],
+  [0.3, 'next'], // late summer yellowing
+  [0, null],
+  [0, null],
+  [0.35, '#8e7a50'], // late autumn browns
+  [0, null],
+  [0, null],
+  [0.35, '#a8b07a'], // late winter thaw
+];
+
+export function grassColor(month: number, fert: number): string {
+  const season = Math.floor(month / 3) as Season;
+  const base = GRASS[season][fert];
+  const [t, target] = MONTH_BLEND[month];
+  if (!target || t === 0) return base;
+  const to = target === 'next' ? GRASS[((season + 1) % 4) as Season][fert] : target;
+  return mix(base, to, t);
+}
+
+export function grassTile(month: number, fert: number, variant: number): Sprite {
+  const season = Math.floor(month / 3) as Season;
   const rand = mulberry32(variant * 97 + fert * 13 + season * 1009);
   return makeSprite(TW + 4, TH + 4, TW / 2 + 2, 2, (ctx) => {
-    const base = GRASS[season][fert];
+    const base = grassColor(month, fert);
     diamond(ctx);
     ctx.fillStyle = base;
     ctx.fill();
