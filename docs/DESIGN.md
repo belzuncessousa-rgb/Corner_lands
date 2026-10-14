@@ -161,3 +161,10 @@ designer asked for.
 - [x] Erudition: paper (from flax/rags) and books at a scriptorium/bookbinder; University eats wood parts
 - [x] Arms: bows and pikes (carpenter), armour (armourer) for the castle's retinue and export
 - [x] Help screen and tutorial objectives for the new systems; balance pass at the 45-minute year
+
+### Phase 7 — Polish (for the scheduled runs)
+- [ ] Villagers visibly carry the new goods (wool bales, cheese wheels, casks, cloth) and work outdoors at the new trades
+- [ ] Winter and autumn looks for pastures, orchards and vines; animals shelter in the byre in deep winter
+- [ ] A first-hour guide tuned to the 45-minute year (objectives that teach fields, workers and stock targets in order)
+- [ ] Phone layout pass for the inspector, charter tree and production book
+- [ ] Performance check on a 250-villager town; trim per-frame work if needed

@@ -1798,3 +1798,42 @@ table.prod td.num {
   text-align: right;
   white-space: nowrap;
 }
+
+/* ------------------------------------------------------------ phones */
+
+@media (max-width: 700px) {
+  /* The top bar gets its own row under the buttons and clock. */
+  #top {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  #top #topbar {
+    order: 3;
+    flex: 1 0 100%;
+    margin: 0;
+    justify-content: space-between;
+    padding: 2px 4px;
+  }
+  #top .stack.right {
+    margin-left: auto;
+  }
+  #top .icon-btn {
+    width: 34px;
+    height: 34px;
+    padding: 4px;
+  }
+  #top .icon-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+  #topbar .chip .delta,
+  #topbar .sep {
+    display: none;
+  }
+  #topbar .chip .prestige {
+    margin-left: 3px;
+  }
+  #chip-panel {
+    width: min(290px, calc(100vw - 16px));
+  }
+}
