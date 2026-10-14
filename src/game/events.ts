@@ -607,11 +607,11 @@ export const EVENTS: DecisionEvent[] = [
       {
         label: 'Call the herb-wife',
         detail: '−5 herbs or medicine. Most of the herds recover.',
-        blocked: (st) => (st.res.herbs + st.res.medicine >= 5 ? null : 'Needs 5 herbs or medicine'),
+        blocked: (st) => (Math.floor(st.res.herbs) + Math.floor(st.res.medicine) >= 5 ? null : 'Needs 5 herbs or medicine'),
         apply: (st) => {
           const m = Math.min(5, Math.floor(st.res.medicine));
           st.res.medicine -= m;
-          st.res.herbs -= 5 - m;
+          st.res.herbs = Math.max(0, st.res.herbs - (5 - m));
           for (const b of st.buildings) if (b.type === 'byre' && b.herd) b.herd = Math.max(1, b.herd - 1);
           return { text: 'Bitter draughts and smoke in the byres. Only a few animals were lost.', kind: 'good' };
         },

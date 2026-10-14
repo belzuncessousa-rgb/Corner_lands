@@ -330,8 +330,17 @@ export function demolish(s: GameState, b: Building): boolean {
   if (b.type === 'townhall') return false;
   const d = BUILDINGS[b.type];
   // Sites return what was delivered (and the gold); finished buildings half.
-  if (b.build >= 1) refund(s, d.cost, 0.5);
-  else {
+  if (b.build >= 1) {
+    refund(s, d.zone ? zoneCost(b.type, b.w, b.h) : d.cost, 0.5);
+    if (b.upgrading) {
+      // A renovation under way gives back its gold and what was carried in.
+      const cost = upgradeCost(b);
+      s.res.gold += cost.gold ?? 0;
+      s.res.prestige += cost.prestige ?? 0;
+      const back = deliveredTo(b);
+      for (const k in back) store(s, k as ResourceId, back[k as ResourceId] ?? 0);
+    }
+  } else {
     s.res.gold += d.cost.gold ?? 0;
     const back = deliveredTo(b);
     for (const k in back) store(s, k as ResourceId, back[k as ResourceId] ?? 0);
@@ -891,6 +900,8 @@ export function inSeason(s: GameState, b: Building): boolean {
  */
 export function restingNow(s: GameState, b: Building): boolean {
   if (!inSeason(s, b)) return true;
+  // The harvest is brought in on the first day of its month; then farmers are free.
+  if (b.type === 'farm' && monthOf(s.day) === 7 && s.day % DAYS_PER_MONTH !== 0) return true;
   if (b.blocked === BLOCK_SEASONAL && b.status.startsWith('Enough')) {
     const r = chooseRecipe(s, b, true);
     const out = r ? r.outputs : workDef(b).outputs;
@@ -954,6 +965,11 @@ export function chooseRecipe(s: GameState, b: Building, any = false): Recipe | n
 }
 
 export function setRecipe(_s: GameState, b: Building, id: string | undefined): void {
+  // Replanting an orchard starts the trees over.
+  if (b.type === 'orchard' && (b.recipe ?? 'apples') !== (id ?? 'apples')) {
+    b.age = 0;
+    b.growth = 0;
+  }
   b.recipe = id;
   b.work = Math.min(b.work, 0.99);
   if (b.blocked) b.blocked = 0;
@@ -1225,7 +1241,7 @@ function stepFarm(s: GameState, b: Building): void {
   const month = monthOf(s.day);
   const fields = zonesOf(s, b);
   const area = zoneArea(fields);
-  const crew = b.workers / BUILDINGS.farm.workers;
+  const crew = Math.min(1, b.workers / Math.max(1, workersOf(b)));
   b.blocked = 0;
   if (!fields.length) {
     b.status = 'Draw fields nearby to farm';
@@ -1323,13 +1339,20 @@ const STARTING_HERD = 6;
 
 function stepByre(s: GameState, b: Building): void {
   const kind = herdKindOf(b);
-  if (b.herdKind !== kind) {
-    b.herdKind = kind;
-    b.herd = STARTING_HERD;
-  }
   const pastures = zonesOf(s, b);
   const capy = herdCapacity(s, b);
-  b.herd = Math.min(b.herd ?? 0, capy.fed);
+  // A fresh herd arrives once there is pasture for it (and when the animal changes).
+  if (capy.free > 0 && (b.herdKind !== kind || !b.herd)) {
+    if (b.herdKind !== kind || b.herd === undefined) b.herd = Math.min(STARTING_HERD, capy.free);
+    else if (!b.herd) b.herd = Math.min(2, capy.free);
+    b.herdKind = kind;
+  }
+  // Pastures shrank below the herd: the surplus is sold at market.
+  if ((b.herd ?? 0) > capy.fed) {
+    const extra = (b.herd ?? 0) - capy.fed;
+    b.herd = capy.fed;
+    s.res.gold += extra * 3;
+  }
   const H = HERDS[kind];
   for (const z of pastures) z.status = `${b.herd} ${b.herd === 1 ? H.name : H.plural} grazing`;
   b.blocked = 0;
@@ -1360,7 +1383,7 @@ function stepByre(s: GameState, b: Building): void {
 /** Monthly herd events: spring lambing and shearing, autumn slaughter, winter fodder. */
 function monthlyHerds(s: GameState, month: number): void {
   for (const b of s.buildings) {
-    if (b.type !== 'byre' || b.build < 1 || b.herdKind === undefined) continue;
+    if (b.type !== 'byre' || b.build < 1 || !b.herd) continue;
     const kind = herdKindOf(b);
     const capy = herdCapacity(s, b);
     const herd = b.herd ?? 0;
@@ -1574,7 +1597,9 @@ export function dailyProduction(s: GameState, rng: StateRng): void {
       continue;
     }
     if (d.workers === 0 || d.cycle === 0) {
-      b.status = passiveStatus(s, b);
+      // Taverns set their own status when they pour (or run dry).
+      if (b.type !== 'tavern') b.status = passiveStatus(s, b);
+      else if (b.workers === 0) b.status = 'No workers available';
       continue;
     }
     if (!inSeason(s, b)) {

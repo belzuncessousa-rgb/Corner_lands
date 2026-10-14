@@ -78,8 +78,8 @@ export const UPGRADABLE_WORK: BuildingType[] = [
 
 /** Worker slots, including the expansion of a level 2 workplace. */
 export function workersOf(b: Building): number {
-  // A family craft is worked by two of the household.
-  if (b.trade) return Math.min(2, b.residents);
+  // A family craft is worked by as many of the household as the workshop needs.
+  if (b.trade) return Math.min(BUILDINGS[b.trade].workers, b.residents);
   const base = BUILDINGS[b.type].workers;
   return b.level >= 2 && UPGRADABLE_WORK.includes(b.type) ? base + Math.ceil(base / 2) : base;
 }

@@ -79,7 +79,7 @@ then fall back to the browser's localStorage.
   food groups). Clothes, boots and medicine wear out every three months.
   Unmet needs sour the mood.
 - **Home crafts** — a Timber House or Townhouse can take up a craft (baker,
-  brewer, weaver, tailor...). Two of the family work it from home and make
+  brewer, weaver, tailor...). The family works it from home and makes
   half as much again as a common workshop.
 - **The manor** — raise the Manor Hall to a Manor House, Stone Manor,
   Lord's Keep and finally a Castle to become a Village, Town, Borough and

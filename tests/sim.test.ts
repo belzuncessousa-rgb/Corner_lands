@@ -645,3 +645,36 @@ describe('charter goods', () => {
     expect(s.happinessFactors.some((f) => /luxur/.test(f.label))).toBe(true);
   });
 });
+
+describe('review regressions', () => {
+  it('an animal farm raised by builders gets its herd once pastures exist', async () => {
+    const { placeZone } = await import('../src/game/sim');
+    const s = generateWorld(71);
+    s.tier = 1;
+    s.res.wood = 150;
+    s.res.gold = 200;
+    s.population = 12;
+    const byre = placeNearRoad(s, 'byre');
+    let z = null;
+    for (let r = 1; r < 10 && !z; r++) z = placeZone(s, 'pasture', byre.x + 2 + r, byre.y, byre.x + 7 + r, byre.y + 5) ?? placeZone(s, 'pasture', byre.x, byre.y + 2 + r, byre.x + 5, byre.y + 7 + r);
+    expect(z).not.toBeNull();
+    run(s, 40);
+    expect(byre.build).toBe(1);
+    expect(byre.herd).toBeGreaterThan(0);
+  });
+
+  it('a home dairy makes half as much again as a dairy, not three times', async () => {
+    const { setTrade } = await import('../src/game/sim');
+    const s = generateWorld(72);
+    s.tier = 1;
+    const h = placeNearRoad(s, 'house');
+    h.build = 1;
+    h.level = 2;
+    s.res.wood = 20;
+    s.res.planks = 20;
+    s.population = 15;
+    expect(setTrade(s, h, 'dairy')).toBeNull();
+    recompute(s);
+    expect(h.workers).toBe(1);
+  });
+});

@@ -442,7 +442,8 @@ export class Hud {
     const kind = group === 'food' ? 'food' : group === 'materials' ? 'materials' : null;
     let storage = '';
     if (group === 'goods') {
-      storage = `<div class="kv"><span>Stored with materials</span><span>${Math.floor(stored(s, 'materials'))} / ${storageCap(s, 'materials')}</span></div>`;
+      storage = `<div class="kv" data-tip="Wares share the storehouses with materials; wheat, barley, oats and flour go to the granaries."><span>${ICONS.storage} Storehouses</span><span>${Math.floor(stored(s, 'materials'))} / ${storageCap(s, 'materials')}</span></div>
+        <div class="kv"><span>${ICONS.granary} Granaries</span><span>${Math.floor(stored(s, 'food'))} / ${storageCap(s, 'food')}</span></div>`;
     } else if (kind) {
       const used = Math.floor(stored(s, kind));
       const cap = storageCap(s, kind);
@@ -683,7 +684,7 @@ export class Hud {
     }
     if (b.type === 'house' && b.build >= 1 && b.level >= 2) {
       const trades = HOME_TRADES.filter((t) => isUnlocked(s, t));
-      rows.push(`<div class="kv product" data-tip="<b>Home craft</b><br>Two of the family work a craft from home, making half as much again as a common workshop. Setting up costs 6 timber and 6 planks."><span>Home craft</span><span class="seg">${[undefined, ...trades]
+      rows.push(`<div class="kv product" data-tip="<b>Home craft</b><br>Members of the family work a craft from home, making half as much again as a common workshop. Setting up costs 6 timber and 6 planks."><span>Home craft</span><span class="seg">${[undefined, ...trades]
         .map((t) => `<button data-action="trade-home" data-t="${t ?? ''}" class="${(b.trade ?? '') === (t ?? '') ? 'active' : ''}" data-tip="${t ? `<b>${esc(BUILDINGS[t].name)}</b><br>${esc(BUILDINGS[t].desc)}` : 'No craft: the family works wherever it is needed.'}">${t ? (ICONS[Object.keys(BUILDINGS[t].outputs)[0] as ResourceId] ?? '') : ''}${t ? BUILDINGS[t].name.split(' ')[0] : 'None'}</button>`)
         .join('')}</span></div>`);
     }
