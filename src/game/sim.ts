@@ -358,7 +358,7 @@ export function doorTile(s: GameState, b: Building): { x: number; y: number } {
 
 // ---------------------------------------------------------------- recompute
 
-const BLOCKED = /^(No |Bushes|Storage full|Waiting|Not enough|Fields untended|Fields lie|Fields resting|Fields harvested)/;
+const BLOCKED = /^(No |Bushes|Storage full|Waiting|Not enough|Fields lie|Fields resting|Fields harvested)/;
 
 /** True when the building's last status says it cannot currently produce. */
 export function isBlocked(b: Building): boolean {

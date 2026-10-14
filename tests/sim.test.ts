@@ -225,3 +225,18 @@ describe('relaxed mode', () => {
     expect(s.population).toBe(8);
   });
 });
+
+describe('job queue', () => {
+  it('an unstaffed farm in spring is not treated as blocked', async () => {
+    const { isBlocked } = await import('../src/game/sim');
+    const s = generateWorld(9);
+    s.tier = 1;
+    s.res.wood = 200;
+    const farm = placeNearRoad(s, 'farm');
+    farm.build = 1;
+    farm.status = 'Fields untended';
+    expect(isBlocked(farm)).toBe(false);
+    farm.status = 'Fields resting for winter';
+    expect(isBlocked(farm)).toBe(true);
+  });
+});

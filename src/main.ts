@@ -506,6 +506,8 @@ export class Game {
       this.keys.add(k);
       if (k === 'escape') {
         if (this.hud.closeModal()) return;
+        // A modal that cannot be dismissed (title screen) swallows Escape.
+        if (this.modalOpen) return;
         if (this.tool.kind !== 'select') this.setTool({ kind: 'select' });
         else if (this.selected !== null) this.select(null);
         else this.hud.showGameMenu();
