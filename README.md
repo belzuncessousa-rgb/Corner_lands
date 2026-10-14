@@ -32,15 +32,22 @@ then fall back to the browser's localStorage.
 | Pan | Left-drag, right-drag, `WASD` / arrow keys, or the minimap |
 | Zoom | Mouse wheel, pinch, `+` / `-` |
 | Build | Pick a category at the bottom, then a building (`H` house, `E` woodcutter, `Q` quarry, `G` forager) |
-| Roads | `R`, click where the road starts, click where it ends; keep clicking to continue |
+| Roads | `R`, click where the road starts, click where it ends; keep clicking to continue. `T` lays paved stone roads (Village) |
 | Demolish | `X`, then click a building or drag across roads |
 | Cancel / deselect | Right-click or `Esc` |
-| Pause / speed | `Space`, `1` `2` `3` |
+| Pause / speed | `Space`, `1` `2` `3` (normal, ×3, ×8) |
 
 ### How the settlement works
 
-- **Pace** — a day lasts four seconds at normal speed, a year about eight
-  minutes. Villagers stroll; they walk faster on roads.
+- **Pace** — a year lasts about 45 minutes at normal speed. Villagers stroll;
+  they walk faster on dirt roads and faster still on paved ones.
+- **Top bar** — happiness, villagers, food, materials, goods and the treasury
+  (coins and prestige). Hover a chip for the breakdown, click to pin it: set
+  how much of each good to keep in stock and whether merchants may buy the
+  surplus. The villagers chip shows who is working, building, idle or resting.
+- **Labour** — select a workplace to choose how many villagers work there, its
+  priority and, where it has several, its product (or Auto). Seasonal work and
+  workplaces whose goods are at their stock target free their workers.
 - **Building** — place a plan and builders carry the materials from storage,
   one load per trip, then raise the walls. Plans can wait for materials.
   Construction is a job: each site takes two builders before other work, and
@@ -52,8 +59,9 @@ then fall back to the browser's localStorage.
   to their resources work faster (the inspector shows their efficiency).
 - **Villagers** — settlers arrive when happiness is at least 50%, nobody went
   hungry and there is free housing.
-- **Food & seasons** — each villager eats one food per month; variety raises
-  happiness. Farms are sown in spring and harvested in autumn; foragers rest in
+- **Food & seasons** — each villager eats one food per month (bread and cheese
+  go further); meals from several food groups (grain, meat, produce, dairy)
+  raise happiness. Farms are sown in spring and harvested in autumn; foragers rest in
   winter and every household burns one timber per winter month.
 - **Homes grow** — Cottage → Timber House (well, market, two kinds of food) →
   Townhouse (church, tavern, three kinds of food). Unmet needs sour the mood.
@@ -61,9 +69,10 @@ then fall back to the browser's localStorage.
   Lord's Keep to become a Village, Town and Borough. Each rank unlocks
   buildings and adds storage.
 - **Workshops** — can be expanded once for half as many workers again.
-- **Trade** — at the marketplace buy and sell goods, or set exports: a
-  merchant's cart visits each month and buys your surplus.
-- **Events** — every year or two something happens (wanderers, a merchant,
+- **Trade** — at the marketplace buy and sell goods; mark goods for sale in the
+  top bar and a merchant's cart visits each month to buy what is above the
+  stock target.
+- **Events** — once or twice a year something happens (wanderers, a merchant,
   wolves, a harvest feast, the king's tax collector...) and you choose what to
   do.
 - **Steward, chronicle & ledger** — timely advice, the full story of your lands

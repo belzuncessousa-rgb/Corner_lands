@@ -124,15 +124,15 @@ Every charter carries a small malus.
 ## Roadmap
 
 ### Phase 1 — Foundations
-- [ ] 45-minute year; events 1.5–2 per year with a larger pool
-- [ ] Data-driven goods registry (groups, value, food value, storage kind)
-- [ ] Top bar with category chips, hover breakdowns, prestige
-- [ ] Stock targets per good (replace export thresholds; converters on Auto)
-- [ ] Worker targets, priority, seasonal schedules; Labour panel on Population hover
-- [ ] Product toggles on buildings
-- [ ] Food groups for variety; food value per good
-- [ ] Stone roads
-- [ ] Medieval art pass: plank walls, wattle & daub, coursed stone, thatch & shingle texture
+- [x] 45-minute year; events 1.5–2 per year with a larger pool
+- [x] Data-driven goods registry (groups, value, food value, storage kind)
+- [x] Top bar with category chips, hover breakdowns, prestige
+- [x] Stock targets per good (replace export thresholds; converters on Auto)
+- [x] Worker targets, priority, seasonal schedules; Labour panel on Population hover
+- [x] Product toggles on buildings
+- [x] Food groups for variety; food value per good
+- [x] Stone roads
+- [x] Medieval art pass: plank walls, wattle & daub, coursed stone, thatch & shingle texture
 
 ### Phase 2 — Land and wood
 - [ ] Firewood; hides; mushrooms & herbs
