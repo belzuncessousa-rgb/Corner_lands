@@ -575,9 +575,6 @@ function drawBuilding(p: Pen, type: BuildingType, level: number, season: Season,
       smoke.push(p.chimney(2.15, 1.65, 34, 18, '#8d8274'));
       // Steps and barrels.
       p.box(1.32, 2.25, 1.78, 2.5, 0, 3, '#9b9284');
-      p.barrel(2.55, 2.55);
-      p.barrel(2.75, 2.45);
-      p.crate(0.45, 2.45);
       break;
     }
     case 'house': {
@@ -980,23 +977,58 @@ function drawBuilding(p: Pen, type: BuildingType, level: number, season: Season,
       break;
     }
     case 'storehouse': {
-      p.shadow(0.3, 0.4, 2.7, 2.4);
-      p.box(0.3, 0.4, 2.7, 2.3, 0, 22, WOOD);
-      for (let x = 0.4; x < 2.7; x += 0.15) p.line([x, 2.3, 0], [x, 2.3, 22], shade(WOOD, 0.75), 0.5);
-      for (let y = 0.5; y < 2.3; y += 0.15) p.line([2.7, y, 0], [2.7, y, 22], shade(WOOD, 0.58), 0.5);
-      p.timber(0.3, 0.4, 2.7, 2.3, 0, 22, '#5a3a22');
+      // Barn at the back, open stacking yard in front (piles drawn live).
+      p.poly(
+        [
+          [0.15, 1.45, 0],
+          [2.85, 1.45, 0],
+          [2.85, 2.9, 0],
+          [0.15, 2.9, 0],
+        ],
+        season === 3 ? '#d4d8d6' : '#a8946a',
+      );
+      p.fence([0.15, 2.92], [1.1, 2.92]);
+      p.fence([1.9, 2.92], [2.85, 2.92]);
+      p.fence([2.92, 1.45], [2.92, 2.85]);
+      p.shadow(0.3, 0.25, 2.7, 1.35);
+      p.box(0.3, 0.25, 2.7, 1.35, 0, 22, WOOD);
+      for (let x = 0.4; x < 2.7; x += 0.15) p.line([x, 1.35, 0], [x, 1.35, 22], shade(WOOD, 0.75), 0.5);
+      for (let y = 0.35; y < 1.35; y += 0.15) p.line([2.7, y, 0], [2.7, y, 22], shade(WOOD, 0.58), 0.5);
+      p.timber(0.3, 0.25, 2.7, 1.35, 0, 22, '#5a3a22');
       // Big barn doors.
-      p.wallL(2.302, 1.15, 1.85, 0, 17, '#5b3a22');
-      p.line([1.15, 2.304, 0], [1.85, 2.304, 17], '#3d2614', 1);
-      p.line([1.85, 2.304, 0], [1.15, 2.304, 17], '#3d2614', 1);
-      p.line([1.5, 2.304, 0], [1.5, 2.304, 17], '#3d2614', 1);
-      p.roofX(0.3, 0.4, 2.7, 2.3, 22, 26, 'shingle', WOOD, 0.14);
-      p.barrel(0.5, 2.6);
-      p.barrel(0.7, 2.7);
-      p.crate(2.2, 2.5);
-      p.crate(2.45, 2.55, 0.14);
-      p.sack(2.85, 1.2);
-      p.sack(2.85, 1.45, '#cdbb8e');
+      p.wallL(1.352, 1.15, 1.85, 0, 17, '#5b3a22');
+      p.line([1.15, 1.354, 0], [1.85, 1.354, 17], '#3d2614', 1);
+      p.line([1.85, 1.354, 0], [1.15, 1.354, 17], '#3d2614', 1);
+      p.line([1.5, 1.354, 0], [1.5, 1.354, 17], '#3d2614', 1);
+      p.roofX(0.3, 0.25, 2.7, 1.35, 22, 22, 'shingle', WOOD, 0.14);
+      break;
+    }
+    case 'granary': {
+      p.poly(
+        [
+          [0.15, 1.45, 0],
+          [2.85, 1.45, 0],
+          [2.85, 2.9, 0],
+          [0.15, 2.9, 0],
+        ],
+        season === 3 ? '#d4d8d6' : '#b09c70',
+      );
+      p.fence([0.15, 2.92], [1.1, 2.92], '#8a6a44');
+      p.fence([1.9, 2.92], [2.85, 2.92], '#8a6a44');
+      p.shadow(0.4, 0.3, 2.6, 1.35);
+      // Raised on staddle stones to keep the rats out.
+      for (const x of [0.5, 1.5, 2.5]) {
+        for (const y of [0.4, 1.25]) {
+          p.box(x - 0.06, y - 0.06, x + 0.06, y + 0.06, 0, 5, '#9a9288');
+          p.ellipse(x, y, 6, 4, 1.5, '#a8a093');
+        }
+      }
+      p.box(0.4, 0.3, 2.6, 1.35, 6, 18, '#b88a52');
+      for (let x = 0.5; x < 2.6; x += 0.12) p.line([x, 1.35, 6], [x, 1.35, 24], '#8a6236', 0.5);
+      for (let y = 0.4; y < 1.35; y += 0.12) p.line([2.6, y, 6], [2.6, y, 24], '#7a5230', 0.5);
+      p.wallL(1.352, 1.3, 1.7, 6, 19, '#5b3a22');
+      p.box(1.35, 1.35, 1.65, 1.6, 0, 6, '#7b5a36');
+      p.roofX(0.4, 0.3, 2.6, 1.35, 24, 20, 'thatch', '#b88a52', 0.16);
       break;
     }
     case 'market': {

@@ -1,5 +1,5 @@
-import { BUILDINGS } from '../game/data';
-import { deliveredTo, hasProblem, monthOf, seasonOf } from '../game/sim';
+import { BUILDINGS, RESOURCE_STORAGE, STORAGE_CAPACITY, type StorageKind } from '../game/data';
+import { deliveredTo, hasProblem, monthOf, seasonOf, storageCap } from '../game/sim';
 import type { Building, BuildingType, GameState, ResourceId, Season } from '../game/types';
 import { idx, inBounds } from '../game/world';
 import type { Agent } from './agents';
@@ -628,6 +628,7 @@ export class Renderer {
       return;
     }
     this.blit(sp, wx, wy);
+    if (STORAGE_CAPACITY[b.type]) this.drawStock(s, b, season);
     if (selected) {
       c.save();
       c.globalCompositeOperation = 'lighter';
@@ -641,6 +642,54 @@ export class Renderer {
       this.drawMarker(b, '#e0a030', '?');
     }
     void s;
+  }
+
+  /**
+   * Piles of goods in a storage yard, one pile per slot, so a filling
+   * storehouse visibly fills up.
+   */
+  private drawStock(s: GameState, b: Building, season: Season): void {
+    const p = new Pen(this.ctx);
+    p.snow = season === 3;
+    const kinds: StorageKind[] = b.type === 'storehouse' ? ['materials'] : b.type === 'granary' ? ['food'] : ['materials', 'food'];
+    const slots: [number, number][] =
+      b.type === 'townhall'
+        ? [
+            [0.45, 2.55],
+            [2.3, 2.75],
+            [2.75, 2.25],
+            [0.35, 2.05],
+          ]
+        : [
+            [0.45, 1.8],
+            [1.05, 1.8],
+            [1.65, 1.8],
+            [2.25, 1.8],
+            [0.45, 2.45],
+            [1.05, 2.45],
+            [1.65, 2.45],
+            [2.25, 2.45],
+          ];
+    const per = Math.floor(slots.length / kinds.length);
+    let slot = 0;
+    for (const kind of kinds) {
+      const cap = storageCap(s, kind);
+      if (!cap) continue;
+      const ids = (Object.keys(RESOURCE_STORAGE) as ResourceId[]).filter((r) => RESOURCE_STORAGE[r] === kind && s.res[r] >= 1);
+      const total = ids.reduce((a, r) => a + s.res[r], 0);
+      const filled = Math.min(per, Math.ceil((total / cap) * per));
+      // Hand out filled slots to goods in proportion to how much there is.
+      const order = ids.sort((a, c) => s.res[c] - s.res[a]);
+      const counts = order.map((r) => Math.max(1, Math.round((s.res[r] / Math.max(1, total)) * filled)));
+      let k = 0;
+      for (let oi = 0; oi < order.length && k < filled; oi++) {
+        for (let n = 0; n < counts[oi] && k < filled; n++, k++) {
+          const [lx, ly] = slots[slot + k];
+          drawGood(p, order[oi], b.x + lx, b.y + ly);
+        }
+      }
+      slot += per;
+    }
   }
 
   private drawMarker(b: Building, color: string, glyph: string): void {
@@ -1065,6 +1114,57 @@ export class Renderer {
 /** Visual variant of a building (houses come in several styles). */
 function variantOf(b: Building): number {
   return b.type === 'house' ? (b.id * 7 + b.x) % 4 : 0;
+}
+
+/** A small pile of one kind of goods. */
+function drawGood(p: Pen, id: ResourceId, x: number, y: number): void {
+  switch (id) {
+    case 'wood':
+      p.logPile(x - 0.15, y, 2);
+      break;
+    case 'stone':
+      p.stonePile(x - 0.15, y - 0.15, 4);
+      break;
+    case 'planks':
+      for (let i = 0; i < 3; i++) p.box(x - 0.2, y - 0.12, x + 0.2, y + 0.12, i * 2.4, 2.2, i % 2 ? '#d7b47c' : '#c8a46c');
+      break;
+    case 'iron':
+      for (let i = 0; i < 3; i++) p.box(x - 0.15 + i * 0.1, y - 0.06, x - 0.07 + i * 0.1, y + 0.1, 0, 3, '#5d6068');
+      p.box(x - 0.1, y - 0.04, x + 0.12, y + 0.04, 3, 3, '#6d7078');
+      break;
+    case 'tools':
+      p.crate(x - 0.1, y - 0.1, 0.2);
+      p.line([x - 0.05, y + 0.1, 8], [x + 0.08, y + 0.1, 14], '#8a8e94', 1.2);
+      break;
+    case 'grain':
+      p.sack(x - 0.08, y);
+      p.sack(x + 0.08, y + 0.05, '#cdbb8e');
+      p.sack(x, y - 0.1, '#e0d0a4');
+      break;
+    case 'bread':
+      p.crate(x - 0.1, y - 0.1, 0.18);
+      p.ellipse(x, y, 8, 3, 1.6, '#c8904a');
+      break;
+    case 'berries': {
+      const [bx, by] = iso(x, y, 0);
+      p.ctx.fillStyle = '#a07a40';
+      p.ctx.beginPath();
+      p.ctx.ellipse(bx, by - 3, 5, 4, 0, 0, Math.PI);
+      p.ctx.fill();
+      p.ctx.fillStyle = '#b23040';
+      p.ctx.beginPath();
+      p.ctx.ellipse(bx, by - 3, 4.5, 2, 0, 0, Math.PI * 2);
+      p.ctx.fill();
+      break;
+    }
+    case 'meat':
+    case 'fish':
+      p.barrel(x - 0.06, y);
+      p.barrel(x + 0.1, y + 0.08);
+      break;
+    default:
+      p.crate(x - 0.1, y - 0.1, 0.18);
+  }
 }
 
 const TREE_SLOTS: [number, number][][] = [
