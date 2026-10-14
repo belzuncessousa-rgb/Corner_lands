@@ -164,6 +164,7 @@ export class Game {
     this.wildlife.update(this.state, gameDt);
     this.renderer.render(this.state, this.agents.agents, this.overlay(), running ? dt : 0, this.wildlife.animals);
     this.hud.minimap.update(dt);
+    this.hud.tickAudio(dt, running);
     this.hudTimer -= dt;
     if (this.hudTimer <= 0) {
       this.hudTimer = 0.25;

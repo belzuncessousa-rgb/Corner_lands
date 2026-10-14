@@ -39,6 +39,7 @@ import { idx, inBounds } from '../game/world';
 import type { Game } from '../main';
 import { ICONS, SEASON_ICONS } from './icons';
 import { Minimap } from './minimap';
+import { Ambient } from './ambient';
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
@@ -69,6 +70,7 @@ export class Hud {
   private shownMessages = 0;
   private modal: HTMLElement | null = null;
   private audio: AudioContext | null = null;
+  private ambient: Ambient | null = null;
   muted = false;
   private objectivesMin = window.innerWidth < 700 || window.innerHeight < 520;
   private lastInspectorKey = '';
@@ -662,6 +664,8 @@ export class Hud {
     m.querySelector('[data-m="help"]')!.addEventListener('click', () => this.showHelp(false));
     m.querySelector('[data-m="sound"]')!.addEventListener('click', () => {
       this.muted = !this.muted;
+      this.ambient?.setMuted(this.muted);
+      if (!this.muted) this.ensureAudio();
       try {
         localStorage.setItem('cornerlands.muted', this.muted ? '1' : '0');
       } catch {
@@ -778,9 +782,16 @@ export class Hud {
     if (this.audio || this.muted) return;
     try {
       this.audio = new AudioContext();
+      this.ambient = new Ambient(this.audio);
     } catch {
       /* no audio */
     }
+  }
+
+  /** Drives ambient sound; called every frame. */
+  tickAudio(dt: number, running: boolean): void {
+    if (!this.ambient || this.muted || this.audio?.state !== 'running') return;
+    this.ambient.update(dt, seasonOf(this.game.state.day), running);
   }
 
   sound(kind: 'place' | 'road' | 'demolish' | 'good' | 'bad' | 'coin'): void {
