@@ -48,6 +48,7 @@ export function deserialize(json: string): GameState {
     else (s as unknown as Record<string, Uint8Array>)[k] = new Uint8Array(buf);
   }
   s.res = { ...emptyResources(), ...s.res };
+  s.history ??= [];
   s.dirty = true;
   return s;
 }

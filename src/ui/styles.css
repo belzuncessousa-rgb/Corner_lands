@@ -911,3 +911,82 @@ button.active {
     display: none;
   }
 }
+
+/* ------------------------------------------------------------ ledger */
+
+.town-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+.town-actions button {
+  flex: 1;
+}
+.modal.wide {
+  width: min(620px, calc(100vw - 32px));
+}
+.ledger {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 10px;
+  margin: 8px 0 12px;
+}
+.chart-card {
+  margin: 0;
+  padding: 6px 8px 2px;
+  border: 1px solid rgba(91, 58, 34, 0.3);
+  border-radius: 5px;
+  background: rgba(255, 250, 235, 0.55);
+}
+.chart-card figcaption {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+.chart-card figcaption b {
+  color: var(--ink);
+  font-size: 16px;
+}
+.chart {
+  width: 100%;
+  height: auto;
+  display: block;
+  touch-action: none;
+}
+.chart .grid {
+  stroke: rgba(91, 58, 34, 0.15);
+  stroke-width: 1;
+}
+.chart .tick {
+  font: 10px var(--serif);
+  fill: var(--ink-soft);
+}
+.chart .line {
+  fill: none;
+  stroke: var(--wood-2);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.chart .area {
+  fill: rgba(122, 82, 48, 0.12);
+}
+.chart .cross {
+  stroke: rgba(59, 42, 26, 0.45);
+  stroke-width: 1;
+}
+.chart .hover circle {
+  fill: var(--wood-2);
+  stroke: var(--parch);
+  stroke-width: 2;
+}
+.chart .hv {
+  font: 600 11px var(--serif);
+  fill: var(--ink);
+}
+.chart .hvbg {
+  fill: var(--parch);
+  stroke: rgba(91, 58, 34, 0.4);
+  stroke-width: 1;
+}

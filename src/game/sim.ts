@@ -752,7 +752,12 @@ export function monthly(s: GameState, rng: StateRng): void {
 
   updateTier(s);
   checkQuests(s);
+  s.history.push({ d: s.day, pop: s.population, food: Math.floor(totalFood(s)), happy: s.happiness, gold: Math.floor(s.res.gold) });
+  if (s.history.length > MAX_HISTORY) s.history.splice(0, s.history.length - MAX_HISTORY);
 }
+
+/** Months of history kept for the ledger (30 years). */
+export const MAX_HISTORY = 360;
 
 /** Decoration beauty enjoyed by a home, capped. */
 export function beautyAt(s: GameState, home: Building): number {

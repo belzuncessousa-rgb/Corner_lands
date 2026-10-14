@@ -78,6 +78,7 @@ export function generateWorld(seed: number): GameState {
     report: { eaten: 0, shortage: 0, variety: 0, cold: false, taxes: 0, arrived: 0, left: 0 },
     rngState: (seed * 7919) >>> 0,
     incoming: 0,
+    history: [],
     dirty: true,
   };
 

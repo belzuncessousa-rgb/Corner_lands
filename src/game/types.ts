@@ -85,6 +85,16 @@ export interface MonthReport {
   left: number;
 }
 
+/** One month's snapshot for the ledger charts. */
+export interface HistoryPoint {
+  /** Day the month started. */
+  d: number;
+  pop: number;
+  food: number;
+  happy: number;
+  gold: number;
+}
+
 export interface GameState {
   version: number;
   seed: number;
@@ -117,6 +127,8 @@ export interface GameState {
   rngState: number;
   /** Settlers still walking in (cosmetic + counted on arrival). */
   incoming: number;
+  /** Monthly snapshots, oldest first. */
+  history: HistoryPoint[];
   /** Set when buildings/roads change; cleared after recompute. */
   dirty: boolean;
 }

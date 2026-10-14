@@ -282,7 +282,10 @@ export class Hud {
       <div class="row"><span>Last month</span><span>ate ${r.eaten}${r.shortage ? `, <span class="neg">${r.shortage} hungry</span>` : ''}</span></div>
       <div class="row"><span>Taxes</span><span>+${r.taxes} ${ICONS.gold}</span></div>
       <div class="tax">${taxes}</div>
-      ${hasBuilt(s, 'market') ? '<button data-action="trade" style="width:100%;margin-top:6px">⚖ Trade at Market</button>' : ''}`);
+      <div class="town-actions">
+        <button data-action="ledger">📜 Ledger</button>
+        ${hasBuilt(s, 'market') ? '<button data-action="trade">⚖ Trade</button>' : ''}
+      </div>`);
   }
 
   private updateInspector(): void {
@@ -537,6 +540,9 @@ export class Hud {
       case 'trade':
         this.showTrade();
         break;
+      case 'ledger':
+        this.showLedger();
+        break;
       case 'trade-do': {
         const err = trade(s, t.dataset.res as ResourceId, Number(t.dataset.n));
         if (err) this.flash(err);
@@ -752,6 +758,28 @@ export class Hud {
     m.querySelector('[data-m="back"]')!.addEventListener('click', () => (fromMain ? this.showMainMenu() : this.showGameMenu()));
   }
 
+  private showLedger(): void {
+    const s = this.game.state;
+    const h = s.history;
+    if (h.length < 2) {
+      this.openModal(`<h2>Town Ledger</h2><p>The clerk needs a couple of months of records before drawing any charts. Check back soon.</p>
+        <div class="row" style="justify-content:flex-end"><button class="primary" data-action="close-modal">Close</button></div>`);
+      return;
+    }
+    const charts: [string, keyof (typeof h)[number], string][] = [
+      ['Villagers', 'pop', ''],
+      ['Food in store', 'food', ''],
+      ['Happiness', 'happy', '%'],
+      ['Gold', 'gold', ''],
+    ];
+    const html = charts.map(([title, key, unit]) => lineChart(title, h.map((p) => [p.d, p[key]]), unit, key === 'happy' ? 100 : undefined)).join('');
+    const m = this.openModal(`<h2>Town Ledger</h2>
+      <div class="ledger">${html}</div>
+      <div class="row" style="justify-content:flex-end"><button class="primary" data-action="close-modal">Close</button></div>`);
+    m.querySelector('.modal')!.classList.add('wide');
+    m.querySelectorAll<SVGSVGElement>('svg.chart').forEach(bindChartHover);
+  }
+
   private showTrade(): void {
     const s = this.game.state;
     const cap = storageCap(s);
@@ -856,4 +884,91 @@ export class Hud {
         break;
     }
   }
+}
+
+// ------------------------------------------------------------------ charts
+
+const CW = 260;
+const CH = 120;
+const PAD = { l: 34, r: 10, t: 8, b: 20 };
+
+/** A single-series line chart in the ledger's ink colour. */
+function lineChart(title: string, pts: [number, number][], unit: string, fixedMax?: number): string {
+  const xs = pts.map((p) => p[0]);
+  const ys = pts.map((p) => p[1]);
+  const x0 = xs[0];
+  const x1 = xs[xs.length - 1];
+  const yMax = fixedMax ?? niceMax(Math.max(1, ...ys));
+  const sx = (x: number) => PAD.l + ((x - x0) / Math.max(1, x1 - x0)) * (CW - PAD.l - PAD.r);
+  const sy = (y: number) => CH - PAD.b - (y / yMax) * (CH - PAD.t - PAD.b);
+  const path = pts.map((p, i) => `${i ? 'L' : 'M'}${sx(p[0]).toFixed(1)},${sy(p[1]).toFixed(1)}`).join('');
+  const area = `${path}L${sx(x1).toFixed(1)},${sy(0)}L${sx(x0).toFixed(1)},${sy(0)}Z`;
+  const grid = [0, 0.5, 1]
+    .map((f) => {
+      const y = sy(yMax * f);
+      return `<line x1="${PAD.l}" x2="${CW - PAD.r}" y1="${y}" y2="${y}" class="grid"/><text x="${PAD.l - 5}" y="${y + 4}" text-anchor="end" class="tick">${fmtNum(yMax * f)}</text>`;
+    })
+    .join('');
+  // Year ticks.
+  let years = '';
+  for (let d = Math.ceil(x0 / 120) * 120; d <= x1; d += 120 * Math.max(1, Math.ceil((x1 - x0) / 120 / 6))) {
+    years += `<text x="${sx(d)}" y="${CH - 5}" text-anchor="middle" class="tick">Y${d / 120 + 1}</text>`;
+  }
+  const last = ys[ys.length - 1];
+  return `<figure class="chart-card">
+    <figcaption><span>${title}</span><b>${fmtNum(last)}${unit}</b></figcaption>
+    <svg class="chart" viewBox="0 0 ${CW} ${CH}" data-pts='${JSON.stringify(pts)}' data-unit="${unit}" data-max="${yMax}" role="img" aria-label="${title} over time, now ${fmtNum(last)}${unit}">
+      ${grid}${years}
+      <path d="${area}" class="area"/>
+      <path d="${path}" class="line"/>
+      <g class="hover" style="display:none"><line class="cross" y1="${PAD.t}" y2="${CH - PAD.b}"/><circle r="4"/><rect class="hvbg" rx="3" height="15"/><text class="hv" y="${PAD.t + 10}"></text></g>
+      <rect x="${PAD.l}" y="0" width="${CW - PAD.l - PAD.r}" height="${CH}" fill="transparent"/>
+    </svg></figure>`;
+}
+
+function bindChartHover(svg: SVGSVGElement): void {
+  const pts = JSON.parse(svg.dataset.pts!) as [number, number][];
+  const unit = svg.dataset.unit ?? '';
+  const yMax = Number(svg.dataset.max);
+  const g = svg.querySelector('.hover') as SVGGElement;
+  const x0 = pts[0][0];
+  const x1 = pts[pts.length - 1][0];
+  const sx = (x: number) => PAD.l + ((x - x0) / Math.max(1, x1 - x0)) * (CW - PAD.l - PAD.r);
+  const sy = (y: number) => CH - PAD.b - (y / yMax) * (CH - PAD.t - PAD.b);
+  svg.addEventListener('pointermove', (e) => {
+    const r = svg.getBoundingClientRect();
+    const vx = ((e.clientX - r.left) / r.width) * CW;
+    let best = pts[0];
+    for (const p of pts) if (Math.abs(sx(p[0]) - vx) < Math.abs(sx(best[0]) - vx)) best = p;
+    const x = sx(best[0]);
+    g.style.display = '';
+    g.querySelector('line')!.setAttribute('x1', String(x));
+    g.querySelector('line')!.setAttribute('x2', String(x));
+    const c = g.querySelector('circle')!;
+    c.setAttribute('cx', String(x));
+    c.setAttribute('cy', String(sy(best[1])));
+    const t = g.querySelector('text')!;
+    const month = MONTH_NAMES[Math.floor(best[0] / 10) % 12];
+    t.textContent = `${month}, Y${Math.floor(best[0] / 120) + 1}: ${fmtNum(best[1])}${unit}`;
+    const right = x > CW / 2;
+    t.setAttribute('x', String(right ? x - 6 : x + 6));
+    t.setAttribute('text-anchor', right ? 'end' : 'start');
+    const bb = t.getBBox();
+    const bg = g.querySelector('rect')!;
+    bg.setAttribute('x', String(bb.x - 3));
+    bg.setAttribute('y', String(bb.y - 1));
+    bg.setAttribute('width', String(bb.width + 6));
+    bg.setAttribute('height', String(bb.height + 2));
+  });
+  svg.addEventListener('pointerleave', () => (g.style.display = 'none'));
+}
+
+function niceMax(v: number): number {
+  const p = 10 ** Math.floor(Math.log10(v));
+  for (const m of [1, 2, 2.5, 5, 10]) if (m * p >= v) return m * p;
+  return 10 * p;
+}
+
+function fmtNum(v: number): string {
+  return v >= 10000 ? `${Math.round(v / 1000)}k` : String(Math.round(v));
 }
