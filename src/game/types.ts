@@ -64,6 +64,11 @@ export interface Building {
   paused: boolean;
   connected: boolean;
   status: string;
+  /**
+   * Why the building cannot currently work: 0 or undefined = it can,
+   * 1 = blocked by a problem (no resources, storage full), 2 = seasonal rest.
+   */
+  blocked?: number;
   /** Units produced in the last month, for display. */
   lastOutput: number;
   output: number;

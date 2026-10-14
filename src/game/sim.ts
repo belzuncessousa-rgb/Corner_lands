@@ -358,11 +358,17 @@ export function doorTile(s: GameState, b: Building): { x: number; y: number } {
 
 // ---------------------------------------------------------------- recompute
 
-const BLOCKED = /^(No |Bushes|Storage full|Waiting|Not enough|Fields lie|Fields resting|Fields harvested)/;
+export const BLOCK_PROBLEM = 1;
+export const BLOCK_SEASONAL = 2;
 
-/** True when the building's last status says it cannot currently produce. */
+/** True when the building could not work last time it tried (problem or season). */
 export function isBlocked(b: Building): boolean {
-  return b.build >= 1 && BLOCKED.test(b.status) && b.status !== 'No workers available';
+  return b.build >= 1 && !!b.blocked;
+}
+
+/** True when the building is stuck on a problem the player may want to fix. */
+export function hasProblem(b: Building): boolean {
+  return b.build >= 1 && b.blocked === BLOCK_PROBLEM;
 }
 
 export function housingOf(b: Building): number {
@@ -564,11 +570,13 @@ export const WOOD_RESERVE = 20;
 function stepFarm(s: GameState, b: Building, cap: number): void {
   const month = monthOf(s.day);
   const crew = b.workers / BUILDINGS.farm.workers;
+  b.blocked = 0;
   if (month <= 5) {
     if (crew > 0) b.growth = Math.min(1, b.growth + crew / 50);
     b.status = crew > 0 ? (month < 3 ? 'Sowing the fields' : 'Tending the crops') : 'Fields untended';
   } else if (month === 6) {
     b.status = b.growth > 0 ? 'Crops ripening' : 'Fields lie fallow';
+    if (b.growth === 0) b.blocked = BLOCK_SEASONAL;
   } else if (month === 7 && s.day % DAYS_PER_MONTH === 0 && b.growth > 0) {
     if (crew > 0) {
       const amount = Math.round(FARM_YIELD * b.growth * (0.5 + 0.5 * farmFertility(s, b)) * (0.6 + 0.4 * crew));
@@ -584,9 +592,11 @@ function stepFarm(s: GameState, b: Building, cap: number): void {
       b.status = 'Crops rotted';
     }
     b.growth = 0;
+    b.blocked = BLOCK_SEASONAL;
   } else if (month >= 7) {
     b.growth = 0;
     b.status = month >= 9 ? 'Fields resting for winter' : 'Fields harvested';
+    b.blocked = BLOCK_SEASONAL;
   }
 }
 
@@ -629,10 +639,12 @@ export function dailyProduction(s: GameState, rng: StateRng): void {
     if (b.build < 1) continue;
     if (!b.connected && b.type !== 'townhall') {
       b.status = 'No road to the manor';
+      b.blocked = 0;
       continue;
     }
     if (b.paused) {
       b.status = 'Paused';
+      b.blocked = 0;
       continue;
     }
     if (b.type === 'farm') {
@@ -651,7 +663,9 @@ export function dailyProduction(s: GameState, rng: StateRng): void {
     }
     b.work += b.workers / d.workers / d.cycle;
     let status: string | null = null;
+    let tried = false;
     while (b.work >= 1) {
+      tried = true;
       status = produce(s, b, rng, cap);
       if (status) {
         b.work = 1;
@@ -659,7 +673,11 @@ export function dailyProduction(s: GameState, rng: StateRng): void {
       }
       b.work -= 1;
     }
-    b.status = status ?? 'Working';
+    if (tried) {
+      const seasonal = b.type === 'forager' && seasonOf(s.day) === 3;
+      b.blocked = status ? (seasonal ? BLOCK_SEASONAL : BLOCK_PROBLEM) : 0;
+    }
+    if (status || !b.blocked) b.status = status ?? 'Working';
   }
 }
 
@@ -701,7 +719,12 @@ export function monthly(s: GameState, rng: StateRng): void {
   for (const b of s.buildings) {
     b.lastOutput = b.output;
     b.output = 0;
-    if (isBlocked(b) && b.type !== 'farm') b.status = 'Looking for work';
+    // Retry blocked workplaces each month. Farms recompute their own state
+    // on the next day, so only their flag is cleared.
+    if (isBlocked(b)) {
+      b.blocked = 0;
+      if (b.type !== 'farm') b.status = 'Looking for work';
+    }
   }
 
   // Eating: one unit per villager per month, spread across food types.

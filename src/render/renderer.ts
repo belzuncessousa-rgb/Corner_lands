@@ -1,5 +1,5 @@
 import { BUILDINGS } from '../game/data';
-import { monthOf, seasonOf } from '../game/sim';
+import { hasProblem, monthOf, seasonOf } from '../game/sim';
 import type { Building, BuildingType, GameState, ResourceId, Season } from '../game/types';
 import { idx, inBounds } from '../game/world';
 import type { Agent } from './agents';
@@ -635,7 +635,7 @@ export class Renderer {
     // Status markers.
     if (!b.connected && b.type !== 'townhall') {
       this.drawMarker(b, '#d8462e', '!');
-    } else if (b.status.startsWith('No ') || b.status.startsWith('Waiting') || b.status === 'Storage full') {
+    } else if (hasProblem(b)) {
       this.drawMarker(b, '#e0a030', '?');
     }
     void s;

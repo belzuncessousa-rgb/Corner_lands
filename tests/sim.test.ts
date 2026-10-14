@@ -5,6 +5,7 @@ import {
   buildRoad,
   demolish,
   doorTile,
+  isBlocked,
   placeOrder,
   placementError,
   recompute,
@@ -227,16 +228,38 @@ describe('relaxed mode', () => {
 });
 
 describe('job queue', () => {
-  it('an unstaffed farm in spring is not treated as blocked', async () => {
-    const { isBlocked } = await import('../src/game/sim');
+  it('staffs an unstaffed spring farm before foragers when hands are short', () => {
     const s = generateWorld(9);
     s.tier = 1;
     s.res.wood = 200;
+    const forager = placeNearRoad(s, 'forager');
     const farm = placeNearRoad(s, 'farm');
     farm.build = 1;
+    forager.build = 1;
+    // A farm that had nobody yesterday must still win workers today.
     farm.status = 'Fields untended';
+    s.population = 3;
+    s.dirty = true;
+    stepDay(s);
+    expect(farm.workers).toBe(3);
+    expect(forager.workers).toBe(0);
+  });
+
+  it('a farm resting over winter is staffed again on the first day of spring', () => {
+    const s = generateWorld(9);
+    s.tier = 1;
+    s.res.wood = 200;
+    const forager = placeNearRoad(s, 'forager');
+    const farm = placeNearRoad(s, 'farm');
+    farm.build = 1;
+    forager.build = 1;
+    s.population = 3;
+    // Jump to the last day of winter.
+    s.day = DAYS_PER_YEAR - 1;
+    s.dirty = true;
+    stepDay(s);
     expect(isBlocked(farm)).toBe(false);
-    farm.status = 'Fields resting for winter';
-    expect(isBlocked(farm)).toBe(true);
+    stepDay(s);
+    expect(farm.workers).toBe(3);
   });
 });

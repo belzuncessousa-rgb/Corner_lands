@@ -35,6 +35,7 @@ export function makeBuilding(id: number, type: BuildingType, x: number, y: numbe
     work: 0,
     growth: 0,
     paused: false,
+    blocked: 0,
     connected: false,
     status: '',
     lastOutput: 0,

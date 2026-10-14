@@ -589,7 +589,20 @@ export class Hud {
     return true;
   }
 
+  /**
+   * Escape inside a dialog: closes it, or acts as its Back button when the
+   * dialog cannot simply be dismissed. Returns true when a dialog consumed it.
+   */
+  handleEscape(): boolean {
+    if (!this.modal) return this.game.modalOpen;
+    if (this.closeModal()) return true;
+    (this.modal.querySelector('[data-m="back"]') as HTMLElement | null)?.click();
+    return true;
+  }
+
   async showMainMenu(): Promise<void> {
+    // Block game input while the save list loads, before the title appears.
+    this.game.modalOpen = true;
     const saves = await listSaves().catch(() => [] as SaveInfo[]);
     const latest = saves[0];
     const m = this.openModal(
