@@ -74,6 +74,11 @@ then fall back to the browser's localStorage.
   ale from barley or cider from apples for the taverns; a Dairy makes cheese;
   the Tannery, Weaver and Tailor & Cobbler turn hides, wool and flax into
   leather, cloth, clothes and boots; the Apothecary makes medicine from herbs.
+  Clay pits by the water feed the Tile Kiln (roof tiles for Townhouses); the
+  Stonemason squares stone for the manor, church and statues; the Carpenter
+  makes wood parts for windmills; the Bloomery smelts ore into iron for the
+  Blacksmith. Kilns, tanneries and bloomeries work in batches: their workers
+  only come once a full batch of inputs is waiting.
 - **Homes grow** — Cottage → Timber House (well, market, a tavern with ale or
   cider, clothes, two food groups) → Townhouse (church, boots, medicine, three
   food groups). Clothes, boots and medicine wear out every three months.
