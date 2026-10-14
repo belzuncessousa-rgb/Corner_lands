@@ -59,10 +59,17 @@ then fall back to the browser's localStorage.
   to their resources work faster (the inspector shows their efficiency).
 - **Villagers** — settlers arrive when happiness is at least 50%, nobody went
   hungry and there is free housing.
+- **Farming** — a Farmstead tends the fields you draw near it (click one
+  corner, then the opposite one): wheat, barley, oats or flax, sown in spring
+  and harvested in autumn; rotate crops for better yields. Animal Farms keep
+  sheep (wool), cattle (milk, beef, hides) or pigs (pork) on fenced pastures;
+  oats let a herd outgrow its pasture over winter. Orchards of apples, pears
+  or plums bear after a year and a half. Households can keep a vegetable
+  patch, hens or beehives in the backyard.
 - **Food & seasons** — each villager eats one food per month (bread and cheese
   go further); meals from several food groups (grain, meat, produce, dairy)
-  raise happiness. Farms are sown in spring and harvested in autumn; foragers rest in
-  winter and every household burns one timber per winter month.
+  raise happiness. Foragers pick berries, autumn mushrooms or herbs and rest in deep winter;
+  every household burns a bundle of firewood (or two logs) each winter month.
 - **Homes grow** — Cottage → Timber House (well, market, two kinds of food) →
   Townhouse (church, tavern, three kinds of food). Unmet needs sour the mood.
 - **The manor** — raise the Manor Hall to a Manor House, Stone Manor and

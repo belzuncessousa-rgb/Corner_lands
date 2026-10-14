@@ -78,9 +78,23 @@ export const QUESTS: Quest[] = [
   {
     id: 'bread',
     title: 'Bake bread',
-    hint: 'A Farmstead grows grain; a Bakery turns it into bread.',
+    hint: 'Build a Farmstead, draw wheat fields beside it (Food menu), and a Bakery bakes the harvest into bread.',
     reward: { gold: 40 },
     done: (s) => count(s, 'farm') >= 1 && count(s, 'bakery') >= 1,
+  },
+  {
+    id: 'yard',
+    title: 'Keep a backyard',
+    hint: 'Select a house and give the family a vegetable patch or a hen coop.',
+    reward: { wood: 15 },
+    done: (s) => s.buildings.some((b) => b.type === 'house' && !!b.yard),
+  },
+  {
+    id: 'herd',
+    title: 'Raise a flock',
+    hint: 'Build an Animal Farm and fence a pasture beside it for sheep, cattle or pigs.',
+    reward: { gold: 40 },
+    done: (s) => s.buildings.some((b) => b.type === 'byre' && (b.herd ?? 0) > 0),
   },
   {
     id: 'planks',
@@ -88,6 +102,13 @@ export const QUESTS: Quest[] = [
     hint: 'A Sawpit turns timber into planks for finer buildings.',
     reward: { wood: 30 },
     done: (s) => count(s, 'sawmill') >= 1,
+  },
+  {
+    id: 'orchard',
+    title: 'Plant an orchard',
+    hint: "Build an Orchard Keeper's Lodge and plant fruit trees nearby. They bear after a year and a half.",
+    reward: { gold: 40 },
+    done: (s) => count(s, 'orchard') >= 1,
   },
   {
     id: 'storehouse',

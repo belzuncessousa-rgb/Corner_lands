@@ -135,10 +135,10 @@ Every charter carries a small malus.
 - [x] Medieval art pass: plank walls, wattle & daub, coursed stone, thatch & shingle texture
 
 ### Phase 2 — Land and wood
-- [ ] Firewood; hides; mushrooms & herbs
-- [ ] Drawn fields with crop choice (wheat, barley, oats, flax)
-- [ ] Drawn orchards (apples, pears, plums); drawn pastures (sheep, cattle, pigs), oats as fodder
-- [ ] Backyard extensions (vegetables, chickens, bees)
+- [x] Firewood; hides; mushrooms & herbs
+- [x] Drawn fields with crop choice (wheat, barley, oats, flax)
+- [x] Drawn orchards (apples, pears, plums); drawn pastures (sheep, cattle, pigs), oats as fodder
+- [x] Backyard extensions (vegetables, chickens, bees)
 
 ### Phase 3 — Workshops and needs
 - [ ] Windmill → bakery; brewhouse; dairy; tanner; weaver; tailor & cobbler; apothecary
