@@ -27,7 +27,14 @@ export function mix(a: string, b: string, t: number): string {
   return `#${((1 << 24) | (m(r1, r2) << 16) | (m(g1, g2) << 8) | m(b1, b2)).toString(16).slice(1)}`;
 }
 
+import { mulberry32 } from '../game/rng';
+
 export type RoofKind = 'thatch' | 'shingle' | 'slate' | 'tile' | 'plank';
+
+/** Wall surfaces: cut stone, rough rubble, weatherboards, logs, wattle and daub. */
+export type Material = 'stone' | 'rubble' | 'plank' | 'log' | 'plaster';
+
+const hash = (...n: number[]) => n.reduce((h, v) => Math.imul(h ^ Math.round(v * 1000), 2654435761) >>> 0, 2166136261);
 
 export const ROOF_COLORS: Record<RoofKind, string> = {
   thatch: '#c49a52',
@@ -47,6 +54,9 @@ export class Pen {
     const base = ROOF_COLORS[kind];
     return this.roofTint ? mix(base, this.roofTint.color, this.roofTint.t) : base;
   }
+
+  /** Picks a wall material from a box colour (set by the sprite builder). */
+  matFor: ((color: string) => Material | undefined) | null = null;
 
   constructor(public ctx: CanvasRenderingContext2D) {}
 
@@ -112,7 +122,13 @@ export class Pen {
   }
 
   /** Box with visible faces: front-left (y=y1), front-right (x=x1) and top. */
-  box(x0: number, y0: number, x1: number, y1: number, z0: number, h: number, color: string, top?: string): void {
+  box(x0: number, y0: number, x1: number, y1: number, z0: number, h: number, color: string, top?: string, mat?: Material): void {
+    this.plainBox(x0, y0, x1, y1, z0, h, color, top);
+    const m = mat ?? this.matFor?.(color);
+    if (m && h >= 5) this.textureBox(x0, y0, x1, y1, z0, h, color, m);
+  }
+
+  private plainBox(x0: number, y0: number, x1: number, y1: number, z0: number, h: number, color: string, top?: string): void {
     const z1 = z0 + h;
     this.poly(
       [
@@ -149,6 +165,128 @@ export class Pen {
     );
   }
 
+  /** Draws a wall material over the two visible faces of a box. */
+  textureBox(x0: number, y0: number, x1: number, y1: number, z0: number, h: number, color: string, m: Material): void {
+    const rand = mulberry32(hash(x0, y0, x1, y1, z0, h));
+    this.textureFace('L', y1, x0, x1, z0, z0 + h, color, m, rand, 1);
+    this.textureFace('R', x1, y0, y1, z0, z0 + h, color, m, rand, 0.76);
+    if (m === 'log') {
+      // Log ends interlock at the front corner.
+      for (let z = z0 + 1.8; z < z0 + h - 0.5; z += 3.6) {
+        this.circle(x1 + 0.02, y1 + 0.02, z, 1.9, shade('#c8a06a', 0.95 + rand() * 0.1));
+        this.circle(x1 + 0.02, y1 + 0.02, z, 0.8, '#9a7346');
+      }
+    }
+  }
+
+  /** Quad on a visible face: 'L' is the plane y = c, 'R' the plane x = c. */
+  private faceQuad(face: 'L' | 'R', c: number, a: number, b: number, za: number, zb: number, fill: string): void {
+    if (face === 'L') this.wallL(c, a, b, za, zb, fill);
+    else this.wallR(c, a, b, za, zb, fill);
+  }
+
+  private faceLine(face: 'L' | 'R', c: number, a: number, za: number, b: number, zb: number, color: string, w: number): void {
+    if (face === 'L') this.line([a, c, za], [b, c, zb], color, w);
+    else this.line([c, a, za], [c, b, zb], color, w);
+  }
+
+  private textureFace(
+    face: 'L' | 'R',
+    c: number,
+    a0: number,
+    a1: number,
+    z0: number,
+    z1: number,
+    color: string,
+    m: Material,
+    rand: () => number,
+    lit: number,
+  ): void {
+    const cc = c + (face === 'L' ? 0.001 : 0.001);
+    const span = a1 - a0;
+    if (span < 0.05) return;
+    const tone = (lo: number, hi: number) => shade(color, lit * (lo + rand() * (hi - lo)));
+    if (m === 'stone' || m === 'rubble') {
+      // Mortar beds with squared blocks laid in courses.
+      this.faceQuad(face, cc, a0, a1, z0, z1, shade(mix(color, '#e2dccd', 0.45), lit * 0.92));
+      let z = z0;
+      let row = 0;
+      while (z < z1 - 0.5) {
+        const ch = m === 'rubble' ? 2.2 + rand() * 1.6 : 3.1 + rand() * 0.5;
+        const zt = Math.min(z1, z + ch);
+        let a = a0 - (row % 2 ? 0.06 + rand() * 0.04 : rand() * 0.04);
+        while (a < a1) {
+          const len = m === 'rubble' ? 0.07 + rand() * 0.12 : 0.13 + rand() * 0.11;
+          const b = Math.min(a1, a + len);
+          const lo = Math.max(a0, a + 0.012);
+          const hi = b - 0.012;
+          if (hi > lo) {
+            const zl = z + 0.35 + (m === 'rubble' ? rand() * 0.4 : 0);
+            const zh = zt - 0.35 - (m === 'rubble' ? rand() * 0.4 : 0);
+            this.faceQuad(face, cc + 0.0005, lo, hi, zl, zh, tone(0.82, 1.04));
+            // Lit upper edge of each block.
+            this.faceLine(face, cc + 0.001, lo, zh - 0.25, hi, zh - 0.25, shade(color, lit * 1.12), 0.45);
+          }
+          a = b;
+        }
+        z = zt;
+        row++;
+      }
+      return;
+    }
+    if (m === 'plank' || m === 'log') {
+      const rowH = m === 'log' ? 3.6 : 2.6;
+      let row = 0;
+      for (let z = z0; z < z1 - 0.3; z += rowH, row++) {
+        const zt = Math.min(z1, z + rowH);
+        this.faceQuad(face, cc, a0, a1, z, zt, tone(0.84, 1.06));
+        if (m === 'log') {
+          this.faceLine(face, cc + 0.001, a0, zt - 0.8, a1, zt - 0.8, shade(color, lit * 1.18), 0.7);
+          this.faceLine(face, cc + 0.001, a0, z + 0.3, a1, z + 0.3, shade(color, lit * 0.55), 0.9);
+        } else {
+          // Lapped weatherboards: a shadow under each board, the odd joint and knot.
+          this.faceLine(face, cc + 0.001, a0, z + 0.25, a1, z + 0.25, shade(color, lit * 0.58), 0.7);
+          if (rand() < 0.6) {
+            const j = a0 + rand() * span;
+            this.faceLine(face, cc + 0.001, j, z + 0.3, j, zt, shade(color, lit * 0.62), 0.5);
+          }
+          if (rand() < 0.25) {
+            const k = a0 + rand() * span;
+            const p: V3 = face === 'L' ? [k, cc + 0.002, z + rowH / 2] : [cc + 0.002, k, z + rowH / 2];
+            this.ellipse(p[0], p[1], p[2], 0.8, 0.5, shade(color, lit * 0.6));
+          }
+        }
+      }
+      return;
+    }
+    // Wattle and daub: limewash mottled with weather, dirt splashed at the
+    // foot of the wall, and here and there the woven hazel showing through.
+    const ctx = this.ctx;
+    const n = Math.round(span * (z1 - z0) * 1.6);
+    for (let i = 0; i < n; i++) {
+      const a = a0 + rand() * span;
+      const z = z0 + rand() * (z1 - z0);
+      const p: V3 = face === 'L' ? [a, cc + 0.001, z] : [cc + 0.001, a, z];
+      const [sx, sy] = iso(p[0], p[1], p[2]);
+      ctx.fillStyle = rand() < 0.5 ? 'rgba(120,96,60,0.07)' : 'rgba(255,250,235,0.12)';
+      ctx.beginPath();
+      ctx.ellipse(sx, sy, 1.5 + rand() * 2.5, 1 + rand() * 1.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    const band = Math.min(3, (z1 - z0) * 0.25);
+    this.faceQuad(face, cc + 0.0008, a0, a1, z0, z0 + band, 'rgba(110,84,52,0.22)');
+    this.faceQuad(face, cc + 0.0008, a0, a1, z0, z0 + band * 0.45, 'rgba(90,66,40,0.2)');
+    if (span > 0.5 && z1 - z0 > 10 && rand() < 0.55) {
+      const a = a0 + 0.08 + rand() * (span - 0.3);
+      const z = z0 + 4 + rand() * (z1 - z0 - 9);
+      const w = 0.09 + rand() * 0.05;
+      this.faceQuad(face, cc + 0.0012, a, a + w, z, z + 3.2, shade('#8a6a44', lit));
+      for (let k = 0; k < 3; k++) {
+        this.faceLine(face, cc + 0.0015, a, z + 0.6 + k, a + w, z + 0.6 + k + (k % 2 ? -0.4 : 0.4), shade('#5e4129', lit), 0.45);
+      }
+    }
+  }
+
   /** Gable roof with the ridge running along the x axis. */
   roofX(x0: number, y0: number, x1: number, y1: number, h: number, rh: number, kind: RoofKind, wall: string, o = 0.1): void {
     const ym = (y0 + y1) / 2;
@@ -166,6 +304,7 @@ export class Pen {
       [x0 - o, ym, h + rh],
     ];
     this.poly(back, shade(col, 0.82), shade(col, 0.5));
+    this.roofTexture(back, kind, 0.82);
     // Gable end facing +x.
     this.poly(
       [
@@ -177,7 +316,7 @@ export class Pen {
       shade(wall, 0.45),
     );
     this.poly(front, shade(col, 1), shade(col, 0.5));
-    this.roofTexture(front, kind, true);
+    this.roofTexture(front, kind, 1);
     if (this.snow) this.snowOn(front);
     else this.poly(front, null, shade(col, 0.45), 0.8);
     // Ridge line.
@@ -201,6 +340,7 @@ export class Pen {
       [xm, y0 - o, h + rh],
     ];
     this.poly(back, shade(col, 0.95), shade(col, 0.5));
+    this.roofTexture(back, kind, 0.95);
     if (this.snow) this.snowOn(back);
     this.poly(
       [
@@ -212,7 +352,7 @@ export class Pen {
       shade(wall, 0.55),
     );
     this.poly(front, shade(col, 0.78), shade(col, 0.45));
-    this.roofTexture(front, kind, false);
+    this.roofTexture(front, kind, 0.78);
     if (this.snow) this.snowOn(front);
     this.line([xm, y0 - o, h + rh], [xm, y1 + o, h + rh], shade(col, 0.5), 1.2);
   }
@@ -231,32 +371,118 @@ export class Pen {
     this.poly([b, c, apex], this.snow ? '#cdd6dc' : shade(col, 0.75), shade(col, 0.45));
   }
 
-  private roofTexture(plane: V3[], kind: RoofKind, alongX: boolean): void {
+  /**
+   * Roof covering drawn over a sloped plane [eave start, eave end, ridge end,
+   * ridge start]: straw for thatch, rows of shingles, slates or clay tiles.
+   */
+  private roofTexture(plane: V3[], kind: RoofKind, lit: number): void {
     const col = this.roofColor(kind);
-    const [e0, e1, r1, r0] = plane;
-    const rows = kind === 'thatch' ? 7 : kind === 'slate' ? 6 : 5;
-    for (let i = 1; i < rows; i++) {
-      const t = i / rows;
-      const a: V3 = [e0[0] + (r0[0] - e0[0]) * t, e0[1] + (r0[1] - e0[1]) * t, e0[2] + (r0[2] - e0[2]) * t];
-      const b: V3 = [e1[0] + (r1[0] - e1[0]) * t, e1[1] + (r1[1] - e1[1]) * t, e1[2] + (r1[2] - e1[2]) * t];
-      this.line(a, b, shade(col, kind === 'thatch' ? 0.82 : 0.7), kind === 'thatch' ? 0.8 : 0.6);
-      if (kind !== 'thatch') {
-        // Staggered vertical joints.
-        const n = 7;
-        for (let j = (i % 2) * 0.5; j < n; j++) {
-          const u = j / n;
-          const t2 = (i - 1) / rows;
-          const p: V3 = [
-            e0[0] + (e1[0] - e0[0]) * u + (r0[0] - e0[0]) * t2,
-            e0[1] + (e1[1] - e0[1]) * u + (r0[1] - e0[1]) * t2,
-            e0[2] + (e1[2] - e0[2]) * u + (r0[2] - e0[2]) * t2,
-          ];
-          const q: V3 = [p[0] + (r0[0] - e0[0]) / rows, p[1] + (r0[1] - e0[1]) / rows, p[2] + (r0[2] - e0[2]) / rows];
-          this.line(p, q, shade(col, 0.75), 0.4);
+    const [e0, e1, , r0] = plane;
+    const P = (u: number, t: number): V3 => [
+      e0[0] + (e1[0] - e0[0]) * u + (r0[0] - e0[0]) * t,
+      e0[1] + (e1[1] - e0[1]) * u + (r0[1] - e0[1]) * t,
+      e0[2] + (e1[2] - e0[2]) * u + (r0[2] - e0[2]) * t,
+    ];
+    const len = (a: V3, b: V3) => {
+      const [ax, ay] = iso(a[0], a[1], a[2]);
+      const [bx, by] = iso(b[0], b[1], b[2]);
+      return Math.hypot(bx - ax, by - ay);
+    };
+    const lu = len(e0, e1);
+    const lt = len(e0, r0);
+    const rand = mulberry32(hash(e0[0], e0[1], e0[2], e1[0], r0[2], kind.length));
+    const ctx = this.ctx;
+    const quad = (u0: number, u1: number, t0: number, t1: number, fill: string) => this.poly([P(u0, t0), P(u1, t0), P(u1, t1), P(u0, t1)], fill);
+    ctx.save();
+    this.path(plane);
+    ctx.clip();
+    if (kind === 'thatch') {
+      // Bundled straw: thousands of short strands running down the slope.
+      const tones = [0.72, 0.84, 0.95, 1.06, 1.16].map((f) => shade(col, f * lit));
+      const n = Math.round((lu * lt) / 3.2);
+      ctx.lineWidth = 0.75;
+      for (let i = 0; i < n; i++) {
+        const u = rand();
+        const t = rand();
+        const dt = (3 + rand() * 4) / lt;
+        const [ax, ay] = iso(...P(u, t));
+        const [bx, by] = iso(...P(u + (rand() - 0.5) * 0.012, t + dt));
+        ctx.strokeStyle = tones[Math.floor(rand() * tones.length)];
+        ctx.beginPath();
+        ctx.moveTo(ax, ay);
+        ctx.lineTo(bx, by);
+        ctx.stroke();
+      }
+      // Courses where each layer of bundles was pegged down.
+      for (let t = 0.22; t < 0.9; t += 0.22) this.line(P(0, t), P(1, t), shade(col, 0.74 * lit), 0.9);
+      // A thick ridge roll held by crossed hazel spars.
+      quad(0, 1, 0.86, 1, shade(col, 0.78 * lit));
+      const spars = Math.max(3, Math.round(lu / 7));
+      for (let k = 0; k < spars; k++) {
+        const u = (k + 0.5) / spars;
+        this.line(P(u - 0.03, 0.87), P(u + 0.03, 0.99), shade('#6b4a2a', lit), 0.6);
+        this.line(P(u + 0.03, 0.87), P(u - 0.03, 0.99), shade('#6b4a2a', lit), 0.6);
+      }
+      this.line(P(0, 0.87), P(1, 0.87), shade(col, 0.6 * lit), 0.8);
+    } else if (kind === 'plank') {
+      const n = Math.max(4, Math.round(lu / 4));
+      for (let k = 0; k < n; k++) {
+        quad(k / n, (k + 1) / n, 0, 1, shade(col, lit * (0.84 + rand() * 0.2)));
+        this.line(P(k / n, 0), P(k / n, 1), shade(col, 0.55 * lit), 0.6);
+      }
+    } else {
+      // Shingles, slates or clay tiles in staggered rows.
+      const rowPx = kind === 'slate' ? 2.8 : kind === 'tile' ? 3.2 : 3.4;
+      const cellPx = kind === 'slate' ? 4.2 : kind === 'tile' ? 3.6 : 4.6;
+      const rows = Math.max(4, Math.round(lt / rowPx));
+      const cols = Math.max(4, Math.round(lu / cellPx));
+      const [lo, hi] = kind === 'slate' ? [0.86, 1.06] : kind === 'tile' ? [0.84, 1.1] : [0.8, 1.08];
+      for (let r = 0; r < rows; r++) {
+        const t0 = r / rows;
+        const t1 = (r + 1) / rows;
+        const off = (r % 2) * 0.5;
+        for (let k = -1; k < cols; k++) {
+          const u0 = (k + off) / cols;
+          const u1 = (k + 1 + off) / cols;
+          const f = lo + rand() * (hi - lo);
+          if (kind === 'tile') {
+            // Barrel tiles: a lit crown and a shaded trough.
+            const um = (u0 + u1) / 2;
+            quad(u0, um, t0, t1, shade(col, lit * f * 1.08));
+            quad(um, u1, t0, t1, shade(col, lit * f * 0.86));
+          } else {
+            quad(u0 + 0.004, u1 - 0.004, t0, t1, shade(col, lit * f));
+          }
+          this.line(P(u0, t0), P(u0, t1), shade(col, 0.6 * lit), 0.45);
+        }
+        // Shadow cast by the course above.
+        this.line(P(0, t1 - 0.012), P(1, t1 - 0.012), shade(col, 0.58 * lit), kind === 'slate' ? 0.6 : 0.8);
+        if (kind === 'shingle' && rand() < 0.5) {
+          // Moss on old shingles.
+          const u = rand();
+          const [mx, my] = iso(...P(u, t0 + 0.5 / rows));
+          ctx.fillStyle = 'rgba(96,120,60,0.35)';
+          ctx.beginPath();
+          ctx.ellipse(mx, my, 2.5 + rand() * 2, 1.2, 0, 0, Math.PI * 2);
+          ctx.fill();
         }
       }
+      if (kind === 'tile' || kind === 'slate') quad(0, 1, 0.94, 1, shade(col, 0.7 * lit));
     }
-    void alongX;
+    ctx.restore();
+    if (kind === 'thatch' && !this.snow) {
+      // Ragged straw ends hanging over the eave.
+      const n = Math.round(lu / 1.6);
+      ctx.lineWidth = 0.8;
+      for (let i = 0; i <= n; i++) {
+        const [ax, ay] = iso(...P(i / n, 0.02));
+        ctx.strokeStyle = shade(col, lit * (0.7 + rand() * 0.35));
+        ctx.beginPath();
+        ctx.moveTo(ax, ay - 1);
+        ctx.lineTo(ax + (rand() - 0.5) * 1.2, ay + 1 + rand() * 1.8);
+        ctx.stroke();
+      }
+    }
   }
 
   private snowOn(plane: V3[]): void {
@@ -299,24 +525,25 @@ export class Pen {
     const posts = Math.max(2, Math.round((x1 - x0) / 0.35));
     for (let i = 0; i <= posts; i++) {
       const x = x0 + ((x1 - x0) * i) / posts;
-      this.line([x, y1, z0], [x, y1, z1], color, 1.1);
+      this.line([x, y1, z0], [x, y1, z1], color, 1.6);
     }
     const postsR = Math.max(2, Math.round((y1 - y0) / 0.35));
     for (let i = 0; i <= postsR; i++) {
       const y = y0 + ((y1 - y0) * i) / postsR;
-      this.line([x1, y, z0], [x1, y, z1], shade(color, 0.8), 1.1);
+      this.line([x1, y, z0], [x1, y, z1], shade(color, 0.8), 1.6);
     }
     const zm = z0 + h * 0.5;
-    this.line([x0, y1, zm], [x1, y1, zm], color, 1);
-    this.line([x1, y0, zm], [x1, y1, zm], shade(color, 0.8), 1);
-    this.line([x0, y1, z1], [x1, y1, z1], color, 1.3);
-    this.line([x1, y0, z1], [x1, y1, z1], shade(color, 0.8), 1.3);
-    this.line([x0, y1, z0 + 0.5], [x1, y1, z0 + 0.5], color, 1.3);
+    this.line([x0, y1, zm], [x1, y1, zm], color, 1.4);
+    this.line([x1, y0, zm], [x1, y1, zm], shade(color, 0.8), 1.4);
+    this.line([x0, y1, z1], [x1, y1, z1], color, 1.8);
+    this.line([x1, y0, z1], [x1, y1, z1], shade(color, 0.8), 1.8);
+    this.line([x0, y1, z0 + 0.7], [x1, y1, z0 + 0.7], color, 1.8);
+    this.line([x1, y0, z0 + 0.7], [x1, y1, z0 + 0.7], shade(color, 0.8), 1.8);
     // A few braces.
     const step = (x1 - x0) / posts;
     for (let i = 0; i < posts; i += 2) {
       const x = x0 + step * i;
-      this.line([x, y1, z0], [x + step, y1, zm], color, 0.8);
+      this.line([x, y1, z0], [x + step, y1, zm], color, 1.2);
     }
   }
 
@@ -340,7 +567,7 @@ export class Pen {
   }
 
   chimney(x: number, y: number, zBase: number, h: number, color = '#8a7d70'): V3 {
-    this.box(x, y, x + 0.12, y + 0.12, zBase, h, color);
+    this.box(x, y, x + 0.12, y + 0.12, zBase, h, color, undefined, 'stone');
     return [x + 0.06, y + 0.06, zBase + h + 2];
   }
 

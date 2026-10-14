@@ -153,7 +153,7 @@ export function placementError(s: GameState, type: BuildingType, x: number, y: n
   if (type === 'fisher' && countInRadius(s, centerOf(x, y, d.w, d.h), 2.5, (i) => s.terrain[i] === 1) < 2) {
     return 'Must be next to water';
   }
-  if ((d.cost.gold ?? 0) > s.res.gold) return 'Not enough gold';
+  if ((d.cost.gold ?? 0) > s.res.gold) return 'Not enough coins';
   return null;
 }
 
@@ -260,7 +260,7 @@ export function trade(s: GameState, id: ResourceId, amount: number): string | nu
   if (!price) return 'Cannot trade this';
   if (amount > 0) {
     const cost = price * amount;
-    if (s.res.gold < cost) return 'Not enough gold';
+    if (s.res.gold < cost) return 'Not enough coins';
     if (roomFor(s, id) < amount) return 'Not enough storage';
     s.res.gold -= cost;
     s.res[id] += amount;

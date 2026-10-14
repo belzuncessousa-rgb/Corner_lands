@@ -406,7 +406,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   market: def({
     type: 'market',
     name: 'Marketplace',
-    desc: 'Households nearby are happier. Enables trading goods for gold.',
+    desc: 'Households nearby are happier. Lets you buy and sell goods, and merchants visit to buy your surplus.',
     category: 'civic',
     w: 3,
     h: 3,

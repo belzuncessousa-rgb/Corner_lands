@@ -1,6 +1,6 @@
 import { mulberry32 } from '../game/rng';
 import type { BuildingType, Season } from '../game/types';
-import { Pen, TH, TW, iso, mix, shade, type V3 } from './pen';
+import { type Material, Pen, TH, TW, iso, mix, shade, type V3 } from './pen';
 
 /** Supersampling factor so sprites stay crisp when zoomed in. */
 export const SS = 2;
@@ -590,8 +590,19 @@ export function buildingSprite(type: BuildingType, w: number, h: number, level: 
   return makeSprite(sw, sh, h * (TW / 2) + 15, top, (ctx) => {
     const p = new Pen(ctx);
     p.snow = season === 3;
+    p.matFor = wallMaterial;
     return drawBuilding(p, type, level, season, variant);
   });
+}
+
+const STONE_COLORS = new Set([STONE, '#c8c0b0', '#9d9488', '#b0a898', '#b6ae9f', '#9d978c', '#a49c8e', '#c8c2b6', '#9b9284']);
+
+/** Wall material for a box colour: stone greys, timber browns, plastered infill. */
+function wallMaterial(color: string): Material | undefined {
+  if (STONE_COLORS.has(color)) return 'stone';
+  if (color === WOOD) return 'plank';
+  if (color === PLASTER || color === '#e8d4b0' || HOUSE_VARIANTS.some((v) => v.wall === color)) return 'plaster';
+  return undefined;
 }
 
 /** Wall colour, roof tint and yard prop for each house variant. */
@@ -710,11 +721,7 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
     }
     case 'woodcutter': {
       p.shadow(0.3, 0.3, 1.3, 1.2);
-      p.box(0.3, 0.3, 1.3, 1.2, 0, 15, WOOD);
-      for (let z = 3; z < 15; z += 3) {
-        p.line([0.3, 1.2, z], [1.3, 1.2, z], shade(WOOD, 0.7), 0.6);
-        p.line([1.3, 0.3, z], [1.3, 1.2, z], shade(WOOD, 0.55), 0.6);
-      }
+      p.box(0.3, 0.3, 1.3, 1.2, 0, 15, WOOD, undefined, 'log');
       p.doorL(1.2, 0.6, 0.18, 11);
       p.windowR(1.3, 0.6, 7, 0.14, 4);
       p.roofX(0.3, 0.3, 1.3, 1.2, 15, 13, 'shingle', WOOD, 0.12);
@@ -860,7 +867,7 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
     }
     case 'hunter': {
       p.shadow(0.3, 0.3, 1.2, 1.1);
-      p.box(0.3, 0.3, 1.2, 1.1, 0, 12, WOOD);
+      p.box(0.3, 0.3, 1.2, 1.1, 0, 12, WOOD, undefined, 'log');
       p.doorL(1.1, 0.6, 0.17, 10);
       p.roofX(0.3, 0.3, 1.2, 1.1, 12, 16, 'shingle', WOOD, 0.12);
       // Antlers over the door.
@@ -889,7 +896,6 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
     case 'fisher': {
       p.shadow(0.3, 0.3, 1.2, 1.1);
       p.box(0.3, 0.3, 1.2, 1.1, 0, 13, WOOD);
-      for (let z = 3; z < 13; z += 3) p.line([0.3, 1.1, z], [1.2, 1.1, z], shade(WOOD, 0.7), 0.5);
       p.doorL(1.1, 0.55, 0.17, 10);
       p.windowR(1.2, 0.5, 6, 0.13, 4);
       p.roofX(0.3, 0.3, 1.2, 1.1, 13, 12, 'thatch', WOOD, 0.12);
@@ -1110,8 +1116,6 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       p.fence([2.92, 1.45], [2.92, 2.85]);
       p.shadow(0.3, 0.25, 2.7, 1.35);
       p.box(0.3, 0.25, 2.7, 1.35, 0, 22, WOOD);
-      for (let x = 0.4; x < 2.7; x += 0.15) p.line([x, 1.35, 0], [x, 1.35, 22], shade(WOOD, 0.75), 0.5);
-      for (let y = 0.35; y < 1.35; y += 0.15) p.line([2.7, y, 0], [2.7, y, 22], shade(WOOD, 0.58), 0.5);
       p.timber(0.3, 0.25, 2.7, 1.35, 0, 22, '#5a3a22');
       // Big barn doors.
       p.wallL(1.352, 1.15, 1.85, 0, 17, '#5b3a22');
@@ -1213,10 +1217,6 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       p.shadow(0.4, 0.2, 2.6, 3.7);
       // Bell tower at the back.
       p.box(0.95, 0.25, 2.05, 1.3, 0, 70, '#b0a898');
-      for (let z = 8; z < 70; z += 9) {
-        p.line([0.95, 1.3, z], [2.05, 1.3, z], '#958d80', 0.5);
-        p.line([2.05, 0.25, z], [2.05, 1.3, z], '#857d70', 0.5);
-      }
       // Belfry openings.
       p.wallL(1.302, 1.3, 1.7, 52, 64, '#2a2522');
       p.wallR(2.052, 0.6, 0.95, 52, 64, '#221e1b');
@@ -1226,10 +1226,6 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       p.line([1.5 - 0.06, 0.775 + 0.06, 125], [1.5 + 0.06, 0.775 - 0.06, 125], '#d8b84a', 1.6);
       // Nave.
       p.box(0.6, 1.2, 2.4, 3.65, 0, 32, '#b6ae9f');
-      for (let z = 6; z < 32; z += 6.5) {
-        p.line([0.6, 3.65, z], [2.4, 3.65, z], '#9a9284', 0.5);
-        p.line([2.4, 1.2, z], [2.4, 3.65, z], '#8a8274', 0.5);
-      }
       // Buttresses and tall windows.
       for (const y of [1.6, 2.2, 2.8, 3.4]) {
         p.box(2.4, y - 0.05, 2.5, y + 0.05, 0, 20, '#a49c8e');
@@ -1459,7 +1455,6 @@ function drawManor(p: Pen, level: number, season: Season, smoke: V3[]): void {
   const towerStone = level >= 4 ? '#9d978c' : STONE;
   // Tower at the back.
   p.box(0.3, 0.15, 1.2, 1.0, 0, towerH, towerStone);
-  for (let z = 6; z < towerH; z += 9) p.line([0.3, 1.0, z], [1.2, 1.0, z], shade(towerStone, 0.8), 0.6);
   p.windowL(1.0, 0.68, towerH - 18, 0.12, 8, season === 3);
   p.windowR(1.2, 0.5, towerH - 18, 0.12, 8);
   if (level >= 4) {

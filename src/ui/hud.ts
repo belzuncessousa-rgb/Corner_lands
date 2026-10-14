@@ -1211,8 +1211,8 @@ export class Hud {
         const keep = keepOf(s, r);
         const on = selling(s, r);
         return `<tr><td>${ICONS[r]} ${RESOURCE_INFO[r].name}</td><td class="num">${Math.floor(s.res[r])}</td>
-          <td><button data-action="trade-do" data-res="${r}" data-n="10" ${s.res.gold < price * 10 || roomFor(s, r) < 10 ? 'disabled' : ''}>Buy 10 <small>${price * 10}g</small></button></td>
-          <td><button data-action="trade-do" data-res="${r}" data-n="-10" ${s.res[r] < 10 ? 'disabled' : ''}>Sell 10 <small>+${sell}g</small></button></td>
+          <td><button data-action="trade-do" data-res="${r}" data-n="10" ${s.res.gold < price * 10 || roomFor(s, r) < 10 ? 'disabled' : ''}>Buy 10 <small>${price * 10}c</small></button></td>
+          <td><button data-action="trade-do" data-res="${r}" data-n="-10" ${s.res[r] < 10 ? 'disabled' : ''}>Sell 10 <small>+${sell}c</small></button></td>
           <td class="export">
             <button data-action="export-toggle" data-res="${r}" class="${on ? 'active' : ''}" data-tip="Sell surplus to visiting merchants each month">${on ? 'Exporting' : 'Export'}</button>
             ${on ? `<span class="keep">keep <button data-action="export-keep" data-res="${r}" data-d="-10">−</button><b>${keep}</b><button data-action="export-keep" data-res="${r}" data-d="10">+</button></span>` : ''}

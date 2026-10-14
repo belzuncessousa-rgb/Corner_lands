@@ -144,7 +144,7 @@ export function upgradeBlocker(s: GameState, b: Building): string | null {
   if (!plan) return 'No further upgrades';
   const missing = plan.reqs.find((r) => !r.met);
   if (missing) return `Needs: ${missing.label}`;
-  if ((plan.cost.gold ?? 0) > s.res.gold) return 'Not enough gold';
+  if ((plan.cost.gold ?? 0) > s.res.gold) return 'Not enough coins';
   return null;
 }
 

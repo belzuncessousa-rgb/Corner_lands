@@ -1,3 +1,4 @@
+import { GOODS } from './data';
 import type { BuildingType, Cost, GameState } from './types';
 
 export interface Quest {
@@ -161,7 +162,7 @@ export function checkQuests(s: GameState): Quest[] {
       s.res[id] += q.reward[id] ?? 0;
     }
     const reward = Object.entries(q.reward)
-      .map(([k, v]) => `${v} ${k}`)
+      .map(([k, v]) => `${v} ${GOODS[k as keyof Cost].name.toLowerCase()}`)
       .join(', ');
     s.messages.push({ day: s.day, text: `Objective complete: ${q.title}. Reward: ${reward}.`, kind: 'good' });
     done.push(q);
