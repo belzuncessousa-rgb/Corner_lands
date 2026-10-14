@@ -14,7 +14,7 @@ export const QUESTS: Quest[] = [
   {
     id: 'houses',
     title: 'Build 2 houses',
-    hint: 'Place Burgage Houses next to a road connected to the Manor Hall.',
+    hint: 'Place Burgage Houses near the Manor Hall. Idle villagers will carry the timber and build them.',
     reward: { wood: 20 },
     done: (s) => count(s, 'house') >= 2,
   },

@@ -62,6 +62,8 @@ export class Game {
   private dragFrom: { x: number; y: number; camX: number; camY: number; button: number } | null = null;
   private moved = false;
   private dragTile: { x: number; y: number } | null = null;
+  /** Where the road being laid starts; the next click finishes a segment. */
+  private roadAnchor: { x: number; y: number } | null = null;
   private pinch: { dist: number; zoom: number } | null = null;
   private keys = new Set<string>();
 
@@ -243,7 +245,9 @@ export class Game {
       const bridges = fresh.filter((t) => isBridge(s, t.x, t.y)).length;
       const cost = bridges ? ` · ${bridges} bridge tiles cost ${bridges * (BRIDGE_COST.wood ?? 0)} timber` : '';
       this.hud.setHint(
-        this.dragTile ? `Road: ${n} tiles${cost} · release to build` : 'Click and drag to lay a road; roads over water become bridges · Right-click to stop',
+        this.roadAnchor
+          ? `Road: ${n} new tiles${cost} · click to lay it, then keep clicking to continue · right-click to finish`
+          : 'Click where the road starts · roads over water become bridges · right-click to stop',
         bridges * (BRIDGE_COST.wood ?? 0) > s.res.wood,
       );
     } else if (tool.kind === 'demolish') {
@@ -275,12 +279,28 @@ export class Game {
   }
 
   private roadTiles(tx: number, ty: number): { x: number; y: number }[] {
+    const start = this.roadAnchor ?? this.dragTile ?? { x: tx, y: ty };
+    // Try both L-shaped routes and keep the one with fewer obstacles.
+    const a = this.lPath(start, tx, ty, true);
+    const b = this.lPath(start, tx, ty, false);
+    // Blocked tiles count heavily; bridges a little, so dry routes win.
+    const bad = (path: { x: number; y: number }[]) =>
+      path.reduce((sum, t) => {
+        if (this.state.road[idx(this.state, t.x, t.y)]) return sum;
+        if (roadError(this.state, t.x, t.y)) return sum + 10;
+        return sum + (isBridge(this.state, t.x, t.y) ? 1 : 0);
+      }, 0);
+    const ba = bad(a);
+    const bb = bad(b);
+    if (ba !== bb) return ba < bb ? a : b;
+    return Math.abs(tx - start.x) >= Math.abs(ty - start.y) ? a : b;
+  }
+
+  private lPath(start: { x: number; y: number }, tx: number, ty: number, horizontalFirst: boolean): { x: number; y: number }[] {
     const s = this.state;
-    const start = this.dragTile ?? { x: tx, y: ty };
     const out: { x: number; y: number }[] = [];
     const dx = Math.sign(tx - start.x);
     const dy = Math.sign(ty - start.y);
-    const horizontalFirst = Math.abs(tx - start.x) >= Math.abs(ty - start.y);
     let x = start.x;
     let y = start.y;
     const push = () => {
@@ -309,11 +329,29 @@ export class Game {
     return out;
   }
 
+  /** Road tool click: start a road, or lay the segment and continue from its end. */
+  private clickRoad(tx: number, ty: number): void {
+    if (!inBounds(this.state, tx, ty)) return;
+    if (!this.roadAnchor) {
+      this.roadAnchor = { x: tx, y: ty };
+      return;
+    }
+    if (tx === this.roadAnchor.x && ty === this.roadAnchor.y) {
+      // Clicking the same tile again lays a single tile and ends the road.
+      this.finishRoad(tx, ty);
+      this.roadAnchor = null;
+      return;
+    }
+    this.finishRoad(tx, ty);
+    this.roadAnchor = { x: tx, y: ty };
+  }
+
   // ---------------------------------------------------------------- actions
 
   setTool(t: Tool): void {
     this.tool = t;
     this.dragTile = null;
+    this.roadAnchor = null;
     if (t.kind !== 'select') this.selected = null;
     this.canvas.classList.toggle('tool', t.kind !== 'select');
     this.hud.update();
@@ -424,7 +462,7 @@ export class Game {
       }
       this.moved = false;
       this.dragFrom = { x: e.clientX, y: e.clientY, camX: this.renderer.cam.x, camY: this.renderer.cam.y, button: e.button };
-      if (e.button === 0 && (this.tool.kind === 'road' || this.tool.kind === 'demolish')) {
+      if (e.button === 0 && this.tool.kind === 'demolish') {
         const [tx, ty] = this.renderer.screenToTile(e.clientX, e.clientY);
         this.dragTile = { x: Math.floor(tx), y: Math.floor(ty) };
       }
@@ -469,14 +507,14 @@ export class Game {
       const tx = Math.floor(ftx);
       const ty = Math.floor(fty);
       if (df.button === 2 && !this.moved) {
-        if (this.tool.kind !== 'select') this.setTool({ kind: 'select' });
+        if (this.tool.kind === 'road' && this.roadAnchor) this.roadAnchor = null;
+        else if (this.tool.kind !== 'select') this.setTool({ kind: 'select' });
         else this.select(null);
         return;
       }
       if (df.button !== 0) return;
-      if (this.tool.kind === 'road' && this.dragTile) {
-        this.finishRoad(tx, ty);
-        this.dragTile = null;
+      if (this.tool.kind === 'road') {
+        if (!this.moved) this.clickRoad(tx, ty);
         return;
       }
       if (this.tool.kind === 'demolish' && this.dragTile) {
@@ -515,7 +553,8 @@ export class Game {
       this.keys.add(k);
       if (k === 'escape') {
         if (this.hud.handleEscape()) return;
-        if (this.tool.kind !== 'select') this.setTool({ kind: 'select' });
+        if (this.tool.kind === 'road' && this.roadAnchor) this.roadAnchor = null;
+        else if (this.tool.kind !== 'select') this.setTool({ kind: 'select' });
         else if (this.selected !== null) this.select(null);
         else this.hud.showGameMenu();
         return;

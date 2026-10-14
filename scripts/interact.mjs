@@ -20,12 +20,11 @@ const hall = await page.evaluate(() => { const h = window.game.state.buildings[0
 await page.keyboard.press('r');
 let [x0, y0] = await scr(hall.x + 4, hall.y + 3);
 let [x1, y1] = await scr(hall.x + 4, hall.y + 9);
-await page.mouse.move(x0, y0);
-await page.mouse.down();
-await page.mouse.move((x0 + x1) / 2, (y0 + y1) / 2, { steps: 5 });
+await page.mouse.click(x0, y0);
 await page.mouse.move(x1, y1, { steps: 5 });
 await page.screenshot({ path: `${out}-1-road-drag.png` });
-await page.mouse.up();
+await page.mouse.click(x1, y1);
+await page.mouse.click(x1, y1, { button: 'right' });
 const roads = await page.evaluate(() => window.game.state.road.reduce((a, b) => a + b, 0));
 console.log('road tiles', roads);
 // Place a house via the build card.

@@ -130,7 +130,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   house: def({
     type: 'house',
     name: 'Burgage House',
-    desc: 'A timber cottage for a family of five. Needs a road connection.',
+    desc: 'A timber cottage for a family of five.',
     category: 'housing',
     cost: { wood: 12 },
     buildDays: 8,
