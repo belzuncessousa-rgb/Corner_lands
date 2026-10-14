@@ -18,4 +18,13 @@ describe('balance', () => {
     for (const r of results) expect(r.townYear).not.toBeNull();
     expect(results.filter((r) => r.boroughYear !== null).length).toBeGreaterThanOrEqual(2);
   });
+
+  // Slow: run with SWEEP=1 after changing the economy or the autoplayer.
+  it.runIf(process.env.SWEEP)('every one of ten maps reaches Town within six years', { timeout: 300000 }, () => {
+    for (let seed = 1; seed <= 10; seed++) {
+      const rep = playBot(generateWorld(seed), 6, seed);
+      console.log(`seed ${seed}: village ${rep.villageYear?.toFixed(1)} town ${rep.townYear?.toFixed(1)} borough ${rep.boroughYear?.toFixed(1)}`);
+      expect(rep.townYear, `seed ${seed}`).not.toBeNull();
+    }
+  });
 });
