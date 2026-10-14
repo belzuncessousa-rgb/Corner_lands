@@ -325,6 +325,12 @@ button.active {
   width: max-content;
   max-width: calc(100vw - 16px);
 }
+/* Leave room for the minimap on wide screens; long categories scroll. */
+@media (min-width: 900px) {
+  #buildbar {
+    max-width: calc(100vw - 420px);
+  }
+}
 #buildbar .tabs {
   display: flex;
   gap: 4px;

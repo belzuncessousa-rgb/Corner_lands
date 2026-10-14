@@ -177,6 +177,17 @@ export class Hud {
     root.addEventListener('click', (e) => this.onClick(e));
     root.addEventListener('mousemove', (e) => this.onTipMove(e));
     root.addEventListener('mouseleave', () => (this.el.tooltip.style.display = 'none'));
+    // The mouse wheel scrolls a long row of building cards sideways.
+    this.el.buildbar.addEventListener(
+      'wheel',
+      (e) => {
+        const cards = (e.target as HTMLElement).closest('.cards') as HTMLElement | null;
+        if (!cards || cards.scrollWidth <= cards.clientWidth) return;
+        cards.scrollLeft += e.deltaY + e.deltaX;
+        e.preventDefault();
+      },
+      { passive: false },
+    );
     // Category chips open their breakdown on hover; a click pins it open.
     this.el.topbar.addEventListener('mouseover', (e) => {
       const chip = (e.target as HTMLElement).closest('[data-chip]') as HTMLElement | null;
