@@ -178,3 +178,9 @@ A ten-seed sweep of the autoplayer exposed stalls a player can hit too.
 - [x] Harvest feast: in autumn the lord may call a feast (food and ale for happiness and prestige)
 - [x] Meadmakers make mead from honey at the brewhouse (tavern drink, luxury)
 - [x] Retinue: spend prestige on a castle guard that wards off wolves and bandits in events
+
+### Phase 9 — Clearer economy (for the scheduled runs)
+- [ ] Steward warns when wheat piles up faster than the mills grind it (suggest a second windmill or bakery)
+- [ ] Steward names the jobs nobody fills when the town has more workplaces than hands
+- [ ] Feast visuals: trestle tables and bunting at the manor in the month of a feast
+- [ ] Late-game balance: twelve-year bot runs reach the Castle on most maps (check prestige and arms costs)
