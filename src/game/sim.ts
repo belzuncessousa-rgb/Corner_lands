@@ -359,6 +359,7 @@ export function doorTile(s: GameState, b: Building): { x: number; y: number } {
 // ---------------------------------------------------------------- recompute
 
 export const BLOCK_PROBLEM = 1;
+/** Idle for a normal reason: the season, or storage is full. */
 export const BLOCK_SEASONAL = 2;
 
 /** True when the building could not work last time it tried (problem or season). */
@@ -675,8 +676,9 @@ export function dailyProduction(s: GameState, rng: StateRng): void {
       b.work -= 1;
     }
     if (tried) {
-      const seasonal = b.type === 'forager' && seasonOf(s.day) === 3;
-      b.blocked = status ? (seasonal ? BLOCK_SEASONAL : BLOCK_PROBLEM) : 0;
+      // Winter rest and full storage are normal pauses, not problems to flag.
+      const idle = (b.type === 'forager' && seasonOf(s.day) === 3) || status === 'Storage full';
+      b.blocked = status ? (idle ? BLOCK_SEASONAL : BLOCK_PROBLEM) : 0;
     }
     if (status || !b.blocked) b.status = status ?? 'Working';
   }
