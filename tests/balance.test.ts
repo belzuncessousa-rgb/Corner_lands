@@ -3,7 +3,7 @@ import { generateWorld } from '../src/game/world';
 import { playBot } from './bot';
 
 describe('balance', () => {
-  it('a simple strategy grows from Hamlet to Village and Town', { timeout: 60000 }, () => {
+  it('a simple strategy grows from Hamlet to Borough', { timeout: 60000 }, () => {
     const results = [101, 202, 303].map((seed) => {
       const s = generateWorld(seed);
       const rep = playBot(s, 12, seed);
@@ -14,7 +14,8 @@ describe('balance', () => {
       expect(r.villageYear).not.toBeNull();
       expect(r.villageYear!).toBeLessThan(5);
     }
-    // The bot is crude; at least one map should reach Town.
-    expect(results.some((r) => r.townYear !== null)).toBe(true);
+    // Every map reaches Town; the crude bot should reach Borough on most.
+    for (const r of results) expect(r.townYear).not.toBeNull();
+    expect(results.filter((r) => r.boroughYear !== null).length).toBeGreaterThanOrEqual(2);
   });
 });

@@ -173,6 +173,15 @@ function act(s: GameState, rand: () => number): void {
   const idle = pop - s.buildings.reduce((a, b) => a + b.workers, 0);
   const foodMakers = count(s, 'forager') + count(s, 'hunter') + count(s, 'fisher') + count(s, 'bakery') * 2;
   const wants: BuildingType[] = [];
+  // Key buildings for progression come first once unlocked.
+  if (s.tier >= 1) {
+    for (const t of ['sawmill', 'bakery', 'market'] as BuildingType[]) {
+      if (count(s, t) === 0 && (t !== 'bakery' || count(s, 'farm') > 0)) wants.push(t);
+    }
+  }
+  if (s.tier >= 2) {
+    for (const t of ['smithy', 'church'] as BuildingType[]) if (count(s, t) === 0) wants.push(t);
+  }
   if (food < pop * 4 && foodMakers < 1 + pop / 6) {
     if (count(s, 'forager') < 2) wants.push('forager');
     wants.push('fisher', 'hunter');
