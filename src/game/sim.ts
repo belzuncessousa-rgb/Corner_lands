@@ -369,6 +369,17 @@ export function totalHousing(s: GameState): number {
 }
 
 const CATEGORY_PRIORITY: Record<Category, number> = { food: 0, resources: 1, industry: 2, civic: 3, housing: 4, decor: 5 };
+/** Fine ordering inside a category: staple food producers are staffed first. */
+const TYPE_PRIORITY: Partial<Record<BuildingType, number>> = {
+  farm: 0,
+  bakery: 0.1,
+  fisher: 0.2,
+  hunter: 0.3,
+  forager: 0.4,
+  woodcutter: 0,
+  quarry: 0.1,
+  forester: 0.2,
+};
 
 export function employed(s: GameState): number {
   let n = 0;
@@ -395,7 +406,8 @@ export function recompute(s: GameState): void {
   let free = s.population;
   // Buildings that could not work last time go to the back of the queue, so
   // villagers are not stuck at a forager with no berries while a hunter idles.
-  const prio = (b: Building) => CATEGORY_PRIORITY[BUILDINGS[b.type].category] + (isBlocked(b) ? 10 : 0);
+  const prio = (b: Building) =>
+    CATEGORY_PRIORITY[BUILDINGS[b.type].category] + (TYPE_PRIORITY[b.type] ?? 0) + (isBlocked(b) ? 10 : 0);
   const jobs = s.buildings.filter((b) => BUILDINGS[b.type].workers > 0).sort((a, b) => prio(a) - prio(b) || a.id - b.id);
   for (const b of s.buildings) b.workers = 0;
   for (const b of jobs) {
@@ -731,6 +743,8 @@ export function monthly(s: GameState, rng: StateRng): void {
   migrate(s, rng);
   if (rollEvent(s, rng, month)) recompute(s);
 
+  if (month <= 5) regrowForests(s, rng);
+
   // Bushes fruit in spring and again in summer.
   if (month === 0 || month === 4) s.berries.set(s.berriesMax);
   if (month === 0) log(s, `Spring of year ${yearOf(s.day)} has arrived.`, 'info');
@@ -751,6 +765,35 @@ export function beautyAt(s: GameState, home: Building): number {
     if (Math.hypot(oc.x - c.x, oc.y - c.y) <= d.radius) total += d.beauty;
   }
   return Math.min(MAX_BEAUTY, total);
+}
+
+/**
+ * Natural regrowth during the growing season: thin woods thicken and forest
+ * edges creep onto open meadow, so timber never runs out entirely.
+ */
+export function regrowForests(s: GameState, rng: StateRng): void {
+  const n = s.width * s.height;
+  const samples = Math.floor(n / 12);
+  for (let k = 0; k < samples; k++) {
+    const i = rng.int(n);
+    if (s.terrain[i] || s.occ[i] >= 0 || s.road[i] || s.rock[i] || s.ore[i] || s.berriesMax[i]) continue;
+    if (s.trees[i] > 0) {
+      if (s.trees[i] < 4 && rng.next() < 0.25) s.trees[i]++;
+      continue;
+    }
+    const x = i % s.width;
+    const y = (i - x) / s.width;
+    let neighbours = 0;
+    for (const [dx, dy] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ]) {
+      if (inBounds(s, x + dx, y + dy) && s.trees[idx(s, x + dx, y + dy)] >= 2) neighbours++;
+    }
+    if (neighbours >= 2 && rng.next() < 0.12) s.trees[i] = 1;
+  }
 }
 
 export function updateHappiness(s: GameState): void {

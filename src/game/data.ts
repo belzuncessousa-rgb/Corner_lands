@@ -146,7 +146,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     workers: 2,
     radius: 7,
     cycle: 2,
-    outputs: { berries: 3 },
+    outputs: { berries: 4 },
     gathers: 'berries',
     hotkey: 'g',
   }),

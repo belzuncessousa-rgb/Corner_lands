@@ -75,11 +75,11 @@ describe('simulation', () => {
   it('woodcutter fells trees and produces timber', () => {
     const s = generateWorld(11);
     const wc = placeNearRoad(s, 'woodcutter');
-    run(s, 15);
+    run(s, 21);
     expect(wc.build).toBe(1);
     const treesBefore = s.trees.reduce((a, b) => a + b, 0);
     const woodBefore = s.res.wood;
-    run(s, 9); // stay inside one month so no firewood is consumed
+    run(s, 8); // stay inside one month: no firewood use or forest regrowth
     if (wc.status === 'No trees in range') return;
     expect(s.res.wood).toBeGreaterThan(woodBefore);
     expect(s.trees.reduce((a, b) => a + b, 0)).toBeLessThan(treesBefore);

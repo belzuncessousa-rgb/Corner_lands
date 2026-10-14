@@ -60,6 +60,56 @@ function tryPlace(s: GameState, type: BuildingType): boolean {
   return !!placeOrder(s, type, best.x, best.y);
 }
 
+/** Lays a road from the network towards the nearest ore deposit. */
+function roadToOre(s: GameState): void {
+  const reached = computeConnectivity(s);
+  const hall = s.buildings.find((b) => b.type === 'townhall')!;
+  let ore = -1;
+  let best = Infinity;
+  s.ore.forEach((v, i) => {
+    if (!v) return;
+    const d = Math.hypot((i % s.width) - hall.x, Math.floor(i / s.width) - hall.y);
+    if (d < best) {
+      best = d;
+      ore = i;
+    }
+  });
+  if (ore < 0) return;
+  const ox = ore % s.width;
+  const oy = Math.floor(ore / s.width);
+  let start = -1;
+  best = Infinity;
+  reached.forEach((v, i) => {
+    if (!v) return;
+    const d = Math.hypot((i % s.width) - ox, Math.floor(i / s.width) - oy);
+    if (d < best) {
+      best = d;
+      start = i;
+    }
+  });
+  if (start < 0 || best < 4) return;
+  // Walk greedily toward the ore, stopping a few tiles short.
+  let x = start % s.width;
+  let y = Math.floor(start / s.width);
+  for (let k = 0; k < 60 && Math.hypot(x - ox, y - oy) > 3; k++) {
+    const dx = Math.sign(ox - x);
+    const dy = Math.sign(oy - y);
+    const tryStep = (nx: number, ny: number) => {
+      if (!inBounds(s, nx, ny)) return false;
+      const i = idx(s, nx, ny);
+      if (s.road[i]) return true;
+      return buildRoad(s, nx, ny);
+    };
+    if (Math.abs(ox - x) >= Math.abs(oy - y) ? tryStep(x + dx, y) || tryStep(x, y + dy) : tryStep(x, y + dy) || tryStep(x + dx, y)) {
+      if (Math.abs(ox - x) >= Math.abs(oy - y) && s.road[idx(s, x + dx, y)]) x += dx;
+      else if (dy && s.road[idx(s, x, y + dy)]) y += dy;
+      else x += dx;
+    } else {
+      return;
+    }
+  }
+}
+
 /** Extends the road network with a straight spur from a random road tile. */
 function growRoads(s: GameState, rand: () => number): void {
   const reached = computeConnectivity(s);
@@ -123,7 +173,11 @@ function act(s: GameState, rand: () => number): void {
   const idle = pop - s.buildings.reduce((a, b) => a + b.workers, 0);
   const foodMakers = count(s, 'forager') + count(s, 'hunter') + count(s, 'fisher') + count(s, 'bakery') * 2;
   const wants: BuildingType[] = [];
-  if (food < pop * 4 && foodMakers < 1 + pop / 6) wants.push('forager', 'hunter', 'fisher');
+  if (food < pop * 4 && foodMakers < 1 + pop / 6) {
+    if (count(s, 'forager') < 2) wants.push('forager');
+    wants.push('fisher', 'hunter');
+    if (s.tier >= 1) wants.push('farm');
+  }
   if (count(s, 'woodcutter') < 1 + Math.floor(pop / 20) || s.res.wood < 25) wants.push('woodcutter');
   if (totalHousing(s) - pop < 4 && idle >= 0) wants.push('house');
   if (count(s, 'quarry') < 1 + Math.floor(pop / 40)) wants.push('quarry');
@@ -138,7 +192,9 @@ function act(s: GameState, rand: () => number): void {
     if (count(s, 'market') < 1) wants.push('market');
   }
   if (s.tier >= 2) {
-    if (count(s, 'mine') < 1) wants.push('mine');
+    if (count(s, 'mine') < 1) {
+      if (!tryPlace(s, 'mine')) roadToOre(s);
+    }
     if (count(s, 'smithy') < 1) wants.push('smithy');
     if (count(s, 'church') < 1) wants.push('church');
     for (const b of s.buildings) if (b.type === 'house' && !canUpgrade(s, b)) upgradeHouse(s, b);
