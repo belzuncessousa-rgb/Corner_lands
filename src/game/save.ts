@@ -1,5 +1,5 @@
 import type { GameState, ResourceId } from './types';
-import { emptyResources } from './world';
+import { emptyResources, makeBuilding } from './world';
 
 const TYPED_KEYS = [
   'terrain',
@@ -62,6 +62,26 @@ export function deserialize(json: string): GameState {
   if (hall) hall.level = Math.max(hall.level, s.tier + 1);
   for (const b of s.buildings) {
     if (b.type === 'house' && b.level >= 2) b.level = Math.min(b.level, 3);
+  }
+  // Farms used to be 4x4 with their own field; they are now a farmstead
+  // with fields drawn beside it.
+  for (const b of [...s.buildings]) {
+    if (b.type !== 'farm' || b.w !== 4) continue;
+    b.w = 2;
+    b.h = 2;
+    for (const [x, y, w, h] of [
+      [b.x + 2, b.y, 2, 2],
+      [b.x, b.y + 2, 4, 2],
+    ]) {
+      const f = makeBuilding(s.nextId++, 'field', x, y);
+      f.w = w;
+      f.h = h;
+      f.build = 1;
+      f.growth = b.growth;
+      for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) s.occ[yy * s.width + xx] = f.id;
+      s.buildings.push(f);
+    }
+    b.growth = 0;
   }
   s.dirty = true;
   return s;

@@ -413,3 +413,102 @@ describe('paved roads', () => {
     expect(stepCost(s, idx(s, x, y))).toBeLessThan(stepCost(s, idx(s, x + 1, y)));
   });
 });
+
+describe('fields, herds, orchards and backyards', () => {
+  const ready = (s: GameState, type: BuildingType) => {
+    const b = placeNearRoad(s, type);
+    b.build = 1;
+    b.need = undefined;
+    s.dirty = true;
+    return b;
+  };
+  /** Places a zone of the given size somewhere within reach of `near`. */
+  const zoneNear = async (s: GameState, type: BuildingType, near: { x: number; y: number }, w: number, h: number) => {
+    const { placeZone } = await import('../src/game/sim');
+    for (let r = 1; r < 12; r++) {
+      for (const [dx, dy] of [[r, 0], [0, r], [-r - w, 0], [0, -r - h], [r, r], [-r - w, -r - h]]) {
+        const z = placeZone(s, type, near.x + dx, near.y + dy, near.x + dx + w - 1, near.y + dy + h - 1);
+        if (z) return z;
+      }
+    }
+    throw new Error(`no room for ${type}`);
+  };
+
+  it('farmsteads sow, tend and harvest the fields drawn nearby', async () => {
+    const s = generateWorld(31);
+    s.tier = 1;
+    for (let k = 0; k < 2; k++) ready(s, 'granary');
+    const farm = ready(s, 'farm');
+    const wheat = await zoneNear(s, 'field', farm, 4, 4);
+    const barley = await zoneNear(s, 'field', farm, 3, 4);
+    barley.recipe = 'barley';
+    s.population = 10;
+    recompute(s);
+    expect(wheat.owner).toBe(farm.id);
+    expect(barley.owner).toBe(farm.id);
+    run(s, DAYS_PER_MONTH * 8 + 1);
+    expect(s.res.grain).toBeGreaterThan(100);
+    expect(s.res.barley).toBeGreaterThan(60);
+    expect(wheat.lastCrop).toBe('wheat');
+  });
+
+  it('a farmstead without fields reports the problem', () => {
+    const s = generateWorld(32);
+    s.tier = 1;
+    const farm = ready(s, 'farm');
+    s.population = 5;
+    run(s, 2);
+    expect(farm.status).toMatch(/Draw fields/);
+  });
+
+  it('herds grow in spring, are shorn and slaughtered in autumn', async () => {
+    const s = generateWorld(33);
+    s.tier = 1;
+    ready(s, 'storehouse');
+    ready(s, 'granary');
+    const byre = ready(s, 'byre');
+    await zoneNear(s, 'pasture', byre, 6, 6);
+    s.population = 6;
+    run(s, 1);
+    expect(byre.herd).toBe(6);
+    run(s, DAYS_PER_MONTH * 3);
+    expect(byre.herd).toBeGreaterThan(6);
+    expect(s.res.wool).toBeGreaterThan(0);
+    // A big flock is thinned out in autumn.
+    byre.herd = 18;
+    run(s, DAYS_PER_MONTH * 6);
+    expect(byre.herd).toBeLessThan(18);
+    expect(s.res.wool).toBeGreaterThan(0);
+    expect(s.res.meat + s.res.hides).toBeGreaterThan(0);
+  });
+
+  it('orchards bear fruit once grown and pickers bring it in', async () => {
+    const s = generateWorld(34);
+    s.tier = 1;
+    s.res.gold = 500;
+    ready(s, 'granary');
+    const lodge = ready(s, 'orchardist');
+    const o = await zoneNear(s, 'orchard', lodge, 4, 4);
+    o.recipe = 'pears';
+    o.age = 1000;
+    s.population = 6;
+    s.day = DAYS_PER_MONTH * 5 - 1;
+    run(s, DAYS_PER_MONTH * 2);
+    expect(s.res.pears).toBeGreaterThan(40);
+  });
+
+  it('backyards cost materials and feed the household', async () => {
+    const { setYard } = await import('../src/game/sim');
+    const s = generateWorld(35);
+    const h = placeNearRoad(s, 'house');
+    h.build = 1;
+    s.res.wood = 20;
+    expect(setYard(s, h, 'hens')).toBeNull();
+    expect(s.res.wood).toBe(12);
+    expect(setYard(s, h, 'bees')).toMatch(/Village/);
+    s.population = 13;
+    recompute(s);
+    run(s, DAYS_PER_MONTH * 2);
+    expect(s.res.eggs).toBeGreaterThan(0);
+  });
+});

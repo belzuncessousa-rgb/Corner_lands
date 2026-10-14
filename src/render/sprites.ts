@@ -634,6 +634,7 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
     }
     case 'house': {
       const hv = HOUSE_VARIANTS[variant % HOUSE_VARIANTS.length];
+      const yard = YARD_CODES[Math.floor(variant / HOUSE_VARIANTS.length)] ?? null;
       const WALL = hv.wall;
       p.roofTint = hv.tint;
       if (level >= 3) {
@@ -691,7 +692,7 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       } else {
         p.shadow(0.35, 0.45, 1.65, 1.45);
         // Vegetable patch.
-        if (season !== 3) {
+        if (season !== 3 && yard === 'veg') {
           p.poly(
             [
               [0.25, 1.6, 0],
@@ -714,9 +715,100 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
         p.windowR(1.65, 0.8, 7, 0.14, 5);
         p.roofX(0.35, 0.45, 1.65, 1.45, 17, 15, 'thatch', WALL, 0.13);
         smoke.push(p.chimney(1.3, 1.08, 24, 14, '#8a7d70'));
-        drawHouseProp(p, hv.prop, season);
+        if (!yard) drawHouseProp(p, hv.prop === 'hive' ? 'logs' : hv.prop, season);
       }
+      if (yard) drawYard(p, yard, level, season);
       p.roofTint = null;
+      break;
+    }
+    case 'field':
+    case 'pasture':
+    case 'orchard': {
+      // Small previews for the build menu; in the world zones are drawn as ground.
+      const ground = type === 'field' ? '#7a5a3a' : type === 'pasture' ? '#7da24a' : '#6e9a44';
+      p.poly(
+        [
+          [0, 0, 0],
+          [1, 0, 0],
+          [1, 1, 0],
+          [0, 1, 0],
+        ],
+        ground,
+      );
+      if (type === 'field') {
+        for (let r = 0; r < 4; r++) {
+          const y = (r + 0.5) / 4;
+          p.line([0.1, y, 0], [0.9, y, 0], '#5e4129', 1.2);
+          p.line([0.1, y - 0.05, 3], [0.9, y - 0.05, 3], '#d8b44a', 5);
+        }
+      } else if (type === 'pasture') {
+        p.fence([0, 1], [1, 1]);
+        p.fence([1, 0], [1, 1]);
+        drawSheep(p.ctx, ...iso(0.45, 0.55), 1);
+        drawSheep(p.ctx, ...iso(0.7, 0.3), -1);
+      } else {
+        const t = fruitTreeSprite('apples', season, 1, true);
+        const [tx, ty] = iso(0.5, 0.5);
+        p.ctx.drawImage(t.canvas, tx - t.ax, ty - t.ay, t.w, t.h);
+      }
+      break;
+    }
+    case 'byre': {
+      // Open-fronted cattle shed with a hay loft and a fenced pen.
+      p.shadow(0.25, 0.25, 1.75, 1.2);
+      p.box(0.25, 0.25, 1.75, 1.2, 0, 15, WOOD);
+      p.wallL(1.202, 0.5, 1.5, 0, 11, '#2e2218');
+      for (const x of [0.5, 1.0, 1.5]) p.line([x, 1.21, 0], [x, 1.21, 15], BEAM, 2);
+      // Hay inside.
+      p.wallL(1.205, 0.55, 1.45, 0, 4, '#c9a54e');
+      p.roofX(0.25, 0.25, 1.75, 1.2, 15, 14, 'thatch', WOOD, 0.14);
+      p.fence([0.2, 1.95], [1.9, 1.95]);
+      p.fence([1.9, 1.3], [1.9, 1.95]);
+      // Trough.
+      p.box(0.4, 1.5, 0.95, 1.62, 0, 3, '#7b5a36');
+      p.wallL(1.621, 0.42, 0.93, 2, 3, '#5a7a9a');
+      if (season !== 3) {
+        const [hx, hy] = iso(1.55, 1.6, 0);
+        p.ctx.fillStyle = '#c9a54e';
+        p.ctx.beginPath();
+        p.ctx.ellipse(hx, hy - 4, 7, 6, 0, Math.PI, 0);
+        p.ctx.lineTo(hx + 7, hy);
+        p.ctx.lineTo(hx - 7, hy);
+        p.ctx.fill();
+      }
+      p.sack(0.3, 1.75, '#d8c79c');
+      break;
+    }
+    case 'orchardist': {
+      p.shadow(0.3, 0.35, 1.6, 1.4);
+      p.box(0.35, 0.35, 1.5, 1.3, 0, 14, '#e8d4b0');
+      p.timber(0.35, 0.35, 1.5, 1.3, 0, 14, BEAM);
+      p.doorL(1.3, 0.8, 0.18, 10);
+      p.windowL(1.3, 0.48, 5, 0.13, 4, season === 3);
+      p.windowR(1.5, 0.7, 5, 0.13, 4);
+      p.roofX(0.35, 0.35, 1.5, 1.3, 14, 14, 'tile', '#e8d4b0', 0.12);
+      smoke.push(p.chimney(0.65, 0.9, 20, 10));
+      // Ladder against the wall, baskets of fruit and a cider barrel.
+      p.line([1.52, 0.5, 0], [1.52, 0.42, 16], '#7b5a36', 1);
+      p.line([1.52, 0.62, 0], [1.52, 0.54, 16], '#7b5a36', 1);
+      for (let z = 2; z < 15; z += 3) p.line([1.52, 0.5 - z * 0.005, z], [1.52, 0.62 - z * 0.005, z], '#7b5a36', 0.8);
+      for (const [x, y, c] of [
+        [1.65, 1.0, '#c4322a'],
+        [1.8, 1.25, '#b8c040'],
+        [1.5, 1.6, '#6a3a80'],
+      ] as [number, number, string][]) {
+        const [sx, sy] = iso(x, y, 0);
+        p.ctx.fillStyle = '#a07a40';
+        p.ctx.beginPath();
+        p.ctx.ellipse(sx, sy - 3, 5, 4, 0, 0, Math.PI);
+        p.ctx.fill();
+        p.ctx.fillStyle = season === 3 ? '#e8ecee' : c;
+        p.ctx.beginPath();
+        p.ctx.ellipse(sx, sy - 3, 4.5, 2, 0, 0, Math.PI * 2);
+        p.ctx.fill();
+      }
+      p.barrel(0.45, 1.6);
+      p.barrel(0.62, 1.75);
       break;
     }
     case 'woodcutter': {
@@ -1392,6 +1484,163 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
     }
   }
   return smoke;
+}
+
+/** Backyard kinds, in the order they are encoded into a house sprite variant. */
+export const YARD_CODES: (string | null)[] = [null, 'veg', 'hens', 'bees'];
+
+/** Vegetable plots, hen coops and beehives behind a house. */
+function drawYard(p: Pen, yard: string, level: number, season: Season): void {
+  const big = level >= 2;
+  const x0 = big ? 1.84 : 1.7;
+  if (yard === 'veg' && level >= 2) {
+    // A strip of beds along the side of larger homes.
+    p.poly(
+      [
+        [x0, 0.3, 0],
+        [1.98, 0.3, 0],
+        [1.98, 1.4, 0],
+        [x0, 1.4, 0],
+      ],
+      season === 3 ? '#cfd4d4' : '#7a5a38',
+    );
+    if (season !== 3) for (let j = 0; j < 4; j++) p.bush((x0 + 1.98) / 2, 0.42 + j * 0.27, 2.2, season === 2 ? '#b08a3a' : '#5d9a3a');
+  } else if (yard === 'hens') {
+    // A little coop on legs with a ramp, and hens scratching about.
+    p.box(x0, 0.45, x0 + 0.24, 0.8, 4, 7, '#9a7247', undefined, 'plank');
+    p.line([x0 + 0.02, 0.8, 0], [x0 + 0.02, 0.8, 4], BEAM, 1.2);
+    p.line([x0 + 0.22, 0.8, 0], [x0 + 0.22, 0.8, 4], BEAM, 1.2);
+    p.roofX(x0, 0.45, x0 + 0.24, 0.8, 11, 5, 'shingle', '#9a7247', 0.03);
+    p.line([x0 + 0.24, 0.6, 4], [x0 + 0.38, 0.6, 0], '#7b5a36', 1.4);
+    for (const [hx, hy] of [
+      [x0 + 0.05, 1.0],
+      [x0 + 0.2, 1.15],
+      [x0 - 0.05, 1.25],
+    ]) {
+      const [sx, sy] = iso(hx, hy, 0);
+      const c = p.ctx;
+      c.fillStyle = hx > x0 ? '#f2ece0' : '#a8622a';
+      c.beginPath();
+      c.ellipse(sx, sy - 2.5, 2.6, 2, 0, 0, Math.PI * 2);
+      c.fill();
+      c.beginPath();
+      c.arc(sx + 2, sy - 4.2, 1.2, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = '#c8322a';
+      c.fillRect(sx + 1.8, sy - 5.8, 1, 1);
+    }
+  } else if (yard === 'bees') {
+    p.box(x0, 0.5, x0 + 0.25, 0.65, 0, 4, '#7b5a36');
+    for (const y of [0.52, 0.62]) {
+      const [x, yy] = iso(x0 + 0.12, y, 4);
+      p.ctx.fillStyle = season === 3 ? '#e8ecee' : '#c9a050';
+      p.ctx.beginPath();
+      p.ctx.ellipse(x, yy - 4, 4, 5, 0, Math.PI, 0);
+      p.ctx.lineTo(x + 4, yy);
+      p.ctx.lineTo(x - 4, yy);
+      p.ctx.fill();
+      p.ctx.strokeStyle = '#8a6a30';
+      p.ctx.lineWidth = 0.5;
+      for (const dz of [1.5, 3, 4.5]) {
+        p.ctx.beginPath();
+        p.ctx.moveTo(x - 3.8 + dz * 0.2, yy - dz);
+        p.ctx.lineTo(x + 3.8 - dz * 0.2, yy - dz);
+        p.ctx.stroke();
+      }
+      p.ctx.fillStyle = '#3a2a1a';
+      p.ctx.fillRect(x - 0.8, yy - 1.4, 1.6, 1.2);
+    }
+    if (season === 1 || season === 0) p.bush(x0 + 0.1, 1.0, 3, '#b97ae0');
+  }
+}
+
+/** A grazing sheep at a screen point; `f` is the facing (1 or -1). */
+export function drawSheep(c: CanvasRenderingContext2D, x: number, y: number, f: number, white = '#f2ece0'): void {
+  c.fillStyle = 'rgba(20,20,10,0.22)';
+  c.beginPath();
+  c.ellipse(x, y, 5, 1.6, 0, 0, Math.PI * 2);
+  c.fill();
+  c.strokeStyle = '#3a3028';
+  c.lineWidth = 0.9;
+  c.beginPath();
+  for (const lx of [-2.5, -1, 1.5, 3]) {
+    c.moveTo(x + lx, y - 3);
+    c.lineTo(x + lx, y);
+  }
+  c.stroke();
+  c.fillStyle = white;
+  for (const [dx, dy, r] of [
+    [-2, -4.5, 2.6],
+    [0.5, -5.2, 2.8],
+    [2.5, -4.3, 2.4],
+    [0, -3.4, 2.6],
+  ]) {
+    c.beginPath();
+    c.arc(x + dx * f, y + dy, r, 0, Math.PI * 2);
+    c.fill();
+  }
+  c.fillStyle = '#3a3028';
+  c.beginPath();
+  c.ellipse(x + 4.6 * f, y - 4.4, 1.5, 1.2, 0, 0, Math.PI * 2);
+  c.fill();
+}
+
+/** A small fruit tree; stage 0..1 from sapling to mature. */
+export function fruitTreeSprite(fruit: string, season: Season, stage: number, fruiting: boolean, blossom = false): Sprite {
+  return makeSprite(36, 48, 18, 42, (ctx) => {
+    const k = 0.45 + 0.55 * stage;
+    const trunkH = 9 * k;
+    ctx.fillStyle = 'rgba(20,30,10,0.22)';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 9 * k, 3.5 * k, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#5e4129';
+    ctx.lineWidth = 2.2 * k;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0, -trunkH);
+    ctx.stroke();
+    const cy = -trunkH - 7 * k;
+    if (season === 3) {
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (const a of [-0.9, -0.3, 0.3, 0.9]) {
+        ctx.moveTo(0, -trunkH);
+        ctx.lineTo(Math.sin(a) * 9 * k, cy - Math.cos(a) * 5 * k);
+      }
+      ctx.stroke();
+      return;
+    }
+    const leaf = season === 2 ? (fruit === 'pears' ? '#c8a03a' : '#b8782a') : fruit === 'plums' ? '#4f7f3a' : '#5d9a3a';
+    const rand = mulberry32(fruit.length * 31 + Math.round(stage * 10));
+    for (const [dx, dy, r] of [
+      [-4, 1, 6],
+      [4, 1, 6],
+      [0, -3, 7],
+      [0, 3, 6],
+    ]) {
+      ctx.fillStyle = shade(leaf, 0.85 + rand() * 0.25);
+      ctx.beginPath();
+      ctx.arc(dx * k, cy + dy * k, r * k, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = 'rgba(255,255,220,0.18)';
+    ctx.beginPath();
+    ctx.arc(-2 * k, cy - 3 * k, 4 * k, 0, Math.PI * 2);
+    ctx.fill();
+    const dot = (color: string, n: number, r: number) => {
+      ctx.fillStyle = color;
+      for (let i = 0; i < n; i++) {
+        const a = rand() * Math.PI * 2;
+        const d = Math.sqrt(rand()) * 8 * k;
+        ctx.beginPath();
+        ctx.arc(Math.cos(a) * d, cy + Math.sin(a) * d * 0.8, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    };
+    if (blossom) dot(fruit === 'plums' ? '#f8f4f0' : '#f6c8d8', 14, 1.1);
+    if (fruiting) dot(fruit === 'apples' ? '#c4322a' : fruit === 'pears' ? '#d0c848' : '#5a2a6e', 8, 1.4);
+  });
 }
 
 function drawHouseProp(p: Pen, prop: 'logs' | 'hive' | 'cart' | 'well', season: Season): void {

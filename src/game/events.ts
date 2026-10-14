@@ -471,7 +471,7 @@ export const EVENTS: DecisionEvent[] = [
         detail: 'Crops suffer unless the heavens answer.',
         apply: (st, rng) => {
           if (rng.next() < 0.4) return { text: 'Thunder on the third night! The rain came in time.', kind: 'good' };
-          for (const b of st.buildings) if (b.type === 'farm') b.growth = Math.max(0, b.growth - 0.3);
+          for (const b of st.buildings) if (b.type === 'field') b.growth = Math.max(0, b.growth - 0.3);
           return { text: 'No rain came. The harvest will be thin this year.', kind: 'bad' };
         },
       },

@@ -24,6 +24,11 @@ import {
   hasBuilt,
   roomFor,
   trade,
+  bCenter,
+  placeZone,
+  zoneArea,
+  zoneError,
+  zonesOf,
 } from './sim';
 import type { BuildingType, Cost, GameState, ResourceId } from './types';
 import { idx, inBounds } from './world';
@@ -69,6 +74,45 @@ function tryPlace(s: GameState, type: BuildingType): boolean {
   if (!best) return false;
   if (d.gathers && resourceInRange(s, type, centerOf(best.x, best.y, d.w, d.h)) < 3) return false;
   return !!placeOrder(s, type, best.x, best.y);
+}
+
+/** Gives each farmstead about 40 tiles of fields on the best soil nearby. */
+function drawFields(s: GameState): void {
+  for (const farm of s.buildings) {
+    if (farm.type !== 'farm' || farm.build < 1) continue;
+    if (zoneArea(zonesOf(s, farm)) >= 36) continue;
+    const c = bCenter(farm);
+    let best = null as { x: number; y: number; w: number; h: number; score: number } | null;
+    for (const [w, h] of [
+      [5, 5],
+      [6, 4],
+      [4, 6],
+      [4, 4],
+      [3, 4],
+      [4, 3],
+      [3, 3],
+    ]) {
+      for (let y = Math.floor(c.y - 9); y <= c.y + 9; y++) {
+        for (let x = Math.floor(c.x - 9); x <= c.x + 9; x++) {
+          if (zoneError(s, 'field', x, y, x + w - 1, y + h - 1)) continue;
+          let blocks = false;
+          let fert = 0;
+          for (let yy = y; yy < y + h && !blocks; yy++) {
+            for (let xx = x; xx < x + w; xx++) {
+              if (onGrid(s, xx, yy)) blocks = true;
+              fert += s.fertility[idx(s, xx, yy)];
+            }
+          }
+          if (blocks) continue;
+          const d = Math.hypot(x + w / 2 - c.x, y + h / 2 - c.y);
+          const score = fert / (w * h) * 4 + w * h * 0.15 - d * 0.4;
+          if (!best || score > best.score) best = { x, y, w, h, score };
+        }
+      }
+      if (best) break;
+    }
+    if (best) placeZone(s, 'field', best.x, best.y, best.x + best.w - 1, best.y + best.h - 1);
+  }
 }
 
 /** Lays a road from the network towards the nearest ore deposit. */
@@ -258,6 +302,7 @@ function act(s: GameState, rand: () => number): void {
   const pop = s.population;
   const food = totalFood(s);
   renovate(s);
+  drawFields(s);
   const sites = s.buildings.filter((b) => b.build < 1).length;
   if (sites >= 3) return;
   const idle = pop - s.buildings.reduce((a, b) => a + b.workers, 0);

@@ -30,6 +30,14 @@ import {
   recompute,
   seasonOf,
   setKeep,
+  setYard,
+  YARDS,
+  zonesOf,
+  zoneArea,
+  herdCapacity,
+  HERDS,
+  orchardMaturity,
+  TEND_PER_TILE,
   labourSummary,
   PAVING_TIER,
   setWorkers,
@@ -55,6 +63,17 @@ import type { Game } from '../main';
 import { CATEGORY_ICONS, ICONS, SEASON_ICONS } from './icons';
 import { Minimap } from './minimap';
 import { Ambient } from './ambient';
+
+const ZONE_COST_NOTE: Partial<Record<BuildingType, string>> = {
+  field: '<small>Free · draw it</small>',
+  pasture: '<small>Fences: timber</small>',
+  orchard: '<small>2 coins a tile</small>',
+};
+const YARD_ICON: Record<string, string> = { veg: 'vegetables', hens: 'eggs', bees: 'honey' };
+const costText = (c: Cost) =>
+  Object.entries(c)
+    .map(([k, v]) => `${v} ${GOODS[k as ResourceId].name.toLowerCase()}`)
+    .join(', ');
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
@@ -212,13 +231,13 @@ export class Hud {
           const d = BUILDINGS[t];
           const locked = !isUnlocked(s, t);
           const poor = !canAfford(s, d.cost);
-          const sel = tool.kind === 'build' && tool.type === t;
+          const sel = (tool.kind === 'build' || tool.kind === 'zone') && tool.type === t;
           return `<div class="card ${sel ? 'sel' : ''} ${locked ? 'locked' : ''} ${poor ? 'poor' : ''}" data-action="build" data-type="${t}" data-tip="${esc(this.buildingTip(t))}">
             ${d.hotkey ? `<span class="key">${d.hotkey}</span>` : ''}
             <img src="${this.cardImage(t)}" alt="" draggable="false">
             ${locked ? `<div class="lock">${TIERS[d.tier].name}</div>` : ''}
             <div class="name">${d.name}</div>
-            <div class="cost">${costHtml(d.cost, s.res)}</div>
+            <div class="cost">${d.zone ? ZONE_COST_NOTE[t] ?? '' : costHtml(d.cost, s.res)}</div>
           </div>`;
         })
         .join('');
@@ -247,7 +266,7 @@ export class Hud {
     return [
       this.category ?? '',
       t.kind,
-      t.kind === 'build' ? t.type : t.kind === 'road' && t.paved ? 'paved' : '',
+      t.kind === 'build' || t.kind === 'zone' ? t.type : t.kind === 'road' && t.paved ? 'paved' : '',
       s.tier,
       ...BUILD_ORDER.map((b) => (canAfford(s, BUILDINGS[b].cost) ? 1 : 0)),
     ].join('|');
@@ -260,6 +279,7 @@ export class Hud {
     if (d.housing) lines.push(`Houses ${d.housing} villagers`);
     if (Object.keys(d.inputs).length) lines.push(`Uses: ${Object.entries(d.inputs).map(([k, v]) => `${v} ${RESOURCE_INFO[k as ResourceId].name}`).join(', ')}`);
     if (Object.keys(d.outputs).length) lines.push(`Makes: ${Object.entries(d.outputs).map(([k, v]) => `${v} ${RESOURCE_INFO[k as ResourceId].name}`).join(', ')}`);
+    if (d.zone) lines.push('<i>Click one corner, then the opposite corner.</i>');
     if (d.tier > this.game.state.tier) lines.push(`<span class="neg">Unlocks at ${TIERS[d.tier].name}</span>`);
     else if (!canAfford(this.game.state, d.cost)) lines.push('<i>You can place it now; builders wait until the materials are in storage.</i>');
     return lines.join('<br>');
@@ -498,7 +518,7 @@ export class Hud {
     const plan = upgradePlan(s, b);
     const blocker = upgradeBlocker(s, b);
     const key = JSON.stringify([
-      b.id, b.status, b.workers, b.builders, b.residents, b.build.toFixed(2), b.paused, b.level, b.lastOutput, b.growth.toFixed(2), b.want, b.priority, b.recipe,
+      b.id, b.status, b.workers, b.builders, b.residents, b.build.toFixed(2), b.paused, b.level, b.lastOutput, b.growth.toFixed(2), b.want, b.priority, b.recipe, b.yard, b.herd, b.owner, Math.floor(b.growth),
       s.tier, blocker, b.need, (b.upProgress ?? 0).toFixed(2), b.unmet, Math.floor(s.res.gold / 10), s.population,
     ]);
     if (key === this.lastInspectorKey) return;
@@ -534,21 +554,25 @@ export class Hud {
         }
       }
       if (d.recipes) {
-        const opts = [{ id: '', name: 'Auto' }, ...d.recipes];
-        rows.push(`<div class="kv product"><span>Product</span><span class="seg">${opts
+        // Fields, orchards and herds are always one thing; workshops may run on Auto.
+        const fixed = !!d.zone || b.type === 'byre';
+        const opts = fixed ? d.recipes : [{ id: '', name: 'Auto' }, ...d.recipes];
+        const current = b.recipe ?? (fixed ? d.recipes[0].id : '');
+        const label = b.type === 'field' ? 'Crop' : b.type === 'orchard' ? 'Fruit' : b.type === 'byre' ? 'Animals' : 'Product';
+        rows.push(`<div class="kv product"><span>${label}</span><span class="seg">${opts
           .map((r) => {
             const rec = d.recipes!.find((x) => x.id === r.id);
             const tip = rec
-              ? `<b>${rec.name}</b><br>${rec.months ? `In ${seasonSpan(rec.months)}` : 'All year'}${rec.auto === false ? '<br>Auto never picks this; choose it to make it.' : ''}`
+              ? `<b>${rec.name}</b><br>${b.type === 'byre' ? 'Changing animals sells the old herd; a new one of six arrives.' : b.type === 'orchard' ? 'Replanting starts the trees over.' : rec.months ? `In ${seasonSpan(rec.months)}` : 'All year'}${rec.auto === false ? '<br>Auto never picks this; choose it to make it.' : ''}`
               : '<b>Auto</b><br>Make whatever is in season and below its stock target.';
-            const icon = rec ? ICONS[Object.keys(rec.outputs)[0] as ResourceId] ?? '' : '';
-            return `<button data-action="recipe" data-r="${r.id}" class="${(b.recipe ?? '') === r.id ? 'active' : ''}" data-tip="${esc(tip)}">${icon}${r.name}</button>`;
+            const icon = rec ? (ICONS[Object.keys(rec.outputs)[0] as ResourceId] ?? '') : '';
+            return `<button data-action="recipe" data-r="${r.id}" class="${current === r.id ? 'active' : ''}" data-tip="${esc(tip)}">${icon}${r.name}</button>`;
           })
           .join('')}</span></div>`);
       }
+      rows.push(...this.zoneRows(b));
       const cap = housingOf(b);
       if (cap) rows.push(`<div class="kv"><span>Residents</span><span>${b.residents} / ${cap}</span></div>`);
-      if (b.type === 'farm') rows.push(`<div class="kv"><span>Crop growth</span><span>${Math.round(b.growth * 100)}%</span></div><div class="progress"><i style="width:${b.growth * 100}%"></i></div>`);
       if (Object.keys(d.outputs).length || b.type === 'farm' || b.type === 'forester') {
         rows.push(`<div class="kv"><span>${b.type === 'forester' ? 'Trees planted' : 'Produced'} last month</span><span>${b.lastOutput}</span></div>`);
       }
@@ -593,6 +617,57 @@ export class Hud {
       ${rows.join('')}
       <div class="status ${warn ? 'warn' : ''}">${esc(b.status || 'Idle')}</div>
       <div class="actions">${actions.join('')}</div>`;
+  }
+
+  /** Inspector rows for farms, herds, orchards, their zones and backyards. */
+  private zoneRows(b: Building): string[] {
+    const s = this.game.state;
+    const rows: string[] = [];
+    const bar = (v: number) => `<div class="progress"><i style="width:${Math.min(100, v * 100)}%"></i></div>`;
+    const zd = BUILDINGS[b.type].zone;
+    if (zd) {
+      const owner = s.buildings.find((o) => o.id === b.owner);
+      rows.push(`<div class="kv"><span>Size</span><span>${b.w} × ${b.h} (${b.w * b.h} tiles)</span></div>`);
+      rows.push(
+        owner
+          ? `<div class="kv link" data-action="goto-b" data-id="${owner.id}"><span>Tended from</span><span>${esc(buildingName(owner))}</span></div>`
+          : `<div class="kv"><span>Tended from</span><span class="neg">No ${BUILDINGS[zd.owner].name} in range</span></div>`,
+      );
+      if (b.type === 'field') {
+        rows.push(`<div class="kv"><span>Crop growth</span><span>${Math.round(b.growth * 100)}%</span></div>${bar(b.growth)}`);
+        if (b.lastCrop) rows.push(`<div class="kv" data-tip="Growing the same crop two years running yields less."><span>Last year</span><span>${esc(b.lastCrop)}${b.lastCrop === (b.recipe ?? 'wheat') ? ' <span class="neg">(same crop: −15%)</span>' : ''}</span></div>`);
+      } else if (b.type === 'orchard') {
+        const m = orchardMaturity(b);
+        rows.push(`<div class="kv"><span>Trees</span><span>${m < 1 ? `${Math.round(m * 100)}% grown` : 'Bearing fruit'}</span></div>${m < 1 ? bar(m) : ''}`);
+        if (b.growth > 0) rows.push(`<div class="kv"><span>Fruit on the trees</span><span>${Math.floor(b.growth)}</span></div>`);
+      }
+    }
+    if (b.type === 'farm' && b.build >= 1) {
+      const fields = zonesOf(s, b);
+      const area = zoneArea(fields);
+      const hands = Math.round((workersOf(b) * 60) / TEND_PER_TILE);
+      rows.push(`<div class="kv" data-tip="Draw fields within the farm's reach (Food menu). ${workersOf(b)} farmers can sow and tend about ${hands} tiles."><span>Fields</span><span class="${area > hands ? 'neg' : ''}">${fields.length} · ${area} of ~${hands} tiles</span></div>`);
+    }
+    if (b.type === 'byre' && b.build >= 1) {
+      const capy = herdCapacity(s, b);
+      const kind = HERDS[b.recipe ?? 'sheep'];
+      rows.push(`<div class="kv" data-tip="A ${kind.name} needs ${kind.tiles} tiles of pasture. With oats in store the herd may grow half as large again, eating oats each winter month."><span>Herd</span><span>${b.herd ?? 0} ${kind.plural} · room for ${capy.free}${capy.fed > capy.free ? ` (+${capy.fed - capy.free} on oats)` : ''}</span></div>`);
+      rows.push(`<div class="kv"><span>Pastures</span><span>${zonesOf(s, b).length} · ${zoneArea(zonesOf(s, b))} tiles</span></div>`);
+    }
+    if (b.type === 'orchardist' && b.build >= 1) {
+      const orchards = zonesOf(s, b);
+      rows.push(`<div class="kv"><span>Orchards</span><span>${orchards.length} · ${zoneArea(orchards)} tiles</span></div>`);
+    }
+    if (b.type === 'house' && b.build >= 1) {
+      const opts = [{ id: '', name: 'None', cost: {} as Cost, desc: 'Nothing but a woodpile.', tier: 0 }, ...Object.entries(YARDS).map(([id, y]) => ({ id, ...y }))];
+      rows.push(`<div class="kv product"><span>Backyard</span><span class="seg">${opts
+        .map((o) => {
+          const locked = s.tier < o.tier;
+          return `<button data-action="yard" data-y="${o.id}" class="${(b.yard ?? '') === o.id ? 'active' : ''}" ${locked ? 'disabled' : ''} data-tip="<b>${o.name}</b><br>${esc(o.desc)}${Object.keys(o.cost).length ? `<br>Costs ${esc(costText(o.cost))}` : ''}${locked ? `<br>Unlocks at ${TIERS[o.tier].name}` : ''}">${o.id ? (ICONS[(YARD_ICON[o.id] ?? 'wood') as ResourceId] ?? '') : ''}${o.name.split(' ')[0]}</button>`;
+        })
+        .join('')}</span></div>`);
+    }
+    return rows;
   }
 
   private updateLog(): void {
@@ -797,8 +872,9 @@ export class Hud {
       return;
     }
     this.category = BUILDINGS[t].category;
-    if (g.tool.kind === 'build' && g.tool.type === t) g.setTool({ kind: 'select' });
-    else g.setTool({ kind: 'build', type: t });
+    const kind = BUILDINGS[t].zone ? 'zone' : 'build';
+    if ((g.tool.kind === 'build' || g.tool.kind === 'zone') && g.tool.type === t) g.setTool({ kind: 'select' });
+    else g.setTool({ kind, type: t });
   }
 
   private onClick(e: MouseEvent): void {
@@ -899,6 +975,17 @@ export class Hud {
         const b = this.selectedBuilding();
         if (b) {
           setPriority(s, b, Number(t.dataset.p));
+          this.update();
+        }
+        break;
+      }
+      case 'yard': {
+        const b = this.selectedBuilding();
+        if (b) {
+          const err = setYard(s, b, t.dataset.y || undefined);
+          if (err) this.flash(err);
+          else this.sound('place');
+          this.lastInspectorKey = '';
           this.update();
         }
         break;

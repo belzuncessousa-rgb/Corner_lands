@@ -22,6 +22,11 @@ import {
   removeRoad,
   resourceInRange,
   roadError,
+  zoneError,
+  zoneCost,
+  placeZone,
+  setYard,
+  footprintClear,
   PAVING_COST,
   PAVING_TIER,
   stepDay,
@@ -40,6 +45,7 @@ export type Tool =
   | { kind: 'select' }
   | { kind: 'build'; type: BuildingType }
   | { kind: 'road'; paved?: boolean }
+  | { kind: 'zone'; type: BuildingType }
   | { kind: 'demolish' };
 
 const SPEEDS = [0, 1, 3, 8];
@@ -72,6 +78,8 @@ export class Game {
   private dragTile: { x: number; y: number } | null = null;
   /** Where the road being laid starts; the next click finishes a segment. */
   private roadAnchor: { x: number; y: number } | null = null;
+  /** First corner of a field, pasture or orchard being drawn. */
+  private zoneAnchor: { x: number; y: number } | null = null;
   private pinch: { dist: number; zoom: number } | null = null;
   private keys = new Set<string>();
 
@@ -247,6 +255,39 @@ export class Game {
         ov.range = { cx: c.x, cy: c.y, r: d.radius, highlight: rangeHighlighter(s, tool.type) };
       }
       this.hud.setHint(this.buildHint(tool.type, p.x, p.y, err), !!err);
+    } else if (tool.kind === 'zone') {
+      const a = this.zoneAnchor ?? { x: tx, y: ty };
+      const err = zoneError(s, tool.type, a.x, a.y, tx, ty);
+      const x0 = Math.min(a.x, tx);
+      const y0 = Math.min(a.y, ty);
+      const w = Math.abs(tx - a.x) + 1;
+      const h = Math.abs(ty - a.y) + 1;
+      ov.tiles = [];
+      for (let y = y0; y < y0 + h; y++) {
+        for (let x = x0; x < x0 + w; x++) {
+          if (!inBounds(s, x, y)) continue;
+          ov.tiles.push({ x, y, ok: !footprintClear(s, x, y, 1, 1) });
+        }
+      }
+      ov.tileColor = 'road';
+      const d = BUILDINGS[tool.type];
+      const owner = d.zone!.owner;
+      const ownerName = BUILDINGS[owner].name;
+      // Show the reach of the workplaces that would tend it.
+      const near = s.buildings.find((o) => o.type === owner && o.build >= 1 && Math.hypot(bCenter(o).x - (x0 + w / 2), bCenter(o).y - (y0 + h / 2)) <= BUILDINGS[owner].radius + Math.max(w, h) / 2);
+      const any = s.buildings.find((o) => o.type === owner);
+      if (near || any) {
+        const c = bCenter(near ?? any!);
+        ov.range = { cx: c.x, cy: c.y, r: BUILDINGS[owner].radius };
+      }
+      const cost = zoneCost(tool.type, w, h);
+      const costText = cost.wood ? ` · ${cost.wood} timber for fences` : cost.gold ? ` · ${cost.gold} coins for saplings` : '';
+      if (!this.zoneAnchor) {
+        this.hud.setHint(`${d.name}: click one corner, then the opposite corner · ${d.zone!.min}–${d.zone!.max} tiles a side`, false);
+      } else {
+        const where = near ? '' : ` · no ${ownerName} in range: nobody will tend it`;
+        this.hud.setHint(err ? `${d.name} ${w}×${h}: ${err}` : `${d.name} ${w}×${h} (${w * h} tiles)${costText}${where} · click to place`, !!err || !near);
+      }
     } else if (tool.kind === 'road') {
       const paved = !!tool.paved;
       const tiles = this.roadTiles(tx, ty);
@@ -354,6 +395,30 @@ export class Game {
     return out;
   }
 
+  /** Zone tool click: first corner, then the opposite corner places it. */
+  private clickZone(type: BuildingType, tx: number, ty: number): void {
+    const s = this.state;
+    if (!inBounds(s, tx, ty)) return;
+    if (!this.zoneAnchor) {
+      this.zoneAnchor = { x: tx, y: ty };
+      return;
+    }
+    const a = this.zoneAnchor;
+    const err = zoneError(s, type, a.x, a.y, tx, ty);
+    if (err) {
+      this.hud.flash(err);
+      return;
+    }
+    const z = placeZone(s, type, a.x, a.y, tx, ty);
+    this.zoneAnchor = null;
+    if (z) {
+      this.hud.sound('place');
+      this.setTool({ kind: 'select' });
+      this.hud.closeCategory();
+      this.select(z.id);
+    }
+  }
+
   /** Road tool click: start a road, or lay the segment and continue from its end. */
   private clickRoad(tx: number, ty: number): void {
     if (!inBounds(this.state, tx, ty)) return;
@@ -377,6 +442,7 @@ export class Game {
     this.tool = t;
     this.dragTile = null;
     this.roadAnchor = null;
+    this.zoneAnchor = null;
     if (t.kind !== 'select') this.selected = null;
     this.canvas.classList.toggle('tool', t.kind !== 'select');
     this.hud.update();
@@ -536,6 +602,7 @@ export class Game {
       const ty = Math.floor(fty);
       if (df.button === 2 && !this.moved) {
         if (this.tool.kind === 'road' && this.roadAnchor) this.roadAnchor = null;
+        else if (this.tool.kind === 'zone' && this.zoneAnchor) this.zoneAnchor = null;
         else if (this.tool.kind !== 'select') this.setTool({ kind: 'select' });
         else this.select(null);
         return;
@@ -543,6 +610,10 @@ export class Game {
       if (df.button !== 0) return;
       if (this.tool.kind === 'road') {
         if (!this.moved) this.clickRoad(tx, ty);
+        return;
+      }
+      if (this.tool.kind === 'zone') {
+        if (!this.moved) this.clickZone(this.tool.type, tx, ty);
         return;
       }
       if (this.tool.kind === 'demolish' && this.dragTile) {
@@ -582,6 +653,7 @@ export class Game {
       if (k === 'escape') {
         if (this.hud.handleEscape()) return;
         if (this.tool.kind === 'road' && this.roadAnchor) this.roadAnchor = null;
+        else if (this.tool.kind === 'zone' && this.zoneAnchor) this.zoneAnchor = null;
         else if (this.tool.kind !== 'select') this.setTool({ kind: 'select' });
         else if (this.selected !== null) this.select(null);
         else if (this.hud.categoryOpen) this.hud.closeCategory();
@@ -690,4 +762,4 @@ function rangeHighlighter(s: GameState, type: BuildingType): ((i: number) => boo
 const game = new Game();
 // Handy hooks for debugging and automated screenshots.
 (window as unknown as Record<string, unknown>).game = game;
-(window as unknown as Record<string, unknown>).cl = { placeOrder, buildRoad, stepDay, recompute, placementError, playBot };
+(window as unknown as Record<string, unknown>).cl = { placeOrder, buildRoad, stepDay, recompute, placementError, playBot, placeZone, setYard };

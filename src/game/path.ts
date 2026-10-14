@@ -1,3 +1,4 @@
+import { BUILDINGS } from './data';
 import type { GameState } from './types';
 
 let gScore = new Float32Array(0);
@@ -97,10 +98,13 @@ export function findPath(
   const start = sy * W + sx;
   const goal = gy * W + gx;
   if (start === goal) return [];
+  // Fields, pastures and orchards can be walked across.
+  const zones = new Set<number>();
+  for (const b of s.buildings) if (BUILDINGS[b.type].zone) zones.add(b.id);
   const passable = (i: number) => {
     if (s.terrain[i] === 1 && !s.road[i]) return false;
     const o = s.occ[i];
-    return o < 0 || allowIds.includes(o) || i === goal;
+    return o < 0 || zones.has(o) || allowIds.includes(o) || i === goal;
   };
   const cost = (i: number) => (s.road[i] ? 1 : s.trees[i] ? 3 : 2.2);
   const heap = new Heap();

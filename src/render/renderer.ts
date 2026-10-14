@@ -1,6 +1,6 @@
 import { BUILDINGS, RESOURCE_STORAGE, STORAGE_CAPACITY, type StorageKind } from '../game/data';
 import { upgradeBlocker } from '../game/levels';
-import { deliveredTo, hasProblem, monthOf, seasonOf, storageCap } from '../game/sim';
+import { deliveredTo, hasProblem, monthOf, orchardMaturity, seasonOf, storageCap } from '../game/sim';
 import type { Building, BuildingType, GameState, ResourceId, Season } from '../game/types';
 import { idx, inBounds } from '../game/world';
 import type { Agent } from './agents';
@@ -15,6 +15,9 @@ import {
   buildingSprite,
   grassTile,
   roadTile,
+  fruitTreeSprite,
+  drawSheep,
+  YARD_CODES,
   pavedTile,
   rockSprite,
   treeSprite,
@@ -233,7 +236,7 @@ export class Renderer {
     }
     this.mark('ground');
     this.drawWaterShimmer(s, visible);
-    this.drawFields(s, season);
+    this.drawFields(s, season, ov.selected);
     this.drawFootpaths(s, agents, season, dt, visible);
     // Roads on top of ground: all edges first so joints blend.
     for (const layer of ['edge', 'fill'] as const) {
@@ -264,7 +267,21 @@ export class Renderer {
     const nb = W + H + 4;
     if (this.buckets.length !== nb) this.buckets = Array.from({ length: nb }, () => []);
     for (const b of this.buckets) b.length = 0;
+    this.orchardTiles.clear();
     s.buildings.forEach((b, bi) => {
+      if (BUILDINGS[b.type].zone) {
+        if (b.type === 'orchard') {
+          for (let y = b.y; y < b.y + b.h; y++) {
+            for (let x = b.x; x < b.x + b.w; x++) {
+              const [wx, wy] = iso(x, y);
+              if (!visible(wx, wy)) continue;
+              this.orchardTiles.set(y * W + x, b);
+              this.buckets[Math.max(x + y, this.boost[y * W + x])].push((y * W + x) * 4);
+            }
+          }
+        }
+        return;
+      }
       const [wx, wy] = iso(b.x + b.w / 2, b.y + b.h / 2);
       if (!visible(wx, wy + 60) && !visible(wx, wy - 100)) return;
       this.buckets[this.buildingDepth(s, b)].push(bi * 4 + 1);
@@ -461,64 +478,142 @@ export class Renderer {
     c.globalAlpha = 1;
   }
 
-  private drawFields(s: GameState, season: Season): void {
+  private drawFields(s: GameState, season: Season, selected?: number): void {
     const p = new Pen(this.ctx);
     const month = monthOf(s.day);
+    const herds = new Map<number, number>();
     for (const b of s.buildings) {
-      if (b.type !== 'farm') continue;
-      const rects: [number, number, number, number][] = [
-        [b.x + 2, b.y, b.x + 4, b.y + 2],
-        [b.x, b.y + 2, b.x + 4, b.y + 4],
-      ];
-      // Yard.
-      p.poly(
-        [
-          [b.x + 0.1, b.y + 0.1, 0],
-          [b.x + 2, b.y + 0.1, 0],
-          [b.x + 2, b.y + 2, 0],
-          [b.x + 0.1, b.y + 2, 0],
-        ],
-        season === 3 ? '#d6dbd9' : '#9c8a5e',
-      );
-      const built = b.build >= 1;
-      for (const [x0, y0, x1, y1] of rects) {
-        const soil = season === 3 ? '#cfd4d4' : '#7a5a3a';
+      if (b.type === 'farm') {
+        // Farmyard.
         p.poly(
           [
-            [x0 + 0.08, y0 + 0.08, 0],
-            [x1 - 0.08, y0 + 0.08, 0],
-            [x1 - 0.08, y1 - 0.08, 0],
-            [x0 + 0.08, y1 - 0.08, 0],
+            [b.x + 0.1, b.y + 0.1, 0],
+            [b.x + b.w - 0.05, b.y + 0.1, 0],
+            [b.x + b.w - 0.05, b.y + b.h - 0.05, 0],
+            [b.x + 0.1, b.y + b.h - 0.05, 0],
           ],
-          soil,
-          '#5e4129',
-          1,
+          season === 3 ? '#d6dbd9' : '#9c8a5e',
         );
-        if (!built) continue;
-        // Furrows / crops along x.
-        const rows = Math.round((y1 - y0) * 4);
-        let crop: string | null = null;
-        let height = 0;
-        if (month <= 5 && b.growth > 0) {
-          crop = b.growth < 0.5 ? '#7aa83e' : '#5e9a34';
-          height = 2 + b.growth * 6;
-        } else if (month === 6 && b.growth > 0) {
-          crop = '#d8b44a';
-          height = 8;
-        } else if (month >= 7 && month <= 8) {
-          crop = '#b89a5a';
-          height = 1.2;
-        }
-        for (let r = 0; r < rows; r++) {
-          const y = y0 + (r + 0.5) / 4;
-          p.line([x0 + 0.15, y, 0], [x1 - 0.15, y, 0], season === 3 ? '#b8bebe' : '#5e4129', 1.4);
-          if (crop) {
-            p.line([x0 + 0.15, y - 0.05, height * 0.5], [x1 - 0.15, y - 0.05, height * 0.5], crop, height + 1.5);
-            p.line([x0 + 0.15, y - 0.08, height], [x1 - 0.15, y - 0.08, height], shadeCrop(crop), 1.2);
-          }
-        }
+      } else if (b.type === 'field') {
+        this.drawField(p, b, season, month);
+      } else if (b.type === 'pasture') {
+        this.drawPasture(p, s, b, season, herds);
+      } else if (b.type === 'orchard') {
+        // Mown grass between the rows.
+        p.poly(
+          [
+            [b.x + 0.05, b.y + 0.05, 0],
+            [b.x + b.w - 0.05, b.y + 0.05, 0],
+            [b.x + b.w - 0.05, b.y + b.h - 0.05, 0],
+            [b.x + 0.05, b.y + b.h - 0.05, 0],
+          ],
+          season === 3 ? 'rgba(230,236,238,0.5)' : 'rgba(80,110,40,0.25)',
+        );
+        for (let x = b.x + 0.5; x < b.x + b.w; x += 1) p.line([x, b.y + 0.2, 0], [x, b.y + b.h - 0.2, 0], season === 3 ? 'rgba(200,206,208,0.6)' : 'rgba(150,170,80,0.35)', 3);
+      }
+      if (selected === b.id && BUILDINGS[b.type].zone) {
+        p.poly(
+          [
+            [b.x, b.y, 0],
+            [b.x + b.w, b.y, 0],
+            [b.x + b.w, b.y + b.h, 0],
+            [b.x, b.y + b.h, 0],
+          ],
+          'rgba(255,230,140,0.12)',
+          `rgba(240,200,80,${0.6 + 0.3 * Math.sin(this.time * 4)})`,
+          2,
+        );
       }
     }
+  }
+
+  private drawField(p: Pen, b: Building, season: Season, month: number): void {
+    const x0 = b.x;
+    const y0 = b.y;
+    const x1 = b.x + b.w;
+    const y1 = b.y + b.h;
+    const soil = season === 3 ? '#cfd4d4' : '#7a5a3a';
+    p.poly(
+      [
+        [x0 + 0.06, y0 + 0.06, 0],
+        [x1 - 0.06, y0 + 0.06, 0],
+        [x1 - 0.06, y1 - 0.06, 0],
+        [x0 + 0.06, y1 - 0.06, 0],
+      ],
+      soil,
+      '#5e4129',
+      1,
+    );
+    const crop = b.recipe ?? 'wheat';
+    const ripe: Record<string, string> = { wheat: '#d8b44a', barley: '#e0cc84', oats: '#d4c070', flax: '#9a8a5a' };
+    const young: Record<string, string> = { wheat: '#5e9a34', barley: '#7aa83e', oats: '#88b04a', flax: '#5a8a4a' };
+    let color: string | null = null;
+    let height = 0;
+    if (month <= 5 && b.growth > 0) {
+      color = b.growth < 0.5 ? '#7aa83e' : young[crop];
+      height = 2 + b.growth * 6;
+      if (crop === 'flax' && month >= 3 && b.growth > 0.5) color = '#6a8ad8';
+    } else if (month === 6 && b.growth > 0) {
+      color = ripe[crop];
+      height = 8;
+    } else if (month >= 7 && month <= 8) {
+      color = '#b89a5a';
+      height = 1.2;
+    }
+    const rows = Math.round(b.h * 4);
+    for (let r = 0; r < rows; r++) {
+      const y = y0 + (r + 0.5) / 4;
+      p.line([x0 + 0.15, y, 0], [x1 - 0.15, y, 0], season === 3 ? '#b8bebe' : '#5e4129', 1.4);
+      if (color) {
+        p.line([x0 + 0.15, y - 0.05, height * 0.5], [x1 - 0.15, y - 0.05, height * 0.5], color, height + 1.5);
+        p.line([x0 + 0.15, y - 0.08, height], [x1 - 0.15, y - 0.08, height], shadeCrop(color), 1.2);
+      }
+    }
+  }
+
+  private drawPasture(p: Pen, s: GameState, b: Building, season: Season, herds: Map<number, number>): void {
+    const x0 = b.x;
+    const y0 = b.y;
+    const x1 = b.x + b.w;
+    const y1 = b.y + b.h;
+    p.poly(
+      [
+        [x0, y0, 0],
+        [x1, y0, 0],
+        [x1, y1, 0],
+        [x0, y1, 0],
+      ],
+      season === 3 ? 'rgba(240,244,246,0.25)' : 'rgba(120,150,50,0.18)',
+    );
+    const post = '#7b5a36';
+    p.fence([x0 + 0.05, y0 + 0.05], [x1 - 0.05, y0 + 0.05], post);
+    p.fence([x0 + 0.05, y0 + 0.05], [x0 + 0.05, y1 - 0.05], post);
+    // Animals, shared out between the owner's pastures by area.
+    const owner = s.buildings.find((o) => o.id === b.owner);
+    if (owner && owner.herd) {
+      const zones = s.buildings.filter((z) => z.owner === owner.id && z.type === 'pasture');
+      const total = zones.reduce((a, z) => a + z.w * z.h, 0);
+      let n = Math.round(((owner.herd ?? 0) * b.w * b.h) / Math.max(1, total));
+      const used = herds.get(owner.id) ?? 0;
+      if (zones[zones.length - 1] === b) n = Math.max(0, (owner.herd ?? 0) - used);
+      herds.set(owner.id, used + n);
+      const kind = owner.herdKind ?? 'sheep';
+      for (let j = 0; j < Math.min(n, 40); j++) {
+        const seed = b.id * 97 + j * 13;
+        const r1 = fract(Math.sin(seed) * 43758.5);
+        const r2 = fract(Math.sin(seed * 1.7) * 24634.6);
+        const t = this.time * 0.05 + r1 * 10;
+        const ax = x0 + 0.4 + (b.w - 0.8) * fract(r1 + 0.08 * Math.sin(t));
+        const ay = y0 + 0.4 + (b.h - 0.8) * fract(r2 + 0.06 * Math.cos(t * 0.8));
+        const [sx, sy] = iso(ax, ay);
+        const f = Math.cos(t) > 0 ? 1 : -1;
+        if (kind === 'sheep') drawSheep(p.ctx, sx, sy, f, season === 3 ? '#e2ddd2' : '#f2ece0');
+        else drawBeast(p.ctx, sx, sy, f, kind, j);
+      }
+    }
+    p.fence([x1 - 0.05, y0 + 0.05], [x1 - 0.05, y1 - 0.05], post);
+    p.fence([x0 + 0.05, y1 - 0.05], [x0 + b.w / 2 - 0.3, y1 - 0.05], post);
+    p.fence([x0 + b.w / 2 + 0.3, y1 - 0.05], [x1 - 0.05, y1 - 0.05], post);
   }
 
   private drawGroundOverlays(s: GameState, ov: Overlay): void {
@@ -619,10 +714,25 @@ export class Renderer {
 
   // ---------------------------------------------------------------- objects
 
+  /** Orchard tiles visible this frame, drawn as fruit trees. */
+  private orchardTiles = new Map<number, Building>();
+
   private drawTileObjects(s: GameState, i: number, season: Season): void {
     const x = i % s.width;
     const y = (i - x) / s.width;
     const v = s.variant[i];
+    const orchard = this.orchardTiles.get(i);
+    if (orchard) {
+      const fruit = orchard.recipe ?? 'apples';
+      const stage = Math.round(orchardMaturity(orchard) * 4) / 4;
+      const month = monthOf(s.day);
+      const fruiting = stage >= 1 && month >= 3 && month <= 6 && (month < 5 || orchard.growth > 0);
+      const blossom = month <= 1 && stage >= 0.5;
+      const sp = this.sprite(`ft:${fruit}:${season}:${stage}:${fruiting}:${blossom}`, () => fruitTreeSprite(fruit, season, stage, fruiting, blossom));
+      const [wx, wy] = iso(x + 0.5, y + 0.5);
+      this.blit(sp, wx, wy);
+      return;
+    }
     if (s.rock[i] || s.ore[i]) {
       const ore = s.ore[i] > 0;
       const rv = v % 4;
@@ -1277,8 +1387,57 @@ export class Renderer {
 }
 
 /** Visual variant of a building (houses come in several styles). */
+const fract = (v: number) => v - Math.floor(v);
+
+/** A cow or a pig at a screen point. */
+function drawBeast(c: CanvasRenderingContext2D, x: number, y: number, f: number, kind: string, j: number): void {
+  const pig = kind === 'pigs';
+  const coat = pig ? '#e8a8a0' : ['#8a5a3a', '#f2ece0', '#3a3028', '#b0703a'][j % 4];
+  const len = pig ? 4.5 : 6.5;
+  const tall = pig ? 2.5 : 5;
+  c.fillStyle = 'rgba(20,20,10,0.22)';
+  c.beginPath();
+  c.ellipse(x, y, len + 1, 1.8, 0, 0, Math.PI * 2);
+  c.fill();
+  c.strokeStyle = pig ? '#b87870' : '#3a3028';
+  c.lineWidth = pig ? 1.2 : 1.3;
+  c.beginPath();
+  for (const lx of [-len * 0.6, len * 0.55]) {
+    c.moveTo(x + lx, y - tall);
+    c.lineTo(x + lx, y);
+  }
+  c.stroke();
+  c.fillStyle = coat;
+  c.beginPath();
+  c.ellipse(x, y - tall - 2.2, len, pig ? 2.8 : 3.4, 0, 0, Math.PI * 2);
+  c.fill();
+  if (!pig && j % 4 === 1) {
+    c.fillStyle = '#3a3028';
+    c.beginPath();
+    c.ellipse(x - 1.5 * f, y - tall - 2.6, 1.8, 1.3, 0, 0, Math.PI * 2);
+    c.fill();
+  }
+  // Head, lowered to graze.
+  c.fillStyle = coat;
+  c.beginPath();
+  c.ellipse(x + (len + 1) * f, y - tall - (pig ? 1.4 : 0.6), pig ? 2 : 2.3, pig ? 1.8 : 2, 0, 0, Math.PI * 2);
+  c.fill();
+  if (pig) {
+    c.fillStyle = '#d88a84';
+    c.fillRect(x + (len + 2.4) * f - 0.8, y - tall - 1.8, 1.6, 1.4);
+  } else {
+    c.strokeStyle = '#e8dcc4';
+    c.lineWidth = 0.7;
+    c.beginPath();
+    c.moveTo(x + (len + 0.5) * f, y - tall - 2.2);
+    c.lineTo(x + (len - 0.6) * f, y - tall - 3.8);
+    c.stroke();
+  }
+}
+
 function variantOf(b: Building): number {
-  return b.type === 'house' ? (b.id * 7 + b.x) % 4 : 0;
+  if (b.type !== 'house') return 0;
+  return ((b.id * 7 + b.x) % 4) + 4 * Math.max(0, YARD_CODES.indexOf(b.yard ?? null));
 }
 
 /** A small pile of one kind of goods. */

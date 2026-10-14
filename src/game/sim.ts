@@ -179,6 +179,86 @@ export function placeOrder(s: GameState, type: BuildingType, x: number, y: numbe
   return b;
 }
 
+// ---------------------------------------------------------------- zones
+
+export function isZone(type: BuildingType): boolean {
+  return !!BUILDINGS[type].zone;
+}
+
+/** What it costs to lay out a zone: fences for pastures, saplings for orchards. */
+export function zoneCost(type: BuildingType, w: number, h: number): Cost {
+  if (type === 'pasture') return { wood: w + h };
+  if (type === 'orchard') return { gold: 2 * w * h };
+  return {};
+}
+
+function zoneRect(x0: number, y0: number, x1: number, y1: number) {
+  const x = Math.min(x0, x1);
+  const y = Math.min(y0, y1);
+  return { x, y, w: Math.abs(x1 - x0) + 1, h: Math.abs(y1 - y0) + 1 };
+}
+
+/** Why a zone cannot be drawn between two corner tiles, or null. */
+export function zoneError(s: GameState, type: BuildingType, x0: number, y0: number, x1: number, y1: number): string | null {
+  const d = BUILDINGS[type];
+  const z = d.zone;
+  if (!z) return 'Not a zone';
+  if (!isUnlocked(s, type)) return `Requires ${TIERS[d.tier].name}`;
+  const r = zoneRect(x0, y0, x1, y1);
+  if (r.w < z.min || r.h < z.min) return `At least ${z.min}×${z.min} tiles`;
+  if (r.w > z.max || r.h > z.max) return `At most ${z.max}×${z.max} tiles`;
+  const clear = footprintClear(s, r.x, r.y, r.w, r.h);
+  if (clear) return clear;
+  const cost = zoneCost(type, r.w, r.h);
+  if (!canAfford(s, cost)) return cost.gold ? 'Not enough coins' : 'Not enough timber for fences';
+  return null;
+}
+
+/** Lays out a field, pasture or orchard between two corner tiles. */
+export function placeZone(s: GameState, type: BuildingType, x0: number, y0: number, x1: number, y1: number): Building | null {
+  if (zoneError(s, type, x0, y0, x1, y1)) return null;
+  const r = zoneRect(x0, y0, x1, y1);
+  pay(s, zoneCost(type, r.w, r.h));
+  const b = makeBuilding(s.nextId++, type, r.x, r.y);
+  b.w = r.w;
+  b.h = r.h;
+  b.build = 1;
+  if (type === 'orchard') b.age = 0;
+  placeBuilding(s, b);
+  recompute(s);
+  return b;
+}
+
+/** Links every zone to the nearest workplace of its kind in range. */
+function assignOwners(s: GameState): void {
+  for (const z of s.buildings) {
+    const zd = BUILDINGS[z.type].zone;
+    if (!zd) continue;
+    const c = bCenter(z);
+    let best: Building | undefined;
+    let bestD = Infinity;
+    for (const o of s.buildings) {
+      if (o.type !== zd.owner || o.build < 1) continue;
+      const oc = bCenter(o);
+      const d = Math.hypot(oc.x - c.x, oc.y - c.y);
+      if (d <= BUILDINGS[o.type].radius + Math.max(z.w, z.h) / 2 && d < bestD) {
+        bestD = d;
+        best = o;
+      }
+    }
+    z.owner = best?.id;
+  }
+}
+
+/** Fields, pastures or orchards tended from a workplace. */
+export function zonesOf(s: GameState, b: Building): Building[] {
+  return s.buildings.filter((z) => z.owner === b.id && BUILDINGS[z.type].zone);
+}
+
+export function zoneArea(zones: Building[]): number {
+  return zones.reduce((a, z) => a + z.w * z.h, 0);
+}
+
 /** Materials already carried to a construction site. */
 export function deliveredTo(b: Building): Cost {
   const d = BUILDINGS[b.type];
@@ -499,6 +579,8 @@ export function travelField(s: GameState, rebuild = false): Float64Array {
   const n = s.width * s.height;
   field = new Float64Array(n).fill(Infinity);
   const heap = new Heap();
+  // Villagers walk across fields, pastures and orchards.
+  const zones = new Set(s.buildings.filter((b) => BUILDINGS[b.type].zone).map((b) => b.id));
   for (const b of s.buildings) {
     if (b.build < 1 || !STORAGE_CAPACITY[b.type]) continue;
     for (let y = b.y; y < b.y + b.h; y++) {
@@ -524,7 +606,7 @@ export function travelField(s: GameState, rebuild = false): Float64Array {
       const j = ny * s.width + nx;
       if (s.terrain[j] === 1 && !s.road[j]) continue;
       // Paths may end at a building's edge but not cross other buildings.
-      if (s.occ[j] >= 0 && field[i] > 0) continue;
+      if (s.occ[j] >= 0 && field[i] > 0 && !zones.has(s.occ[j])) continue;
       const ng = g + stepCost(s, j);
       if (ng < field[j]) {
         field[j] = ng;
@@ -638,6 +720,7 @@ export function employed(s: GameState): number {
 /** Re-runs connectivity, distributes residents and assigns jobs. */
 export function recompute(s: GameState): void {
   if (s.dirty) {
+    assignOwners(s);
     travelField(s, true);
     for (const b of s.buildings) b.trip = tripDays(s, b);
     s.dirty = false;
@@ -988,39 +1071,289 @@ function farmFertility(s: GameState, b: Building): number {
   return f / (b.w * b.h);
 }
 
-export const FARM_YIELD = 300;
+/** Grain (or barley, oats, flax) per tile from a fully tended field on rich soil. */
+export const FIELD_YIELD = 18;
+/** Farmer-days of sowing and tending each tile of field needs in a season. */
+export const TEND_PER_TILE = 4;
 /** Converters leave this much timber in stock for firewood. */
 export const WOOD_RESERVE = 20;
 
+const CROP_GOOD: Record<string, ResourceId> = { wheat: 'grain', barley: 'barley', oats: 'oats', flax: 'flax' };
+const CROP_FACTOR: Record<string, number> = { wheat: 1, barley: 1, oats: 1.15, flax: 0.5 };
+
+export function cropOf(f: Building): string {
+  return f.recipe ?? 'wheat';
+}
+
 function stepFarm(s: GameState, b: Building): void {
   const month = monthOf(s.day);
+  const fields = zonesOf(s, b);
+  const area = zoneArea(fields);
   const crew = b.workers / BUILDINGS.farm.workers;
   b.blocked = 0;
+  if (!fields.length) {
+    b.status = 'Draw fields nearby to farm';
+    b.blocked = BLOCK_PROBLEM;
+    return;
+  }
   if (month <= 5) {
-    if (crew > 0) b.growth = Math.min(1, b.growth + crew / 50);
-    b.status = crew > 0 ? (month < 3 ? 'Sowing the fields' : 'Tending the crops') : 'Fields untended';
-  } else if (month === 6) {
-    b.status = b.growth > 0 ? 'Crops ripening' : 'Fields lie fallow';
-    if (b.growth === 0) b.blocked = BLOCK_SEASONAL;
-  } else if (month === 7 && s.day % DAYS_PER_MONTH === 0 && b.growth > 0) {
-    if (crew > 0) {
-      const amount = Math.round(FARM_YIELD * b.growth * (0.5 + 0.5 * farmFertility(s, b)) * (0.6 + 0.4 * crew));
-      const gained = store(s, 'grain', amount);
-      b.output += gained;
-      if (gained === 0) log(s, `The harvest rotted in the field: no room left to store ${amount} grain.`, 'bad', b);
-      else if (gained < amount) log(s, `Harvest! A farm brought in ${gained} grain; ${amount - gained} spoiled for lack of storage.`, 'bad', b);
-      else log(s, `Harvest! A farm brought in ${gained} grain.`, 'good', b);
-      b.status = 'Harvest gathered';
-    } else {
-      log(s, 'Crops rotted in an unstaffed field.', 'bad', b);
-      b.status = 'Crops rotted';
+    const grow = b.workers > 0 ? b.workers / (area * TEND_PER_TILE) : 0;
+    for (const f of fields) {
+      f.growth = Math.min(1, f.growth + grow);
+      f.status = b.workers ? (month < 3 ? `Sowing ${cropOf(f)}` : `${cap(cropOf(f))} growing`) : 'Untended';
     }
-    b.growth = 0;
+    b.status = b.workers > 0 ? (month < 3 ? 'Sowing the fields' : 'Tending the crops') : 'Fields untended';
+    if (b.workers > 0 && area * TEND_PER_TILE > b.workers * 60 * 1.05) b.status += ' (more fields than hands)';
+  } else if (month === 6) {
+    b.status = 'Crops ripening';
+    for (const f of fields) f.status = f.growth > 0 ? `${cap(cropOf(f))} ripening` : 'Lying fallow';
+    b.blocked = BLOCK_SEASONAL;
+  } else if (month === 7 && s.day % DAYS_PER_MONTH === 0) {
+    const got: Partial<Record<ResourceId, number>> = {};
+    let unstaffed = 0;
+    let spoiled = 0;
+    for (const f of fields) {
+      if (f.growth <= 0) continue;
+      const crop = cropOf(f);
+      if (crew <= 0) {
+        unstaffed++;
+        f.status = 'Crops rotted';
+      } else {
+        const rotation = f.lastCrop === crop ? 0.85 : 1;
+        const amount = Math.round(
+          f.w * f.h * FIELD_YIELD * f.growth * (0.5 + 0.5 * farmFertility(s, f)) * (0.6 + 0.4 * crew) * CROP_FACTOR[crop] * rotation,
+        );
+        const good = CROP_GOOD[crop];
+        const n = store(s, good, amount);
+        got[good] = (got[good] ?? 0) + n;
+        b.output += n;
+        f.lastOutput = n;
+        spoiled += amount - n;
+        f.status = n < amount ? `Harvested ${n}; ${amount - n} spoiled` : `Harvested ${n} ${GOODS[good].name.toLowerCase()}`;
+      }
+      f.lastCrop = crop;
+      f.growth = 0;
+    }
+    const list = Object.entries(got)
+      .filter(([, n]) => n! > 0)
+      .map(([k, n]) => `${n} ${GOODS[k as ResourceId].name.toLowerCase()}`)
+      .join(', ');
+    if (list) log(s, `Harvest! The fields brought in ${list}.${spoiled ? ` ${spoiled} more spoiled: the granaries are full.` : ''}`, spoiled ? 'bad' : 'good', b);
+    else if (spoiled) log(s, `The harvest rotted in the fields: no room left in the granaries for ${spoiled} sacks.`, 'bad', b);
+    if (unstaffed) log(s, 'Crops rotted in the fields: no farmers to bring them in.', 'bad', b);
+    b.status = 'Harvest gathered';
     b.blocked = BLOCK_SEASONAL;
   } else if (month >= 7) {
-    b.growth = 0;
+    for (const f of fields) {
+      f.growth = 0;
+      if (month >= 9) f.status = 'Resting for winter';
+    }
     b.status = month >= 9 ? 'Fields resting for winter' : 'Fields harvested';
     b.blocked = BLOCK_SEASONAL;
+  }
+}
+
+const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+
+/** Animals each pasture tile carries, and how fast the herd grows each spring. */
+export const HERDS: Record<string, { tiles: number; births: number; name: string; plural: string }> = {
+  sheep: { tiles: 2, births: 0.8, name: 'sheep', plural: 'sheep' },
+  cattle: { tiles: 4, births: 0.5, name: 'cow', plural: 'cattle' },
+  pigs: { tiles: 3, births: 1.5, name: 'pig', plural: 'pigs' },
+};
+
+export function herdKindOf(b: Building): string {
+  return b.recipe ?? 'sheep';
+}
+
+/** How many animals the pastures feed for free, and with oats over winter. */
+export function herdCapacity(s: GameState, b: Building): { free: number; fed: number } {
+  const per = HERDS[herdKindOf(b)].tiles;
+  const free = Math.floor(zoneArea(zonesOf(s, b)) / per);
+  return { free, fed: free + (s.res.oats >= 1 ? Math.floor(free / 2) : 0) };
+}
+
+/** A fresh herd of a few animals arrives when the farm opens or changes animal. */
+const STARTING_HERD = 6;
+
+function stepByre(s: GameState, b: Building): void {
+  const kind = herdKindOf(b);
+  if (b.herdKind !== kind) {
+    b.herdKind = kind;
+    b.herd = STARTING_HERD;
+  }
+  const pastures = zonesOf(s, b);
+  const capy = herdCapacity(s, b);
+  b.herd = Math.min(b.herd ?? 0, capy.fed);
+  const H = HERDS[kind];
+  for (const z of pastures) z.status = `${b.herd} ${b.herd === 1 ? H.name : H.plural} grazing`;
+  b.blocked = 0;
+  if (!pastures.length) {
+    b.status = 'Fence pastures nearby for the animals';
+    b.blocked = BLOCK_PROBLEM;
+    return;
+  }
+  if (b.workers === 0) {
+    b.status = 'No herders';
+    return;
+  }
+  const month = monthOf(s.day);
+  const crew = b.workers / workersOf(b);
+  if (kind === 'cattle' && month >= 1 && month <= 8) {
+    b.work += (b.herd ?? 0) * 0.12 * crew;
+    const n = Math.floor(b.work);
+    if (n > 0) {
+      b.work -= n;
+      b.output += store(s, 'milk', n);
+    }
+    b.status = `Milking ${b.herd} cattle`;
+  } else {
+    b.status = `Herding ${b.herd} ${b.herd === 1 ? H.name : H.plural}`;
+  }
+}
+
+/** Monthly herd events: spring lambing and shearing, autumn slaughter, winter fodder. */
+function monthlyHerds(s: GameState, month: number): void {
+  for (const b of s.buildings) {
+    if (b.type !== 'byre' || b.build < 1 || b.herdKind === undefined) continue;
+    const kind = herdKindOf(b);
+    const capy = herdCapacity(s, b);
+    const herd = b.herd ?? 0;
+    const staffed = b.workers > 0;
+    if (month === 1 && herd > 0) {
+      b.herd = Math.min(capy.fed, herd + Math.max(1, Math.round(herd * HERDS[kind].births)));
+      if (kind === 'sheep' && staffed) {
+        const n = store(s, 'wool', herd * 2);
+        b.output += n;
+        if (n) log(s, `Shearing time: ${n} wool from the flock.`, 'info', b);
+      }
+    }
+    if (month === 8 && staffed) {
+      const keep = Math.max(2, Math.ceil(capy.free * 0.5));
+      const cull = Math.max(0, herd - keep);
+      if (cull > 0) {
+        b.herd = herd - cull;
+        const got: string[] = [];
+        const add = (id: ResourceId, n: number) => {
+          const k = store(s, id, n);
+          if (k) got.push(`${k} ${GOODS[id].name.toLowerCase()}`);
+          b.output += k;
+        };
+        if (kind === 'pigs') add('pork', cull * 4);
+        else add('meat', cull * (kind === 'cattle' ? 5 : 2));
+        add('hides', cull);
+        log(s, `Autumn slaughter: ${got.join(', ')}.`, 'info', b);
+      }
+    }
+    if (month >= 9 || month === 0) {
+      // Animals beyond what the pasture feeds eat oats through winter.
+      const extra = Math.max(0, (b.herd ?? 0) - capy.free);
+      if (extra > 0) {
+        const eat = Math.min(extra, Math.floor(s.res.oats));
+        s.res.oats -= eat;
+        if (eat < extra) {
+          b.herd = (b.herd ?? 0) - (extra - eat);
+          log(s, `Without oats, ${extra - eat} animals had to be sold off.`, 'bad', b);
+        }
+      }
+    }
+  }
+}
+
+/** Days before young fruit trees bear (a year and a half). */
+export const ORCHARD_MATURE_DAYS = Math.round(DAYS_PER_MONTH * MONTHS_PER_YEAR * 1.5);
+/** Fruit per tile of a mature orchard in a season. */
+export const ORCHARD_YIELD = 7;
+/** Fruit one picker gathers in a day. */
+const PICK_PER_DAY = 5;
+
+export function orchardMaturity(b: Building): number {
+  return Math.min(1, (b.age ?? 0) / ORCHARD_MATURE_DAYS);
+}
+
+function stepOrchardist(s: GameState, b: Building): void {
+  const orchards = zonesOf(s, b);
+  b.blocked = 0;
+  if (!orchards.length) {
+    b.status = 'Plant orchards nearby';
+    b.blocked = BLOCK_PROBLEM;
+    return;
+  }
+  const hanging = orchards.reduce((a, o) => a + o.growth, 0);
+  if (hanging < 1) {
+    b.status = 'Nothing ripe to pick';
+    b.blocked = BLOCK_SEASONAL;
+    return;
+  }
+  let pick = b.workers * PICK_PER_DAY * (b.efficiency ?? 1);
+  for (const o of orchards) {
+    if (pick <= 0) break;
+    const n = Math.min(Math.floor(o.growth), Math.ceil(pick));
+    if (n <= 0) continue;
+    const good = (o.recipe ?? 'apples') as ResourceId;
+    const k = store(s, good, n);
+    o.growth -= n;
+    o.lastOutput += k;
+    b.output += k;
+    pick -= n;
+  }
+  b.status = `Picking fruit (${Math.floor(hanging)} on the trees)`;
+}
+
+/** Orchards age daily; fruit sets in late summer and rots if not picked. */
+function dailyOrchards(s: GameState): void {
+  const month = monthOf(s.day);
+  const first = s.day % DAYS_PER_MONTH === 0;
+  for (const o of s.buildings) {
+    if (o.type !== 'orchard') continue;
+    o.age = (o.age ?? 0) + 1;
+    const m = orchardMaturity(o);
+    if (month === 5 && first) {
+      o.growth = Math.round(o.w * o.h * ORCHARD_YIELD * (m >= 1 ? 1 : m * m));
+      o.lastOutput = 0;
+    }
+    if (month === 7 && first) o.growth = 0;
+    const fruit = GOODS[(o.recipe ?? 'apples') as ResourceId].name.toLowerCase();
+    o.status =
+      m < 1
+        ? `Young trees: ${Math.round(m * 100)}% grown`
+        : month >= 5 && month <= 6 && o.growth > 0
+          ? `${Math.floor(o.growth)} ${fruit} ripe`
+          : month <= 1
+            ? 'In blossom'
+            : month <= 4
+              ? `${cap(fruit)} setting`
+              : 'Resting';
+  }
+}
+
+/** Backyard extensions a family can keep, what they cost and make. */
+export const YARDS: Record<string, { name: string; cost: Cost; desc: string; tier: number }> = {
+  veg: { name: 'Vegetable patch', cost: { wood: 4 }, desc: 'Cabbages, leeks and turnips: 3 vegetables a month from spring to autumn.', tier: 0 },
+  hens: { name: 'Hen coop', cost: { wood: 8 }, desc: 'A few hens: 3 eggs a month, 1 in winter.', tier: 0 },
+  bees: { name: 'Beehives', cost: { wood: 6, gold: 15 }, desc: 'Straw skeps: about 8 honey each late summer.', tier: 1 },
+};
+
+export function setYard(s: GameState, b: Building, kind: string | undefined): string | null {
+  if (b.type !== 'house' || b.build < 1) return 'Only homes have backyards';
+  if (kind === b.yard) return null;
+  if (kind) {
+    const y = YARDS[kind];
+    if (!y) return 'Unknown';
+    if (s.tier < y.tier) return `Requires ${TIERS[y.tier].name}`;
+    if (!canAfford(s, y.cost)) return 'Cannot afford it';
+    pay(s, y.cost);
+  }
+  b.yard = kind;
+  return null;
+}
+
+function monthlyYards(s: GameState, month: number): void {
+  for (const b of s.buildings) {
+    if (b.type !== 'house' || !b.yard || b.residents === 0) continue;
+    if (b.yard === 'veg' && month >= 3 && month <= 8) b.lastOutput = store(s, 'vegetables', 3);
+    else if (b.yard === 'hens') b.lastOutput = store(s, 'eggs', month >= 9 ? 1 : 3);
+    else if (b.yard === 'bees' && month === 6) b.lastOutput = store(s, 'honey', 8);
   }
 }
 
@@ -1079,8 +1412,17 @@ export function dailyProduction(s: GameState, rng: StateRng): void {
       b.blocked = 0;
       continue;
     }
+    if (d.zone) continue;
     if (b.type === 'farm') {
       stepFarm(s, b);
+      continue;
+    }
+    if (b.type === 'byre') {
+      stepByre(s, b);
+      continue;
+    }
+    if (b.type === 'orchardist') {
+      stepOrchardist(s, b);
       continue;
     }
     if (d.workers === 0 || d.cycle === 0) {
@@ -1306,6 +1648,8 @@ export function monthly(s: GameState, rng: StateRng): void {
   report.taxes = Math.floor(taxes);
   s.res.gold += report.taxes;
   serveAle(s);
+  monthlyHerds(s, month);
+  monthlyYards(s, month);
   report.trade = exportGoods(s);
 
   updateHappiness(s);
@@ -1489,6 +1833,7 @@ export function stepDay(s: GameState): void {
   const rng = new StateRng(s);
   recompute(s);
   dailyConstruction(s);
+  dailyOrchards(s);
   dailyProduction(s, rng);
   noteSeen(s);
   s.day++;

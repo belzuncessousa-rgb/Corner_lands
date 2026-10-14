@@ -66,6 +66,11 @@ export type BuildingType =
   | 'hunter'
   | 'fisher'
   | 'farm'
+  | 'field'
+  | 'byre'
+  | 'pasture'
+  | 'orchardist'
+  | 'orchard'
   | 'bakery'
   | 'sawmill'
   | 'mine'
@@ -131,6 +136,17 @@ export interface Building {
   priority?: number;
   /** Chosen product (recipe id), or undefined for Auto. */
   recipe?: string;
+  /** Zones (fields, pastures, orchards): the workplace that tends them. */
+  owner?: number;
+  /** Byres: animals in the herd, and which animal they are. */
+  herd?: number;
+  herdKind?: string;
+  /** Orchards: days since planting. */
+  age?: number;
+  /** Fields: the crop harvested last year (for rotation). */
+  lastCrop?: string;
+  /** Houses: what the family keeps in the backyard. */
+  yard?: string;
   /** Units produced in the last month, for display. */
   lastOutput: number;
   output: number;

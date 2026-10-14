@@ -591,15 +591,17 @@ export class AgentSystem {
           return false;
         }, 'fish');
       }
-      case 'farm': {
+      case 'farm':
+      case 'byre':
+      case 'orchardist': {
         const m = Math.floor(s.day / 10) % 12;
-        if (m >= 9) return null;
-        // Field tiles are part of the farm footprint (front quadrants).
-        const fx = b.x + 2 + Math.floor(Math.random() * 2);
-        const fy = b.y + Math.floor(Math.random() * 4);
-        return Math.random() < 0.5
-          ? { x: fx, y: fy, act: m >= 6 ? 'scythe' : 'hoe' }
-          : { x: b.x + Math.floor(Math.random() * 2), y: b.y + 2 + Math.floor(Math.random() * 2), act: m >= 6 ? 'scythe' : 'hoe' };
+        if (b.type === 'farm' && m >= 9) return null;
+        // Work out in one of the fields, pastures or orchards this place tends.
+        const zones = s.buildings.filter((z) => z.owner === b.id);
+        if (!zones.length) return null;
+        const z = zones[Math.floor(Math.random() * zones.length)];
+        const act = b.type === 'farm' ? (m >= 6 ? 'scythe' : 'hoe') : b.type === 'orchardist' ? 'pick' : 'herd';
+        return { x: z.x + Math.floor(Math.random() * z.w), y: z.y + Math.floor(Math.random() * z.h), act };
       }
       default:
         return null;
@@ -639,6 +641,10 @@ function carryFor(type: string): ResourceId | null {
       return 'fish';
     case 'farm':
       return 'grain';
+    case 'byre':
+      return 'wool';
+    case 'orchardist':
+      return 'apples';
     case 'bakery':
       return 'bread';
     case 'sawmill':
