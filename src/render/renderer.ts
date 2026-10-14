@@ -1,5 +1,6 @@
 import { BUILDINGS, RESOURCE_STORAGE, STORAGE_CAPACITY, type StorageKind } from '../game/data';
 import { upgradeBlocker } from '../game/levels';
+import { hasCharter } from '../game/charters';
 import { HOME_TRADES, deliveredTo, hasProblem, monthOf, orchardMaturity, seasonOf, storageCap } from '../game/sim';
 import type { Building, BuildingType, GameState, ResourceId, Season } from '../game/types';
 import { idx, inBounds } from '../game/world';
@@ -724,7 +725,7 @@ export class Renderer {
     const orchard = this.orchardTiles.get(i);
     if (orchard) {
       const fruit = orchard.recipe ?? 'apples';
-      const stage = Math.round(orchardMaturity(orchard) * 4) / 4;
+      const stage = Math.round(orchardMaturity(orchard, hasCharter(s, 'orchard2')) * 4) / 4;
       const month = monthOf(s.day);
       const fruiting = stage >= 1 && month >= 3 && month <= 6 && (month < 5 || orchard.growth > 0);
       const blossom = month <= 1 && stage >= 0.5;

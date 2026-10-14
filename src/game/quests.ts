@@ -173,6 +173,20 @@ export const QUESTS: Quest[] = [
     reward: { gold: 200 },
     done: (s) => s.tier >= 3,
   },
+  {
+    id: 'charter',
+    title: 'Win a town charter',
+    hint: 'Prestige gathers from a fine manor, a church and monuments. Spend it on a charter (crown button) to specialise your town.',
+    reward: { gold: 100 },
+    done: (s) => (s.charters?.length ?? 0) >= 1,
+  },
+  {
+    id: 'city',
+    title: 'Raise a castle',
+    hint: 'With 150 villagers and three charters, raise the Keep into a Castle and become a City.',
+    reward: { gold: 500 },
+    done: (s) => s.tier >= 4,
+  },
 ];
 
 export function activeQuests(s: GameState, n = 3): Quest[] {

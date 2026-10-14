@@ -24,6 +24,7 @@ import {
   TRADE_PRICES,
 } from './data';
 import { advise } from './advisor';
+import { hasCharter, onPath } from './charters';
 import { rollEvent } from './events';
 import {
   HOUSE_LEVELS,
@@ -71,7 +72,7 @@ export function storageCap(s: GameState, kind: StorageKind): number {
   let n = 0;
   for (const b of s.buildings) {
     if (b.build < 1) continue;
-    n += STORAGE_CAPACITY[b.type]?.[kind] ?? 0;
+    n += (STORAGE_CAPACITY[b.type]?.[kind] ?? 0) * (b.type === 'granary' && hasCharter(s, 'farm3a') ? 2 : 1);
     if (b.type === 'townhall') n += (b.level - 1) * MANOR_STORAGE_PER_LEVEL[kind];
   }
   return n;
@@ -161,7 +162,7 @@ export function placementError(s: GameState, type: BuildingType, x: number, y: n
 /** Materials of a cost that builders must carry (gold is paid up front). */
 export function materialsOf(cost: Cost): Cost {
   const out: Cost = {};
-  for (const k in cost) if (k !== 'gold') out[k as ResourceId] = cost[k as ResourceId];
+  for (const k in cost) if (k !== 'gold' && k !== 'prestige') out[k as ResourceId] = cost[k as ResourceId];
   return out;
 }
 
@@ -337,10 +338,10 @@ export function hasBuilt(s: GameState, type: BuildingType): boolean {
 
 export function trade(s: GameState, id: ResourceId, amount: number): string | null {
   if (!hasBuilt(s, 'market')) return 'Requires a marketplace';
-  const price = TRADE_PRICES[id];
+  const price = priceOf(s, id);
   if (!price) return 'Cannot trade this';
   if (amount > 0) {
-    const cost = price * amount;
+    const cost = Math.ceil(price * amount * (hasCharter(s, 'trade1') ? 0.85 : 1));
     if (s.res.gold < cost) return 'Not enough coins';
     if (roomFor(s, id) < amount) return 'Not enough storage';
     s.res.gold -= cost;
@@ -349,9 +350,18 @@ export function trade(s: GameState, id: ResourceId, amount: number): string | nu
     const n = -amount;
     if (s.res[id] < n) return 'Not enough goods';
     s.res[id] -= n;
-    s.res.gold += Math.floor(price * SELL_FACTOR * n);
+    s.res.gold += Math.floor(price * SELL_FACTOR * n * (hasCharter(s, 'trade1') ? 1.2 : 1));
   }
   return null;
+}
+
+/** Market price of a good, with what charters add to it. */
+export function priceOf(s: GameState, id: ResourceId): number {
+  const base = TRADE_PRICES[id] ?? 0;
+  const special: Partial<Record<ResourceId, string>> = { cider: 'orchard3a', ale: 'farm3b', cheese: 'herd3b' };
+  if (special[id] && hasCharter(s, special[id]!)) return base * 2;
+  if (id === 'tools' && hasCharter(s, 'metal3b')) return base * 1.5;
+  return base;
 }
 
 /** Taverns pour ale or cider: a cask a month for every eight villagers they serve. */
@@ -455,12 +465,12 @@ export function noteSeen(s: GameState): void {
 /** Monthly visit of merchants buying surplus goods at staffed markets. */
 export function exportGoods(s: GameState): number {
   const markets = s.buildings.filter((b) => b.type === 'market' && b.build >= 1 && b.workers > 0).length;
-  let budget = markets * EXPORT_PER_MARKET;
+  let budget = markets * EXPORT_PER_MARKET * (hasCharter(s, 'trade2') ? 2 : 1);
   let gold = 0;
   const sold: string[] = [];
   for (const k in s.sell ?? {}) {
     const id = k as ResourceId;
-    const price = TRADE_PRICES[id];
+    const price = priceOf(s, id) * (hasCharter(s, 'trade3a') ? 1.3 : 1);
     if (!price || budget <= 0) continue;
     const n = Math.min(budget, Math.floor(s.res[id] - keepOf(s, id)));
     if (n <= 0) continue;
@@ -1000,10 +1010,27 @@ function fullFor(s: GameState, out: Cost): boolean {
   return false;
 }
 
+/** How much more (or less) a workplace makes thanks to the town's charters. */
+export function charterBonus(s: GameState, b: Building, id: ResourceId): number {
+  if (!s.charters?.length) return 1;
+  const d = workDef(b);
+  let f = 1;
+  const t = b.trade ?? b.type;
+  if ((t === 'forager' || t === 'hunter') && hasCharter(s, 'nature1')) f *= 1.4;
+  if ((t === 'quarry' || t === 'mine') && onPath(s, 'nature')) f *= 0.8;
+  const converter = Object.keys(d.inputs).length > 0 || !!d.recipes?.some((r) => Object.keys(r.inputs).length > 0);
+  if (converter) f *= hasCharter(s, 'learning3a') ? 1.25 : hasCharter(s, 'learning2') ? 1.1 : 1;
+  if (id === 'cider' && hasCharter(s, 'orchard3a')) f *= 1.5;
+  if (id === 'ale' && hasCharter(s, 'farm3b')) f *= 1.5;
+  if (id === 'cheese' && hasCharter(s, 'herd3b')) f *= 1.5;
+  if (id === 'tools' && hasCharter(s, 'metal3b')) f *= 1.5;
+  return f;
+}
+
 function addOutput(s: GameState, b: Building, out: Cost): boolean {
   if (fullFor(s, out)) return false;
   const bonus = b.trade ? HOME_TRADE_BONUS : 1;
-  for (const k in out) b.output += store(s, k as ResourceId, (out[k as ResourceId] ?? 0) * bonus);
+  for (const k in out) b.output += store(s, k as ResourceId, (out[k as ResourceId] ?? 0) * bonus * charterBonus(s, b, k as ResourceId));
   return true;
 }
 
@@ -1054,7 +1081,9 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
       const t = nearestTile(s, b, d.radius, (i, dist) => (arr[i] > 0 ? dist : null));
       if (t < 0) return b.type === 'quarry' ? 'No rock in range' : 'No ore in range';
       b.resDist = tileDist(s, b, t);
-      arr[t]--;
+      // Deep shafts never exhaust a vein.
+      if (!(b.type === 'mine' && hasCharter(s, 'metal1'))) arr[t]--;
+      if (b.type === 'mine' && hasCharter(s, 'metal2')) s.res.gold += 1;
       addOutput(s, b, d.outputs);
       return null;
     }
@@ -1173,7 +1202,7 @@ function stepFarm(s: GameState, b: Building): void {
     return;
   }
   if (month <= 5) {
-    const grow = b.workers > 0 ? b.workers / (area * TEND_PER_TILE) : 0;
+    const grow = b.workers > 0 ? (b.workers * (hasCharter(s, 'farm2') ? 1.5 : 1)) / (area * TEND_PER_TILE) : 0;
     for (const f of fields) {
       f.growth = Math.min(1, f.growth + grow);
       f.status = b.workers ? (month < 3 ? `Sowing ${cropOf(f)}` : `${cap(cropOf(f))} growing`) : 'Untended';
@@ -1195,7 +1224,7 @@ function stepFarm(s: GameState, b: Building): void {
         unstaffed++;
         f.status = 'Crops rotted';
       } else {
-        const rotation = f.lastCrop === crop ? 0.85 : 1;
+        const rotation = (f.lastCrop === crop ? 0.85 : 1) * fieldCharterFactor(s);
         const amount = Math.round(
           f.w * f.h * FIELD_YIELD * f.growth * (0.5 + 0.5 * farmFertility(s, f)) * (0.6 + 0.4 * crew) * CROP_FACTOR[crop] * rotation,
         );
@@ -1229,6 +1258,14 @@ function stepFarm(s: GameState, b: Building): void {
   }
 }
 
+/** Charters that change every harvest. */
+function fieldCharterFactor(s: GameState): number {
+  let f = hasCharter(s, 'farm1') ? 1.2 : 1;
+  if (onPath(s, 'learning')) f *= 0.9;
+  if (onPath(s, 'herd')) f *= 0.9;
+  return f;
+}
+
 const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 
 /** Animals each pasture tile carries, and how fast the herd grows each spring. */
@@ -1245,7 +1282,8 @@ export function herdKindOf(b: Building): string {
 /** How many animals the pastures feed for free, and with oats over winter. */
 export function herdCapacity(s: GameState, b: Building): { free: number; fed: number } {
   const per = HERDS[herdKindOf(b)].tiles;
-  const free = Math.floor(zoneArea(zonesOf(s, b)) / per);
+  const mult = (hasCharter(s, 'herd2') ? 1.5 : 1) * (onPath(s, 'farm') ? 0.8 : 1);
+  const free = Math.floor((zoneArea(zonesOf(s, b)) / per) * mult);
   return { free, fed: free + (s.res.oats >= 1 ? Math.floor(free / 2) : 0) };
 }
 
@@ -1276,7 +1314,7 @@ function stepByre(s: GameState, b: Building): void {
   const month = monthOf(s.day);
   const crew = b.workers / workersOf(b);
   if (kind === 'cattle' && month >= 1 && month <= 8) {
-    b.work += (b.herd ?? 0) * 0.12 * crew;
+    b.work += (b.herd ?? 0) * 0.12 * crew * (hasCharter(s, 'herd1') ? 1.3 : 1);
     const n = Math.floor(b.work);
     if (n > 0) {
       b.work -= n;
@@ -1299,7 +1337,7 @@ function monthlyHerds(s: GameState, month: number): void {
     if (month === 1 && herd > 0) {
       b.herd = Math.min(capy.fed, herd + Math.max(1, Math.round(herd * HERDS[kind].births)));
       if (kind === 'sheep' && staffed) {
-        const n = store(s, 'wool', herd * 2);
+        const n = store(s, 'wool', Math.round(herd * 2 * (hasCharter(s, 'herd1') ? 1.3 : 1)));
         b.output += n;
         if (n) log(s, `Shearing time: ${n} wool from the flock.`, 'info', b);
       }
@@ -1315,8 +1353,9 @@ function monthlyHerds(s: GameState, month: number): void {
           if (k) got.push(`${k} ${GOODS[id].name.toLowerCase()}`);
           b.output += k;
         };
-        if (kind === 'pigs') add('pork', cull * 4);
-        else add('meat', cull * (kind === 'cattle' ? 5 : 2));
+        const meat = (hasCharter(s, 'herd1') ? 1.3 : 1) * (hasCharter(s, 'herd3a') ? 1.5 : 1);
+        if (kind === 'pigs') add('pork', Math.round(cull * 4 * meat));
+        else add('meat', Math.round(cull * (kind === 'cattle' ? 5 : 2) * meat));
         add('hides', cull);
         log(s, `Autumn slaughter: ${got.join(', ')}.`, 'info', b);
       }
@@ -1343,8 +1382,8 @@ export const ORCHARD_YIELD = 7;
 /** Fruit one picker gathers in a day. */
 const PICK_PER_DAY = 5;
 
-export function orchardMaturity(b: Building): number {
-  return Math.min(1, (b.age ?? 0) / ORCHARD_MATURE_DAYS);
+export function orchardMaturity(b: Building, fast = false): number {
+  return Math.min(1, (b.age ?? 0) / (ORCHARD_MATURE_DAYS * (fast ? 2 / 3 : 1)));
 }
 
 function stepOrchardist(s: GameState, b: Building): void {
@@ -1361,7 +1400,7 @@ function stepOrchardist(s: GameState, b: Building): void {
     b.blocked = BLOCK_SEASONAL;
     return;
   }
-  let pick = b.workers * PICK_PER_DAY * (b.efficiency ?? 1);
+  let pick = (b.workers * PICK_PER_DAY * (b.efficiency ?? 1)) / (onPath(s, 'orchard') ? 1.33 : 1);
   for (const o of orchards) {
     if (pick <= 0) break;
     const n = Math.min(Math.floor(o.growth), Math.ceil(pick));
@@ -1383,9 +1422,9 @@ function dailyOrchards(s: GameState): void {
   for (const o of s.buildings) {
     if (o.type !== 'orchard') continue;
     o.age = (o.age ?? 0) + 1;
-    const m = orchardMaturity(o);
+    const m = orchardMaturity(o, hasCharter(s, 'orchard2'));
     if (month === 5 && first) {
-      o.growth = Math.round(o.w * o.h * ORCHARD_YIELD * (m >= 1 ? 1 : m * m));
+      o.growth = Math.round(o.w * o.h * ORCHARD_YIELD * (m >= 1 ? 1 : m * m) * (hasCharter(s, 'orchard1') ? 1.3 : 1));
       o.lastOutput = 0;
     }
     if (month === 7 && first) o.growth = 0;
@@ -1429,7 +1468,9 @@ function monthlyYards(s: GameState, month: number): void {
     if (b.type !== 'house' || !b.yard || b.residents === 0) continue;
     if (b.yard === 'veg' && month >= 3 && month <= 8) b.lastOutput = store(s, 'vegetables', 3);
     else if (b.yard === 'hens') b.lastOutput = store(s, 'eggs', month >= 9 ? 1 : 3);
-    else if (b.yard === 'bees' && month === 6) b.lastOutput = store(s, 'honey', 8);
+    else if (b.yard === 'bees' && month === 6) {
+      b.lastOutput = store(s, 'honey', Math.round(8 * (hasCharter(s, 'orchard1') ? 1.3 : 1) * (hasCharter(s, 'orchard3b') ? 2 : 1)));
+    }
   }
 }
 
@@ -1728,6 +1769,8 @@ export function monthly(s: GameState, rng: StateRng): void {
   rollEvent(s, rng, month);
 
   if (month <= 5) regrowForests(s, rng);
+  if (month <= 5 && hasCharter(s, 'nature2')) regrowForests(s, rng);
+  monthlyPrestige(s);
 
   // Bushes fruit in spring and again in summer.
   if (month === 0 || month === 4) s.berries.set(s.berriesMax);
@@ -1747,6 +1790,37 @@ export function monthly(s: GameState, rng: StateRng): void {
   }
   s.history.push({ d: s.day, pop: s.population, food: Math.floor(totalFood(s)), happy: s.happiness, gold: Math.floor(s.res.gold) });
   if (s.history.length > MAX_HISTORY) s.history.splice(0, s.history.length - MAX_HISTORY);
+}
+
+/**
+ * Prestige: the renown of the lord's house, from a fine manor, a church,
+ * monuments, townhouses and the charters that bring it.
+ */
+export function prestigeIncome(s: GameState): number {
+  let n = 0;
+  for (const b of s.buildings) {
+    if (b.build < 1) continue;
+    if (b.type === 'townhall') n += (b.level - 1) * 1.5;
+    else if (b.type === 'church') n += 1;
+    else if (b.type === 'statue') n += 1;
+    else if (b.type === 'maypole') n += 0.5;
+    else if (b.type === 'house' && b.level >= 3) n += 0.2;
+    else if (b.type === 'hunter' && hasCharter(s, 'nature3b')) n += 1;
+  }
+  if (hasCharter(s, 'learning1')) n += 2;
+  if (hasCharter(s, 'learning3b')) n += 2;
+  if (hasCharter(s, 'metal3a')) n += 3;
+  return n;
+}
+
+function monthlyPrestige(s: GameState): void {
+  s.res.prestige += prestigeIncome(s);
+  if (hasCharter(s, 'metal3a')) s.res.gold += 20;
+  if (hasCharter(s, 'trade3b')) {
+    let paved = 0;
+    for (let i = 0; i < s.road.length; i++) if (s.road[i] === 2) paved++;
+    s.res.gold += Math.floor(paved / 3);
+  }
 }
 
 /** Months of history kept for the ledger (30 years). */
@@ -1843,6 +1917,17 @@ export function updateHappiness(s: GameState): void {
     if (beauty) factors.push({ label: 'Beautiful surroundings', value: Math.round(beauty / residents) });
   }
   for (const m of s.moods ?? []) if (m.until > s.day) factors.push({ label: m.label, value: m.value });
+  if (s.charters?.length) {
+    const c = (id: string, label: string, v: number) => hasCharter(s, id) && factors.push({ label, value: v });
+    c('nature2', 'Love of the greenwood', 3);
+    c('nature3a', "The druids' grove", 6);
+    c('learning3b', 'The cathedral choir', 6);
+    c('orchard3b', 'Honey cakes', 4);
+    if (onPath(s, 'metal') && s.buildings.some((b) => (b.type === 'mine' || b.type === 'bloomery' || b.type === 'smithy') && b.build >= 1)) {
+      factors.push({ label: 'Smoke from the forges', value: -4 });
+    }
+    if (onPath(s, 'trade') && s.taxLevel > 0) factors.push({ label: 'Grumbling at the merchants’ taxes', value: -3 });
+  }
   if (homeless > 0 && s.population > 0) {
     factors.push({ label: 'Homelessness', value: -Math.round(5 + (20 * homeless) / s.population) });
   }

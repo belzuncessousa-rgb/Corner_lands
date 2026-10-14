@@ -246,6 +246,8 @@ export interface GameState {
   /** Stock at the end of last month, and the change over that month. */
   lastMonth?: Partial<Record<ResourceId, number>>;
   flow?: Partial<Record<ResourceId, number>>;
+  /** Town charters granted (see charters.ts). */
+  charters?: string[];
   /** Goods the settlement has ever held. */
   seen?: ResourceId[];
   /** Decision event waiting for the player's choice. */

@@ -2141,7 +2141,7 @@ function drawManor(p: Pen, level: number, season: Season, smoke: V3[]): void {
     ],
     level >= 3 ? '#b4ad9e' : '#b9ad94',
   );
-  const towerH = level >= 4 ? 78 : level >= 3 ? 64 : 54;
+  const towerH = level >= 5 ? 96 : level >= 4 ? 78 : level >= 3 ? 64 : 54;
   const towerStone = level >= 4 ? '#9d978c' : STONE;
   // Tower at the back.
   p.box(0.3, 0.15, 1.2, 1.0, 0, towerH, towerStone);
@@ -2188,7 +2188,38 @@ function drawManor(p: Pen, level: number, season: Season, smoke: V3[]): void {
     p.wallL(2.255, 1.18, 1.3, 8, 22, '#a8322d');
     p.wallL(2.255, 1.8, 1.92, 8, 22, '#a8322d');
   }
-  if (level >= 4) {
+  if (level >= 5) {
+    // Castle: a crenellated curtain wall with corner towers rings the keep.
+    const w = '#a49c8e';
+    const merlons = (x0: number, y0: number, x1: number, y1: number, z: number) => {
+      const n = Math.max(2, Math.round(Math.max(x1 - x0, y1 - y0) / 0.16));
+      for (let i = 0; i < n; i += 2) {
+        const t0 = i / n;
+        const t1 = (i + 1) / n;
+        p.box(x0 + (x1 - x0) * t0, y0 + (y1 - y0) * t0, x0 + (x1 - x0) * t1 + (x1 === x0 ? 0.06 : 0), y0 + (y1 - y0) * t1 + (y1 === y0 ? 0.06 : 0), z, 4, w);
+      }
+    };
+    p.box(0.08, 2.78, 2.6, 2.9, 0, 18, w);
+    merlons(0.08, 2.78, 2.6, 2.78, 18);
+    p.box(2.78, 0.1, 2.9, 2.6, 0, 18, w);
+    merlons(2.78, 0.1, 2.78, 2.6, 18);
+    // Gatehouse in the front wall.
+    p.box(1.25, 2.7, 1.85, 2.95, 0, 30, w);
+    p.wallL(2.952, 1.42, 1.68, 0, 14, '#2a2522');
+    merlons(1.25, 2.7, 1.85, 2.7, 30);
+    for (const [x, y] of [
+      [0.0, 2.65],
+      [2.65, 2.65],
+      [2.65, 0.0],
+    ]) {
+      p.box(x, y, x + 0.35, y + 0.35, 0, 40, w);
+      merlons(x, y + 0.3, x + 0.35, y + 0.3, 40);
+      merlons(x + 0.3, y, x + 0.3, y + 0.35, 40);
+      p.windowL(y + 0.35, x + 0.12, 26, 0.08, 6);
+    }
+    p.flag(2.82, 2.82, 44, 22, '#2e5e9a');
+    p.flag(1.55, 2.82, 34, 18, '#a8322d');
+  } else if (level >= 4) {
     // A curtain wall stub with a gate tower at the front corner.
     p.box(2.55, 2.45, 2.9, 2.85, 0, 34, '#9d978c');
     for (let i = 0; i < 2; i++) p.box(2.55 + i * 0.2, 2.77, 2.67 + i * 0.2, 2.85, 34, 6, '#9d978c');

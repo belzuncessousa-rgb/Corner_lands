@@ -1639,3 +1639,77 @@ table.goods button.sell svg {
 table.goods button.sell.active svg {
   opacity: 1;
 }
+
+/* ------------------------------------------------------------ charters */
+
+.modal.wide.charter-modal {
+  width: min(1000px, calc(100vw - 24px));
+}
+.charters {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.charter-tree {
+  width: min(560px, 58vw);
+  height: auto;
+  flex: 0 0 auto;
+}
+.charter-tree .path-label {
+  font-size: 13px;
+  font-variant: small-caps;
+  fill: #5b3a22;
+  font-weight: 700;
+}
+.charter-node {
+  cursor: pointer;
+}
+.charter-node:hover circle {
+  filter: brightness(1.08);
+}
+.charter-node.open circle {
+  animation: charterPulse 1.6s ease-in-out infinite;
+}
+@keyframes charterPulse {
+  50% {
+    stroke-width: 5;
+  }
+}
+.charter-detail {
+  flex: 1;
+  min-width: 260px;
+  font-size: 14px;
+}
+.charter-detail h3 {
+  margin: 4px 0;
+}
+.charter-detail .kv {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 0;
+}
+.charter-detail .kv svg,
+.charter-detail button svg {
+  width: 16px;
+  height: 16px;
+  vertical-align: middle;
+}
+.charter-detail .sub {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.7;
+}
+.charter-detail .note {
+  font-size: 13px;
+  opacity: 0.85;
+}
+@media (max-width: 760px) {
+  .charters {
+    flex-direction: column;
+  }
+  .charter-tree {
+    width: 100%;
+  }
+}

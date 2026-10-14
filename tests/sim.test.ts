@@ -573,3 +573,37 @@ describe('workshops and household goods', () => {
     expect(s.res.cloth % 3).toBe(0);
   });
 });
+
+describe('charters', () => {
+  it('cost prestige, rise in price, follow their path and exclude rivals', async () => {
+    const { grantCharter, charterError, charterCost } = await import('../src/game/charters');
+    const s = generateWorld(51);
+    s.res.prestige = 1000;
+    expect(charterError(s, 'farm1')).toMatch(/Towns/);
+    s.tier = 2;
+    expect(charterError(s, 'farm2')).toMatch(/previous/);
+    const first = charterCost(s);
+    expect(grantCharter(s, 'farm1')).toBe(true);
+    expect(charterCost(s)).toBeGreaterThan(first);
+    expect(grantCharter(s, 'farm2')).toBe(true);
+    expect(grantCharter(s, 'farm3a')).toBe(true);
+    expect(charterError(s, 'farm3b')).toMatch(/alongside/);
+    expect(s.res.prestige).toBeLessThan(1000);
+  });
+
+  it('a granted charter changes the economy', async () => {
+    const { grantCharter } = await import('../src/game/charters');
+    const { storageCap, prestigeIncome } = await import('../src/game/sim');
+    const s = generateWorld(52);
+    s.tier = 2;
+    s.res.prestige = 1000;
+    const g = placeNearRoad(s, 'granary');
+    g.build = 1;
+    const before = storageCap(s, 'food');
+    for (const id of ['farm1', 'farm2', 'farm3a']) grantCharter(s, id);
+    expect(storageCap(s, 'food')).toBe(before + 300);
+    const p = prestigeIncome(s);
+    grantCharter(s, 'learning1');
+    expect(prestigeIncome(s)).toBe(p + 2);
+  });
+});

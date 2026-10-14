@@ -15,6 +15,7 @@ import {
   GROUP_NAMES,
 } from '../game/data';
 import { getEvent, resolveEvent } from '../game/events';
+import { CHARTERS, CHARTER_TIER, PATHS, charterCost, charterError, grantCharter, hasCharter } from '../game/charters';
 import { HOUSE_LEVELS, MANOR_LEVELS, buildingName, houseNeeds, startUpgrade, upgradeBlocker, upgradePlan, workersOf } from '../game/levels';
 import { activeQuests } from '../game/quests';
 import { StateRng } from '../game/rng';
@@ -30,6 +31,7 @@ import {
   recompute,
   seasonOf,
   setKeep,
+  prestigeIncome,
   setTrade,
   workDef,
   HOME_TRADES,
@@ -150,6 +152,7 @@ export class Hud {
           <div class="btnrow">
             <button id="menu-btn" class="panel icon-btn" data-action="menu" data-tip="Menu (Esc)">${CATEGORY_ICONS.menu}</button>
             <button class="panel icon-btn" data-action="chronicle" data-tip="<b>Chronicle</b><br>Everything that has happened in your lands.">${CATEGORY_ICONS.scroll}</button>
+            <button class="panel icon-btn" data-action="charters" data-tip="<b>Town Charters</b><br>Spend prestige to specialise your town.">${ICONS.prestige}</button>
           </div>
           <div id="objectives" class="panel"></div>
         </div>
@@ -400,7 +403,7 @@ export class Hud {
       ).join('')}</div>
       <div class="kv" style="margin-top:8px"><span>${ICONS.prestige} Prestige</span><b>${Math.floor(s.res.prestige)}</b></div>
       <p class="note">${esc(GOODS.prestige.desc)}</p>
-      <div class="row">${hasBuilt(s, 'market') ? '<button data-action="trade">⚖ Trade</button>' : ''}<button data-action="ledger">Ledger</button></div>`;
+      <div class="row">${hasBuilt(s, 'market') ? '<button data-action="trade">⚖ Trade</button>' : ''}<button data-action="ledger">Ledger</button><button data-action="charters">${ICONS.prestige} Charters</button></div>`;
   }
 
   private goodsPanel(group: GoodsGroup): string {
@@ -642,7 +645,7 @@ export class Hud {
         rows.push(`<div class="kv"><span>Crop growth</span><span>${Math.round(b.growth * 100)}%</span></div>${bar(b.growth)}`);
         if (b.lastCrop) rows.push(`<div class="kv" data-tip="Growing the same crop two years running yields less."><span>Last year</span><span>${esc(b.lastCrop)}${b.lastCrop === (b.recipe ?? 'wheat') ? ' <span class="neg">(same crop: −15%)</span>' : ''}</span></div>`);
       } else if (b.type === 'orchard') {
-        const m = orchardMaturity(b);
+        const m = orchardMaturity(b, hasCharter(s, 'orchard2'));
         rows.push(`<div class="kv"><span>Trees</span><span>${m < 1 ? `${Math.round(m * 100)}% grown` : 'Bearing fruit'}</span></div>${m < 1 ? bar(m) : ''}`);
         if (b.growth > 0) rows.push(`<div class="kv"><span>Fruit on the trees</span><span>${Math.floor(b.growth)}</span></div>`);
       }
@@ -1039,6 +1042,24 @@ export class Hud {
       case 'trade':
         this.showTrade();
         break;
+      case 'charters':
+        this.charterSel = null;
+        this.showCharters();
+        break;
+      case 'charter-sel':
+        e.preventDefault();
+        this.charterSel = t.dataset.id || null;
+        this.showCharters();
+        break;
+      case 'charter-grant':
+        if (grantCharter(s, t.dataset.id!)) {
+          const c = CHARTERS.find((x) => x.id === t.dataset.id)!;
+          log(s, `The crown grants the town a charter: ${c.name}.`, 'good');
+          this.sound('good');
+          recompute(s);
+        }
+        this.showCharters();
+        break;
       case 'ledger':
         this.showLedger();
         break;
@@ -1073,6 +1094,86 @@ export class Hud {
   }
 
   // ---------------------------------------------------------------- modals
+
+  private charterSel: string | null = null;
+
+  /** The charter tree: paths radiate from the Town Charter at the centre. */
+  private showCharters(): void {
+    const s = this.game.state;
+    const W = 620;
+    const cx = W / 2;
+    const cy = W / 2;
+    const nodes: string[] = [];
+    const lines: string[] = [];
+    const pos = new Map<string, [number, number]>();
+    PATHS.forEach((path, i) => {
+      const a = -Math.PI / 2 + (i * Math.PI * 2) / PATHS.length;
+      const at = (r: number, da = 0): [number, number] => [cx + Math.cos(a + da) * r, cy + Math.sin(a + da) * r];
+      for (const c of CHARTERS.filter((x) => x.path === path.id)) {
+        const p = c.rank === 3 ? at(250, c.id.endsWith('a') ? -0.16 : 0.16) : at(c.rank === 1 ? 105 : 180);
+        pos.set(c.id, p);
+        const prev = c.rank === 1 ? [cx, cy] : pos.get(CHARTERS.find((x) => x.path === c.path && x.rank === c.rank - 1)!.id)!;
+        const taken = hasCharter(s, c.id);
+        lines.push(`<line x1="${prev[0]}" y1="${prev[1]}" x2="${p[0]}" y2="${p[1]}" stroke="${taken ? path.color : '#b8a27a'}" stroke-width="${taken ? 4 : 2}" ${taken ? '' : 'stroke-dasharray="5 4"'}/>`);
+      }
+      const [lx, ly] = at(292);
+      const cos = Math.cos(a);
+      const anchor = cos > 0.3 ? 'start' : cos < -0.3 ? 'end' : 'middle';
+      nodes.push(`<text x="${lx}" y="${ly + (Math.sin(a) > 0.5 ? 8 : Math.sin(a) < -0.5 ? -8 : 0)}" class="path-label" text-anchor="${anchor}" dominant-baseline="middle" fill="${path.color}">${esc(path.name)}</text>`);
+    });
+    for (const c of CHARTERS) {
+      const [x, y] = pos.get(c.id)!;
+      const path = PATHS.find((p) => p.id === c.path)!;
+      const taken = hasCharter(s, c.id);
+      const err = charterError(s, c.id);
+      const open = !taken && !err;
+      const reachable = !taken && (!err || /prestige/.test(err));
+      const fill = taken ? path.color : reachable ? '#f4e7c8' : '#d6ccb6';
+      const stroke = taken ? '#3b2a1a' : open ? '#c8a038' : reachable ? path.color : '#a89878';
+      const sel = this.charterSel === c.id;
+      nodes.push(`<g class="charter-node ${open ? 'open' : ''}" data-action="charter-sel" data-id="${c.id}">
+        <circle cx="${x}" cy="${y}" r="${sel ? 27 : 24}" fill="${fill}" stroke="${stroke}" stroke-width="${sel || open ? 3.5 : 2}"/>
+        <text x="${x}" y="${y + 1}" text-anchor="middle" dominant-baseline="middle" fill="${taken ? '#fff8e6' : '#3b2a1a'}" font-size="13" font-weight="700">${c.rank === 3 ? `III${c.id.slice(-1)}` : 'I'.repeat(c.rank)}</text>
+      </g>`);
+    }
+    const taken = s.charters?.length ?? 0;
+    const sel = this.charterSel ? CHARTERS.find((c) => c.id === this.charterSel) : null;
+    let detail = `<h3>Town Charters</h3>
+      <p>The crown grants charters that shape what kind of town yours becomes. Each one costs prestige, and every charter makes the next dearer: go deep along one path, or take a little of several.</p>
+      <div class="kv"><span>${ICONS.prestige} Prestige</span><b>${Math.floor(s.res.prestige)}</b></div>
+      <div class="kv"><span>Next charter costs</span><b>${charterCost(s)}</b></div>
+      <div class="kv"><span>Prestige a month</span><b>+${prestigeIncome(s).toFixed(1)}</b></div>
+      <div class="kv"><span>Granted</span><b>${taken}</b></div>
+      ${s.tier < CHARTER_TIER ? `<p class="neg">Charters are granted once your settlement is a ${TIERS[CHARTER_TIER].name}. Prestige gathers meanwhile.</p>` : '<p class="note">Choose a circle to read its charter.</p>'}`;
+    if (sel) {
+      const path = PATHS.find((p) => p.id === sel.path)!;
+      const err = charterError(s, sel.id);
+      const done = hasCharter(s, sel.id);
+      const others = sel.excludes?.map((x) => CHARTERS.find((c) => c.id === x)!.name);
+      detail = `<h3 style="color:${path.color}">${esc(sel.name)}</h3>
+        <div class="sub">${esc(path.name)} · rank ${sel.rank}</div>
+        <p>${esc(sel.desc)}</p>
+        <p class="note"><b>Drawback of the path:</b> ${esc(path.malus)}</p>
+        ${others?.length ? `<p class="note">Cannot be held alongside ${esc(others.join(' or '))}.</p>` : ''}
+        ${done ? '<p class="pos"><b>Granted.</b></p>' : `<div class="kv"><span>Cost</span><b>${charterCost(s)} ${ICONS.prestige}</b></div>
+          <button class="primary" data-action="charter-grant" data-id="${sel.id}" ${err ? 'disabled' : ''}>Grant this charter</button>
+          ${err ? `<p class="neg">${esc(err)}</p>` : ''}`}
+        <p><a href="#" data-action="charter-sel" data-id="">← Back</a></p>`;
+    }
+    const html = `<div class="charters">
+        <svg viewBox="-110 -10 ${W + 220} ${W + 20}" class="charter-tree">
+          ${lines.join('')}
+          <circle cx="${cx}" cy="${cy}" r="42" fill="#7a2a2a" stroke="#c8a038" stroke-width="4"/>
+          <text x="${cx}" y="${cy - 6}" text-anchor="middle" fill="#f4e7c8" font-size="13" font-weight="700">TOWN</text>
+          <text x="${cx}" y="${cy + 11}" text-anchor="middle" fill="#f4e7c8" font-size="13" font-weight="700">CHARTER</text>
+          ${nodes.join('')}
+        </svg>
+        <div class="charter-detail">${detail}</div>
+      </div>
+      <div class="row" style="justify-content:flex-end;margin-top:8px"><button class="primary" data-action="close-modal">Close</button></div>`;
+    if (this.modal && this.modal.querySelector('.charters')) this.modal.querySelector('.modal')!.innerHTML = html;
+    else this.openModal(html).querySelector('.modal')!.classList.add('wide', 'charter-modal');
+  }
 
   private openModal(html: string, closable = true): HTMLElement {
     this.closeModal(true);

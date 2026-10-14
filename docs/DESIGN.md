@@ -150,5 +150,5 @@ Every charter carries a small malus.
 - [x] New construction costs (tiles for townhouses, dressed stone for manor)
 
 ### Phase 5 — Prestige and charters
-- [ ] Prestige income; charter tree UI; first ranks of every path
-- [ ] Castle levels above the Keep
+- [x] Prestige income; charter tree UI; first ranks of every path
+- [x] Castle levels above the Keep

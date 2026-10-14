@@ -81,9 +81,14 @@ then fall back to the browser's localStorage.
 - **Home crafts** — a Timber House or Townhouse can take up a craft (baker,
   brewer, weaver, tailor...). Two of the family work it from home and make
   half as much again as a common workshop.
-- **The manor** — raise the Manor Hall to a Manor House, Stone Manor and
-  Lord's Keep to become a Village, Town and Borough. Each rank unlocks
-  buildings and adds storage.
+- **The manor** — raise the Manor Hall to a Manor House, Stone Manor,
+  Lord's Keep and finally a Castle to become a Village, Town, Borough and
+  City. Each rank unlocks buildings and adds storage.
+- **Prestige & charters** — a fine manor, a church, monuments and townhouses
+  bring prestige each month. From Town on, spend it on charters (crown
+  button): seven paths (Metalwork, Orchard Masters, Erudition, Harmony with
+  Nature, Traders, Farmers, Shepherds) of two ranks that then fork into rival
+  guilds. Every charter makes the next dearer, and each path has a drawback.
 - **Expansions** — workshops can be expanded once for half as many workers again.
 - **Trade** — at the marketplace buy and sell goods; mark goods for sale in the
   top bar and a merchant's cart visits each month to buy what is above the

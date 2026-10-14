@@ -764,8 +764,9 @@ export const CATEGORY_NAMES: Record<Category, string> = {
 export const TIERS = [
   { name: 'Hamlet', pop: 0, desc: 'A handful of families clearing the land.' },
   { name: 'Village', pop: 20, desc: 'Unlocks farms, bakeries, sawpits, markets, taverns, Timber Houses and workshop expansions.' },
-  { name: 'Town', pop: 45, desc: 'Unlocks mines, blacksmiths, churches and Townhouses.' },
+  { name: 'Town', pop: 45, desc: 'Unlocks mines, bloomeries, blacksmiths, churches, Townhouses and town charters.' },
   { name: 'Borough', pop: 90, desc: 'Your lands prosper. A true seat of a lord!' },
+  { name: 'City', pop: 150, desc: 'A castle crowns your city. Songs are sung of your house across the realm.' },
 ];
 
 export const TAX_LEVELS = [

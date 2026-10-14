@@ -39,6 +39,7 @@ export const MANOR_LEVELS: { name: string; cost?: Cost; days?: number }[] = [
   { name: 'Manor House', cost: { wood: 40, stone: 20, gold: 50 }, days: 20 },
   { name: 'Stone Manor', cost: { planks: 40, dressedstone: 40, stone: 20, gold: 150 }, days: 30 },
   { name: "Lord's Keep", cost: { dressedstone: 80, stone: 40, planks: 60, tools: 15, gold: 400 }, days: 40 },
+  { name: 'Castle', cost: { dressedstone: 160, stone: 80, planks: 60, tools: 25, gold: 800, prestige: 150 }, days: 60 },
 ];
 
 /** Extra storage each manor level above the first provides. */
@@ -143,6 +144,7 @@ export function upgradePlan(s: GameState, b: Building): UpgradePlan | null {
     const reqs: Need[] = [{ label: `${tier.pop} villagers (${s.population})`, met: s.population >= tier.pop }];
     if (b.level + 1 === 3) reqs.push({ label: 'A marketplace', met: hasBuilt(s, 'market') });
     if (b.level + 1 === 4) reqs.push({ label: 'A church', met: hasBuilt(s, 'church') });
+    if (b.level + 1 === 5) reqs.push({ label: 'Three town charters', met: (s.charters?.length ?? 0) >= 3 });
     return { to: b.level + 1, name: next.name, cost: next.cost, days: next.days ?? 20, reqs };
   }
   if (UPGRADABLE_WORK.includes(b.type) && b.level < 2) {
@@ -165,6 +167,7 @@ export function upgradeBlocker(s: GameState, b: Building): string | null {
   const missing = plan.reqs.find((r) => !r.met);
   if (missing) return `Needs: ${missing.label}`;
   if ((plan.cost.gold ?? 0) > s.res.gold) return 'Not enough coins';
+  if ((plan.cost.prestige ?? 0) > s.res.prestige) return 'Not enough prestige';
   return null;
 }
 
@@ -173,6 +176,7 @@ export function startUpgrade(s: GameState, b: Building): boolean {
   if (upgradeBlocker(s, b)) return false;
   const plan = upgradePlan(s, b)!;
   s.res.gold -= plan.cost.gold ?? 0;
+  s.res.prestige -= plan.cost.prestige ?? 0;
   b.upgrading = plan.to;
   b.upProgress = 0;
   b.need = materialsOf(plan.cost);
