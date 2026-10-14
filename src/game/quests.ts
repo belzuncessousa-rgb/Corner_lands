@@ -162,7 +162,7 @@ export const QUESTS: Quest[] = [
   {
     id: 'town',
     title: 'Become a Town',
-    hint: 'With 45 villagers and a marketplace, raise the manor to a Stone Manor.',
+    hint: "With 45 villagers and a marketplace, raise the manor to a Stone Manor. A Stonemason's Yard squares the stone it needs.",
     reward: { gold: 100 },
     done: (s) => s.tier >= 2,
   },
@@ -176,7 +176,7 @@ export const QUESTS: Quest[] = [
   {
     id: 'upgrade',
     title: 'Upgrade 3 homes',
-    hint: 'Cottages near a well and a market, with two food groups on the table, can become Timber Houses.',
+    hint: 'Cottages near a well, a market and a tavern, with clothes and two food groups on the table, can become Timber Houses.',
     reward: { gold: 80 },
     done: (s) => s.buildings.filter((b) => b.type === 'house' && b.level >= 2).length >= 3,
   },
