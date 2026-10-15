@@ -203,5 +203,5 @@ Save size was checked (about 200 KB after twenty years, fine for browser storage
 - [x] Coverage overlay (V): a toggle that tints the map by well, market, tavern and church reach, so homes out of reach stand out
 - [x] Undo the last placement or demolition (a few seconds' grace, refunding fully)
 - [x] Thirty-year soak with the meddling monkey (STRESS=1): watch for drift (gold or prestige running away, message and chronicle growth, frame time at 300+ villagers)
-- [ ] Gold sinks for the late game: towns sit on 20,000+ coins after twenty years (the thirty-year soak); e.g. a cathedral or town walls built over years, festivals, buying land or charters with coin
+- [x] Gold sinks for the late game (yearly fairs that grow dearer; the Cathedral great work): towns sit on 20,000+ coins after twenty years (the thirty-year soak); e.g. a cathedral or town walls built over years, festivals, buying land or charters with coin
 - [ ] Research pass: recent reviews of cozy city builders (2025–2026) for complaints this game could answer; add the best as items

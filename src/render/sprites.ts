@@ -1817,6 +1817,53 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       p.ctx.fill();
       break;
     }
+    case 'cathedral': {
+      const stone = '#bdb4a3';
+      const dark = '#a69d8c';
+      const glass = season === 3 ? '#e8b850' : '#5a6a9a';
+      p.shadow(0.3, 0.2, 4.7, 5.8);
+      // Apse at the back.
+      p.box(1.7, 0.35, 3.3, 1.2, 0, 34, dark);
+      p.roofY(1.7, 0.35, 3.3, 1.2, 34, 20, 'slate', dark, 0.08);
+      // The long nave.
+      p.box(1.4, 1.1, 3.6, 4.7, 0, 46, stone);
+      for (const y of [1.5, 2.1, 3.5, 4.1]) {
+        p.box(3.6, y - 0.06, 3.75, y + 0.06, 0, 30, dark);
+        p.wallR(3.602, y + 0.14, y + 0.34, 16, 38, '#3a3a52');
+        p.wallR(3.603, y + 0.17, y + 0.31, 18, 36, glass);
+      }
+      p.roofY(1.4, 1.1, 3.6, 4.7, 46, 34, 'slate', stone, 0.1);
+      // Transept across the crossing.
+      p.box(0.4, 2.45, 4.6, 3.3, 0, 46, stone);
+      p.wallR(4.602, 2.65, 3.1, 14, 40, '#3a3a52');
+      p.wallR(4.603, 2.7, 3.05, 16, 38, glass);
+      p.roofX(0.4, 2.45, 4.6, 3.3, 46, 30, 'slate', stone, 0.1);
+      // Spire over the crossing.
+      p.box(2.2, 2.6, 2.8, 3.15, 46, 40, stone);
+      p.roofPyramid(2.2, 2.6, 2.8, 3.15, 86, 70, 'slate', 0.04);
+      p.line([2.5, 2.875, 156], [2.5, 2.875, 168], '#d8b84a', 1.6);
+      p.line([2.44, 2.935, 163], [2.56, 2.815, 163], '#d8b84a', 1.6);
+      // West front: twin towers and a great door with a rose window.
+      for (const x0 of [1.15, 3.05]) {
+        p.box(x0, 4.6, x0 + 0.8, 5.55, 0, 96, dark);
+        p.wallL(5.552, x0 + 0.25, x0 + 0.55, 70, 86, '#2a2522');
+        p.wallR(x0 + 0.802, 4.85, 5.3, 70, 86, '#221e1b');
+        p.roofPyramid(x0, 4.6, x0 + 0.8, 5.55, 96, 44, 'slate');
+      }
+      p.box(1.95, 4.7, 3.05, 5.45, 0, 60, stone);
+      p.wallL(5.452, 2.25, 2.75, 0, 26, '#4a2f1b');
+      p.line([2.5, 5.454, 0], [2.5, 5.454, 26], '#2e1d10', 0.8);
+      const [rx, ry] = iso(2.5, 5.452, 44);
+      p.ctx.fillStyle = '#3a3a52';
+      p.ctx.beginPath();
+      p.ctx.arc(rx, ry, 8, 0, Math.PI * 2);
+      p.ctx.fill();
+      p.ctx.fillStyle = season === 3 ? '#e8b850' : '#7a5a9a';
+      p.ctx.beginPath();
+      p.ctx.arc(rx, ry, 5.5, 0, Math.PI * 2);
+      p.ctx.fill();
+      break;
+    }
     case 'garden': {
       const flowers = season === 3 ? ['#e8eef0'] : season === 2 ? ['#d8903a', '#b8503a', '#e0c040'] : ['#e84a6a', '#f2d34a', '#b97ae0', '#f4f0e0', '#e86a3a'];
       p.poly(

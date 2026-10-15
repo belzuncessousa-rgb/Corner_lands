@@ -177,6 +177,7 @@ export function placementError(s: GameState, type: BuildingType, x: number, y: n
   if ((type === 'fisher' || type === 'claypit') && countInRadius(s, centerOf(x, y, d.w, d.h), 2.5, (i) => s.terrain[i] === 1) < 2) {
     return 'Must be next to water';
   }
+  if (type === 'cathedral' && s.buildings.some((b) => b.type === 'cathedral')) return 'Your town has its cathedral';
   if ((d.cost.gold ?? 0) > s.res.gold) return 'Not enough coins';
   return null;
 }
@@ -631,13 +632,14 @@ export function resourceInRange(s: GameState, type: BuildingType, c: { x: number
 }
 
 export function coveredBy(s: GameState, b: Building, type: BuildingType): boolean {
-  const r = BUILDINGS[type].radius;
   const c = bCenter(b);
   for (const o of s.buildings) {
-    if (o.type !== type || o.build < 1) continue;
-    if (BUILDINGS[type].workers > 0 && (o.workers === 0 || o.blocked === BLOCK_PROBLEM)) continue;
+    // A cathedral serves as a church, with a far wider reach.
+    const serves = o.type === type || (type === 'church' && o.type === 'cathedral');
+    if (!serves || o.build < 1) continue;
+    if (BUILDINGS[o.type].workers > 0 && (o.workers === 0 || o.blocked === BLOCK_PROBLEM)) continue;
     const oc = bCenter(o);
-    if (Math.hypot(oc.x - c.x, oc.y - c.y) <= r) return true;
+    if (Math.hypot(oc.x - c.x, oc.y - c.y) <= BUILDINGS[o.type].radius) return true;
   }
   return false;
 }
@@ -1727,6 +1729,7 @@ function passiveStatus(s: GameState, b: Building): string {
     case 'garden':
     case 'maypole':
     case 'statue':
+    case 'cathedral':
     case 'church': {
       let homes = 0;
       const c = bCenter(b);
@@ -2064,6 +2067,7 @@ export function prestigeIncome(s: GameState): number {
     if (b.build < 1) continue;
     if (b.type === 'townhall') n += (b.level - 1) * 1.5;
     else if (b.type === 'church') n += 1;
+    else if (b.type === 'cathedral') n += 6;
     else if (b.type === 'statue') n += 1;
     else if (b.type === 'maypole') n += 0.5;
     else if (b.type === 'house' && b.level >= 3) n += 0.2;
@@ -2231,6 +2235,7 @@ export function updateHappiness(s: GameState): void {
     if (luxury) factors.push({ label: 'Fine living (luxuries)', value: Math.round((10 * luxury) / residents) });
   }
   for (const m of s.moods ?? []) if (m.until > s.day) factors.push({ label: m.label, value: m.value });
+  if (s.buildings.some((b) => b.type === 'cathedral' && b.build >= 1)) factors.push({ label: 'The cathedral', value: 6 });
   if (s.retinue) factors.push({ label: "The lord's guard", value: 2 });
   if (s.charters?.length) {
     const c = (id: string, label: string, v: number) => hasCharter(s, id) && factors.push({ label, value: v });

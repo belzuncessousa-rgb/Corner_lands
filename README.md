@@ -98,6 +98,10 @@ then fall back to the browser's localStorage.
 - **The manor** — raise the Manor Hall to a Manor House, Stone Manor,
   Lord's Keep and finally a Castle to become a Village, Town, Borough and
   City. Each rank unlocks buildings and adds storage.
+- **Fairs and the Cathedral** — from Town on the treasury can endow a fair once
+  a year (each dearer than the last) for prestige and cheer. A Borough may raise
+  one Cathedral: a fortune and most of a year to build, it serves as a church
+  far and wide, cheers everyone and brings prestige every month.
 - **Retinue** — a Borough may raise men-at-arms at the manor (prestige and
   arms, then 10 coins a month). They cheer the town and can be sent against
   wolves and bandits.

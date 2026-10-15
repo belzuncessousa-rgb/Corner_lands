@@ -210,6 +210,13 @@ export const QUESTS: Quest[] = [
     done: (s) => (s.charters?.length ?? 0) >= 1,
   },
   {
+    id: 'fair',
+    title: 'Hold a great fair',
+    hint: 'Coins pile up in a busy town. Open the treasury (coins in the top bar) and endow a fair once a year: each grander than the last, each bringing prestige.',
+    reward: { prestige: 20 },
+    done: (s) => (s.fairs ?? 0) >= 1,
+  },
+  {
     id: 'city',
     title: 'Raise a castle',
     hint: 'With 150 villagers and three charters, raise the Keep into a Castle and become a City.',
@@ -224,7 +231,14 @@ export function activeQuests(s: GameState, n = 3): Quest[] {
 
 /** Completes any active quests that are satisfied and grants rewards. */
 export function checkQuests(s: GameState): Quest[] {
-  const done: Quest[] = [];
+  const done: Quest[] = [  {
+    id: 'cathedral',
+    title: 'Raise a cathedral',
+    hint: 'The great work of a lifetime (Civic menu): a fortune in coin, dressed stone and tiles, most of a year to build. It cheers the whole town and brings prestige every month.',
+    reward: { prestige: 50 },
+    done: (s) => count(s, 'cathedral') >= 1,
+  },
+];
   for (const q of activeQuests(s, 3)) {
     if (!q.done(s)) continue;
     s.quests.push(q.id);

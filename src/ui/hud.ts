@@ -15,7 +15,7 @@ import {
   RESOURCE_STORAGE,
   STORAGE_CAPACITY,
 } from '../game/data';
-import { feastCost, feastError, getEvent, holdFeast, resolveEvent } from '../game/events';
+import { fairCost, fairError, fairPrestige, FAIR_TIER, feastCost, feastError, getEvent, holdFair, holdFeast, resolveEvent } from '../game/events';
 import { CHARTERS, CHARTER_TIER, PATHS, charterCost, charterError, grantCharter, hasCharter } from '../game/charters';
 import { HOUSE_LEVELS, MANOR_LEVELS, buildingName, houseNeeds, startUpgrade, upgradeBlocker, upgradePlan, workersOf } from '../game/levels';
 import { activeQuests } from '../game/quests';
@@ -480,6 +480,15 @@ export class Hud {
       ).join('')}</div>
       <div class="kv" style="margin-top:8px"><span>${ICONS.prestige} Prestige</span><b>${Math.floor(s.res.prestige)}</b></div>
       <p class="note">${esc(GOODS.prestige.desc)}</p>
+      ${
+        s.tier >= FAIR_TIER
+          ? `<div class="kv feast" data-tip="Once a year, endow a fair: merchants, jugglers and a tournament. Each fair is grander and dearer than the last. Brings prestige and +8 happiness for a season."><span>Fair</span><span>${
+              fairError(s) && s.res.gold >= fairCost(s)
+                ? `<small class="muted">${esc(fairError(s)!)}</small>`
+                : `<button data-action="fair" ${fairError(s) ? 'disabled' : ''}>Hold a fair <small>${fairCost(s)}c · +${fairPrestige(s)} ${ICONS.prestige}</small></button>`
+            }</span></div>`
+          : ''
+      }
       <div class="row">${hasBuilt(s, 'market') ? '<button data-action="trade">⚖ Trade</button>' : ''}<button data-action="ledger">Ledger</button><button data-action="charters">${ICONS.prestige} Charters</button></div>`;
   }
 
@@ -1339,6 +1348,16 @@ export class Hud {
         log(s, 'The lord pays off the men-at-arms.', 'info');
         this.lastInspectorKey = '';
         break;
+      case 'fair': {
+        const err = holdFair(s);
+        if (err) this.flash(err);
+        else {
+          log(s, 'A great fair comes to town: merchants, jugglers and a tournament on the green.', 'good');
+          this.sound('good');
+        }
+        this.renderChipPanel();
+        break;
+      }
       case 'feast': {
         const err = holdFeast(s);
         if (err) this.flash(err);

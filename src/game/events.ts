@@ -64,6 +64,40 @@ export function feastCost(s: GameState): { food: number; drink: number } {
   return { food: s.population, drink: Math.ceil(s.population / 8) };
 }
 
+// ---------------------------------------------------------------- fairs
+
+/** Rank (Town) from which the lord may endow a fair. */
+export const FAIR_TIER = 2;
+
+/** Coins the next fair costs: each one grander than the last. */
+export function fairCost(s: GameState): number {
+  return Math.round(400 * Math.pow(1.5, s.fairs ?? 0));
+}
+
+/** Prestige a fair brings: more for grander fairs. */
+export function fairPrestige(s: GameState): number {
+  return 15 + 5 * (s.fairs ?? 0);
+}
+
+export function fairError(s: GameState): string | null {
+  if (s.tier < FAIR_TIER) return 'Fairs are held in Towns';
+  if (s.lastFair === Math.floor(s.day / DAYS_PER_YEAR)) return 'There has been a fair this year';
+  if (s.res.gold < fairCost(s)) return `Needs ${fairCost(s)} coins`;
+  return null;
+}
+
+/** Endows a fair: merchants, jugglers and a tournament; spends coin for prestige and cheer. */
+export function holdFair(s: GameState): string | null {
+  const err = fairError(s);
+  if (err) return err;
+  s.res.gold -= fairCost(s);
+  s.res.prestige += fairPrestige(s);
+  addMood(s, 'The great fair', 8, 4);
+  s.fairs = (s.fairs ?? 0) + 1;
+  s.lastFair = Math.floor(s.day / DAYS_PER_YEAR);
+  return null;
+}
+
 /** Why the lord cannot call a feast now, or null. */
 export function feastError(s: GameState): string | null {
   if (!FEAST_MONTHS.includes(Math.floor(s.day / DAYS_PER_MONTH) % 12)) return 'In autumn, after the harvest';

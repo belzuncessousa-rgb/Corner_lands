@@ -958,3 +958,44 @@ describe('undo', () => {
     expect(stored(s, 'materials')).toBeCloseTo(mats);
   });
 });
+
+describe('fairs', () => {
+  it('cost more each time, once a year, and bring prestige', async () => {
+    const { fairCost, fairError, holdFair } = await import('../src/game/events');
+    const s = generateWorld(94);
+    s.res.gold = 5000;
+    expect(fairError(s)).toMatch(/Towns/);
+    s.tier = 2;
+    const first = fairCost(s);
+    const prestige = s.res.prestige;
+    expect(holdFair(s)).toBeNull();
+    expect(s.res.gold).toBe(5000 - first);
+    expect(s.res.prestige).toBeGreaterThan(prestige);
+    expect(fairError(s)).toMatch(/this year/);
+    s.day += DAYS_PER_YEAR;
+    expect(fairCost(s)).toBeGreaterThan(first);
+  });
+});
+
+describe('cathedral', () => {
+  it('serves as a church far and wide, one per town', async () => {
+    const { coveredBy, placementError } = await import('../src/game/sim');
+    const s = generateWorld(95);
+    s.tier = 3;
+    s.res.gold = 5000;
+    const home = placeNearRoad(s, 'house');
+    home.build = 1;
+    const c = placeNearRoad(s, 'cathedral');
+    c.build = 1;
+    c.need = undefined;
+    c.workers = 2;
+    expect(coveredBy(s, home, 'church')).toBe(true);
+    let tried = 0;
+    for (let x = 0; x < s.width && tried < 50; x++) for (let y = 0; y < s.height && tried < 50; y++) {
+      const e = placementError(s, 'cathedral', x, y);
+      if (e === null) throw new Error('a second cathedral was allowed');
+      if (e === 'Your town has its cathedral') tried++;
+    }
+    expect(tried).toBeGreaterThan(0);
+  });
+});

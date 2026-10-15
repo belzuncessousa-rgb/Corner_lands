@@ -102,6 +102,7 @@ export type BuildingType =
   | 'well'
   | 'market'
   | 'church'
+  | 'cathedral'
   | 'storehouse'
   | 'granary'
   | 'tavern'
@@ -282,6 +283,9 @@ export interface GameState {
   moods?: { label: string; value: number; until: number }[];
   /** Year in which the lord last called a harvest feast. */
   lastFeast?: number;
+  /** Fairs held so far (each costs more) and the year of the last. */
+  fairs?: number;
+  lastFair?: number;
   /** Messages logged so far (numbers each one). */
   messageCount?: number;
   /** Day the last feast was held (the manor stays decorated for a month). */

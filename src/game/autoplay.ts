@@ -3,7 +3,7 @@
  * tune balance; the title screen uses it to grow a demo village.
  */
 import { BUILDINGS, DAYS_PER_MONTH } from './data';
-import { autoResolve, feastError, holdFeast } from './events';
+import { autoResolve, fairCost, fairError, feastError, holdFair, holdFeast } from './events';
 import { grantCharter } from './charters';
 import { startUpgrade, upgradeBlocker, upgradePlan } from './levels';
 import { StateRng } from './rng';
@@ -368,6 +368,7 @@ export function act(s: GameState, rand: () => number): void {
   const pop = s.population;
   const food = totalFood(s);
   if (!feastError(s) && food > pop * 4) holdFeast(s);
+  if (!fairError(s) && s.res.gold > fairCost(s) * 3) holdFair(s);
   renovate(s);
   drawFields(s);
   const sites = s.buildings.filter((b) => b.build < 1).length;
@@ -454,6 +455,7 @@ export function act(s: GameState, rand: () => number): void {
     }
     if (count(s, 'smithy') < 1) wants.push('smithy');
     if (count(s, 'church') < 1) wants.push('church');
+    if (s.tier >= 3 && count(s, 'cathedral') < 1 && s.res.gold > 3000) wants.push('cathedral');
     if (pop >= 60 && count(s, 'tanner') < 1) wants.push('tanner');
     if (count(s, 'mine') > 0 && count(s, 'bloomery') < 1) wants.push('bloomery');
     if (count(s, 'claypit') < 1) wants.push('claypit');

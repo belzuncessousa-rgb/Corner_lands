@@ -143,7 +143,7 @@ export function upgradePlan(s: GameState, b: Building): UpgradePlan | null {
     const tier = TIERS[b.level];
     const reqs: Need[] = [{ label: `${tier.pop} villagers (${s.population})`, met: s.population >= tier.pop }];
     if (b.level + 1 === 3) reqs.push({ label: 'A marketplace', met: hasBuilt(s, 'market') });
-    if (b.level + 1 === 4) reqs.push({ label: 'A church', met: hasBuilt(s, 'church') });
+    if (b.level + 1 === 4) reqs.push({ label: 'A church', met: hasBuilt(s, 'church') || hasBuilt(s, 'cathedral') });
     if (b.level + 1 === 5) reqs.push({ label: 'Three town charters', met: (s.charters?.length ?? 0) >= 3 });
     return { to: b.level + 1, name: next.name, cost: next.cost, days: next.days ?? 20, reqs };
   }
