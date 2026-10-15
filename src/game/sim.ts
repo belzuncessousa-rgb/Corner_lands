@@ -920,6 +920,8 @@ export function restingNow(s: GameState, b: Building): boolean {
   }
   // The harvest is brought in on the first day of its month; then farmers are free.
   if (b.type === 'farm' && monthOf(s.day) === 7 && s.day % DAYS_PER_MONTH !== 0) return true;
+  // Foresters whose woods are full take other work until next month.
+  if (b.blocked === BLOCK_SEASONAL && b.status === 'The woods are full') return true;
   if (b.blocked === BLOCK_SEASONAL && b.status.startsWith('Enough')) {
     const r = chooseRecipe(s, b, true);
     const out = r ? r.outputs : workDef(b).outputs;
@@ -1143,7 +1145,7 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
         b.output++;
         return null;
       }
-      return 'No room to plant';
+      return 'The woods are full';
     }
     case 'quarry':
     case 'mine': {
@@ -1680,6 +1682,7 @@ export function dailyProduction(s: GameState, rng: StateRng): void {
         status === 'Storage full' ||
         status === 'Out of season' ||
         status === 'Nothing to gather this season' ||
+        status === 'The woods are full' ||
         !!status?.startsWith('Batch done') ||
         !!status?.startsWith('Enough');
       b.blocked = status ? (idle ? BLOCK_SEASONAL : BLOCK_PROBLEM) : 0;
