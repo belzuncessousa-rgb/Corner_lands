@@ -1874,3 +1874,7 @@ table.prod td.num {
 #inspector .kv.feast button { padding: 2px 8px; font-size: 13px; }
 #inspector .kv.feast > span:first-child { white-space: nowrap; margin-right: 10px; }
 #log .msg .times { font-weight: bold; color: var(--wood, #7a5a3a); margin-left: 4px; }
+
+/* Colour is not the only cue: bad and good news also carry a sign. */
+#log .msg.bad::before { content: '⚠ '; font-weight: bold; color: var(--bad); }
+#log .msg.good::before { content: '✓ '; font-weight: bold; color: var(--good); }

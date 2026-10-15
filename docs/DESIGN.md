@@ -191,6 +191,6 @@ Anno, Farthest Frontier, Timberborn and cozy builders; the shipped answers
 are listed in the README.
 - [x] Touch: taps tolerate 14 px of wobble; a long press acts as right-click (cancel, deselect)
 - [ ] A funnel test that plays the objectives like a new player (including the teaching ones) and flags any step that takes over ten minutes
-- [ ] Colour-blind pass: simulate deuteranopia on screenshots of markers, charts and the charter tree; add shapes where colour alone carries meaning
+- [x] Colour-blind pass (scripts/cvdshots.mjs): simulate deuteranopia on screenshots of markers, charts and the charter tree; add shapes where colour alone carries meaning
 - [x] Keyboard: list every hotkey in the help screen; Esc closes tools, panels and menus in a predictable order
 - [x] Optional "pause on bad news" setting (events already pause)
