@@ -1277,6 +1277,31 @@ export function cropOf(f: Building): string {
   return f.recipe ?? 'wheat';
 }
 
+/** What a field will bring in at harvest, with `crew` the share of farmers at work. */
+function fieldYield(s: GameState, f: Building, crew: number): number {
+  const crop = cropOf(f);
+  const rotation = (f.lastCrop === crop ? 0.85 : 1) * fieldCharterFactor(s);
+  return Math.round(f.w * f.h * FIELD_YIELD * f.growth * (0.5 + 0.5 * farmFertility(s, f)) * (0.6 + 0.4 * crew) * CROP_FACTOR[crop] * rotation);
+}
+
+/**
+ * The coming harvest against the room left for it, per kind of store:
+ * lets the steward warn before crops spoil for want of space.
+ */
+export function harvestForecast(s: GameState): { kind: StorageKind; expected: number; room: number }[] {
+  const expected: Partial<Record<StorageKind, number>> = {};
+  for (const f of s.buildings) {
+    if (f.type !== 'field' || f.growth <= 0) continue;
+    const kind = RESOURCE_STORAGE[CROP_GOOD[cropOf(f)]];
+    if (kind) expected[kind] = (expected[kind] ?? 0) + fieldYield(s, f, 1);
+  }
+  return (Object.keys(expected) as StorageKind[]).map((kind) => ({
+    kind,
+    expected: expected[kind]!,
+    room: Math.max(0, storageCap(s, kind) - stored(s, kind)),
+  }));
+}
+
 function stepFarm(s: GameState, b: Building): void {
   const month = monthOf(s.day);
   const fields = zonesOf(s, b);
@@ -1304,6 +1329,7 @@ function stepFarm(s: GameState, b: Building): void {
     const got: Partial<Record<ResourceId, number>> = {};
     let unstaffed = 0;
     let spoiled = 0;
+    const spoiledIn = new Set<string>();
     for (const f of fields) {
       if (f.growth <= 0) continue;
       const crop = cropOf(f);
@@ -1311,16 +1337,14 @@ function stepFarm(s: GameState, b: Building): void {
         unstaffed++;
         f.status = 'Crops rotted';
       } else {
-        const rotation = (f.lastCrop === crop ? 0.85 : 1) * fieldCharterFactor(s);
-        const amount = Math.round(
-          f.w * f.h * FIELD_YIELD * f.growth * (0.5 + 0.5 * farmFertility(s, f)) * (0.6 + 0.4 * crew) * CROP_FACTOR[crop] * rotation,
-        );
+        const amount = fieldYield(s, f, crew);
         const good = CROP_GOOD[crop];
         const n = store(s, good, amount);
         got[good] = (got[good] ?? 0) + n;
         b.output += n;
         f.lastOutput = n;
         spoiled += amount - n;
+        if (amount > n) spoiledIn.add(RESOURCE_STORAGE[good] === 'food' ? 'granaries' : 'storehouses');
         f.status = n < amount ? `Harvested ${n}; ${amount - n} spoiled` : `Harvested ${n} ${GOODS[good].name.toLowerCase()}`;
       }
       f.lastCrop = crop;
@@ -1330,8 +1354,9 @@ function stepFarm(s: GameState, b: Building): void {
       .filter(([, n]) => n! > 0)
       .map(([k, n]) => `${n} ${GOODS[k as ResourceId].name.toLowerCase()}`)
       .join(', ');
-    if (list) log(s, `Harvest! The fields brought in ${list}.${spoiled ? ` ${spoiled} more spoiled: the granaries are full.` : ''}`, spoiled ? 'bad' : 'good', b);
-    else if (spoiled) log(s, `The harvest rotted in the fields: no room left in the granaries for ${spoiled} sacks.`, 'bad', b);
+    const where = [...spoiledIn].join(' and ');
+    if (list) log(s, `Harvest! The fields brought in ${list}.${spoiled ? ` ${spoiled} more spoiled: the ${where} are full.` : ''}`, spoiled ? 'bad' : 'good', b);
+    else if (spoiled) log(s, `The harvest rotted in the fields: no room left in the ${where} for ${spoiled} sacks.`, 'bad', b);
     if (unstaffed) log(s, 'Crops rotted in the fields: no farmers to bring them in.', 'bad', b);
     b.status = 'Harvest gathered';
     b.blocked = BLOCK_SEASONAL;

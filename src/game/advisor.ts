@@ -1,6 +1,6 @@
 import { DAYS_PER_MONTH, FOOD_IDS, GOODS, RESOURCE_STORAGE } from './data';
 import type { StorageKind } from './data';
-import { labourSummary, storageCap, stored, totalHousing } from './sim';
+import { harvestForecast, labourSummary, storageCap, stored, totalHousing } from './sim';
 import { RESOURCE_IDS } from './types';
 import type { GameState } from './types';
 
@@ -76,6 +76,16 @@ const ADVICE: Advice[] = [
     id: 'clothes',
     when: (s) => s.res.clothes < 1 && s.buildings.some((b) => b.type === 'house' && b.level >= 2 && b.unmet?.includes('Clothes')),
     text: () => 'Steward: the families in Timber Houses need clothes. Shear sheep or grow flax, weave cloth and have a tailor sew it, or buy clothes at the market.',
+  },
+  {
+    id: 'harvest-room',
+    when: (s, m) => (m === 5 || m === 6) && harvestForecast(s).some((h) => h.expected > h.room + 10),
+    text: (s) => {
+      const h = harvestForecast(s).find((x) => x.expected > x.room + 10)!;
+      const store = h.kind === 'food' ? 'granaries' : 'storehouses';
+      const build = h.kind === 'food' ? 'a Granary' : 'a Storehouse';
+      return `Steward: the harvest is near. The fields should bring in about ${h.expected}, but the ${store} have room for only ${h.room}; the rest will spoil. Build ${build} or sell some stock before autumn.`;
+    },
   },
   {
     id: 'storage',

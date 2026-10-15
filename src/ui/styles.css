@@ -597,7 +597,7 @@ button.active {
   padding: 7px 10px;
   font-size: 14px;
   pointer-events: none;
-  z-index: 30;
+  z-index: 40;
   display: none;
 }
 #tooltip b {

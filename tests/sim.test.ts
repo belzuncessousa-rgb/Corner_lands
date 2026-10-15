@@ -824,3 +824,27 @@ describe('retinue', () => {
     expect(s.retinue).toBe(false);
   });
 });
+
+describe('harvest forecast', () => {
+  it('the steward warns before a harvest that will not fit', async () => {
+    const { advise } = await import('../src/game/advisor');
+    const { harvestForecast, placeZone, storageCap, stored } = await import('../src/game/sim');
+    const s = generateWorld(88);
+    s.tier = 1;
+    const farm = placeNearRoad(s, 'farm');
+    farm.build = 1;
+    farm.need = undefined;
+    let field = null;
+    for (let r = 3; r < 12 && !field; r++) field = placeZone(s, 'field', farm.x + r, farm.y, farm.x + r + 4, farm.y + 4) ?? placeZone(s, 'field', farm.x - r - 4, farm.y, farm.x - r, farm.y + 4);
+    expect(field).not.toBeNull();
+    field!.build = 1;
+    field!.growth = 1;
+    s.res.grain += storageCap(s, 'food') - stored(s, 'food');
+    const f = harvestForecast(s).find((h) => h.kind === 'food')!;
+    expect(f.expected).toBeGreaterThan(10);
+    expect(f.room).toBe(0);
+    s.advice = { housing: s.day, 'food-low': s.day, firewood: s.day, granary: s.day };
+    advise(s, 6);
+    expect(s.messages.at(-1)?.text).toMatch(/harvest is near/);
+  });
+});

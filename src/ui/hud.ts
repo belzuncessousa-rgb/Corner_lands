@@ -430,6 +430,42 @@ export class Hud {
       <div class="row">${hasBuilt(s, 'market') ? '<button data-action="trade">⚖ Trade</button>' : ''}<button data-action="ledger">Ledger</button><button data-action="charters">${ICONS.prestige} Charters</button></div>`;
   }
 
+  /**
+   * Why a good is short or plentiful: who makes it and whether they are
+   * working, who uses it, and which workplaces are waiting for it.
+   */
+  private goodDiagnosis(r: ResourceId): string {
+    const s = this.game.state;
+    const makes = (b: Building) => {
+      const d = workDef(b);
+      return r in d.outputs || !!d.recipes?.some((x) => r in x.outputs && (!x.charter || hasCharter(s, x.charter)));
+    };
+    const uses = (b: Building) => {
+      const d = workDef(b);
+      return r in d.inputs || !!d.recipes?.some((x) => r in x.inputs && (!x.charter || hasCharter(s, x.charter)));
+    };
+    const done = s.buildings.filter((b) => b.build >= 1);
+    const lines: string[] = [];
+    const makers = done.filter(makes);
+    const byName = new Map<string, Building[]>();
+    for (const b of makers) byName.set(buildingName(b), [...(byName.get(buildingName(b)) ?? []), b]);
+    for (const [name, list] of byName) {
+      const working = list.filter((b) => b.workers > 0 && !hasProblem(b)).length;
+      const stalled = list.filter((b) => hasProblem(b));
+      const resting = list.length - working - stalled.length;
+      const parts = [`${working} at work`];
+      if (resting) parts.push(`${resting} resting or unstaffed`);
+      if (stalled.length) parts.push(`${stalled.length} stalled: ${esc(stalled[0].status.toLowerCase())}`);
+      lines.push(`${esc(name)} ×${list.length} — ${parts.join(', ')}`);
+    }
+    if (!makers.length && GOODS[r].group !== 'currency') lines.push('<i>Nothing in your lands makes this yet.</i>');
+    const users = done.filter(uses);
+    if (users.length) lines.push(`Used by ${users.length} workplace${users.length > 1 ? 's' : ''}`);
+    const waiting = done.filter((b) => b.lack === r);
+    if (waiting.length) lines.push(`<span class="neg">⚠ ${waiting.length} waiting for it: ${esc(waiting.slice(0, 3).map((b) => buildingName(b)).join(', '))}</span>`);
+    return lines.length ? `<br><br>${lines.join('<br>')}` : '';
+  }
+
   private goodsPanel(group: GoodsGroup): string {
     const s = this.game.state;
     const market = hasBuilt(s, 'market');
@@ -440,8 +476,9 @@ export class Hud {
         const flow = s.flow?.[r] ?? 0;
         const keep = keepOf(s, r);
         const sell = selling(s, r);
-        return `<tr data-tip="<b>${g.name}</b><br>${esc(g.desc)}${g.food ? `<br>Feeds ${g.food} · ${g.foodGroup}` : ''}">
-          <td class="ic">${ICONS[r]}</td><td>${g.name}</td>
+        const wanted = s.buildings.some((b) => b.lack === r && b.build >= 1);
+        return `<tr data-tip="${esc(`<b>${g.name}</b><br>${esc(g.desc)}${g.food ? `<br>Feeds ${g.food} · ${g.foodGroup}` : ''}${this.goodDiagnosis(r)}`)}">
+          <td class="ic">${ICONS[r]}</td><td>${g.name}${wanted ? ' <span class="neg" title="Workplaces are waiting for this">⚠</span>' : ''}</td>
           <td class="num"><b>${Math.floor(s.res[r])}</b></td>
           <td class="num flow ${flow > 0 ? 'pos' : flow < 0 ? 'neg' : ''}">${flow > 0 ? '+' : ''}${flow || ''}</td>
           <td class="keep" data-tip="<b>Keep in stock</b><br>Workers making ${g.name.toLowerCase()} rest once there are ${keep}${market ? '; merchants buy what is above it if you sell' : ''}."><button data-action="keep" data-res="${r}" data-d="-10">−</button><span>${keep}</span><button data-action="keep" data-res="${r}" data-d="10">+</button></td>
