@@ -51,6 +51,12 @@ export type Tool =
 
 const SPEEDS = [0, 1, 3, 8];
 
+/** Pixels a pointer may move and still count as a click: more for fingers. */
+const MOUSE_SLOP = 6;
+const TOUCH_SLOP = 14;
+/** Holding a finger this long acts as a right-click. */
+const LONG_PRESS_MS = 500;
+
 export class Game {
   state: GameState;
   renderer: Renderer;
@@ -74,8 +80,17 @@ export class Game {
 
   // Pointer state.
   private pointers = new Map<number, { x: number; y: number }>();
-  private dragFrom: { x: number; y: number; camX: number; camY: number; button: number } | null = null;
+  private dragFrom: { x: number; y: number; camX: number; camY: number; button: number; touch?: boolean } | null = null;
   private moved = false;
+  private longPress = 0;
+
+  /** Right-click (or a long press): drop the half-drawn road or zone, then the tool, then the selection. */
+  private cancelOrDeselect(): void {
+    if (this.tool.kind === 'road' && this.roadAnchor) this.roadAnchor = null;
+    else if (this.tool.kind === 'zone' && this.zoneAnchor) this.zoneAnchor = null;
+    else if (this.tool.kind !== 'select') this.setTool({ kind: 'select' });
+    else this.select(null);
+  }
   private dragTile: { x: number; y: number } | null = null;
   /** Where the road being laid starts; the next click finishes a segment. */
   private roadAnchor: { x: number; y: number } | null = null;
@@ -564,7 +579,18 @@ export class Game {
         return;
       }
       this.moved = false;
-      this.dragFrom = { x: e.clientX, y: e.clientY, camX: this.renderer.cam.x, camY: this.renderer.cam.y, button: e.button };
+      this.dragFrom = { x: e.clientX, y: e.clientY, camX: this.renderer.cam.x, camY: this.renderer.cam.y, button: e.button, touch: e.pointerType === 'touch' };
+      // Phones have no right button: a long press cancels the tool or deselects.
+      clearTimeout(this.longPress);
+      if (e.pointerType === 'touch') {
+        this.longPress = window.setTimeout(() => {
+          if (!this.dragFrom || this.moved || this.pointers.size !== 1) return;
+          this.dragFrom = null;
+          this.dragTile = null;
+          this.cancelOrDeselect();
+          navigator.vibrate?.(15);
+        }, LONG_PRESS_MS);
+      }
       if (e.button === 0 && this.tool.kind === 'demolish') {
         const [tx, ty] = this.renderer.screenToTile(e.clientX, e.clientY);
         this.dragTile = { x: Math.floor(tx), y: Math.floor(ty) };
@@ -585,7 +611,11 @@ export class Game {
         return;
       }
       const dist = Math.hypot(e.clientX - df.x, e.clientY - df.y);
-      if (dist > 6) this.moved = true;
+      // Fingers wobble: a touch must travel further than a mouse before it counts as a drag.
+      if (dist > (df.touch ? TOUCH_SLOP : MOUSE_SLOP)) {
+        this.moved = true;
+        clearTimeout(this.longPress);
+      }
       const panning = df.button !== 0 || (this.tool.kind !== 'road' && this.tool.kind !== 'demolish') || !this.dragTile;
       if (this.moved && panning) {
         cv.classList.add('dragging');
@@ -596,6 +626,7 @@ export class Game {
       }
     });
     const end = (e: PointerEvent) => {
+      clearTimeout(this.longPress);
       this.pointers.delete(e.pointerId);
       cv.classList.remove('dragging');
       if (this.pinch) {
@@ -610,10 +641,7 @@ export class Game {
       const tx = Math.floor(ftx);
       const ty = Math.floor(fty);
       if (df.button === 2 && !this.moved) {
-        if (this.tool.kind === 'road' && this.roadAnchor) this.roadAnchor = null;
-        else if (this.tool.kind === 'zone' && this.zoneAnchor) this.zoneAnchor = null;
-        else if (this.tool.kind !== 'select') this.setTool({ kind: 'select' });
-        else this.select(null);
+        this.cancelOrDeselect();
         return;
       }
       if (df.button !== 0) return;

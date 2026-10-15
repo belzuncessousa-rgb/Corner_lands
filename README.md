@@ -34,7 +34,7 @@ then fall back to the browser's localStorage.
 | Build | Pick a category at the bottom, then a building (`H` house, `E` woodcutter, `Q` quarry, `G` forager) |
 | Roads | `R`, click where the road starts, click where it ends; keep clicking to continue. `T` lays paved stone roads (Village) |
 | Demolish | `X`, then click a building or drag across roads |
-| Cancel / deselect | Right-click or `Esc` |
+| Cancel / deselect | Right-click, `Esc`, or a long press on touch screens |
 | Pause / speed | `Space`, `1` `2` `3` (normal, ×3, ×8) |
 
 ### How the settlement works
@@ -161,6 +161,7 @@ SWEEP=1 npx vitest run tests/balance.test.ts         # ten-map robustness sweep 
 STRESS=1 npx vitest run tests/stress.test.ts         # 15-year soak with a meddling monkey (slow)
 node scripts/showcase.mjs out    # screenshots of every building per season
 node scripts/uitest.mjs          # drives the real UI: build, draw fields, workers, targets
+node scripts/touchtest.mjs       # phone: wobbly taps still select, long press cancels
 node scripts/uifuzz.mjs          # random clicks, keys and drags over a big town (STEPS, SEED, W, H)
 ```
 

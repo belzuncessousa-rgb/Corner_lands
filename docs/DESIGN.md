@@ -189,7 +189,7 @@ A ten-seed sweep of the autoplayer exposed stalls a player can hit too.
 Research into what players praise and criticise in Manor Lords, Banished,
 Anno, Farthest Frontier, Timberborn and cozy builders; the shipped answers
 are listed in the README.
-- [ ] Touch: check tap/drag thresholds (~10–20 px) and add long-press to inspect on phones
+- [x] Touch: taps tolerate 14 px of wobble; a long press acts as right-click (cancel, deselect)
 - [ ] A funnel test that plays the objectives like a new player (including the teaching ones) and flags any step that takes over ten minutes
 - [ ] Colour-blind pass: simulate deuteranopia on screenshots of markers, charts and the charter tree; add shapes where colour alone carries meaning
 - [ ] Keyboard: list every hotkey in the help screen; Esc closes tools, panels and menus in a predictable order
