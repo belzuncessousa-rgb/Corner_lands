@@ -60,10 +60,14 @@ then fall back to the browser's localStorage.
   Select a storehouse, granary or the manor to see what the stores hold and
   sell whatever is above its stock target.
 - **Villagers** — settlers arrive when happiness is at least 50%, nobody went
-  hungry and there is free housing.
+  hungry, there is free housing and the larders hold two months of food for
+  everyone (the villagers chip says what is holding them back).
 - **Farming** — a Farmstead tends the fields you draw near it (click one
   corner, then the opposite one): wheat, barley, oats or flax, sown in spring
-  and harvested in autumn; rotate crops for better yields. Animal Farms keep
+  and harvested in autumn; rotate crops for better yields. Rich soil yields
+  up to twice as much: the hint while drawing and the field's panel show the
+  soil and the expected harvest. What the stores cannot take waits in the
+  farmstead's barn. Animal Farms keep
   sheep (wool), cattle (milk, beef, hides) or pigs (pork) on fenced pastures;
   oats let a herd outgrow its pasture over winter. Orchards of apples, pears
   or plums bear after a year and a half. Households can keep a vegetable

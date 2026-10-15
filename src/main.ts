@@ -287,7 +287,15 @@ export class Game {
         this.hud.setHint(`${d.name}: click one corner, then the opposite corner · ${d.zone!.min}–${d.zone!.max} tiles a side`, false);
       } else {
         const where = near ? '' : ` · no ${ownerName} in range: nobody will tend it`;
-        this.hud.setHint(err ? `${d.name} ${w}×${h}: ${err}` : `${d.name} ${w}×${h} (${w * h} tiles)${costText}${where} · click to place`, !!err || !near);
+        // Fields care about the soil: say how rich the ground under the plan is.
+        let soil = '';
+        if (tool.type === 'field' && !err) {
+          let f = 0;
+          for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) if (inBounds(s, x, y)) f += s.fertility[idx(s, x, y)];
+          const avg = f / (w * h);
+          soil = ` · ${avg < 0.4 ? 'poor' : avg < 0.7 ? 'fair' : 'rich'} soil (${Math.round(avg * 100)}%)`;
+        }
+        this.hud.setHint(err ? `${d.name} ${w}×${h}: ${err}` : `${d.name} ${w}×${h} (${w * h} tiles)${soil}${costText}${where} · click to place`, !!err || !near);
       }
     } else if (tool.kind === 'road') {
       const paved = !!tool.paved;

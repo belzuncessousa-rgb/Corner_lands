@@ -84,7 +84,7 @@ const ADVICE: Advice[] = [
       const h = harvestForecast(s).find((x) => x.expected > x.room + 10)!;
       const store = h.kind === 'food' ? 'granaries' : 'storehouses';
       const build = h.kind === 'food' ? 'a Granary' : 'a Storehouse';
-      return `Steward: the harvest is near. The fields should bring in about ${h.expected}, but the ${store} have room for only ${h.room}; the rest will spoil. Build ${build} or sell some stock before autumn.`;
+      return `Steward: the harvest is near. The fields should bring in about ${h.expected}, but the ${store} and the farm barns have room for only ${h.room}; the rest will spoil. Build ${build} or sell some stock before autumn.`;
     },
   },
   {

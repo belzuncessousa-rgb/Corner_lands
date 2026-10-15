@@ -1873,3 +1873,4 @@ table.prod td.num {
 #inspector .kv.feast .muted { color: var(--ink-soft, #7a6a55); font-style: italic; font-size: 12.5px; text-align: right; }
 #inspector .kv.feast button { padding: 2px 8px; font-size: 13px; }
 #inspector .kv.feast > span:first-child { white-space: nowrap; margin-right: 10px; }
+#log .msg .times { font-weight: bold; color: var(--wood, #7a5a3a); margin-left: 4px; }

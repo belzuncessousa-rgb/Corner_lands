@@ -1285,6 +1285,23 @@ function fieldYield(s: GameState, f: Building, crew: number): number {
 }
 
 /**
+ * What a field should bring in: with the growth it has now, and if it is
+ * fully tended by harvest time, plus the soil's richness (0-1). Uses the same
+ * formula as the harvest itself, so the preview never lies.
+ */
+export function fieldForecast(s: GameState, f: Building): { good: ResourceId; now: number; full: number; soil: number } {
+  const owner = s.buildings.find((o) => o.id === f.owner);
+  const crew = owner ? Math.min(1, owner.workers / Math.max(1, workersOf(owner))) : 0;
+  const good = CROP_GOOD[cropOf(f)];
+  const growth = f.growth;
+  const now = fieldYield(s, f, crew || 1);
+  f.growth = 1;
+  const full = fieldYield(s, f, 1);
+  f.growth = growth;
+  return { good, now, full, soil: farmFertility(s, f) };
+}
+
+/**
  * The coming harvest against the room left for it, per kind of store:
  * lets the steward warn before crops spoil for want of space.
  */
@@ -1295,14 +1312,48 @@ export function harvestForecast(s: GameState): { kind: StorageKind; expected: nu
     const kind = RESOURCE_STORAGE[CROP_GOOD[cropOf(f)]];
     if (kind) expected[kind] = (expected[kind] ?? 0) + fieldYield(s, f, 1);
   }
+  // Barns take what the stores cannot.
+  let barns = 0;
+  for (const b of s.buildings) if (b.type === 'farm' && b.build >= 1) barns += FARM_BARN - barnTotal(b);
   return (Object.keys(expected) as StorageKind[]).map((kind) => ({
     kind,
     expected: expected[kind]!,
-    room: Math.max(0, storageCap(s, kind) - stored(s, kind)),
+    room: Math.max(0, storageCap(s, kind) - stored(s, kind)) + barns,
   }));
 }
 
+/** Harvest a farmstead's barn holds while the stores are full. */
+export const FARM_BARN = 200;
+/** Sacks carried from a barn to the stores each day, as room allows. */
+const BARN_UNLOAD = 25;
+
+export function barnTotal(b: Building): number {
+  let n = 0;
+  for (const k in b.barn) n += b.barn[k as ResourceId] ?? 0;
+  return n;
+}
+
+/** Share of the stores barns leave free, so fresh food still has room. */
+const BARN_HEADROOM = 0.15;
+
+/** Carries what waits in a farm's barn to the stores as room frees up. */
+function unloadBarn(s: GameState, b: Building): void {
+  if (!b.barn) return;
+  let budget = BARN_UNLOAD;
+  for (const k in b.barn) {
+    const id = k as ResourceId;
+    const kind = RESOURCE_STORAGE[id];
+    const spare = kind ? roomFor(s, id) - storageCap(s, kind) * BARN_HEADROOM : budget;
+    const moved = store(s, id, Math.max(0, Math.min(budget, b.barn[id] ?? 0, Math.floor(spare))));
+    b.barn[id] = (b.barn[id] ?? 0) - moved;
+    budget -= moved;
+    if (!b.barn[id]) delete b.barn[id];
+  }
+  if (!Object.keys(b.barn).length) b.barn = undefined;
+}
+
 function stepFarm(s: GameState, b: Building): void {
+  unloadBarn(s, b);
   const month = monthOf(s.day);
   const fields = zonesOf(s, b);
   const area = zoneArea(fields);
@@ -1329,6 +1380,7 @@ function stepFarm(s: GameState, b: Building): void {
     const got: Partial<Record<ResourceId, number>> = {};
     let unstaffed = 0;
     let spoiled = 0;
+    let inBarn = 0;
     const spoiledIn = new Set<string>();
     for (const f of fields) {
       if (f.growth <= 0) continue;
@@ -1340,12 +1392,17 @@ function stepFarm(s: GameState, b: Building): void {
         const amount = fieldYield(s, f, crew);
         const good = CROP_GOOD[crop];
         const n = store(s, good, amount);
-        got[good] = (got[good] ?? 0) + n;
-        b.output += n;
-        f.lastOutput = n;
-        spoiled += amount - n;
-        if (amount > n) spoiledIn.add(RESOURCE_STORAGE[good] === 'food' ? 'granaries' : 'storehouses');
-        f.status = n < amount ? `Harvested ${n}; ${amount - n} spoiled` : `Harvested ${n} ${GOODS[good].name.toLowerCase()}`;
+        // What the stores cannot take waits in the farm's barn.
+        const barned = Math.min(amount - n, FARM_BARN - barnTotal(b));
+        if (barned > 0) b.barn = { ...b.barn, [good]: (b.barn?.[good] ?? 0) + barned };
+        inBarn += barned;
+        got[good] = (got[good] ?? 0) + n + barned;
+        b.output += n + barned;
+        f.lastOutput = n + barned;
+        const lost = amount - n - barned;
+        spoiled += lost;
+        if (lost > 0) spoiledIn.add(RESOURCE_STORAGE[good] === 'food' ? 'granaries' : 'storehouses');
+        f.status = lost > 0 ? `Harvested ${amount - lost}; ${lost} spoiled` : `Harvested ${amount} ${GOODS[good].name.toLowerCase()}`;
       }
       f.lastCrop = crop;
       f.growth = 0;
@@ -1355,7 +1412,8 @@ function stepFarm(s: GameState, b: Building): void {
       .map(([k, n]) => `${n} ${GOODS[k as ResourceId].name.toLowerCase()}`)
       .join(', ');
     const where = [...spoiledIn].join(' and ');
-    if (list) log(s, `Harvest! The fields brought in ${list}.${spoiled ? ` ${spoiled} more spoiled: the ${where} are full.` : ''}`, spoiled ? 'bad' : 'good', b);
+    const barnNote = inBarn ? ` ${inBarn} wait in the barn for room in the stores.` : '';
+    if (list) log(s, `Harvest! The fields brought in ${list}.${barnNote}${spoiled ? ` ${spoiled} spoiled: the ${where} and the barn are full.` : ''}`, spoiled ? 'bad' : 'good', b);
     else if (spoiled) log(s, `The harvest rotted in the fields: no room left in the ${where} for ${spoiled} sacks.`, 'bad', b);
     if (unstaffed) log(s, 'Crops rotted in the fields: no farmers to bring them in.', 'bad', b);
     b.status = 'Harvest gathered';
@@ -2152,14 +2210,28 @@ function migrate(s: GameState, rng: StateRng): void {
     // Relaxed mode: nobody leaves, but nobody new arrives either.
   } else if (s.happiness >= 50 && r.shortage === 0) {
     const free = housing - s.population;
-    if (free > 0) {
-      const n = Math.min(free, 1 + Math.floor((s.happiness - 50) / 12) + rng.int(2));
+    // Newcomers only settle where the larders could feed everyone for a while.
+    const room = Math.floor(totalFood(s) / SETTLER_FOOD_MONTHS) - s.population;
+    if (free > 0 && room > 0) {
+      const n = Math.min(free, room, 1 + Math.floor((s.happiness - 50) / 12) + rng.int(2));
       s.population += n;
       r.arrived += n;
       log(s, `${n} settler${n > 1 ? 's' : ''} arrived seeking a new life.`, 'info');
     }
   }
   recompute(s);
+}
+
+/** Months of food in store settlers want to see for the whole town, themselves included. */
+export const SETTLER_FOOD_MONTHS = 2;
+
+/** Why no settlers are coming right now, or null if they may. */
+export function settlerBlocker(s: GameState): string | null {
+  if (s.happiness < 50) return 'Villagers are not happy enough (50% needed)';
+  if (s.report.shortage > 0) return 'Someone went hungry last month';
+  if (totalHousing(s) <= s.population) return 'Every home is full';
+  if (totalFood(s) < (s.population + 1) * SETTLER_FOOD_MONTHS) return `The larders look thin: settlers want ${SETTLER_FOOD_MONTHS} months of food for everyone`;
+  return null;
 }
 
 /** The settlement's rank follows the manor's level. */

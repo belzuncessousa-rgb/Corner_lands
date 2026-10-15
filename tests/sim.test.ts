@@ -842,9 +842,41 @@ describe('harvest forecast', () => {
     s.res.grain += storageCap(s, 'food') - stored(s, 'food');
     const f = harvestForecast(s).find((h) => h.kind === 'food')!;
     expect(f.expected).toBeGreaterThan(10);
-    expect(f.room).toBe(0);
+    // Only the farm's barn is left to take it.
+    expect(f.room).toBe(200);
     s.advice = { housing: s.day, 'food-low': s.day, firewood: s.day, granary: s.day };
     advise(s, 6);
     expect(s.messages.at(-1)?.text).toMatch(/harvest is near/);
+  });
+});
+
+describe('farm barn', () => {
+  it('keeps harvest the granaries cannot take and carries it over later', async () => {
+    const { placeZone, storageCap, stored, barnTotal, FARM_BARN } = await import('../src/game/sim');
+    const s = generateWorld(89);
+    s.tier = 1;
+    const farm = placeNearRoad(s, 'farm');
+    farm.build = 1;
+    farm.need = undefined;
+    let field = null;
+    for (let r = 3; r < 12 && !field; r++) field = placeZone(s, 'field', farm.x + r, farm.y, farm.x + r + 5, farm.y + 5) ?? placeZone(s, 'field', farm.x - r - 5, farm.y, farm.x - r, farm.y + 5);
+    field!.build = 1;
+    field!.growth = 1;
+    s.population = 12;
+    s.res.grain += storageCap(s, 'food') - stored(s, 'food');
+    // Jump to the eve of the harvest.
+    s.day = 7 * DAYS_PER_MONTH - 1;
+    s.dirty = true;
+    run(s, 2);
+    expect(barnTotal(farm)).toBeGreaterThan(0);
+    expect(barnTotal(farm)).toBeLessThanOrEqual(FARM_BARN);
+    // Room frees up: the barn carries into the granary, leaving some room for fresh food.
+    const held = barnTotal(farm);
+    s.res.grain = 0;
+    run(s, 4);
+    expect(barnTotal(farm)).toBeLessThan(held);
+    expect(stored(s, 'food')).toBeGreaterThan(storageCap(s, 'food') * 0.6);
+    expect(stored(s, 'food')).toBeLessThanOrEqual(storageCap(s, 'food') * 0.86 + 1);
+    expect(s.res.grain).toBeGreaterThan(0);
   });
 });

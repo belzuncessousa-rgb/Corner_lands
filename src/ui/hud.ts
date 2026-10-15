@@ -43,6 +43,9 @@ import {
   YARDS,
   zonesOf,
   zoneArea,
+  fieldForecast,
+  FARM_BARN,
+  settlerBlocker,
   herdCapacity,
   HERDS,
   orchardMaturity,
@@ -399,7 +402,7 @@ export class Hud {
     return `<h3>${ICONS.happy} Happiness ${s.happiness}%</h3>
       <div class="bar"><i style="width:${s.happiness}%;background-position:${-220 + s.happiness * 2.2}px 0"></i></div>
       ${factors || '<i>No villagers yet</i>'}
-      <p class="note">Above 50% settlers arrive; below 30% families leave.${s.happinessTarget !== s.happiness ? ` Heading towards ${s.happinessTarget}%.` : ''}</p>`;
+      <p class="note">Above 50% settlers arrive, if there are homes and two months of food in store; below 30% families leave.${s.happinessTarget !== s.happiness ? ` Heading towards ${s.happinessTarget}%.` : ''}</p>`;
   }
 
   private labourPanel(): string {
@@ -416,7 +419,9 @@ export class Hud {
       .slice(0, 5)
       .map((x) => `<div class="kv link" data-action="goto-b" data-id="${x.b.id}"><span>${esc(buildingName(x.b))}</span><span class="neg">${x.have}/${x.want}</span></div>`)
       .join('');
+    const blocked = settlerBlocker(s);
     return `<h3>${ICONS.people} Villagers ${s.population} <small>of ${housing} beds</small></h3>
+      <div class="kv"><span>Newcomers</span><span class="${blocked ? 'neg' : 'pos'}">${blocked ? esc(blocked) : 'Settlers are arriving'}</span></div>
       <div class="labour-sum">
         <div><b>${l.workers}</b><span>at work</span></div>
         <div><b>${l.builders}</b><span>building</span></div>
@@ -603,7 +608,7 @@ export class Hud {
     const key = JSON.stringify([
       b.id, b.status, b.workers, b.builders, b.residents, b.build.toFixed(2), b.paused, b.level, b.lastOutput, b.growth.toFixed(2), b.want, b.priority, b.recipe, b.yard, b.trade, b.herd, b.owner, Math.floor(b.growth),
       s.tier, blocker, b.need, (b.upProgress ?? 0).toFixed(2), b.unmet, Math.floor(s.res.gold / 10), s.population,
-      s.lastFeast, monthOf(s.day), s.retinue, Math.floor(s.res.prestige), Math.floor(s.res.weapons),
+      s.lastFeast, monthOf(s.day), s.retinue, b.barn, Math.floor(s.res.prestige), Math.floor(s.res.weapons),
       STORAGE_CAPACITY[b.type] ? RESOURCE_IDS.map((r) => (RESOURCE_STORAGE[r] ? Math.floor(s.res[r]) : 0)).join() : '',
     ]);
     if (key === this.lastInspectorKey) return;
@@ -769,6 +774,10 @@ export class Hud {
       );
       if (b.type === 'field') {
         rows.push(`<div class="kv"><span>Crop growth</span><span>${Math.round(b.growth * 100)}%</span></div>${bar(b.growth)}`);
+        const fc = fieldForecast(s, b);
+        const name = GOODS[fc.good].name.toLowerCase();
+        rows.push(`<div class="kv" data-tip="Harvest comes in early autumn. It grows with the farmers' work through spring and summer, the soil's richness and crop rotation."><span>Expected harvest</span><span>${b.growth > 0 ? `~${fc.now} ${name}` : '—'}${fc.full > fc.now ? ` <small>(up to ${fc.full})</small>` : ''}</span></div>`);
+        rows.push(`<div class="kv" data-tip="Richer soil yields up to twice as much as poor soil. Look for dark green, lush ground."><span>Soil</span><span class="${fc.soil < 0.4 ? 'neg' : ''}">${fc.soil < 0.4 ? 'Poor' : fc.soil < 0.7 ? 'Fair' : 'Rich'} (${Math.round(fc.soil * 100)}%)</span></div>`);
         if (b.lastCrop) rows.push(`<div class="kv" data-tip="Growing the same crop two years running yields less."><span>Last year</span><span>${esc(b.lastCrop)}${b.lastCrop === (b.recipe ?? 'wheat') ? ' <span class="neg">(same crop: −15%)</span>' : ''}</span></div>`);
       } else if (b.type === 'orchard') {
         const m = orchardMaturity(b, hasCharter(s, 'orchard2'));
@@ -781,6 +790,12 @@ export class Hud {
       const area = zoneArea(fields);
       const hands = Math.round((workersOf(b) * 60) / TEND_PER_TILE);
       rows.push(`<div class="kv" data-tip="Draw fields within the farm's reach (Food menu). ${workersOf(b)} farmers can sow and tend about ${hands} tiles."><span>Fields</span><span class="${area > hands ? 'neg' : ''}">${fields.length} · ${area} of ~${hands} tiles</span></div>`);
+      if (b.barn) {
+        const held = Object.entries(b.barn)
+          .map(([k, v]) => `${Math.floor(v ?? 0)} ${GOODS[k as ResourceId].name.toLowerCase()}`)
+          .join(', ');
+        rows.push(`<div class="kv" data-tip="Harvest the stores had no room for. It is carried over as room frees up; the barn holds ${FARM_BARN}."><span>In the barn</span><span>${held}</span></div>`);
+      }
     }
     if (b.type === 'byre' && b.build >= 1) {
       const capy = herdCapacity(s, b);
@@ -823,27 +838,58 @@ export class Hud {
       const m = msgs[i];
       // Routine news goes to the chronicle only.
       if (m.kind === 'info') continue;
+      const text = `${m.kind === 'advice' ? '<b>Steward:</b> ' : ''}${esc(m.text.replace(/^Steward: /, ''))}`;
+      // The same news again bumps a counter on the toast already showing.
+      const same = [...this.el.log.children].find((c) => (c as HTMLElement).dataset.text === m.text) as HTMLElement | undefined;
+      if (same) {
+        const n = Number(same.dataset.n ?? 1) + 1;
+        same.dataset.n = String(n);
+        same.innerHTML = `${text} <span class="times">×${n}</span>`;
+        this.expire(same, m.kind);
+        continue;
+      }
       const div = document.createElement('div');
       div.className = `msg panel ${m.kind}${m.at ? ' link' : ''}`;
-      div.innerHTML = `${m.kind === 'advice' ? '<b>Steward:</b> ' : ''}${esc(m.text.replace(/^Steward: /, ''))}`;
+      div.dataset.text = m.text;
+      div.dataset.kind = m.kind;
+      div.innerHTML = text;
       if (m.at) {
         const at = m.at;
-        div.title = 'Show me';
+        div.title = 'Show me (right-click to dismiss)';
         div.addEventListener('click', () => {
           this.game.renderer.centerOn(at.x, at.y);
           this.game.renderer.clampCamera(this.game.state);
         });
       }
+      div.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        div.remove();
+      });
       this.el.log.appendChild(div);
-      setTimeout(() => div.classList.add('old'), 7000);
-      setTimeout(() => div.remove(), 8000);
+      this.expire(div, m.kind);
       if (!played) {
         this.sound(m.kind === 'bad' ? 'bad' : 'good');
         played = true;
       }
     }
     this.shownMessages = msgs.length;
-    while (this.el.log.children.length > 3) this.el.log.firstElementChild?.remove();
+    // Keep three at most: good news makes way first, warnings last.
+    const rank: Record<string, number> = { good: 0, advice: 1, bad: 2 };
+    while (this.el.log.children.length > 3) {
+      const all = [...this.el.log.children] as HTMLElement[];
+      const drop = all.reduce((a, c) => ((rank[c.dataset.kind ?? ''] ?? 1) < (rank[a.dataset.kind ?? ''] ?? 1) ? c : a));
+      drop.remove();
+    }
+  }
+
+  /** Fades a toast after a while; warnings stay up longer. */
+  private expire(div: HTMLElement, kind: string): void {
+    const life = kind === 'bad' ? 14000 : kind === 'advice' ? 11000 : 7000;
+    clearTimeout(Number(div.dataset.fade));
+    clearTimeout(Number(div.dataset.gone));
+    div.classList.remove('old');
+    div.dataset.fade = String(window.setTimeout(() => div.classList.add('old'), life));
+    div.dataset.gone = String(window.setTimeout(() => div.remove(), life + 1000));
   }
 
   private celebrate(tier: number): void {

@@ -177,6 +177,8 @@ export interface Building {
   trade?: BuildingType;
   /** Houses: goods the household has been supplied with, until which day. */
   supply?: Partial<Record<ResourceId, number>>;
+  /** A farmstead's barn: harvest waiting for room in the stores. */
+  barn?: Partial<Record<ResourceId, number>>;
   /** Houses: what the family keeps in the backyard. */
   yard?: string;
   /** Units produced in the last month, for display. */

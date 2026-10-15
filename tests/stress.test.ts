@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BUILDINGS, BUILD_ORDER, DAYS_PER_YEAR, RESOURCE_STORAGE } from '../src/game/data';
+import { BUILDINGS, BUILD_ORDER, DAYS_PER_MONTH, DAYS_PER_YEAR, RESOURCE_STORAGE } from '../src/game/data';
 import { CHARTERS, grantCharter } from '../src/game/charters';
 import { getEvent, holdFeast, resolveEvent } from '../src/game/events';
 import { startUpgrade, workersOf } from '../src/game/levels';
@@ -166,15 +166,18 @@ function soak(seed: number, years: number, chaos = 0.3) {
     r = (r * 1103515245 + 12345) & 0x7fffffff;
     return r / 0x7fffffff;
   };
+  // Villager-months of hunger: a measure of boom and bust.
+  let hungry = 0;
   for (let d = 0; d < years * DAYS_PER_YEAR; d++) {
     if (d % 5 === 0) act(s, rand);
     if (rand() < chaos) meddle();
     const before = { materials: stored(s, 'materials'), food: stored(s, 'food') };
     stepDay(s);
     const bad = invariants(s) ?? overfilled(s, before);
-    if (bad) return { s, bad: `day ${s.day}: ${bad}` };
+    if (bad) return { s, bad: `day ${s.day}: ${bad}`, hungry };
+    if (s.day % DAYS_PER_MONTH === 0) hungry += s.report.shortage;
   }
-  return { s, bad: null };
+  return { s, bad: null, hungry };
 }
 
 /** A day's work must never push a store that is already full any fuller. */
@@ -226,8 +229,8 @@ describe('stress', () => {
   it.runIf(process.env.STRESS)('long soak: 10 maps for 15 years', { timeout: 1200000 }, () => {
     for (let seed = 1; seed <= 10; seed++) {
       const t = performance.now();
-      const { bad, s } = soak(seed, 15);
-      console.log(`seed ${seed}: pop ${s.population} tier ${s.tier} buildings ${s.buildings.length} ${Math.round(performance.now() - t)}ms ${bad ?? 'ok'}`);
+      const { bad, s, hungry } = soak(seed, 15);
+      console.log(`seed ${seed}: pop ${s.population} tier ${s.tier} buildings ${s.buildings.length} hungry ${hungry} ${Math.round(performance.now() - t)}ms ${bad ?? 'ok'}`);
       expect(bad, `seed ${seed}`).toBeNull();
     }
   });
