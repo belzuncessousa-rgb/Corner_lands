@@ -87,7 +87,7 @@ export function folkDoing(s: GameState, a: Agent): string {
   }
 }
 
-const WISHES: Record<string, string> = {
+export const WISHES: Record<string, string> = {
   'Enough food': 'My belly grumbles. Is there nothing in the granary?',
   'Firewood in winter': 'Our hearth was cold all winter.',
   'A well nearby': 'If only the well were not so far to carry water.',

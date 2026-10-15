@@ -85,7 +85,7 @@ import type { Game } from '../main';
 import { CATEGORY_ICONS, ICONS, SEASON_ICONS } from './icons';
 import { Minimap } from './minimap';
 import { Ambient } from './ambient';
-import { folkDoing, folkName, folkThought, workplaceOf } from './folk';
+import { folkDoing, folkName, folkThought, WISHES, workplaceOf } from './folk';
 
 const ZONE_COST_NOTE: Partial<Record<BuildingType, string>> = {
   field: '<small>Free · draw it</small>',
@@ -435,9 +435,25 @@ export class Hud {
         return `<div ${attrs}><span>${esc(label)}</span><span class="${full ? 'pos' : 'neg'}">${t.met}/${t.of} homes</span></div>`;
       })
       .join('');
+    // Town talk: the wishes most often heard in the lanes, in the villagers' words.
+    const voices = new Map<string, { homes: number; at: number }>();
+    for (const b of s.buildings) {
+      if (b.type !== 'house' || b.build < 1) continue;
+      for (const u of houseNeeds(s, b, b.level).filter((n) => !n.met).map((n) => n.label)) {
+        const v = voices.get(u) ?? { homes: 0, at: b.id };
+        v.homes++;
+        voices.set(u, v);
+      }
+    }
+    const talk = [...voices]
+      .sort((a, b) => b[1].homes - a[1].homes)
+      .slice(0, 3)
+      .map(([u, v]) => `<div class="talk link" data-action="goto-b" data-id="${v.at}" data-tip="Show one of these homes">“${esc(WISHES[u] ?? `We need ${u.toLowerCase()}.`)}” <small>— ${v.homes} home${v.homes > 1 ? 's' : ''}</small></div>`)
+      .join('');
     return `<h3>${ICONS.happy} Happiness ${s.happiness}%</h3>
       <div class="bar"><i style="width:${s.happiness}%;background-position:${-220 + s.happiness * 2.2}px 0"></i></div>
       ${factors || '<i>No villagers yet</i>'}
+      ${talk ? `<div class="sub">Town talk</div>${talk}` : ''}
       ${needs ? `<div class="sub">Needs of Timber Houses and Townhouses</div>${needs}` : ''}
       <p class="note">Above 50% settlers arrive, if there are homes and two months of food in store; below 30% families leave.${s.happinessTarget !== s.happiness ? ` Heading towards ${s.happinessTarget}%.` : ''}</p>`;
   }
