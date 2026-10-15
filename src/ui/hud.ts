@@ -438,7 +438,7 @@ export class Hud {
     // Town talk: the wishes most often heard in the lanes, in the villagers' words.
     const voices = new Map<string, { homes: number; at: number }>();
     for (const b of s.buildings) {
-      if (b.type !== 'house' || b.build < 1) continue;
+      if (b.type !== 'house' || b.build < 1 || b.residents === 0) continue;
       for (const u of houseNeeds(s, b, b.level).filter((n) => !n.met).map((n) => n.label)) {
         const v = voices.get(u) ?? { homes: 0, at: b.id };
         v.homes++;
@@ -674,7 +674,7 @@ export class Hud {
     const key = JSON.stringify([
       b.id, b.status, b.workers, b.builders, b.residents, b.build.toFixed(2), b.paused, b.level, b.lastOutput, b.growth.toFixed(2), b.want, b.priority, b.recipe, b.yard, b.trade, b.herd, b.owner, Math.floor(b.growth),
       s.tier, blocker, b.need, (b.upProgress ?? 0).toFixed(2), b.unmet, Math.floor(s.res.gold / 10), s.population,
-      s.lastFeast, s.festivals, monthOf(s.day), s.retinue, b.barn, Math.floor(s.res.prestige), Math.floor(s.res.weapons),
+      s.lastFeast, s.festivals, monthOf(s.day), s.retinue, Math.floor(s.res.wood), Math.floor(totalFood(s)), b.barn, Math.floor(s.res.prestige), Math.floor(s.res.weapons),
       STORAGE_CAPACITY[b.type] ? RESOURCE_IDS.map((r) => (RESOURCE_STORAGE[r] ? Math.floor(s.res[r]) : 0)).join() : '',
     ]);
     if (key === this.lastInspectorKey) return;
@@ -1884,7 +1884,7 @@ export class Hud {
     const saves = await listSaves().catch(() => [] as SaveInfo[]);
     const list = saves
       .map(
-        (s, i) => `<div class="save"><div class="n">${esc(s.slot)}<br><small>${esc(s.summary)} · ${new Date(s.updated).toLocaleString()} · ${s.where}</small></div>
+        (s, i) => `<div class="save"><div class="n">${s.slot.startsWith('autosave') ? '<i>Autosave</i>' : esc(s.slot)}<br><small>${esc(s.summary)} · ${new Date(s.updated).toLocaleString()} · ${s.where}</small></div>
         <button class="primary" data-load="${i}">Load</button><button data-del="${i}" title="Delete">✖</button></div>`,
       )
       .join('');

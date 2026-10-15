@@ -1,5 +1,5 @@
 import { BUILDINGS } from './data';
-import { deliveredTo, demolish, recompute, store, zoneCost } from './sim';
+import { deliveredTo, demolish, log, recompute, store, zoneCost } from './sim';
 import type { Building, Cost, GameState, ResourceId } from './types';
 import { idx, placeBuilding } from './world';
 
@@ -40,9 +40,12 @@ export function undoMany(steps: UndoStep[], label: string): UndoStep {
   return {
     label,
     revert: (s) => {
-      let err: string | null = null;
-      for (const st of steps) err = st.revert(s) ?? err;
-      return err;
+      // Take back what can be; sections already built stay, and only if none
+      // could be taken back is it an error.
+      const kept = steps.filter((st) => st.revert(s) !== null).length;
+      if (kept === steps.length) return 'Already built';
+      if (kept) log(s, `${kept} section${kept > 1 ? 's' : ''} already built ${kept > 1 ? 'were' : 'was'} kept.`, 'info');
+      return null;
     },
   };
 }

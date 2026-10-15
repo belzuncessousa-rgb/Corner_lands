@@ -259,6 +259,8 @@ export interface GameState {
   relaxed?: boolean;
   /** Hardy mode: a scarcer start, colder winters, choosier settlers. */
   hardy?: boolean;
+  /** Identifies this settlement among saves (its autosave slot). */
+  founded?: number;
   /** Day each piece of advisor advice was last given. */
   advice?: Record<string, number>;
   /** Old export rules (pre stock targets); migrated on load. */

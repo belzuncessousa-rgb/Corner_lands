@@ -220,3 +220,9 @@ about medieval builders, Manor Lords' own roadmap included) and the soaks.
 - [x] Town talk: a panel gathering what villagers are saying (their most common wishes), linked to the homes that voice them
 - [x] A hardier mode beside Normal and Relaxed (scarcer start, colder winters), balanced with the autoplayer
 - [x] Seasonal festivals beyond the harvest feast (May Day at the maypole, Midsummer fires) as small optional spends with visible decorations
+
+### Phase 14 — Next (for the scheduled runs)
+- [x] Autosaves per settlement: founding a new one never overwrites the last (players lose towns to a single shared autosave slot in other builders); the three most recent are kept
+- [ ] A save-slot screen with a thumbnail of each town (the minimap image) and its rank and year
+- [ ] Sound pass: distinct, quiet cues for festivals, fairs, the retinue and wall gates
+- [ ] A late-game soak with the reach overlay, walls and festivals exercised by the autoplayer

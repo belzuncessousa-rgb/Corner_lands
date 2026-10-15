@@ -1,5 +1,5 @@
 import './ui/styles.css';
-import { listSaves, loadGame, saveGame } from './api';
+import { deleteSave, listSaves, loadGame, saveGame } from './api';
 import { BUILDINGS, BUILD_ORDER, DAY_SECONDS, MONTH_NAMES, TIERS } from './game/data';
 import { playBot } from './game/autoplay';
 import { autoResolve } from './game/events';
@@ -55,6 +55,9 @@ export type Tool =
   | { kind: 'demolish' };
 
 const SPEEDS = [0, 1, 3, 8];
+
+/** Autosaves of different settlements kept before the oldest is removed. */
+const AUTOSAVES_KEPT = 3;
 
 /** Seconds' grace to take back a placement or demolition. */
 const UNDO_MS = 10000;
@@ -182,6 +185,7 @@ export class Game {
 
   newGame(seed: number, mode: 'normal' | 'relaxed' | 'hardy' = 'normal'): void {
     this.state = generateWorld(seed, { relaxed: mode === 'relaxed', hardy: mode === 'hardy' });
+    this.state.founded = Date.now();
     recompute(this.state);
     // Show a meaningful happiness breakdown from the very first day.
     this.state.report.variety = FOOD_IDS.filter((f) => this.state.res[f] > 0).length;
@@ -233,7 +237,18 @@ export class Game {
   }
 
   async hasAutosave(): Promise<boolean> {
-    return (await listSaves()).some((s) => s.slot === 'autosave');
+    return (await listSaves()).some((s) => s.slot.startsWith('autosave'));
+  }
+
+  /**
+   * Each settlement autosaves to its own slot, so founding a new one never
+   * overwrites the last; only the three most recent settlements are kept.
+   */
+  async autosave(): Promise<void> {
+    this.state.founded ??= Date.now();
+    await this.save(`autosave-${this.state.founded}`);
+    const autos = (await listSaves()).filter((x) => x.slot.startsWith('autosave-'));
+    for (const old of autos.slice(AUTOSAVES_KEPT)) await deleteSave(old.slot, old.where).catch(() => undefined);
   }
 
   // ---------------------------------------------------------------- loop
@@ -280,7 +295,7 @@ export class Game {
     if (this.demo) return;
     // Autosave at the start of every season.
     if (monthOf(this.state.day) % 3 === 0) {
-      this.save('autosave').catch(() => undefined);
+      this.autosave().catch(() => undefined);
     }
   }
 
@@ -554,7 +569,10 @@ export class Game {
     this.dragTile = null;
     this.roadAnchor = null;
     this.zoneAnchor = null;
-    if (t.kind !== 'select') this.selected = null;
+    if (t.kind !== 'select') {
+      this.selected = null;
+      this.selectedAgent = null;
+    }
     this.canvas.classList.toggle('tool', t.kind !== 'select');
     this.hud.update();
   }
