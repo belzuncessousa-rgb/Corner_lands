@@ -418,11 +418,13 @@ export function serveAle(s: GameState): void {
     }
     if (casks <= 0) {
       t.blocked = 0;
+      t.lack = undefined;
       const drinks = poured.join(' and ');
       t.status = served ? `Pouring ${drinks || 'drinks'} for ${served} villagers` : 'No homes nearby yet';
     } else {
       t.blocked = BLOCK_PROBLEM;
       t.status = 'The casks are dry: needs ale, cider, mead or wine';
+      t.lack = 'ale';
     }
   }
 }
@@ -1240,6 +1242,7 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
           return 'Batch done: waiting for the next load';
         }
         const missing = Object.keys(inputs).filter((k) => s.res[k as ResourceId] < (inputs[k as ResourceId] ?? 0));
+        b.lack = missing[0] as ResourceId;
         return `Waiting for ${missing.map((k) => GOODS[k as ResourceId].name.toLowerCase()).join(', ')}`;
       }
       // Inputs leave the store as the outputs arrive: milling a full granary's
@@ -1677,6 +1680,7 @@ export function dailyProduction(s: GameState, rng: StateRng): void {
       b.work -= 1;
     }
     if (tried) {
+      if (!status?.startsWith('Waiting for')) b.lack = undefined;
       // Winter rest and full storage are normal pauses, not problems to flag.
       const idle =
         status === 'Storage full' ||

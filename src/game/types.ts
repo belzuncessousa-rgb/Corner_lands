@@ -131,6 +131,8 @@ export interface Building {
   growth: number;
   paused: boolean;
   status: string;
+  /** The input a stalled workplace is waiting for (shown over it on the map). */
+  lack?: ResourceId;
   /** Builders working on this site or renovation. */
   builders?: number;
   /** Level a renovation is raising the building to. */

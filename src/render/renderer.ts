@@ -5,6 +5,7 @@ import { HOME_TRADES, deliveredTo, hasProblem, monthOf, orchardMaturity, seasonO
 import type { Building, BuildingType, GameState, ResourceId, Season } from '../game/types';
 import { idx, inBounds } from '../game/world';
 import type { Agent } from './agents';
+import { ICONS } from '../ui/icons';
 import type { Animal } from './wildlife';
 import { Pen, TH, TW, iso, mix } from './pen';
 import {
@@ -802,7 +803,7 @@ export class Renderer {
     // Status markers.
     if (!this.showMarkers) return;
     if (hasProblem(b)) {
-      this.drawMarker(b, '#e0a030', '?');
+      this.drawMarker(b, '#e0a030', '?', b.lack);
     } else if ((b.type === 'house' || b.type === 'townhall') && !b.upgrading && !upgradeBlocker(s, b)) {
       this.drawMarker(b, b.type === 'townhall' ? '#c89a38' : '#4f8a3a', '↑');
     }
@@ -877,20 +878,27 @@ export class Renderer {
     if ((got.stone ?? 0) > 0) p.stonePile(b.x + 0.2, b.y + b.h + 0.05, 3);
   }
 
-  private drawMarker(b: Building, color: string, glyph: string): void {
+  /** A bobbing bubble over a building: a glyph, or the good it is waiting for. */
+  private drawMarker(b: Building, color: string, glyph: string, good?: ResourceId): void {
     const c = this.ctx;
     const [x, y] = iso(b.x + b.w / 2, b.y + b.h / 2, 46 + Math.sin(this.time * 3) * 3);
+    const icon = good ? goodIcon(good) : null;
+    const r = icon ? 10 : 8;
     c.fillStyle = 'rgba(0,0,0,0.35)';
     c.beginPath();
-    c.arc(x + 1, y + 1, 8, 0, Math.PI * 2);
+    c.arc(x + 1, y + 1, r, 0, Math.PI * 2);
     c.fill();
-    c.fillStyle = color;
+    c.fillStyle = icon ? '#fff3d6' : color;
     c.beginPath();
-    c.arc(x, y, 8, 0, Math.PI * 2);
+    c.arc(x, y, r, 0, Math.PI * 2);
     c.fill();
-    c.strokeStyle = '#fff6dc';
-    c.lineWidth = 1.5;
+    c.strokeStyle = icon ? color : '#fff6dc';
+    c.lineWidth = icon ? 2 : 1.5;
     c.stroke();
+    if (icon) {
+      c.drawImage(icon, x - 7.5, y - 7.5, 15, 15);
+      return;
+    }
     c.fillStyle = '#fff';
     c.font = 'bold 11px Georgia, serif';
     c.textAlign = 'center';
@@ -1618,6 +1626,20 @@ const CARRY_COLORS: Partial<Record<ResourceId, string>> = {
 };
 
 /** A load on a villager's shoulder, shaped by what it is. */
+const iconCache = new Map<ResourceId, HTMLImageElement>();
+
+/** The HUD's icon for a good as an image for the canvas (null until loaded). */
+function goodIcon(id: ResourceId): HTMLImageElement | null {
+  let img = iconCache.get(id);
+  if (!img) {
+    img = new Image();
+    const src = (ICONS[id] ?? '').replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" ');
+    img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(src)}`;
+    iconCache.set(id, img);
+  }
+  return img.complete && img.naturalWidth ? img : null;
+}
+
 function drawCarried(c: CanvasRenderingContext2D, id: ResourceId, x: number, y: number): void {
   const shape = CARRY_SHAPES[id] ?? 'crate';
   const color = CARRY_COLORS[id] ?? GOOD_COLORS[id] ?? '#c8a46c';
