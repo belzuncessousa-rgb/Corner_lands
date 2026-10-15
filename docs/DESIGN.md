@@ -224,5 +224,5 @@ about medieval builders, Manor Lords' own roadmap included) and the soaks.
 ### Phase 14 — Next (for the scheduled runs)
 - [x] Autosaves per settlement: founding a new one never overwrites the last (players lose towns to a single shared autosave slot in other builders); the three most recent are kept
 - [x] A save-slot screen with a thumbnail of each town (the minimap image) and its rank and year
-- [ ] Sound pass: distinct, quiet cues for festivals, fairs, the retinue and wall gates
+- [x] Sound pass: distinct, quiet cues for festivals, fairs, the retinue and wall gates
 - [x] A late-game soak with walls and festivals exercised by the autoplayer (found that a tight ring of walls stifles a town's growth; walls now have posterns, and the autoplayer walls wide and stops at forty sections)

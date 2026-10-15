@@ -690,7 +690,7 @@ export class Game {
       }
       if (placed.length) {
         this.offerUndo(undoMany(placed, `Undo ${placed.length} wall section${placed.length > 1 ? 's' : ''}`));
-        this.hud.sound('place');
+        this.hud.sound('stone');
       }
       return;
     }

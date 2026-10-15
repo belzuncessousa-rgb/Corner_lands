@@ -1380,7 +1380,7 @@ export class Hud {
       case 'retinue': {
         const err = raiseRetinue(s);
         if (err) this.flash(err);
-        else this.sound('good');
+        else this.sound('march');
         this.lastInspectorKey = '';
         break;
       }
@@ -1396,7 +1396,7 @@ export class Hud {
         else {
           const f = FESTIVALS.find((x) => x.id === id)!;
           log(s, `${f.name}! ${f.desc}`, 'good');
-          this.sound('good');
+          this.sound('jig');
         }
         this.lastInspectorKey = '';
         break;
@@ -1406,7 +1406,7 @@ export class Hud {
         if (err) this.flash(err);
         else {
           log(s, 'A great fair comes to town: merchants, jugglers and a tournament on the green.', 'good');
-          this.sound('good');
+          this.sound('fanfare');
         }
         this.renderChipPanel();
         break;
@@ -2015,7 +2015,7 @@ export class Hud {
     this.ambient.update(dt, seasonOf(this.game.state.day), running);
   }
 
-  sound(kind: 'place' | 'road' | 'demolish' | 'good' | 'bad' | 'coin'): void {
+  sound(kind: 'place' | 'road' | 'demolish' | 'good' | 'bad' | 'coin' | 'jig' | 'fanfare' | 'march' | 'stone'): void {
     if (this.muted) return;
     this.ensureAudio();
     const ac = this.audio;
@@ -2074,6 +2074,28 @@ export class Hud {
       case 'coin':
         tone(1200, 0, 0.12, 'square', 0.04);
         tone(1600, 0.06, 0.18, 'square', 0.04);
+        break;
+      case 'jig':
+        // A few bars on a pipe for a festival.
+        [784, 880, 988, 880, 784, 659, 784, 988].forEach((f, i) => tone(f, i * 0.11, 0.14, 'triangle', 0.06));
+        break;
+      case 'fanfare':
+        // Heralds' trumpets for a fair.
+        tone(392, 0, 0.18, 'sawtooth', 0.035);
+        tone(523, 0.16, 0.18, 'sawtooth', 0.035);
+        tone(659, 0.32, 0.18, 'sawtooth', 0.035);
+        tone(784, 0.48, 0.5, 'sawtooth', 0.04);
+        break;
+      case 'march':
+        // Drums as the men-at-arms take service.
+        for (let i = 0; i < 4; i++) {
+          tone(80, i * 0.22, 0.16, 'sine', 0.2);
+          noise(0.08, 0.08, 400);
+        }
+        break;
+      case 'stone':
+        tone(70, 0, 0.25, 'sine', 0.22);
+        noise(0.18, 0.12, 500);
         break;
     }
   }
