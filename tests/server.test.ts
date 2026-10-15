@@ -34,6 +34,17 @@ describe('save server', () => {
     expect(await r.json()).toEqual({ ok: true });
   });
 
+  it('lists a small PNG thumbnail but nothing else in its place', async () => {
+    const png = 'data:image/png;base64,iVBORw0KGgo=';
+    await fetch(`${base}/api/saves/with-thumb`, { method: 'PUT', body: JSON.stringify({ summary: 'Town', updated: 5, thumb: png, data: 'x' }) });
+    await fetch(`${base}/api/saves/bad-thumb`, { method: 'PUT', body: JSON.stringify({ summary: 'Town', updated: 6, thumb: 'javascript:alert(1)', data: 'x' }) });
+    const list = (await (await fetch(`${base}/api/saves`)).json()) as { slot: string; thumb?: string }[];
+    expect(list.find((s) => s.slot === 'with-thumb')?.thumb).toBe(png);
+    expect(list.find((s) => s.slot === 'bad-thumb')?.thumb).toBeUndefined();
+    await fetch(`${base}/api/saves/with-thumb`, { method: 'DELETE' });
+    await fetch(`${base}/api/saves/bad-thumb`, { method: 'DELETE' });
+  });
+
   it('stores, lists, loads and deletes saves', async () => {
     const body = JSON.stringify({ summary: 'Hamlet', updated: 123, data: 'abc' });
     expect((await fetch(`${base}/api/saves/slot-1`, { method: 'PUT', body })).status).toBe(200);

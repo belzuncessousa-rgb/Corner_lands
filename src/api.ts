@@ -8,6 +8,13 @@ export interface SaveInfo {
   updated: number;
   summary: string;
   where: 'server' | 'local';
+  /** A small picture of the town (PNG data URL), when the save has one. */
+  thumb?: string;
+}
+
+/** Only small PNG pictures are accepted as save thumbnails. */
+export function validThumb(t: unknown): string | undefined {
+  return typeof t === 'string' && t.startsWith('data:image/png;base64,') && t.length < 60000 && /^[A-Za-z0-9+/=]*$/.test(t.slice(22)) ? t : undefined;
 }
 
 const LOCAL_PREFIX = 'cornerlands.save.';
@@ -34,9 +41,9 @@ export function sanitizeSlot(slot: string): string {
   );
 }
 
-export async function saveGame(slot: string, data: string, summary: string): Promise<'server' | 'local'> {
+export async function saveGame(slot: string, data: string, summary: string, thumb?: string): Promise<'server' | 'local'> {
   slot = sanitizeSlot(slot);
-  const payload = JSON.stringify({ summary, updated: Date.now(), data });
+  const payload = JSON.stringify({ summary, updated: Date.now(), thumb: validThumb(thumb), data });
   if (await server()) {
     try {
       const r = await fetch(`/api/saves/${slot}`, {
@@ -88,8 +95,8 @@ export async function listSaves(): Promise<SaveInfo[]> {
     try {
       const r = await fetch('/api/saves');
       if (r.ok) {
-        const list = (await r.json()) as { slot: string; updated: number; summary: string }[];
-        for (const s of list) out.push({ ...s, where: 'server' });
+        const list = (await r.json()) as { slot: string; updated: number; summary: string; thumb?: string }[];
+        for (const s of list) out.push({ ...s, thumb: validThumb(s.thumb), where: 'server' });
       }
     } catch {
       /* ignore */
@@ -100,8 +107,8 @@ export async function listSaves(): Promise<SaveInfo[]> {
       const key = localStorage.key(i);
       if (!key || !key.startsWith(LOCAL_PREFIX)) continue;
       try {
-        const v = JSON.parse(localStorage.getItem(key) || '{}') as { summary?: string; updated?: number };
-        out.push({ slot: key.slice(LOCAL_PREFIX.length), updated: v.updated ?? 0, summary: v.summary ?? '', where: 'local' });
+        const v = JSON.parse(localStorage.getItem(key) || '{}') as { summary?: string; updated?: number; thumb?: string };
+        out.push({ slot: key.slice(LOCAL_PREFIX.length), updated: v.updated ?? 0, summary: v.summary ?? '', where: 'local', thumb: validThumb(v.thumb) });
       } catch {
         /* skip corrupt */
       }

@@ -59,6 +59,21 @@ export class Minimap {
     this.canvas.addEventListener('pointerup', () => (this.dragging = false));
   }
 
+  /** A small picture of the whole map for the save list (PNG data URL). */
+  thumbnail(): string | undefined {
+    try {
+      const w = 120;
+      const h = Math.round((this.canvas.height / this.canvas.width) * w);
+      const c = document.createElement('canvas');
+      c.width = w;
+      c.height = h;
+      c.getContext('2d')!.drawImage(this.canvas, 0, 0, w, h);
+      return c.toDataURL('image/png');
+    } catch {
+      return undefined;
+    }
+  }
+
   private toTile(mx: number, my: number): [number, number] {
     const k = this.k;
     const a = (mx - this.size / 2) / k;

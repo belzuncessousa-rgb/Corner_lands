@@ -226,7 +226,7 @@ export class Game {
   }
 
   async save(slot: string): Promise<string> {
-    const where = await saveGame(slot, serialize(this.state), this.summary());
+    const where = await saveGame(slot, serialize(this.state), this.summary(), this.hud.minimap.thumbnail());
     return where;
   }
 

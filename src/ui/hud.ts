@@ -1884,7 +1884,7 @@ export class Hud {
     const saves = await listSaves().catch(() => [] as SaveInfo[]);
     const list = saves
       .map(
-        (s, i) => `<div class="save"><div class="n">${s.slot.startsWith('autosave') ? '<i>Autosave</i>' : esc(s.slot)}<br><small>${esc(s.summary)} · ${new Date(s.updated).toLocaleString()} · ${s.where}</small></div>
+        (s, i) => `<div class="save">${s.thumb ? `<img class="thumb" src="${esc(s.thumb)}" alt="">` : ''}<div class="n">${s.slot.startsWith('autosave') ? '<i>Autosave</i>' : esc(s.slot)}<br><small>${esc(s.summary)} · ${new Date(s.updated).toLocaleString()} · ${s.where}</small></div>
         <button class="primary" data-load="${i}">Load</button><button data-del="${i}" title="Delete">✖</button></div>`,
       )
       .join('');

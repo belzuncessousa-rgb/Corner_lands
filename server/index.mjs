@@ -55,7 +55,9 @@ async function handleApi(req, res, url) {
     for (const f of files) {
       try {
         const meta = JSON.parse(await readFile(join(SAVES, f), 'utf8'));
-        list.push({ slot: f.slice(0, -5), updated: meta.updated ?? 0, summary: meta.summary ?? '' });
+        // A thumbnail is passed on only if it is a small PNG picture.
+        const thumb = typeof meta.thumb === 'string' && meta.thumb.startsWith('data:image/png;base64,') && meta.thumb.length < 60000 ? meta.thumb : undefined;
+        list.push({ slot: f.slice(0, -5), updated: meta.updated ?? 0, summary: meta.summary ?? '', thumb });
       } catch {
         /* skip unreadable save */
       }
