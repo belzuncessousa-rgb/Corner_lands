@@ -30,9 +30,14 @@ const check = (name, ok, info = '') => { results.push(`${ok ? 'PASS' : 'FAIL'} $
 // Esc closes a pinned top-bar panel before anything else.
 await page.click('[data-chip="goods"]');
 await page.waitForTimeout(200);
+// Move away first: hovering a chip opens its panel anyway.
+await page.mouse.move(700, 500);
+await page.waitForTimeout(400);
+const pinned = await page.$eval('#chip-panel', (e) => getComputedStyle(e).display) !== 'none';
 await page.keyboard.press('Escape');
 await page.waitForTimeout(200);
-check('Esc closes a pinned panel', (await page.$eval('#chip-panel', (e) => getComputedStyle(e).display)) === 'none' && !(await page.$('.modal-back')));
+if (process.env.DEBUG) console.log('pinned before Esc', pinned, 'menu', !!(await page.$('.modal-back')));
+check('Esc closes a pinned panel', pinned && (await page.$eval('#chip-panel', (e) => getComputedStyle(e).display)) === 'none' && !(await page.$('.modal-back')));
 // Farmstead from the menu (search a free spot near the hall).
 await pick('farming', 'farm');
 const spot = await page.evaluate(([hx, hy]) => (() => { for (let r = 4; r < 14; r++) for (const [dx, dy] of [[r, -r], [r, 0], [0, -r], [-r, 0], [0, r]]) if (!window.cl.placementError(window.game.state, 'farm', hx + dx, hy + dy)) return [hx + dx, hy + dy]; return null; })(), [hall.x, hall.y]);
