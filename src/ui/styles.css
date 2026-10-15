@@ -1919,3 +1919,11 @@ table.prod td.num {
 
 /* A villager's passing thought. */
 #inspector .thought { font-style: italic; margin: 8px 2px 2px; color: var(--ink-soft); line-height: 1.35; }
+@media (max-width: 700px) {
+  .prod.chains,
+  .prod.chains tbody,
+  .prod.chains tr { display: block; width: 100%; }
+  table.prod.chains td,
+  table.prod.chains td:nth-child(2) { display: block; width: auto; padding: 2px 4px; }
+  .prod.chains td:first-child { width: auto; padding-top: 8px; }
+}

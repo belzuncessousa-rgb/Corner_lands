@@ -1417,7 +1417,7 @@ export function chainReport(s: GameState, links: ResourceId[]): { links: ChainLi
     const name = GOODS[r.id].name.toLowerCase();
     if (r.used > r.made && r.stock < Math.max(10, r.used)) return { links: rows, weak: i, why: `Short of ${name}: the next workshop used ${r.used} but only ${r.made} were made` };
     if (r.stock >= keepOf(s, r.id) * 0.8 && r.made > 0 && next.made < r.made / 2) {
-      return { links: rows, weak: i + 1, why: `${GOODS[r.id].name} piles up: the ${GOODS[next.id].name.toLowerCase()} makers cannot keep up` };
+      return { links: rows, weak: i + 1, why: `${GOODS[r.id].name} ${GOODS[r.id].name.endsWith('s') ? 'pile' : 'piles'} up: the ${GOODS[next.id].name.toLowerCase()} makers cannot keep up` };
     }
   }
   return { links: rows, weak: null, why: null };
