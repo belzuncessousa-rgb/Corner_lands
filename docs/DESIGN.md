@@ -226,3 +226,9 @@ about medieval builders, Manor Lords' own roadmap included) and the soaks.
 - [x] A save-slot screen with a thumbnail of each town (the minimap image) and its rank and year
 - [x] Sound pass: distinct, quiet cues for festivals, fairs, the retinue and wall gates
 - [x] A late-game soak with walls and festivals exercised by the autoplayer (found that a tight ring of walls stifles a town's growth; walls now have posterns, and the autoplayer walls wide and stops at forty sections)
+
+### Phase 15 — Next ideas (for the scheduled runs)
+- [ ] Just-in-time tips: the first time a tool or panel is opened, one short line on what it does (players drop long tutorials; short contextual help works)
+- [ ] Weather you can see: drifting snow in winter, rain showers in spring, falling leaves in autumn (light particles, off in light mode)
+- [ ] Milestones in the chronicle: first harvest, first Timber House, a hundred villagers, the castle raised — each with the date
+- [ ] The autoplayer raises a cathedral when rich, so the soak exercises it
