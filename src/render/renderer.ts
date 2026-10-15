@@ -850,6 +850,10 @@ export class Renderer {
       this.drawConstruction(b, sp, wx, wy);
       return;
     }
+    if (b.type === 'wall') {
+      this.drawWall(s, b);
+      return;
+    }
     this.blit(sp, wx, wy);
     if (STORAGE_CAPACITY[b.type]) this.drawStock(s, b, season);
     if (b.type === 'townhall' && s.feastDay !== undefined && s.day - s.feastDay < DAYS_PER_MONTH) this.drawFeast(b);
@@ -895,6 +899,49 @@ export class Renderer {
   }
   private upgradeKey = '';
   private upgradable = new Set<number>();
+
+  /**
+   * A section of town wall, joined to its neighbours. Beside a road it rises
+   * into a gate tower, so roads pass through the wall between towers.
+   */
+  private drawWall(s: GameState, b: Building): void {
+    const p = new Pen(this.ctx);
+    p.snow = seasonOf(s.day) === 3;
+    const x = b.x;
+    const y = b.y;
+    const stone = '#b5ac9b';
+    const top = '#cdc4b3';
+    const H = 22;
+    const at = (dx: number, dy: number) => {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (!inBounds(s, nx, ny)) return { wall: false, road: false };
+      const i = idx(s, nx, ny);
+      const o = s.occ[i] >= 0 ? s.buildings.find((q) => q.id === s.occ[i]) : undefined;
+      return { wall: o?.type === 'wall' && o.build >= 1, road: s.road[i] > 0 };
+    };
+    const gate = at(1, 0).road || at(-1, 0).road || at(0, 1).road || at(0, -1).road;
+    // Arms reach towards neighbours further back first, so nearer ones overlap.
+    if (at(-1, 0).wall) p.box(x - 0.5, y + 0.36, x + 0.5, y + 0.64, 0, H, stone, top);
+    if (at(0, -1).wall) p.box(x + 0.36, y - 0.5, x + 0.64, y + 0.5, 0, H, stone, top);
+    if (gate) {
+      p.box(x + 0.14, y + 0.14, x + 0.86, y + 0.86, 0, H * 2, '#aaa190', top);
+      p.wallL(y + 0.862, x + 0.38, x + 0.62, H * 1.3, H * 1.6, '#2a2522');
+      p.wallR(x + 0.862, y + 0.38, y + 0.62, H * 1.3, H * 1.6, '#221e1b');
+      p.roofPyramid(x + 0.14, y + 0.14, x + 0.86, y + 0.86, H * 2, 18, 'slate');
+    } else {
+      p.box(x + 0.32, y + 0.32, x + 0.68, y + 0.68, 0, H + 4, stone, top);
+      // Crenellations along the top.
+      for (const [cx, cy] of [
+        [0.36, 0.36],
+        [0.56, 0.36],
+        [0.36, 0.56],
+        [0.56, 0.56],
+      ]) {
+        p.box(x + cx, y + cy, x + cx + 0.08, y + cy + 0.08, H + 4, 4, stone, top);
+      }
+    }
+  }
 
   /** Trestle tables and bunting in the manor's yard for a month after a feast. */
   private drawFeast(b: Building): void {

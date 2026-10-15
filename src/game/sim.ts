@@ -2155,11 +2155,13 @@ export function monthly(s: GameState, rng: StateRng): void {
  */
 export function prestigeIncome(s: GameState): number {
   let n = 0;
+  let walls = 0;
   for (const b of s.buildings) {
     if (b.build < 1) continue;
     if (b.type === 'townhall') n += (b.level - 1) * 1.5;
     else if (b.type === 'church') n += 1;
     else if (b.type === 'cathedral') n += 6;
+    else if (b.type === 'wall') walls++;
     else if (b.type === 'statue') n += 1;
     else if (b.type === 'maypole') n += 0.5;
     else if (b.type === 'house' && b.level >= 3) n += 0.2;
@@ -2168,10 +2170,21 @@ export function prestigeIncome(s: GameState): number {
   if (hasCharter(s, 'learning1')) n += 1;
   if (hasCharter(s, 'learning3b')) n += 2;
   if (hasCharter(s, 'metal3a')) n += 1 + s.buildings.filter((b) => b.type === 'jeweller' && b.build >= 1).length * 2;
+  // Town walls: renown grows with every twenty sections, up to six a month.
+  n += Math.min(6, walls / 20);
   return n;
 }
 
 // ---------------------------------------------------------------- retinue
+
+/** Wall sections that make a town feel safe and keep wolves and bandits out. */
+export const WALL_SAFE = 40;
+
+export function wallSections(s: GameState): number {
+  let n = 0;
+  for (const b of s.buildings) if (b.type === 'wall' && b.build >= 1) n++;
+  return n;
+}
 
 /** Settlement rank (Borough) from which the lord may keep a retinue. */
 export const RETINUE_TIER = 3;
@@ -2328,6 +2341,7 @@ export function updateHappiness(s: GameState): void {
   }
   for (const m of s.moods ?? []) if (m.until > s.day) factors.push({ label: m.label, value: m.value });
   if (s.buildings.some((b) => b.type === 'cathedral' && b.build >= 1)) factors.push({ label: 'The cathedral', value: 6 });
+  if (wallSections(s) >= WALL_SAFE) factors.push({ label: 'Safe behind the town walls', value: 4 });
   if (s.retinue) factors.push({ label: "The lord's guard", value: 2 });
   if (s.charters?.length) {
     const c = (id: string, label: string, v: number) => hasCharter(s, id) && factors.push({ label, value: v });

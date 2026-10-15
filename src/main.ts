@@ -14,6 +14,8 @@ import {
   isBridge,
   centerOf,
   log,
+  lockReason,
+  isUnlocked,
   coveredBy,
   monthOf,
   placeOrder,
@@ -46,7 +48,7 @@ import { Hud } from './ui/hud';
 export type Tool =
   | { kind: 'select' }
   | { kind: 'build'; type: BuildingType }
-  | { kind: 'road'; paved?: boolean }
+  | { kind: 'road'; paved?: boolean; wall?: boolean }
   | { kind: 'zone'; type: BuildingType }
   | { kind: 'demolish' };
 
@@ -368,6 +370,23 @@ export class Game {
         }
         this.hud.setHint(err ? `${d.name} ${w}×${h}: ${err}` : `${d.name} ${w}×${h} (${w * h} tiles)${soil}${costText}${where} · click to place`, !!err || !near);
       }
+    } else if (tool.kind === 'road' && tool.wall) {
+      // Town walls: laid like a road; road tiles become gates.
+      const tiles = this.roadTiles(tx, ty);
+      const gate = (t: { x: number; y: number }) => inBounds(s, t.x, t.y) && s.road[idx(s, t.x, t.y)] > 0;
+      ov.tiles = tiles.map((t) => ({ ...t, ok: gate(t) || !placementError(s, 'wall', t.x, t.y) }));
+      ov.tileColor = 'road';
+      const n = tiles.filter((t) => !gate(t) && !placementError(s, 'wall', t.x, t.y)).length;
+      const c = BUILDINGS.wall.cost;
+      const err = isUnlocked(s, 'wall') ? '' : lockReason(s, 'wall');
+      this.hud.setHint(
+        err
+          ? `Town walls: ${err}`
+          : this.roadAnchor
+            ? `Town wall: ${n} sections · ${n * (c.stone ?? 0)} stone, ${n * (c.dressedstone ?? 0)} dressed stone, ${n * (c.gold ?? 0)} coins · roads it crosses become gates · keep clicking to continue`
+            : 'Click where the wall starts, then where it ends · roads it crosses get gate towers',
+        !!err,
+      );
     } else if (tool.kind === 'road') {
       const paved = !!tool.paved;
       const tiles = this.roadTiles(tx, ty);
@@ -605,6 +624,14 @@ export class Game {
   private finishRoad(tx: number, ty: number): void {
     const s = this.state;
     let n = 0;
+    if (this.tool.kind === 'road' && this.tool.wall) {
+      for (const t of this.roadTiles(tx, ty)) {
+        if (s.road[idx(s, t.x, t.y)] > 0) continue;
+        if (!placementError(s, 'wall', t.x, t.y) && placeOrder(s, 'wall', t.x, t.y)) n++;
+      }
+      if (n) this.hud.sound('place');
+      return;
+    }
     const paved = this.tool.kind === 'road' && !!this.tool.paved;
     for (const t of this.roadTiles(tx, ty)) if (buildRoad(s, t.x, t.y, paved)) n++;
     if (n) {

@@ -1,6 +1,6 @@
 import { DAYS_PER_MONTH, DAYS_PER_YEAR } from './data';
 import type { StateRng } from './rng';
-import { log, store, totalHousing } from './sim';
+import { log, store, totalHousing, wallSections, WALL_SAFE } from './sim';
 import type { GameState, MessageKind, ResourceId } from './types';
 import { FOOD_IDS } from './data';
 
@@ -321,6 +321,15 @@ export const EVENTS: DecisionEvent[] = [
       'Howling in the night. A shepherd swears he saw a pack of wolves at the forest edge, bold and hungry, eyeing the smokehouse.',
     weight: (s) => (s.population >= 10 ? 2 : 0),
     choices: (s) => [
+      ...(wallSections(s) >= WALL_SAFE
+        ? [
+            {
+              label: 'Shut the gates',
+              detail: 'The town walls keep them out. Nothing is lost.',
+              apply: () => ({ text: 'The watch shut the gates at dusk. Whatever prowled outside went hungry.', kind: 'good' as MessageKind }),
+            },
+          ]
+        : []),
       ...(s.retinue
         ? [
             {
@@ -553,6 +562,15 @@ export const EVENTS: DecisionEvent[] = [
       'Carters report masked men on the forest road. Last night they took a wagon of goods and left the driver tied to a tree.',
     weight: (s) => (s.population >= 15 ? 2 : 0),
     choices: (s) => [
+      ...(wallSections(s) >= WALL_SAFE
+        ? [
+            {
+              label: 'Shut the gates',
+              detail: 'The town walls keep them out. Nothing is lost.',
+              apply: () => ({ text: 'The watch shut the gates at dusk. Whatever prowled outside went hungry.', kind: 'good' as MessageKind }),
+            },
+          ]
+        : []),
       ...(s.retinue
         ? [
             {

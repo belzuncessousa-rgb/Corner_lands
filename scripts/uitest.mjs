@@ -179,6 +179,20 @@ await page.keyboard.press('v');
 const reach = await page.evaluate(() => window.game.coverage);
 await page.keyboard.press('Escape');
 check('reach overlay toggles', reach === 'well' && (await page.evaluate(() => window.game.coverage)) === null);
+// Town walls (City): laid like a road from the Civic menu.
+{
+  await page.evaluate(() => { const s = window.game.state; s.tier = 4; s.res.stone += 200; s.res.dressedstone += 100; s.res.gold += 500; window.game.hud.update(); });
+  await page.evaluate(() => document.querySelectorAll('.banner').forEach((e) => e.remove()));
+  await pick('civic', 'wall');
+  const wy = hall.y - 6;
+  await page.evaluate(([x, y]) => window.game.renderer.centerOn(x, y), [hall.x + 2, wy]);
+  await clickTile(hall.x - 2, wy);
+  await clickTile(hall.x + 5, wy);
+  const walls = await page.evaluate(() => window.game.state.buildings.filter((b) => b.type === 'wall').length);
+  check('lay a town wall with two clicks', walls >= 5, `${walls} sections`);
+  await page.evaluate(() => { window.game.setTool({ kind: 'select' }); window.game.hud.closeCategory(); });
+  await page.evaluate(() => { window.game.state.tier = 1; });
+}
 // A long game: once the chronicle is full, new news still shows.
 const late = await page.evaluate(() => {
   const g = window.game;

@@ -1817,6 +1817,13 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       p.ctx.fill();
       break;
     }
+    case 'wall': {
+      // A short stretch with a merlon, for the build card and the building site.
+      p.shadow(0.1, 0.3, 0.9, 0.7);
+      p.box(0.1, 0.34, 0.9, 0.66, 0, 22, '#b5ac9b', '#cdc4b3');
+      for (const x0 of [0.14, 0.42, 0.7]) p.box(x0, 0.38, x0 + 0.14, 0.62, 22, 5, '#b5ac9b', '#cdc4b3');
+      break;
+    }
     case 'cathedral': {
       const stone = '#bdb4a3';
       const dark = '#a69d8c';

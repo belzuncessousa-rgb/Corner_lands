@@ -1029,3 +1029,33 @@ describe('year in review', () => {
     expect(page?.text).toMatch(/treasury/);
   });
 });
+
+describe('town walls', () => {
+  it('bring prestige, cheer the town and keep wolves out once long enough', async () => {
+    const { prestigeIncome, updateHappiness, WALL_SAFE, placeOrder } = await import('../src/game/sim');
+    const { EVENTS } = await import('../src/game/events');
+    const s = generateWorld(98);
+    s.tier = 4;
+    s.res.gold = 9999;
+    const h = hall(s);
+    const base = prestigeIncome(s);
+    let n = 0;
+    for (let y = h.y - 12; y < h.y + 14 && n < WALL_SAFE; y++) {
+      for (const x of [h.x - 10, h.x + 13]) {
+        if (n >= WALL_SAFE) break;
+        const w = placeOrder(s, 'wall', x, y);
+        if (w) {
+          w.build = 1;
+          w.need = undefined;
+          n++;
+        }
+      }
+    }
+    expect(n).toBe(WALL_SAFE);
+    expect(prestigeIncome(s)).toBeCloseTo(base + WALL_SAFE / 20);
+    updateHappiness(s);
+    expect(s.happinessFactors.some((f) => f.label.includes('walls'))).toBe(true);
+    s.population = 30;
+    expect(EVENTS.find((e) => e.id === 'wolves')!.choices(s)[0].label).toBe('Shut the gates');
+  });
+});

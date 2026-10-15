@@ -238,6 +238,13 @@ export function checkQuests(s: GameState): Quest[] {
     reward: { prestige: 50 },
     done: (s) => count(s, 'cathedral') >= 1,
   },
+  {
+    id: 'walls',
+    title: 'Raise the town walls',
+    hint: 'A City may wall itself in (Civic menu: Town Wall): lay it like a road, section by section. Where it crosses a road a gate tower rises. Forty sections keep wolves and bandits out.',
+    reward: { prestige: 40 },
+    done: (s) => count(s, 'wall') >= 40,
+  },
 ];
   for (const q of activeQuests(s, 3)) {
     if (!q.done(s)) continue;

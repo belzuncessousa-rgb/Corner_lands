@@ -1156,6 +1156,11 @@ export class Hud {
       return;
     }
     this.category = BUILDINGS[t].category;
+    if (t === 'wall') {
+      // Walls are laid like roads, section by section.
+      g.setTool(g.tool.kind === 'road' && g.tool.wall ? { kind: 'select' } : { kind: 'road', wall: true });
+      return;
+    }
     const kind = BUILDINGS[t].zone ? 'zone' : 'build';
     if ((g.tool.kind === 'build' || g.tool.kind === 'zone') && g.tool.type === t) g.setTool({ kind: 'select' });
     else g.setTool({ kind, type: t });
