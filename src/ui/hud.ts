@@ -157,6 +157,7 @@ export class Hud {
     try {
       this.muted = localStorage.getItem('cornerlands.muted') === '1';
       this.uiScale = Number(localStorage.getItem('cornerlands.uiScale')) || 1;
+      this.pauseOnBad = localStorage.getItem('cornerlands.pauseOnBad') === '1';
     } catch {
       /* ignore */
     }
@@ -327,6 +328,8 @@ export class Hud {
   private chipTimer = 0;
   /** Text and panel size chosen in the menu (CSS zoom on the UI layer). */
   private uiScale = 1;
+  /** Stop the clock when bad news arrives (famine, departures, fire). */
+  private pauseOnBad = false;
 
   private applyScale(): void {
     this.root.style.setProperty('zoom', this.uiScale === 1 ? '' : String(this.uiScale));
@@ -895,6 +898,7 @@ export class Hud {
         this.sound(m.kind === 'bad' ? 'bad' : 'good');
         played = true;
       }
+      if (m.kind === 'bad' && this.pauseOnBad && this.game.speed > 0) this.game.setSpeed(0);
     }
     this.shownMessages = msgs.length;
     // Keep three at most: good news makes way first, warnings last.
@@ -1581,6 +1585,7 @@ export class Hud {
         <button data-m="help">How to Play</button>
         <button data-m="sound">Sound: ${this.muted ? 'Off' : 'On'}</button>
         <button data-m="scale">Text size: ${Math.round(this.uiScale * 100)}%</button>
+        <button data-m="pausebad">Pause on bad news: ${this.pauseOnBad ? 'On' : 'Off'}</button>
       </div>`,
     );
     m.querySelector('[data-m="resume"]')!.addEventListener('click', () => this.closeModal());
@@ -1588,6 +1593,15 @@ export class Hud {
     m.querySelector('[data-m="load"]')!.addEventListener('click', () => this.showLoad(false));
     m.querySelector('[data-m="new"]')!.addEventListener('click', () => this.showNewGame(false));
     m.querySelector('[data-m="help"]')!.addEventListener('click', () => this.showHelp(false));
+    m.querySelector('[data-m="pausebad"]')!.addEventListener('click', () => {
+      this.pauseOnBad = !this.pauseOnBad;
+      try {
+        localStorage.setItem('cornerlands.pauseOnBad', this.pauseOnBad ? '1' : '0');
+      } catch {
+        /* ignore */
+      }
+      this.showGameMenu();
+    });
     m.querySelector('[data-m="scale"]')!.addEventListener('click', () => {
       const steps = [0.85, 1, 1.15, 1.3];
       this.uiScale = steps[(steps.indexOf(this.uiScale) + 1) % steps.length];

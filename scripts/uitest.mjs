@@ -160,6 +160,14 @@ await page.click('#inspector [data-action="retinue"]');
 check('raise a retinue', (await page.evaluate(() => window.game.state.retinue)) === true);
 await page.evaluate(() => { window.game.state.tier = 1; });
 await page.evaluate(() => window.game.select(null));
+// Pause on bad news, switched on in the menu.
+await page.keyboard.press('Escape');
+await page.click('[data-m="pausebad"]');
+await page.click('[data-m="resume"]');
+await page.evaluate(() => { const g = window.game; g.setSpeed(1); g.state.messages.push({ day: g.state.day, text: 'Food shortage! 3 villagers went hungry.', kind: 'bad' }); g.hud.update(); });
+await page.waitForTimeout(300);
+check('bad news pauses the game when asked', (await page.evaluate(() => window.game.speed)) === 0);
+await page.evaluate(() => localStorage.removeItem('cornerlands.pauseOnBad'));
 // Save through the menu, then load it back.
 if (process.env.DEBUG) await page.screenshot({ path: '/tmp/claude-0/before-menu.png' });
 await page.keyboard.press('Escape');

@@ -193,4 +193,4 @@ are listed in the README.
 - [ ] A funnel test that plays the objectives like a new player (including the teaching ones) and flags any step that takes over ten minutes
 - [ ] Colour-blind pass: simulate deuteranopia on screenshots of markers, charts and the charter tree; add shapes where colour alone carries meaning
 - [x] Keyboard: list every hotkey in the help screen; Esc closes tools, panels and menus in a predictable order
-- [ ] Optional "pause when an event or a famine starts" setting
+- [x] Optional "pause on bad news" setting (events already pause)
