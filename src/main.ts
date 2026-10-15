@@ -15,6 +15,7 @@ import {
   centerOf,
   demolish,
   log,
+  coveredBy,
   monthOf,
   placeOrder,
   placementError,
@@ -51,6 +52,9 @@ export type Tool =
 
 const SPEEDS = [0, 1, 3, 8];
 
+/** Services whose reach the V overlay can show. */
+const COVERAGE_TYPES: BuildingType[] = ['well', 'market', 'tavern', 'church'];
+
 /** Pixels a pointer may move and still count as a click: more for fingers. */
 const MOUSE_SLOP = 6;
 const TOUCH_SLOP = 14;
@@ -83,6 +87,15 @@ export class Game {
   private dragFrom: { x: number; y: number; camX: number; camY: number; button: number; touch?: boolean } | null = null;
   private moved = false;
   private longPress = 0;
+  /** Which service's reach the map is showing (V cycles), if any. */
+  coverage: BuildingType | null = null;
+
+  /** Cycles the reach overlay: wells, markets, taverns, churches, off. */
+  cycleCoverage(): void {
+    const order: (BuildingType | null)[] = [...COVERAGE_TYPES, null];
+    this.coverage = order[(order.indexOf(this.coverage) + 1) % order.length];
+    this.hud.showCoverage(this.coverage);
+  }
 
   /** Right-click (or a long press): drop the half-drawn road or zone, then the tool, then the selection. */
   private cancelOrDeselect(): void {
@@ -241,6 +254,15 @@ export class Game {
   private overlay(): Overlay {
     const ov: Overlay = {};
     const s = this.state;
+    if (this.coverage) {
+      const type = this.coverage;
+      const circles = s.buildings
+        .filter((b) => b.type === type && b.build >= 1)
+        .map((b) => ({ cx: bCenter(b).x, cy: bCenter(b).y, r: BUILDINGS[type].radius }));
+      const homes = new Map<number, boolean>();
+      for (const b of s.buildings) if (b.type === 'house' && b.build >= 1) homes.set(b.id, coveredBy(s, b, type));
+      ov.coverage = { circles, homes };
+    }
     if (this.selected !== null) {
       ov.selected = this.selected;
       const b = s.buildings.find((o) => o.id === this.selected);
@@ -350,6 +372,8 @@ export class Game {
         b ? `Click to demolish ${BUILDINGS[b.type].name}${b.type === 'townhall' ? ' (not possible)' : ''}` : 'Click a building, or drag across roads to remove them',
         b?.type === 'townhall',
       );
+    } else if (this.coverage) {
+      this.hud.showCoverage(this.coverage);
     } else {
       this.hud.setHint('', false);
     }
@@ -689,6 +713,11 @@ export class Game {
       this.keys.add(k);
       if (k === 'escape') {
         if (this.hud.handleEscape()) return;
+        if (this.coverage) {
+          this.coverage = null;
+          this.hud.showCoverage(null);
+          return;
+        }
         if (this.tool.kind === 'road' && this.roadAnchor) this.roadAnchor = null;
         else if (this.tool.kind === 'zone' && this.zoneAnchor) this.zoneAnchor = null;
         else if (this.tool.kind !== 'select') this.setTool({ kind: 'select' });
@@ -707,6 +736,8 @@ export class Game {
         this.setTool({ kind: 'road' });
       } else if (k === 't') {
         this.setTool({ kind: 'road', paved: true });
+      } else if (k === 'v') {
+        this.cycleCoverage();
       } else if (k === 'x' || k === 'delete') {
         this.setTool({ kind: 'demolish' });
       } else if (k === '+' || k === '=') {

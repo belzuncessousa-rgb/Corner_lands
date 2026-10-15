@@ -200,7 +200,7 @@ When a phase is done, keep going: stress the game harder, look for new
 player insights on the web, and add what you learn here as new items.
 Save size was checked (about 200 KB after twenty years, fine for browser storage).
 - [ ] Production chains view in the Production Book: wheat → flour → bread drawn as a chain, each link showing made vs used last month and the weakest link highlighted (players say Anno's numbers do not diagnose)
-- [ ] Coverage overlay: a toggle that tints the map by well, market, tavern and church reach, so homes out of reach stand out
+- [x] Coverage overlay (V): a toggle that tints the map by well, market, tavern and church reach, so homes out of reach stand out
 - [ ] Undo the last placement or demolition (a few seconds' grace, refunding fully)
 - [x] Thirty-year soak with the meddling monkey (STRESS=1): watch for drift (gold or prestige running away, message and chronicle growth, frame time at 300+ villagers)
 - [ ] Gold sinks for the late game: towns sit on 20,000+ coins after twenty years (the thirty-year soak); e.g. a cathedral or town walls built over years, festivals, buying land or charters with coin

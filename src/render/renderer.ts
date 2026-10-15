@@ -48,6 +48,8 @@ export interface Overlay {
   hover?: { x: number; y: number };
   /** Range circle in tile coordinates. */
   range?: { cx: number; cy: number; r: number; highlight?: (i: number) => boolean };
+  /** Reach of every well (or market, tavern, church) and which homes it covers. */
+  coverage?: { circles: { cx: number; cy: number; r: number }[]; homes: Map<number, boolean> };
 }
 
 interface Particle {
@@ -217,8 +219,11 @@ export class Renderer {
     }
   }
 
+  private coverageHomes: Map<number, boolean> | null = null;
+
   private renderFrame(s: GameState, agents: Agent[], ov: Overlay, dt: number, animals: Animal[]): void {
     this.time += dt;
+    this.coverageHomes = ov.coverage?.homes ?? null;
     const c = this.ctx;
     const season = seasonOf(s.day);
     const z = this.cam.zoom;
@@ -656,6 +661,36 @@ export class Renderer {
       c.lineTo(a - TW / 2, b + TH / 2);
       c.closePath();
     };
+    if (ov.coverage) {
+      // Tint each tile once, however many circles reach it.
+      const seen = new Set<number>();
+      c.fillStyle = 'rgba(90,160,255,0.32)';
+      for (const { cx, cy, r } of ov.coverage.circles) {
+        for (let y = Math.floor(cy - r); y <= Math.ceil(cy + r); y++) {
+          for (let x = Math.floor(cx - r); x <= Math.ceil(cx + r); x++) {
+            if (!inBounds(s, x, y) || Math.hypot(x + 0.5 - cx, y + 0.5 - cy) > r) continue;
+            const i = idx(s, x, y);
+            if (seen.has(i)) continue;
+            seen.add(i);
+            tileDiamond(x, y);
+            c.fill();
+          }
+        }
+      }
+      // A ring marks the edge of each reach.
+      c.strokeStyle = 'rgba(30,70,140,0.55)';
+      c.lineWidth = 1.5;
+      for (const { cx, cy, r } of ov.coverage.circles) {
+        c.beginPath();
+        for (let k = 0; k <= 48; k++) {
+          const a = (k / 48) * Math.PI * 2;
+          const [px, py] = iso(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+          if (k) c.lineTo(px, py);
+          else c.moveTo(px, py);
+        }
+        c.stroke();
+      }
+    }
     if (ov.range) {
       const { cx, cy, r, highlight } = ov.range;
       for (let y = Math.floor(cy - r); y <= Math.ceil(cy + r); y++) {
@@ -825,6 +860,12 @@ export class Renderer {
       c.globalAlpha = 0.12 + 0.06 * Math.sin(this.time * 4);
       c.drawImage(sp.canvas, wx - sp.ax, wy - sp.ay, sp.w, sp.h);
       c.restore();
+    }
+    // While the reach overlay is on, homes show whether they are covered.
+    const covered = this.coverageHomes?.get(b.id);
+    if (covered !== undefined) {
+      this.drawMarker(b, covered ? '#3f7a34' : '#b8483a', covered ? '✓' : '✗');
+      return;
     }
     // Status markers.
     if (!this.showMarkers) return;

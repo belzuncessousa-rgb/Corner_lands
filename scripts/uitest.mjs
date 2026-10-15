@@ -160,6 +160,11 @@ await page.click('#inspector [data-action="retinue"]');
 check('raise a retinue', (await page.evaluate(() => window.game.state.retinue)) === true);
 await page.evaluate(() => { window.game.state.tier = 1; });
 await page.evaluate(() => window.game.select(null));
+// The reach overlay: V cycles wells, markets, taverns, churches; Esc closes it.
+await page.keyboard.press('v');
+const reach = await page.evaluate(() => window.game.coverage);
+await page.keyboard.press('Escape');
+check('reach overlay toggles', reach === 'well' && (await page.evaluate(() => window.game.coverage)) === null);
 // A long game: once the chronicle is full, new news still shows.
 const late = await page.evaluate(() => {
   const g = window.game;

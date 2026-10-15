@@ -51,6 +51,7 @@ import {
   orchardMaturity,
   TEND_PER_TILE,
   labourSummary,
+  coveredBy,
   PAVING_TIER,
   setWorkers,
   setPriority,
@@ -98,6 +99,9 @@ const costText = (c: Cost) =>
 function lastNumber(msgs: { n?: number }[]): number {
   return msgs.length ? (msgs[msgs.length - 1].n ?? msgs.length) : 0;
 }
+
+const REACH_ICON =
+  '<svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><circle cx="10" cy="10" r="7.5" fill="none" stroke="#5a3a22" stroke-width="1.4" stroke-dasharray="2.5 1.8"/><circle cx="10" cy="10" r="2.6" fill="#3a5a8a"/></svg>';
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
@@ -176,6 +180,7 @@ export class Hud {
             <button class="panel icon-btn" data-action="chronicle" data-tip="<b>Chronicle</b><br>Everything that has happened in your lands.">${CATEGORY_ICONS.scroll}</button>
             <button class="panel icon-btn" data-action="production" data-tip="<b>Production Book</b><br>Every trade, what it takes and what it makes.">${ICONS.books}</button>
             <button class="panel icon-btn" data-action="charters" data-tip="<b>Town Charters</b><br>Spend prestige to specialise your town.">${ICONS.prestige}</button>
+            <button class="panel icon-btn" data-action="coverage" data-tip="<b>Reach</b> (V)<br>Show where wells, markets, taverns and churches reach, and which homes they miss.">${REACH_ICON}</button>
           </div>
           <div id="objectives" class="panel"></div>
         </div>
@@ -942,6 +947,33 @@ export class Hud {
     this.renderBuildBar();
   }
 
+  /** Says which reach the map shows, and how many homes it misses. */
+  showCoverage(type: BuildingType | null): void {
+    this.coverageType = type;
+    this.updateCoverageHint();
+  }
+  private coverageType: BuildingType | null = null;
+  private coverageKey = '';
+  private coverageText = '';
+
+  private updateCoverageHint(): void {
+    const type = this.coverageType;
+    if (!type) {
+      this.coverageKey = '';
+      this.setHint('', false);
+      return;
+    }
+    const s = this.game.state;
+    const key = `${type}:${s.day}:${s.buildings.length}`;
+    if (key !== this.coverageKey) {
+      this.coverageKey = key;
+      const homes = s.buildings.filter((b) => b.type === 'house' && b.build >= 1);
+      const missed = homes.filter((h) => !coveredBy(s, h, type)).length;
+      this.coverageText = `${BUILDINGS[type].name} reach: ${homes.length - missed} of ${homes.length} homes ✓${missed ? `, ${missed} ✗` : ''} · V for the next, Esc to close`;
+    }
+    this.setHint(this.coverageText, false);
+  }
+
   /** A large, quiet title when a new season begins. */
   private updateSeason(): void {
     const s = this.game.state;
@@ -1021,7 +1053,9 @@ export class Hud {
 
   private updateHint(): void {
     if (performance.now() < this.flashUntil) return;
-    if (this.game.tool.kind === 'select') this.setHint('', false);
+    if (this.game.tool.kind !== 'select') return;
+    if (this.coverageType) this.updateCoverageHint();
+    else this.setHint('', false);
   }
 
   // ---------------------------------------------------------------- tooltips
@@ -1147,6 +1181,9 @@ export class Hud {
         break;
       case 'chronicle':
         this.showChronicle();
+        break;
+      case 'coverage':
+        g.cycleCoverage();
         break;
       case 'deselect':
         g.select(null);
@@ -1704,7 +1741,7 @@ export class Hud {
         <p><b>Prestige</b> comes from a fine manor, a church and monuments. From Town on, spend it on <b>charters</b> (crown button) to specialise your town.</p>
         <p>Your <b>steward</b> warns you when things go wrong; the <b>Chronicle</b> (scroll button) keeps the full story.</p>
         <div class="ornament">❦</div>
-        <p><b>Keys</b>: <kbd>Left-drag</kbd> / <kbd>WASD</kbd> / arrows pan · <kbd>Wheel</kbd> / <kbd>+</kbd><kbd>-</kbd> / pinch zoom · <kbd>R</kbd> road (click, click) · <kbd>T</kbd> paved road · <kbd>X</kbd> / <kbd>Del</kbd> demolish · ${BUILD_ORDER.filter((b) => BUILDINGS[b].hotkey)
+        <p><b>Keys</b>: <kbd>Left-drag</kbd> / <kbd>WASD</kbd> / arrows pan · <kbd>Wheel</kbd> / <kbd>+</kbd><kbd>-</kbd> / pinch zoom · <kbd>R</kbd> road (click, click) · <kbd>T</kbd> paved road · <kbd>X</kbd> / <kbd>Del</kbd> demolish · <kbd>V</kbd> reach of wells, markets, taverns, churches · ${BUILD_ORDER.filter((b) => BUILDINGS[b].hotkey)
           .map((b) => `<kbd>${BUILDINGS[b].hotkey!.toUpperCase()}</kbd> ${BUILDINGS[b].name.toLowerCase()}`)
           .join(' · ')} · <kbd>Space</kbd> pause · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> speed</p>
         <p><kbd>Esc</kbd>, <kbd>Right-click</kbd> or a long press on touch screens backs out one step at a time: a dialog, a pinned panel, a half-drawn road or field, the tool, the selection, then opens the menu.</p>
