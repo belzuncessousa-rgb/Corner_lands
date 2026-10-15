@@ -9,6 +9,7 @@ import { startUpgrade, upgradeBlocker, upgradePlan } from './levels';
 import { StateRng } from './rng';
 import {
   labourSummary,
+  coveredBy,
   harvestForecast,
   barnTotal,
   FARM_BARN,
@@ -41,7 +42,8 @@ import { idx, inBounds } from './world';
 
 const count = (s: GameState, t: BuildingType) => s.buildings.filter((b) => b.type === t).length;
 
-function tryPlace(s: GameState, type: BuildingType): boolean {
+/** Places a building near the manor, or near `near` (a home that lacks it). */
+export function tryPlace(s: GameState, type: BuildingType, near?: { x: number; y: number }): boolean {
   const d = BUILDINGS[type];
   // Count materials already promised to unfinished sites.
   if (!affordsWithPromises(s, d.cost)) return false;
@@ -67,7 +69,8 @@ function tryPlace(s: GameState, type: BuildingType): boolean {
       }
       if (!touches) continue;
       const c = centerOf(x, y, d.w, d.h);
-      let score = -Math.hypot(c.x - hall.x, c.y - hall.y);
+      const to = near ?? hall;
+      let score = -Math.hypot(c.x - to.x, c.y - to.y);
       if (d.gathers) {
         const res = resourceInRange(s, type, c);
         // Only spots with something to gather are worth considering.
@@ -88,7 +91,7 @@ function tryPlace(s: GameState, type: BuildingType): boolean {
 }
 
 /** Finds the best clear rectangle for a zone near a workplace. */
-function zoneSpot(s: GameState, type: BuildingType, near: { x: number; y: number; w: number; h: number }, sizes: [number, number][]) {
+export function zoneSpot(s: GameState, type: BuildingType, near: { x: number; y: number; w: number; h: number }, sizes: [number, number][]) {
   const c = bCenter(near as never);
   for (const [w, h] of sizes) {
     let best = null as { x: number; y: number; w: number; h: number; score: number } | null;
@@ -381,6 +384,10 @@ export function act(s: GameState, rand: () => number): void {
       if (count(s, t) === 0 && ready) wants.push(t);
     }
   }
+  // Timber Houses need a tavern: one, and a brewhouse for it, once there is a market.
+  if (s.tier >= 1 && hasBuilt(s, 'market')) {
+    for (const t of ['tavern', 'brewhouse'] as BuildingType[]) if (count(s, t) === 0) wants.push(t);
+  }
   if (s.tier >= 2) {
     for (const t of ['smithy', 'church'] as BuildingType[]) if (count(s, t) === 0) wants.push(t);
   }
@@ -411,6 +418,14 @@ export function act(s: GameState, rand: () => number): void {
   // No rock beside the roads yet: lay a road towards the nearest outcrop.
   if (count(s, 'quarry') === 0 && pop >= 8 && s.day % DAYS_PER_MONTH === 0) roadToOre(s, s.rock);
   if (pop >= 10 && count(s, 'well') < Math.ceil(pop / 20)) wants.push('well');
+  // Homes out of reach of a well, the market or a tavern cannot grow: serve them first.
+  if (s.tier >= 2 && s.day % 10 === 0) {
+    for (const t of ['well', 'market', 'tavern'] as BuildingType[]) {
+      if (t !== 'well' && !hasBuilt(s, t)) continue;
+      const lone = s.buildings.find((h) => h.type === 'house' && h.build >= 1 && !coveredBy(s, h, t));
+      if (lone && count(s, t) < 2 + Math.floor(pop / (t === 'well' ? 12 : 40)) && tryPlace(s, t, bCenter(lone))) return;
+    }
+  }
   if (count(s, 'forester') < count(s, 'woodcutter')) wants.push('forester');
   const stores = 2 + Math.floor(pop / 50);
   // Full stores stop the quarry and the woodcutters: a storehouse comes first.

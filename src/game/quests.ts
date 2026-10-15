@@ -98,9 +98,16 @@ export const QUESTS: Quest[] = [
     done: (s) => s.tier >= 1,
   },
   {
+    id: 'sow',
+    title: 'Sow wheat',
+    hint: 'Build a Farmstead and draw a field beside it (Farming menu): click one corner, then the other. Wheat is sown in spring and harvested in early autumn.',
+    reward: { wood: 15 },
+    done: (s) => s.buildings.some((b) => b.type === 'field' && b.build >= 1 && (b.recipe ?? 'wheat') === 'wheat' && b.owner !== undefined),
+  },
+  {
     id: 'bread',
     title: 'Bake bread',
-    hint: 'Build a Farmstead and draw wheat fields beside it (Farming menu). A Windmill grinds the harvest and a Bakery bakes the flour.',
+    hint: 'A Windmill grinds the wheat and a Bakery bakes the flour. The windmill needs wood parts: build a Sawpit for planks and a Carpenter\'s Workshop to make them.',
     reward: { gold: 40 },
     done: (s) => count(s, 'farm') >= 1 && count(s, 'windmill') >= 1 && count(s, 'bakery') >= 1,
   },
