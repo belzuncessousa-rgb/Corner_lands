@@ -1,4 +1,4 @@
-import { BUILDINGS, RESOURCE_STORAGE, STORAGE_CAPACITY, type StorageKind } from '../game/data';
+import { BUILDINGS, DAYS_PER_MONTH, RESOURCE_STORAGE, STORAGE_CAPACITY, type StorageKind } from '../game/data';
 import { upgradeBlocker } from '../game/levels';
 import { hasCharter } from '../game/charters';
 import { HOME_TRADES, deliveredTo, hasProblem, monthOf, orchardMaturity, seasonOf, storageCap } from '../game/sim';
@@ -792,6 +792,7 @@ export class Renderer {
     }
     this.blit(sp, wx, wy);
     if (STORAGE_CAPACITY[b.type]) this.drawStock(s, b, season);
+    if (b.type === 'townhall' && s.feastDay !== undefined && s.day - s.feastDay < DAYS_PER_MONTH) this.drawFeast(b);
     if (b.upgrading) this.drawScaffold(b);
     if (selected) {
       c.save();
@@ -808,6 +809,35 @@ export class Renderer {
       this.drawMarker(b, b.type === 'townhall' ? '#c89a38' : '#4f8a3a', '↑');
     }
     void s;
+  }
+
+  /** Trestle tables and bunting in the manor's yard for a month after a feast. */
+  private drawFeast(b: Building): void {
+    const p = new Pen(this.ctx);
+    const y = b.y + b.h - 0.32;
+    const x0 = b.x + 0.95;
+    const x1 = b.x + 2.1;
+    // A long table with a cloth, loaves and a cask at the end.
+    p.box(x0, y - 0.12, x1, y + 0.12, 0, 4, '#8a6238', '#e8dcc0');
+    for (let k = 0; k < 4; k++) p.circle(x0 + 0.18 + k * 0.28, y, 5, 1.6, k % 2 ? '#c8913c' : '#b8483a');
+    p.barrel(x1 + 0.22, y);
+    // Bunting from the manor's corner to a pole across the yard.
+    const a: [number, number, number] = [b.x + 0.2, b.y + b.h - 0.05, 20];
+    const c: [number, number, number] = [b.x + b.w - 0.05, b.y + b.h - 0.05, 20];
+    p.line([a[0], a[1], 0], a, '#6b4a2e', 1.2);
+    p.line([c[0], c[1], 0], c, '#6b4a2e', 1.2);
+    const colors = ['#b8483a', '#e8c048', '#3a5a8a', '#f2ead8'];
+    const n = 9;
+    let prev = a;
+    for (let k = 1; k <= n; k++) {
+      const t = k / n;
+      const sag = Math.sin(t * Math.PI) * 4;
+      const pt: [number, number, number] = [a[0] + (c[0] - a[0]) * t, a[1] + (c[1] - a[1]) * t, a[2] - sag];
+      p.line(prev, pt, '#5a4030', 0.7);
+      const mid: [number, number, number] = [(prev[0] + pt[0]) / 2, (prev[1] + pt[1]) / 2, (prev[2] + pt[2]) / 2];
+      p.poly([prev, pt, [mid[0], mid[1], mid[2] - 4]], colors[k % colors.length]);
+      prev = pt;
+    }
   }
 
   /**

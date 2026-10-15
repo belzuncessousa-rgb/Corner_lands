@@ -89,6 +89,7 @@ export function holdFeast(s: GameState): string | null {
   addMood(s, 'Memories of the feast', merry ? 14 : 9, 6);
   s.res.prestige += merry ? 10 : 5;
   s.lastFeast = Math.floor(s.day / DAYS_PER_YEAR);
+  s.feastDay = s.day;
   return null;
 }
 const need = (s: GameState, id: ResourceId, n: number, name: string) => (s.res[id] >= n ? null : `Needs ${n} ${name}`);
@@ -226,6 +227,7 @@ export const EVENTS: DecisionEvent[] = [
           takeFood(st, st.population);
           addMood(st, 'Memories of the feast', 12, 6);
           st.lastFeast = Math.floor(st.day / DAYS_PER_YEAR);
+          st.feastDay = st.day;
           return { text: 'Music, ale and roast meat late into the night. Nobody will forget it soon.', kind: 'good' };
         },
       },

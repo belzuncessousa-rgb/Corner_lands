@@ -280,6 +280,8 @@ export interface GameState {
   moods?: { label: string; value: number; until: number }[];
   /** Year in which the lord last called a harvest feast. */
   lastFeast?: number;
+  /** Day the last feast was held (the manor stays decorated for a month). */
+  feastDay?: number;
   /** Monthly snapshots, oldest first. */
   history: HistoryPoint[];
   /** Set when buildings/roads change; cleared after recompute. */
