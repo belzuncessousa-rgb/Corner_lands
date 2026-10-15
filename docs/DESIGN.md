@@ -212,4 +212,11 @@ about medieval builders, Manor Lords' own roadmap included) and the soaks.
 - [x] A second great work for Cities (town walls with gatehouses, built in sections), so the castle is not the end of the road
 - [x] Late-game events that use the retinue, fairs and charters (a royal visit, a rival lord's challenge, a plague the apothecaries can fight)
 - [x] Chronicle as a story: a year-end page summing up the year (harvest, newcomers, buildings raised, events)
-- [ ] Performance: draw static buildings into cached chunks when the camera stands still (large towns on machines without GPU canvas)
+- [x] Performance on machines without GPU canvas: measured instead of cached. With light mode a 300-villager town runs at 30 fps in software rendering; a lower canvas resolution only helped at half size (too blurry), so it was left out
+
+### Phase 13 — From the second research pass (for the scheduled runs)
+- [x] New-game map preview with forest, water, rock, ore and soil near the manor (Timberborn and Farthest Frontier show the land before you commit)
+- [x] Villagers with names, trades, homes and passing thoughts when clicked (players love individual stories, e.g. Heard of the Story?)
+- [ ] Town talk: a panel gathering what villagers are saying (their most common wishes), linked to the homes that voice them
+- [ ] A hardier mode beside Normal and Relaxed (scarcer start, colder winters), balanced with the autoplayer
+- [ ] Seasonal festivals beyond the harvest feast (May Day at the maypole, Midsummer fires) as small optional spends with visible decorations
