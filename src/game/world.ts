@@ -43,7 +43,7 @@ export function makeBuilding(id: number, type: BuildingType, x: number, y: numbe
 }
 
 /** Generates a fresh map and initial settlement. */
-export function generateWorld(seed: number, opts: { relaxed?: boolean } = {}): GameState {
+export function generateWorld(seed: number, opts: { relaxed?: boolean; hardy?: boolean } = {}): GameState {
   const W = MAP_SIZE;
   const H = MAP_SIZE;
   const n = W * H;
@@ -237,6 +237,9 @@ export function generateWorld(seed: number, opts: { relaxed?: boolean } = {}): G
   if (opts.relaxed) {
     s.relaxed = true;
     for (const k of ['wood', 'stone', 'berries', 'meat', 'gold'] as const) s.res[k] *= 2;
+  } else if (opts.hardy) {
+    s.hardy = true;
+    for (const k of ['wood', 'stone', 'berries', 'meat', 'gold'] as const) s.res[k] = Math.round(s.res[k] * 0.6);
   }
   return s;
 }

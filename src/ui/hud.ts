@@ -1688,6 +1688,7 @@ export class Hud {
       <div class="modes">
         <label class="mode"><input type="radio" name="mode" value="normal" checked><span><b>Normal</b><br><small>Hungry or unhappy villagers will leave.</small></span></label>
         <label class="mode"><input type="radio" name="mode" value="relaxed"><span><b>Relaxed</b><br><small>Double starting supplies; nobody ever leaves in anger.</small></span></label>
+        <label class="mode"><input type="radio" name="mode" value="hardy"><span><b>Hardy</b><br><small>A scarcer start, bitter winters, choosier settlers.</small></span></label>
       </div>
       <div class="ornament">❦</div>
       <div class="row" style="justify-content:flex-end">
@@ -1718,8 +1719,8 @@ export class Hud {
     });
     m.querySelector('[data-m="back"]')!.addEventListener('click', () => (fromMain ? this.showMainMenu() : this.showGameMenu()));
     m.querySelector('[data-m="go"]')!.addEventListener('click', () => {
-      const relaxed = (m.querySelector('input[name="mode"]:checked') as HTMLInputElement | null)?.value === 'relaxed';
-      this.game.newGame(seedOf(input.value.trim()), relaxed);
+      const mode = ((m.querySelector('input[name="mode"]:checked') as HTMLInputElement | null)?.value ?? 'normal') as 'normal' | 'relaxed' | 'hardy';
+      this.game.newGame(seedOf(input.value.trim()), mode);
       this.closeModal(true);
       this.game.setSpeed(1);
     });

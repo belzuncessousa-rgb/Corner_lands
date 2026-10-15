@@ -180,8 +180,8 @@ export class Game {
     this.setSpeed(this.speedIndex === 0 ? this.lastSpeed : 0);
   }
 
-  newGame(seed: number, relaxed = false): void {
-    this.state = generateWorld(seed, { relaxed });
+  newGame(seed: number, mode: 'normal' | 'relaxed' | 'hardy' = 'normal'): void {
+    this.state = generateWorld(seed, { relaxed: mode === 'relaxed', hardy: mode === 'hardy' });
     recompute(this.state);
     // Show a meaningful happiness breakdown from the very first day.
     this.state.report.variety = FOOD_IDS.filter((f) => this.state.res[f] > 0).length;
@@ -218,7 +218,7 @@ export class Game {
 
   summary(): string {
     const s = this.state;
-    return `${TIERS[s.tier].name} · ${s.population} villagers · Year ${yearOf(s.day)}, ${MONTH_NAMES[monthOf(s.day)]}${s.relaxed ? ' · Relaxed' : ''}`;
+    return `${TIERS[s.tier].name} · ${s.population} villagers · Year ${yearOf(s.day)}, ${MONTH_NAMES[monthOf(s.day)]}${s.relaxed ? ' · Relaxed' : s.hardy ? ' · Hardy' : ''}`;
   }
 
   async save(slot: string): Promise<string> {

@@ -138,7 +138,9 @@ then fall back to the browser's localStorage.
   and monthly charts.
 - **Settings** — the game menu (Esc) scales every panel from 85% to 130% and
   can pause the game whenever bad news arrives.
-- **Relaxed mode** — double starting supplies and nobody ever leaves in anger.
+- **Relaxed and Hardy modes** — Relaxed doubles the starting supplies and nobody
+  ever leaves in anger; Hardy starts scarcer, burns twice the firewood in winter
+  and needs three months of food before settlers come.
 
 ## Project layout
 

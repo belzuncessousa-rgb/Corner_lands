@@ -1,6 +1,6 @@
 import { DAYS_PER_MONTH, FOOD_IDS, GOODS, RESOURCE_STORAGE } from './data';
 import type { StorageKind } from './data';
-import { harvestForecast, labourSummary, log, storageCap, stored, totalHousing } from './sim';
+import { harvestForecast, labourSummary, log, winterBundles, storageCap, stored, totalHousing } from './sim';
 import { RESOURCE_IDS } from './types';
 import type { GameState } from './types';
 
@@ -43,9 +43,9 @@ const ADVICE: Advice[] = [
   },
   {
     id: 'firewood',
-    when: (s, m) => m >= 6 && m <= 8 && s.res.firewood + s.res.wood / 2 < homes(s) * 3 + 5,
+    when: (s, m) => m >= 6 && m <= 8 && s.res.firewood + s.res.wood / 2 < homes(s) * 3 * winterBundles(s) + 5,
     text: (s) =>
-      `Steward: winter is coming. Each home burns a bundle of firewood a month, or two logs of timber. We need about ${homes(s) * 3} firewood; set a woodcutter to split firewood.`,
+      `Steward: winter is coming. Each home burns a bundle of firewood a month, or two logs of timber. We need about ${homes(s) * 3 * winterBundles(s)} firewood; set a woodcutter to split firewood.`,
   },
   {
     id: 'housing',

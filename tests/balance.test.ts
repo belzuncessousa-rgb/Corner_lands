@@ -22,6 +22,17 @@ describe('balance', () => {
     expect(results.filter((r) => r.cityYear !== null).length).toBeGreaterThanOrEqual(2);
   });
 
+  // Slow: SWEEP=1. Hardy mode is harder, but the autoplayer still gets to Town.
+  it.runIf(process.env.SWEEP)('hardy mode is still winnable', { timeout: 300000 }, () => {
+    let towns = 0;
+    for (let seed = 1; seed <= 6; seed++) {
+      const rep = playBot(generateWorld(seed, { hardy: true }), 6, seed);
+      console.log(`hardy seed ${seed}: village ${rep.villageYear?.toFixed(1)} town ${rep.townYear?.toFixed(1)} borough ${rep.boroughYear?.toFixed(1)}`);
+      if (rep.townYear !== null) towns++;
+    }
+    expect(towns).toBeGreaterThanOrEqual(5);
+  });
+
   // Slow: run with SWEEP=1 after changing the economy or the autoplayer.
   it.runIf(process.env.SWEEP)('every one of ten maps reaches Town within six years', { timeout: 300000 }, () => {
     for (let seed = 1; seed <= 10; seed++) {

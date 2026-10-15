@@ -2082,10 +2082,10 @@ export function monthly(s: GameState, rng: StateRng): void {
   if (need > 0) log(s, `Food shortage! ${need} villagers went hungry.`, 'bad');
 
   // Heating in winter: each household burns a bundle of split firewood, or
-  // twice as much raw timber.
+  // twice as much raw timber (two bundles in hardy winters).
   report.cold = false;
   if (Math.floor(prevMonth / 3) === 3) {
-    let homes = s.buildings.filter((b) => b.residents > 0).length;
+    let homes = s.buildings.filter((b) => b.residents > 0).length * winterBundles(s);
     const split = Math.min(homes, Math.floor(s.res.firewood));
     s.res.firewood -= split;
     homes -= split;
@@ -2378,7 +2378,7 @@ function migrate(s: GameState, rng: StateRng): void {
     log(s, `${n} homeless villagers left the settlement.`, 'bad');
   }
   if ((s.happiness < 30 || r.shortage > 0) && s.population > 2 && !s.relaxed) {
-    const n = Math.max(1, Math.round(s.population * (r.shortage > 0 ? 0.12 : 0.06)));
+    const n = Math.max(1, Math.round(s.population * (r.shortage > 0 ? 0.12 : 0.06) * (s.hardy ? 1.25 : 1)));
     const actual = Math.min(n, s.population - 2);
     s.population -= actual;
     r.left += actual;
@@ -2389,7 +2389,7 @@ function migrate(s: GameState, rng: StateRng): void {
   } else if (s.happiness >= 50 && r.shortage === 0) {
     const free = housing - s.population;
     // Newcomers only settle where the larders could feed everyone for a while.
-    const room = Math.floor(larder(s) / SETTLER_FOOD_MONTHS) - s.population;
+    const room = Math.floor(larder(s) / settlerMonths(s)) - s.population;
     if (free > 0 && room > 0) {
       const n = Math.min(free, room, 1 + Math.floor((s.happiness - 50) / 12) + rng.int(2));
       s.population += n;
@@ -2404,15 +2404,25 @@ function migrate(s: GameState, rng: StateRng): void {
 /** Months of food in store settlers want to see for the whole town, themselves included. */
 export const SETTLER_FOOD_MONTHS = 2;
 
+/** Months of food settlers want to see: more in hardy mode. */
+export function settlerMonths(s: GameState): number {
+  return s.hardy ? SETTLER_FOOD_MONTHS + 1 : SETTLER_FOOD_MONTHS;
+}
+
+/** Bundles of firewood each home burns a winter month. */
+export function winterBundles(s: GameState): number {
+  return s.hardy ? 2 : 1;
+}
+
 /** Why no settlers are coming right now, or null if they may. */
 export function settlerBlocker(s: GameState): string | null {
   if (s.happiness < 50) return 'Villagers are not happy enough (50% needed)';
   if (s.report.shortage > 0) return 'Someone went hungry last month';
   if (totalHousing(s) <= s.population) return 'Every home is full';
-  if (larder(s) < (s.population + 1) * SETTLER_FOOD_MONTHS) {
+  if (larder(s) < (s.population + 1) * settlerMonths(s)) {
     // Full granaries that still cannot hold enough: the town needs more of them.
-    if (stored(s, 'food') >= storageCap(s, 'food') * 0.9) return `The granaries are too small to hold ${SETTLER_FOOD_MONTHS} months of food for everyone: build a Granary`;
-    return `The larders look thin: settlers want ${SETTLER_FOOD_MONTHS} months of food for everyone`;
+    if (stored(s, 'food') >= storageCap(s, 'food') * 0.9) return `The granaries are too small to hold ${settlerMonths(s)} months of food for everyone: build a Granary`;
+    return `The larders look thin: settlers want ${settlerMonths(s)} months of food for everyone`;
   }
   return null;
 }

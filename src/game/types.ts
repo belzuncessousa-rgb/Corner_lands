@@ -257,6 +257,8 @@ export interface GameState {
   incoming: number;
   /** Relaxed mode: generous start and villagers never leave in anger. */
   relaxed?: boolean;
+  /** Hardy mode: a scarcer start, colder winters, choosier settlers. */
+  hardy?: boolean;
   /** Day each piece of advisor advice was last given. */
   advice?: Record<string, number>;
   /** Old export rules (pre stock targets); migrated on load. */

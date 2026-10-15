@@ -218,5 +218,5 @@ about medieval builders, Manor Lords' own roadmap included) and the soaks.
 - [x] New-game map preview with forest, water, rock, ore and soil near the manor (Timberborn and Farthest Frontier show the land before you commit)
 - [x] Villagers with names, trades, homes and passing thoughts when clicked (players love individual stories, e.g. Heard of the Story?)
 - [x] Town talk: a panel gathering what villagers are saying (their most common wishes), linked to the homes that voice them
-- [ ] A hardier mode beside Normal and Relaxed (scarcer start, colder winters), balanced with the autoplayer
+- [x] A hardier mode beside Normal and Relaxed (scarcer start, colder winters), balanced with the autoplayer
 - [x] Seasonal festivals beyond the harvest feast (May Day at the maypole, Midsummer fires) as small optional spends with visible decorations
