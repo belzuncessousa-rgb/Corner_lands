@@ -1420,6 +1420,27 @@ export function chainReport(s: GameState, links: ResourceId[]): { links: ChainLi
   return { links: rows, weak: null, why: null };
 }
 
+/** A page for the chronicle as each year ends: how the lands fared. */
+function yearInReview(s: GameState): void {
+  const y = s.year;
+  s.year = { pop: s.population, gold: s.res.gold, prestige: s.res.prestige, arrived: 0, left: 0, built: 0, harvest: 0 };
+  if (!y) return;
+  const done = yearOf(s.day) - 1;
+  const parts: string[] = [];
+  const grew = s.population - y.pop;
+  const place = TIERS[s.tier].name.toLowerCase();
+  parts.push(grew > 0 ? `the ${place} grew by ${grew} to ${s.population} souls` : grew < 0 ? `${-grew} fewer souls remain (${s.population})` : `${s.population} souls, as many as a year ago`);
+  if (y.arrived) parts.push(`${y.arrived} newcomers settled`);
+  if (y.left) parts.push(`${y.left} left`);
+  if (y.built) parts.push(`${y.built} buildings were raised`);
+  if (y.harvest) parts.push(`the fields gave ${y.harvest} sacks`);
+  const gold = Math.round(s.res.gold - y.gold);
+  parts.push(`the treasury ${gold >= 0 ? 'gained' : 'lost'} ${Math.abs(gold)} coins`);
+  const prestige = Math.round(s.res.prestige - y.prestige);
+  if (prestige) parts.push(`${prestige > 0 ? '+' : ''}${prestige} prestige`);
+  log(s, `The year ${done} in review: ${parts.join(', ')}.`, 'good');
+}
+
 /** The day's harvest across every farm, summed up in one message. */
 let harvestDay: { got: Partial<Record<ResourceId, number>>; barn: number; spoiled: number; where: Set<string>; at: Building } | null = null;
 
@@ -1427,6 +1448,7 @@ function reportHarvest(s: GameState): void {
   const h = harvestDay;
   harvestDay = null;
   if (!h) return;
+  if (s.year) for (const k in h.got) s.year.harvest += h.got[k as ResourceId] ?? 0;
   const list = Object.entries(h.got)
     .filter(([, n]) => (n ?? 0) > 0)
     .map(([k, n]) => `${n} ${GOODS[k as ResourceId].name.toLowerCase()}`)
@@ -1983,6 +2005,7 @@ export function dailyConstruction(s: GameState): void {
       b.need = undefined;
       b.work = 0;
       log(s, `${d.name} completed.`, 'info', b);
+      if (s.year) s.year.built++;
       s.dirty = true;
     }
   }
@@ -2100,7 +2123,10 @@ export function monthly(s: GameState, rng: StateRng): void {
 
   // Bushes fruit in spring and again in summer.
   if (month === 0 || month === 4) s.berries.set(s.berriesMax);
-  if (month === 0) log(s, `Spring of year ${yearOf(s.day)} has arrived.`, 'info');
+  if (month === 0) {
+    yearInReview(s);
+    log(s, `Spring of year ${yearOf(s.day)} has arrived.`, 'info');
+  }
   if (month === 9) log(s, 'Winter is here. Keep timber stocked for firewood.', 'info');
 
   updateTier(s);
@@ -2331,6 +2357,7 @@ function migrate(s: GameState, rng: StateRng): void {
     const n = Math.min(s.population - housing, Math.max(1, Math.ceil((s.population - housing) / 2)));
     s.population -= n;
     r.left += n;
+    if (s.year) s.year.left += n;
     log(s, `${n} homeless villagers left the settlement.`, 'bad');
   }
   if ((s.happiness < 30 || r.shortage > 0) && s.population > 2 && !s.relaxed) {
@@ -2338,6 +2365,7 @@ function migrate(s: GameState, rng: StateRng): void {
     const actual = Math.min(n, s.population - 2);
     s.population -= actual;
     r.left += actual;
+    if (s.year) s.year.left += actual;
     if (actual > 0) log(s, `${actual} unhappy villagers packed up and left.`, 'bad');
   } else if (s.happiness < 30 || r.shortage > 0) {
     // Relaxed mode: nobody leaves, but nobody new arrives either.
@@ -2349,6 +2377,7 @@ function migrate(s: GameState, rng: StateRng): void {
       const n = Math.min(free, room, 1 + Math.floor((s.happiness - 50) / 12) + rng.int(2));
       s.population += n;
       r.arrived += n;
+      if (s.year) s.year.arrived += n;
       log(s, `${n} settler${n > 1 ? 's' : ''} arrived seeking a new life.`, 'info');
     }
   }
@@ -2390,6 +2419,7 @@ export function nextTierRequirements(s: GameState): string[] {
 
 export function stepDay(s: GameState): void {
   const rng = new StateRng(s);
+  s.year ??= { pop: s.population, gold: s.res.gold, prestige: s.res.prestige, arrived: 0, left: 0, built: 0, harvest: 0 };
   recompute(s);
   dailyConstruction(s);
   dailyOrchards(s);

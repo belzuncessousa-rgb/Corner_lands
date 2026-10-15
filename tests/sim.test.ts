@@ -1019,3 +1019,13 @@ describe('production chains', () => {
     expect(r.why).toMatch(/Flour piles up/);
   });
 });
+
+describe('year in review', () => {
+  it('sums up each year in the chronicle', () => {
+    const s = generateWorld(97);
+    run(s, DAYS_PER_YEAR + 1);
+    const page = s.messages.find((m) => m.text.startsWith('The year 1 in review'));
+    expect(page?.text).toMatch(/souls/);
+    expect(page?.text).toMatch(/treasury/);
+  });
+});
