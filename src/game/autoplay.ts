@@ -9,6 +9,7 @@ import { startUpgrade, upgradeBlocker, upgradePlan } from './levels';
 import { StateRng } from './rng';
 import {
   labourSummary,
+  WALL_SAFE,
   coveredBy,
   harvestForecast,
   barnTotal,
@@ -357,6 +358,37 @@ function renovate(s: GameState): void {
   }
 }
 
+/** A City walls itself in, a few sections at a time, around its outermost buildings. */
+function layWall(s: GameState): void {
+  if (s.buildings.some((b) => b.type === 'wall' && b.build < 1)) return;
+  // Forty sections give the walls' full comfort; leave the rest of the land open for growth.
+  if (s.buildings.filter((b) => b.type === 'wall').length >= WALL_SAFE) return;
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  for (const b of s.buildings) {
+    if (BUILDINGS[b.type].zone || b.type === 'wall') continue;
+    x0 = Math.min(x0, b.x);
+    y0 = Math.min(y0, b.y);
+    x1 = Math.max(x1, b.x + b.w);
+    y1 = Math.max(y1, b.y + b.h);
+  }
+  x0 -= 6;
+  y0 -= 6;
+  x1 += 5;
+  y1 += 5;
+  const ring: [number, number][] = [];
+  for (let x = x0; x <= x1; x++) ring.push([x, y0], [x, y1]);
+  for (let y = y0 + 1; y < y1; y++) ring.push([x0, y], [x1, y]);
+  let laid = 0;
+  for (const [x, y] of ring) {
+    if (laid >= 6) break;
+    if (!inBounds(s, x, y) || s.road[idx(s, x, y)] || placementError(s, 'wall', x, y)) continue;
+    if (placeOrder(s, 'wall', x, y)) laid++;
+  }
+}
+
 /** The bot favours farming and trade charters. */
 const BOT_CHARTERS = ['farm1', 'trade1', 'farm2', 'herd1', 'trade2', 'farm3a', 'learning1'];
 
@@ -370,6 +402,7 @@ export function act(s: GameState, rand: () => number): void {
   if (!feastError(s) && food > pop * 4) holdFeast(s);
   if (!fairError(s) && s.res.gold > fairCost(s) * 3) holdFair(s);
   for (const f of FESTIVALS) if (!festivalError(s, f.id) && food > pop * 4) holdFestival(s, f.id);
+  if (s.tier >= 4 && s.res.dressedstone > 60 && s.res.gold > 500) layWall(s);
   renovate(s);
   drawFields(s);
   const sites = s.buildings.filter((b) => b.build < 1).length;

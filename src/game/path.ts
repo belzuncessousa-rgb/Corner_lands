@@ -98,9 +98,9 @@ export function findPath(
   const start = sy * W + sx;
   const goal = gy * W + gx;
   if (start === goal) return [];
-  // Fields, pastures and orchards can be walked across.
+  // Fields, pastures and orchards can be walked across; posterns lead through the town wall.
   const zones = new Set<number>();
-  for (const b of s.buildings) if (BUILDINGS[b.type].zone) zones.add(b.id);
+  for (const b of s.buildings) if (BUILDINGS[b.type].zone || (b.type === 'wall' && (b.x + b.y) % 6 === 0)) zones.add(b.id);
   const passable = (i: number) => {
     if (s.terrain[i] === 1 && !s.road[i]) return false;
     const o = s.occ[i];

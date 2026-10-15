@@ -105,7 +105,8 @@ then fall back to the browser's localStorage.
   one Cathedral: a fortune and most of a year to build, it serves as a church
   far and wide, cheers everyone and brings prestige every month.
 - **Town walls** — a City lays walls like roads, section by section; where they
-  cross a road a gate tower rises. Walls bring prestige, and forty sections make
+  cross a road a gate tower rises, and every sixth section has a postern door
+  for folk on foot. Walls bring prestige, and forty sections make
   the town feel safe and keep wolves and bandits out.
 - **Retinue** — a Borough may raise men-at-arms at the manor (prestige and
   arms, then 10 coins a month). They cheer the town and can be sent against

@@ -940,6 +940,11 @@ export class Renderer {
       p.wallL(y + 0.862, x + 0.38, x + 0.62, H * 1.3, H * 1.6, '#2a2522');
       p.wallR(x + 0.862, y + 0.38, y + 0.62, H * 1.3, H * 1.6, '#221e1b');
       p.roofPyramid(x + 0.14, y + 0.14, x + 0.86, y + 0.86, H * 2, 18, 'slate');
+    } else if ((x + y) % 6 === 0) {
+      // A postern: a small arched door through the wall for folk on foot.
+      p.box(x + 0.28, y + 0.28, x + 0.72, y + 0.72, 0, H + 8, '#aaa190', top);
+      p.wallL(y + 0.722, x + 0.42, x + 0.58, 0, 12, '#4a2f1b');
+      p.wallR(x + 0.722, y + 0.42, y + 0.58, 0, 12, '#3e2716');
     } else {
       p.box(x + 0.32, y + 0.32, x + 0.68, y + 0.68, 0, H + 4, stone, top);
       // Crenellations along the top.

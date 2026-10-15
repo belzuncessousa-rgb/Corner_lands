@@ -701,7 +701,8 @@ export function travelField(s: GameState, rebuild = false): Float64Array {
   field = new Float64Array(n).fill(Infinity);
   const heap = new Heap();
   // Villagers walk across fields, pastures and orchards.
-  const zones = new Set(s.buildings.filter((b) => BUILDINGS[b.type].zone).map((b) => b.id));
+  // Fields can be walked across, and posterns let walkers through the town wall.
+  const zones = new Set(s.buildings.filter((b) => BUILDINGS[b.type].zone || isPostern(b)).map((b) => b.id));
   for (const b of s.buildings) {
     if (b.build < 1 || !STORAGE_CAPACITY[b.type]) continue;
     for (let y = b.y; y < b.y + b.h; y++) {
@@ -2182,6 +2183,11 @@ export function prestigeIncome(s: GameState): number {
 
 /** Wall sections that make a town feel safe and keep wolves and bandits out. */
 export const WALL_SAFE = 40;
+
+/** Every sixth section of town wall has a postern: a small door villagers on foot can use. */
+export function isPostern(b: Building): boolean {
+  return b.type === 'wall' && (b.x + b.y) % 6 === 0;
+}
 
 export function wallSections(s: GameState): number {
   let n = 0;
