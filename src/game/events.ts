@@ -130,6 +130,124 @@ const need = (s: GameState, id: ResourceId, n: number, name: string) => (s.res[i
 
 export const EVENTS: DecisionEvent[] = [
   {
+    id: 'royal',
+    title: 'A Royal Progress',
+    text: () =>
+      "Heralds ride ahead: the king himself will pass through on his progress, with his court, his hounds and a hundred hungry retainers.",
+    weight: (s) => (s.tier >= 3 ? 2 : 0),
+    choices: (s) => [
+      {
+        label: 'Host the king in splendour',
+        detail: `−${Math.ceil(s.population / 2)} food, −300 coins. +40 prestige, happiness +6 for half a year.`,
+        blocked: (st) => need(st, 'gold', 300, 'coins') ?? (food(st) >= Math.ceil(st.population / 2) ? null : 'Not enough food'),
+        apply: (st) => {
+          takeFood(st, Math.ceil(st.population / 2));
+          st.res.gold -= 300;
+          st.res.prestige += 40;
+          addMood(st, 'The king came to our town', 6, 6);
+          return { text: 'Banners, a boar hunt and a feast in the hall. The king rode away smiling, and the whole realm hears of it.', kind: 'good' };
+        },
+      },
+      {
+        label: 'A modest welcome',
+        detail: '−100 coins. +10 prestige.',
+        blocked: (st) => need(st, 'gold', 100, 'coins'),
+        apply: (st) => {
+          st.res.gold -= 100;
+          st.res.prestige += 10;
+          return { text: 'Bread, ale and a loyal address at the gate. The court passed through in good humour.', kind: 'info' };
+        },
+      },
+      {
+        label: 'Feign illness and stay away',
+        detail: '−15 prestige.',
+        apply: (st) => {
+          st.res.prestige = Math.max(0, st.res.prestige - 15);
+          return { text: 'The king found the manor shuttered. Tongues at court are wagging.', kind: 'bad' };
+        },
+      },
+    ],
+  },
+  {
+    id: 'tourney',
+    title: "A Rival Lord's Challenge",
+    text: () => 'A neighbouring lord sends his herald: his champions challenge yours to a tournament, with a purse of silver for the winner.',
+    weight: (s) => (s.tier >= 3 ? 1.5 : 0),
+    choices: () => [
+      {
+        label: 'Send the retinue to the lists',
+        detail: 'Needs a retinue. Likely win: +250 coins, +25 prestige.',
+        blocked: (st) => (st.retinue ? null : 'Needs a retinue (raised at the manor)'),
+        apply: (st, rng) => {
+          if (rng.next() < 0.65) {
+            st.res.gold += 250;
+            st.res.prestige += 25;
+            addMood(st, 'Our champions won the tourney', 4, 3);
+            return { text: 'Your men-at-arms unhorsed the rival champions. The purse and the glory are yours.', kind: 'good' };
+          }
+          st.res.prestige += 5;
+          return { text: 'A hard fight, lost by a lance. Still, the crowds cheered your colours.', kind: 'info' };
+        },
+      },
+      {
+        label: 'Hire a champion',
+        detail: '−200 coins. +12 prestige.',
+        blocked: (st) => need(st, 'gold', 200, 'coins'),
+        apply: (st) => {
+          st.res.gold -= 200;
+          st.res.prestige += 12;
+          return { text: 'A wandering knight rode in your colours and did you credit.', kind: 'info' };
+        },
+      },
+      {
+        label: 'Decline the challenge',
+        detail: '−10 prestige.',
+        apply: (st) => {
+          st.res.prestige = Math.max(0, st.res.prestige - 10);
+          return { text: 'The rival lord laughs at your caution in every hall from here to the sea.', kind: 'bad' };
+        },
+      },
+    ],
+  },
+  {
+    id: 'plague',
+    title: 'Sickness in the Town',
+    text: () => 'A fever spreads through the crowded lanes. The physicians ask for medicine and clean water; the priests call for prayer.',
+    weight: (s) => (s.population >= 60 ? 1 : 0),
+    choices: (s) => [
+      {
+        label: 'Physicians and medicine',
+        detail: `−${Math.ceil(s.population / 10)} medicine. Nobody is lost.`,
+        blocked: (st) => need(st, 'medicine', Math.ceil(st.population / 10), 'medicine'),
+        apply: (st) => {
+          st.res.medicine -= Math.ceil(st.population / 10);
+          addMood(st, 'The fever passed', 2, 3);
+          return { text: 'Tinctures and boiled water broke the fever. Every soul recovered.', kind: 'good' };
+        },
+      },
+      {
+        label: 'Quarantine the sick lanes',
+        detail: 'About one in twenty is lost; happiness −4 for a season.',
+        apply: (st) => {
+          const n = Math.max(1, Math.round(st.population * 0.05));
+          st.population -= n;
+          addMood(st, 'The quarantine', -4, 3);
+          return { text: `The sick lanes were closed off. ${n} villagers did not live to see them opened.`, kind: 'bad' };
+        },
+      },
+      {
+        label: 'Pray for deliverance',
+        detail: 'About one in ten is lost.',
+        apply: (st) => {
+          const n = Math.max(1, Math.round(st.population * 0.1));
+          st.population -= n;
+          addMood(st, 'The fever', -6, 4);
+          return { text: `The bells rang day and night. ${n} villagers were buried before the fever broke.`, kind: 'bad' };
+        },
+      },
+    ],
+  },
+  {
     id: 'family',
     title: 'Wanderers at the Gate',
     text: () =>

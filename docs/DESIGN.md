@@ -210,6 +210,6 @@ Save size was checked (about 200 KB after twenty years, fine for browser storage
 From the research pass (late-game variety is the most common complaint
 about medieval builders, Manor Lords' own roadmap included) and the soaks.
 - [ ] A second great work for Cities (town walls with gatehouses, built in sections), so the castle is not the end of the road
-- [ ] Late-game events that use the retinue, fairs and charters (a royal visit, a rival lord's challenge, a plague the apothecaries can fight)
+- [x] Late-game events that use the retinue, fairs and charters (a royal visit, a rival lord's challenge, a plague the apothecaries can fight)
 - [x] Chronicle as a story: a year-end page summing up the year (harvest, newcomers, buildings raised, events)
 - [ ] Performance: draw static buildings into cached chunks when the camera stands still (large towns on machines without GPU canvas)
