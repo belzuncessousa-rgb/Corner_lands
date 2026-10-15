@@ -9,6 +9,9 @@ import { startUpgrade, upgradeBlocker, upgradePlan } from './levels';
 import { StateRng } from './rng';
 import {
   labourSummary,
+  harvestForecast,
+  barnTotal,
+  FARM_BARN,
   buildRoad,
   canAfford,
   centerOf,
@@ -118,6 +121,8 @@ function drawFields(s: GameState): void {
     if (farm.type !== 'farm' || farm.build < 1) continue;
     const fields = zonesOf(s, farm);
     if (zoneArea(fields) >= 36) continue;
+    // The last harvest did not fit: no more fields for now.
+    if (s.buildings.some((b) => b.type === 'farm' && barnTotal(b) > FARM_BARN * 0.6)) continue;
     const spot = zoneSpot(s, 'field', farm, [
       [5, 5],
       [6, 4],
@@ -322,23 +327,24 @@ function affordsWithPromises(s: GameState, cost: Cost): boolean {
 function renovate(s: GameState): void {
   const hall = s.buildings.find((b) => b.type === 'townhall');
   const plan = hall ? upgradePlan(s, hall) : null;
+  let saving = false;
   if (hall && plan && !hall.upgrading && plan.reqs.every((r) => r.met)) {
     if (!upgradeBlocker(s, hall) && affordsWithPromises(s, plan.cost)) {
       startUpgrade(s, hall);
     } else {
-      // Save up for the manor: buy what is missing, and hold off on homes.
+      // Save up for the manor: buy what is missing, and renovate one home at a time.
       for (const k in plan.cost) {
         const id = k as ResourceId;
         if (id === 'gold') continue;
         const short = (plan.cost[id] ?? 0) - s.res[id];
         if (short > 0 && hasBuilt(s, 'market') && s.res.gold > (plan.cost.gold ?? 0) + 60) trade(s, id, Math.min(short, roomFor(s, id)));
       }
-      return;
+      saving = true;
     }
   }
   let busy = s.buildings.filter((b) => b.upgrading).length;
   for (const b of s.buildings) {
-    if (busy >= 2) break;
+    if (busy >= (saving ? 1 : 2)) break;
     if (b.type !== 'house' || upgradeBlocker(s, b)) continue;
     if (!affordsWithPromises(s, upgradePlan(s, b)!.cost)) continue;
     if (startUpgrade(s, b)) busy++;
@@ -381,7 +387,7 @@ export function act(s: GameState, rand: () => number): void {
   if (s.tier >= 1 && s.res.grain > 60 && count(s, 'windmill') < 1 + Math.floor(s.res.grain / 60)) wants.push('windmill');
   if (s.tier >= 1 && s.res.flour > 20 && count(s, 'bakery') < 1 + count(s, 'windmill')) wants.push('bakery');
   if (food < pop * 4 && foodMakers < 1 + pop / 6) {
-    if (s.tier >= 1 && count(s, 'farm') < 2 + Math.floor(pop / 25)) wants.push('farm');
+    if (s.tier >= 1 && count(s, 'farm') < 1 + Math.floor(pop / 40)) wants.push('farm');
     if (count(s, 'forager') < 2) wants.push('forager');
     if (count(s, 'fisher') < 2 + Math.floor(pop / 30)) wants.push('fisher');
     if (count(s, 'hunter') < 2 + Math.floor(pop / 30)) wants.push('hunter');
@@ -410,10 +416,13 @@ export function act(s: GameState, rand: () => number): void {
     wants.push('storehouse');
   }
   if (stored(s, 'food') > storageCap(s, 'food') * 0.8 && count(s, 'granary') < stores) wants.push('granary');
+  // A harvest that will not fit: a granary before autumn.
+  else if (monthOf(s.day) <= 6 && count(s, 'granary') < 2 + Math.floor(pop / 30) && harvestForecast(s).some((h) => h.kind === 'food' && h.expected > h.room)) wants.push('granary');
   if (s.tier >= 1) {
-    if (count(s, 'farm') < Math.ceil(pop / 16)) wants.push('farm');
-    if (count(s, 'windmill') < Math.ceil(count(s, 'farm') / 2)) wants.push('windmill');
-    if (count(s, 'bakery') < Math.ceil(count(s, 'farm') / 2)) wants.push('bakery');
+    // A field of wheat bakes into bread for some sixty villagers a year.
+    if (count(s, 'farm') < 1 + Math.floor(pop / 50)) wants.push('farm');
+    if (count(s, 'windmill') < count(s, 'farm')) wants.push('windmill');
+    if (count(s, 'bakery') < count(s, 'windmill')) wants.push('bakery');
     if (count(s, 'tavern') > 0 && count(s, 'brewhouse') < 1) wants.push('brewhouse');
     if (pop >= 30 && count(s, 'byre') < 1) wants.push('byre');
     if (count(s, 'byre') > 0 && count(s, 'weaver') < 1) wants.push('weaver');

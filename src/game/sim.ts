@@ -36,6 +36,7 @@ import {
   upgradeDays,
   upgradePlan,
   workersOf,
+  buildingName,
 } from './levels';
 import { Heap } from './path';
 import { checkQuests } from './quests';
@@ -1322,6 +1323,23 @@ export function harvestForecast(s: GameState): { kind: StorageKind; expected: nu
   }));
 }
 
+/** The day's harvest across every farm, summed up in one message. */
+let harvestDay: { got: Partial<Record<ResourceId, number>>; barn: number; spoiled: number; where: Set<string>; at: Building } | null = null;
+
+function reportHarvest(s: GameState): void {
+  const h = harvestDay;
+  harvestDay = null;
+  if (!h) return;
+  const list = Object.entries(h.got)
+    .filter(([, n]) => (n ?? 0) > 0)
+    .map(([k, n]) => `${n} ${GOODS[k as ResourceId].name.toLowerCase()}`)
+    .join(', ');
+  if (!list && !h.spoiled) return;
+  const barn = h.barn ? ` ${h.barn} wait in the barns for room in the stores.` : '';
+  const lost = h.spoiled ? ` ${h.spoiled} spoiled: the ${[...h.where].join(' and ')} and the barns are full.` : '';
+  log(s, `Harvest! The fields brought in ${list || 'nothing'}.${barn}${lost}`, h.spoiled ? 'bad' : 'good', h.at);
+}
+
 /** Harvest a farmstead's barn holds while the stores are full. */
 export const FARM_BARN = 200;
 /** Sacks carried from a barn to the stores each day, as room allows. */
@@ -1413,9 +1431,16 @@ function stepFarm(s: GameState, b: Building): void {
       .join(', ');
     const where = [...spoiledIn].join(' and ');
     const barnNote = inBarn ? ` ${inBarn} wait in the barn for room in the stores.` : '';
-    if (list) log(s, `Harvest! The fields brought in ${list}.${barnNote}${spoiled ? ` ${spoiled} spoiled: the ${where} and the barn are full.` : ''}`, spoiled ? 'bad' : 'good', b);
-    else if (spoiled) log(s, `The harvest rotted in the fields: no room left in the ${where} for ${spoiled} sacks.`, 'bad', b);
+    // Each farm's tally goes to the chronicle; one toast sums up the day's harvest.
+    if (list) log(s, `${buildingName(b)}: the fields brought in ${list}.${barnNote}${spoiled ? ` ${spoiled} spoiled: the ${where} and the barn are full.` : ''}`, 'info', b);
+    else if (spoiled) log(s, `${buildingName(b)}: the harvest rotted in the fields, no room left in the ${where} for ${spoiled} sacks.`, 'info', b);
     if (unstaffed) log(s, 'Crops rotted in the fields: no farmers to bring them in.', 'bad', b);
+    harvestDay ??= { got: {}, barn: 0, spoiled: 0, where: new Set(), at: b };
+    for (const k in got) harvestDay.got[k as ResourceId] = (harvestDay.got[k as ResourceId] ?? 0) + (got[k as ResourceId] ?? 0);
+    harvestDay.barn += inBarn;
+    harvestDay.spoiled += spoiled;
+    for (const w of spoiledIn) harvestDay.where.add(w);
+    if (spoiled && !harvestDay.spoiled) harvestDay.at = b;
     b.status = 'Harvest gathered';
     b.blocked = BLOCK_SEASONAL;
   } else if (month >= 7) {
@@ -2257,6 +2282,7 @@ export function stepDay(s: GameState): void {
   dailyConstruction(s);
   dailyOrchards(s);
   dailyProduction(s, rng);
+  reportHarvest(s);
   noteSeen(s);
   s.day++;
   if (s.day % DAYS_PER_MONTH === 0) monthly(s, rng);

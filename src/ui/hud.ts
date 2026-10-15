@@ -399,9 +399,30 @@ export class Hud {
     const factors = s.happinessFactors
       .map((f) => `<div class="kv"><span>${esc(f.label)}</span><span class="${f.value >= 0 ? 'pos' : 'neg'}">${f.value > 0 ? '+' : ''}${f.value}</span></div>`)
       .join('');
+    // How many finer homes have each of their needs met, worst first.
+    const tally = new Map<string, { met: number; of: number; lacking?: number }>();
+    for (const b of s.buildings) {
+      if (b.type !== 'house' || b.level < 2 || b.build < 1) continue;
+      for (const n of houseNeeds(s, b, b.level).slice(2)) {
+        const t = tally.get(n.label) ?? { met: 0, of: 0 };
+        t.of++;
+        if (n.met) t.met++;
+        else t.lacking ??= b.id;
+        tally.set(n.label, t);
+      }
+    }
+    const needs = [...tally]
+      .sort((a, b) => a[1].met / a[1].of - b[1].met / b[1].of)
+      .map(([label, t]) => {
+        const full = t.met === t.of;
+        const attrs = full ? 'class="kv"' : `class="kv link" data-action="goto-b" data-id="${t.lacking}" data-tip="Show a home that lacks this"`;
+        return `<div ${attrs}><span>${esc(label)}</span><span class="${full ? 'pos' : 'neg'}">${t.met}/${t.of} homes</span></div>`;
+      })
+      .join('');
     return `<h3>${ICONS.happy} Happiness ${s.happiness}%</h3>
       <div class="bar"><i style="width:${s.happiness}%;background-position:${-220 + s.happiness * 2.2}px 0"></i></div>
       ${factors || '<i>No villagers yet</i>'}
+      ${needs ? `<div class="sub">Needs of Timber Houses and Townhouses</div>${needs}` : ''}
       <p class="note">Above 50% settlers arrive, if there are homes and two months of food in store; below 30% families leave.${s.happinessTarget !== s.happiness ? ` Heading towards ${s.happinessTarget}%.` : ''}</p>`;
   }
 
