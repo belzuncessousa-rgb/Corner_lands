@@ -799,4 +799,4 @@ function rangeHighlighter(s: GameState, type: BuildingType): ((i: number) => boo
 const game = new Game();
 // Handy hooks for debugging and automated screenshots.
 (window as unknown as Record<string, unknown>).game = game;
-(window as unknown as Record<string, unknown>).cl = { placeOrder, buildRoad, stepDay, recompute, placementError, playBot, placeZone, setYard, keepOf };
+(window as unknown as Record<string, unknown>).cl = { placeOrder, buildRoad, stepDay, recompute, placementError, playBot, placeZone, setYard, keepOf, log };

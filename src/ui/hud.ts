@@ -94,6 +94,11 @@ const costText = (c: Cost) =>
     .map(([k, v]) => `${v} ${GOODS[k as ResourceId].name.toLowerCase()}`)
     .join(', ');
 
+/** The number of the newest message (old saves without numbers count by position). */
+function lastNumber(msgs: { n?: number }[]): number {
+  return msgs.length ? (msgs[msgs.length - 1].n ?? msgs.length) : 0;
+}
+
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
 function costHtml(cost: Cost, have?: Record<string, number>): string {
@@ -228,7 +233,7 @@ export class Hud {
     this.lastTier = this.game.state.tier;
     this.lastSeason = seasonOf(this.game.state.day);
     this.category = null;
-    this.shownMessages = this.game.state.messages.length;
+    this.shownMessages = lastNumber(this.game.state.messages);
     this.el.log.innerHTML = '';
     this.lastInspectorKey = '';
     this.renderBuildBar();
@@ -855,14 +860,15 @@ export class Hud {
   private updateLog(): void {
     const s = this.game.state;
     const msgs = s.messages;
-    if (this.game.demo) {
-      this.shownMessages = msgs.length;
+    // Messages are numbered: the oldest are trimmed, so positions cannot tell what is new.
+    const last = lastNumber(msgs);
+    if (this.game.demo || last < this.shownMessages) {
+      this.shownMessages = last;
       return;
     }
-    if (msgs.length < this.shownMessages) this.shownMessages = msgs.length;
     let played = false;
-    for (let i = this.shownMessages; i < msgs.length; i++) {
-      const m = msgs[i];
+    for (const m of msgs) {
+      if ((m.n ?? 0) <= this.shownMessages) continue;
       // Routine news goes to the chronicle only.
       if (m.kind === 'info') continue;
       const text = `${m.kind === 'advice' ? '<b>Steward:</b> ' : ''}${esc(m.text.replace(/^Steward: /, ''))}`;
@@ -900,7 +906,7 @@ export class Hud {
       }
       if (m.kind === 'bad' && this.pauseOnBad && this.game.speed > 0) this.game.setSpeed(0);
     }
-    this.shownMessages = msgs.length;
+    this.shownMessages = last;
     // Keep three at most: good news makes way first, warnings last.
     const rank: Record<string, number> = { good: 0, advice: 1, bad: 2 };
     while (this.el.log.children.length > 3) {

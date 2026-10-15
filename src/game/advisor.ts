@@ -1,6 +1,6 @@
 import { DAYS_PER_MONTH, FOOD_IDS, GOODS, RESOURCE_STORAGE } from './data';
 import type { StorageKind } from './data';
-import { harvestForecast, labourSummary, storageCap, stored, totalHousing } from './sim';
+import { harvestForecast, labourSummary, log, storageCap, stored, totalHousing } from './sim';
 import { RESOURCE_IDS } from './types';
 import type { GameState } from './types';
 
@@ -137,7 +137,7 @@ export function advise(s: GameState, month: number): void {
     const last = s.advice[a.id] ?? -Infinity;
     if (s.day - last < COOLDOWN || !a.when(s, month)) continue;
     s.advice[a.id] = s.day;
-    s.messages.push({ day: s.day, text: a.text(s), kind: 'advice' });
+    log(s, a.text(s), 'advice');
     return;
   }
 }

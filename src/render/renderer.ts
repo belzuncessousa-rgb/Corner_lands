@@ -156,7 +156,8 @@ export class Renderer {
   /** Reduced-resolution copies of sprite canvases, used when zoomed out. */
   private lod(cv: HTMLCanvasElement): HTMLCanvasElement {
     const scale = this.cam.zoom * this.dpr;
-    if (scale > 0.95) return cv;
+    // Full detail while frames are fast; the lighter copies only when drawing gets slow.
+    if (scale > (this.light ? 1.2 : 0.95)) return cv;
     const level = scale > 0.48 ? 0 : 1;
     const cache = this.lodCache[level];
     let small = cache.get(cv);
@@ -165,7 +166,9 @@ export class Renderer {
       small = document.createElement('canvas');
       small.width = Math.max(1, src.width >> 1);
       small.height = Math.max(1, src.height >> 1);
-      small.getContext('2d')!.drawImage(src, 0, 0, small.width, small.height);
+      const g = small.getContext('2d')!;
+      g.imageSmoothingQuality = 'high';
+      g.drawImage(src, 0, 0, small.width, small.height);
       cache.set(cv, small);
     }
     return small;
@@ -177,10 +180,23 @@ export class Renderer {
       small = document.createElement('canvas');
       small.width = Math.max(1, cv.width >> 1);
       small.height = Math.max(1, cv.height >> 1);
-      small.getContext('2d')!.drawImage(cv, 0, 0, small.width, small.height);
+      const g = small.getContext('2d')!;
+      g.imageSmoothingQuality = 'high';
+      g.drawImage(cv, 0, 0, small.width, small.height);
       this.lodCache[level].set(cv, small);
     }
     return small;
+  }
+
+  /** Drawing with the lighter sprite copies because frames were slow. */
+  light = false;
+  private renderMs = 0;
+
+  /** Keeps a running average of render time and switches light mode with some slack. */
+  private noteRenderTime(ms: number): void {
+    this.renderMs = this.renderMs * 0.95 + ms * 0.05;
+    if (!this.light && this.renderMs > 14) this.light = true;
+    else if (this.light && this.renderMs < 3) this.light = false;
   }
 
   private blit(sp: Sprite, wx: number, wy: number, alpha = 1): void {
@@ -193,6 +209,15 @@ export class Renderer {
   // ---------------------------------------------------------------- main
 
   render(s: GameState, agents: Agent[], ov: Overlay, dt: number, animals: Animal[] = []): void {
+    const started = performance.now();
+    try {
+      this.renderFrame(s, agents, ov, dt, animals);
+    } finally {
+      this.noteRenderTime(performance.now() - started);
+    }
+  }
+
+  private renderFrame(s: GameState, agents: Agent[], ov: Overlay, dt: number, animals: Animal[]): void {
     this.time += dt;
     const c = this.ctx;
     const season = seasonOf(s.day);
@@ -805,11 +830,30 @@ export class Renderer {
     if (!this.showMarkers) return;
     if (hasProblem(b)) {
       this.drawMarker(b, '#e0a030', '?', b.lack);
-    } else if ((b.type === 'house' || b.type === 'townhall') && !b.upgrading && !upgradeBlocker(s, b)) {
+    } else if ((b.type === 'house' || b.type === 'townhall') && this.canUpgrade(s, b)) {
       this.drawMarker(b, b.type === 'townhall' ? '#c89a38' : '#4f8a3a', '↑');
     }
     void s;
   }
+
+  /**
+   * Whether a home or the manor could be upgraded now. Checking means
+   * scanning the town for wells, markets and taverns in reach, so it is
+   * worked out once per game day (or when buildings change), not every frame.
+   */
+  private canUpgrade(s: GameState, b: Building): boolean {
+    const key = `${s.day}:${s.buildings.length}:${Math.floor(s.res.gold)}`;
+    if (key !== this.upgradeKey) {
+      this.upgradeKey = key;
+      this.upgradable.clear();
+      for (const o of s.buildings) {
+        if ((o.type === 'house' || o.type === 'townhall') && o.build >= 1 && !o.upgrading && !upgradeBlocker(s, o)) this.upgradable.add(o.id);
+      }
+    }
+    return this.upgradable.has(b.id);
+  }
+  private upgradeKey = '';
+  private upgradable = new Set<number>();
 
   /** Trestle tables and bunting in the manor's yard for a month after a feast. */
   private drawFeast(b: Building): void {

@@ -62,9 +62,13 @@ export function isWinter(day: number): boolean {
 
 // ---------------------------------------------------------------- messages
 
+/** Most messages kept for the chronicle. */
+export const MAX_MESSAGES = 40;
+
 export function log(s: GameState, text: string, kind: MessageKind = 'info', at?: Building): void {
-  s.messages.push({ day: s.day, text, kind, ...(at ? { at: { x: at.x + at.w / 2, y: at.y + at.h / 2 } } : {}) });
-  if (s.messages.length > 40) s.messages.splice(0, s.messages.length - 40);
+  s.messageCount = (s.messageCount ?? s.messages.length) + 1;
+  s.messages.push({ day: s.day, text, kind, n: s.messageCount, ...(at ? { at: { x: at.x + at.w / 2, y: at.y + at.h / 2 } } : {}) });
+  if (s.messages.length > MAX_MESSAGES) s.messages.splice(0, s.messages.length - MAX_MESSAGES);
 }
 
 // ---------------------------------------------------------------- resources

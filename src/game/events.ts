@@ -1,6 +1,6 @@
 import { DAYS_PER_MONTH, DAYS_PER_YEAR } from './data';
 import type { StateRng } from './rng';
-import { store, totalHousing } from './sim';
+import { log, store, totalHousing } from './sim';
 import type { GameState, MessageKind, ResourceId } from './types';
 import { FOOD_IDS } from './data';
 
@@ -846,7 +846,7 @@ export function resolveEvent(s: GameState, rng: StateRng, choice: number): boole
   const c = e.choices(s)[choice];
   if (!c || c.blocked?.(s)) return false;
   const out = c.apply(s, rng);
-  s.messages.push({ day: s.day, text: `${e.title}: ${out.text}`, kind: out.kind });
+  log(s, `${e.title}: ${out.text}`, out.kind);
   s.pendingEvent = undefined;
   return true;
 }

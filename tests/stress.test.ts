@@ -248,6 +248,23 @@ describe('stress', () => {
     expect(s.population).toBeGreaterThanOrEqual(pop);
   });
 
+  it.runIf(process.env.STRESS)('thirty years: nothing drifts or piles up', { timeout: 1800000 }, () => {
+    for (const seed of [3, 6, 9]) {
+      const t = performance.now();
+      const { bad, s, hungry } = soak(seed, 30, 0.1);
+      const ms = (performance.now() - t) / (30 * DAYS_PER_YEAR);
+      const size = serialize(s).length;
+      console.log(
+        `seed ${seed}: pop ${s.population} tier ${s.tier} gold ${Math.round(s.res.gold)} prestige ${Math.round(s.res.prestige)} messages ${s.messages.length} history ${s.history.length} buildings ${s.buildings.length} save ${Math.round(size / 1024)}KB ${ms.toFixed(2)}ms/day hungry ${hungry} ${bad ?? 'ok'}`,
+      );
+      expect(bad).toBeNull();
+      // Bounded lists: the log keeps the last forty messages.
+      expect(s.messages.length).toBeLessThanOrEqual(40);
+      expect(size).toBeLessThan(1024 * 1024);
+      expect(ms).toBeLessThan(20);
+    }
+  });
+
   it.runIf(process.env.STRESS)('long soak: 10 maps for 15 years', { timeout: 1200000 }, () => {
     for (let seed = 1; seed <= 10; seed++) {
       const t = performance.now();

@@ -918,3 +918,15 @@ describe('steward on mills', () => {
     expect(s.messages.at(-1)?.text).toMatch(/wheat sits unground/);
   });
 });
+
+describe('chronicle', () => {
+  it('keeps the last forty messages and numbers every one', async () => {
+    const { log, MAX_MESSAGES } = await import('../src/game/sim');
+    const s = generateWorld(92);
+    const before = s.messageCount ?? s.messages.length;
+    for (let i = 0; i < 100; i++) log(s, `news ${i}`, 'good');
+    expect(s.messages.length).toBe(MAX_MESSAGES);
+    expect(s.messages.at(-1)?.n).toBe(before + 100);
+    expect(s.messages.at(-1)?.text).toBe('news 99');
+  });
+});

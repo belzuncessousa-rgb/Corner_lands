@@ -195,6 +195,8 @@ export interface Message {
   kind: MessageKind;
   /** Tile the message is about; clicking it centres the camera there. */
   at?: { x: number; y: number };
+  /** Running number, so the HUD knows what is new after old messages are trimmed. */
+  n?: number;
 }
 
 export interface MonthReport {
@@ -280,6 +282,8 @@ export interface GameState {
   moods?: { label: string; value: number; until: number }[];
   /** Year in which the lord last called a harvest feast. */
   lastFeast?: number;
+  /** Messages logged so far (numbers each one). */
+  messageCount?: number;
   /** Day the last feast was held (the manor stays decorated for a month). */
   feastDay?: number;
   /** Monthly snapshots, oldest first. */

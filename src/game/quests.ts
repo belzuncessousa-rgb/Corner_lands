@@ -1,5 +1,5 @@
 import { GOODS } from './data';
-import { sellPrice, store } from './sim';
+import { log, sellPrice, store } from './sim';
 import type { BuildingType, Cost, GameState, ResourceId } from './types';
 
 export interface Quest {
@@ -241,7 +241,7 @@ export function checkQuests(s: GameState): Quest[] {
       .map(([k, v]) => `${v} ${GOODS[k as keyof Cost].name.toLowerCase()}`)
       .join(', ');
     const note = sold ? ` (the stores were full, so some was sold for ${sold} coins)` : '';
-    s.messages.push({ day: s.day, text: `Objective complete: ${q.title}. Reward: ${reward}${note}.`, kind: 'good' });
+    log(s, `Objective complete: ${q.title}. Reward: ${reward}${note}.`, 'good');
     done.push(q);
   }
   return done;

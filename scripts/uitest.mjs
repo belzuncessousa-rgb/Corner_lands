@@ -160,11 +160,20 @@ await page.click('#inspector [data-action="retinue"]');
 check('raise a retinue', (await page.evaluate(() => window.game.state.retinue)) === true);
 await page.evaluate(() => { window.game.state.tier = 1; });
 await page.evaluate(() => window.game.select(null));
+// A long game: once the chronicle is full, new news still shows.
+const late = await page.evaluate(() => {
+  const g = window.game;
+  for (let i = 0; i < 60; i++) { window.cl.log(g.state, `Old news ${i}`, 'good'); g.hud.update(); }
+  window.cl.log(g.state, 'Fresh news after a long game', 'good');
+  g.hud.update();
+  return [...document.querySelectorAll('#log .msg')].some((e) => e.textContent.includes('Fresh news'));
+});
+check('news still shows once the chronicle is full', late);
 // Pause on bad news, switched on in the menu.
 await page.keyboard.press('Escape');
 await page.click('[data-m="pausebad"]');
 await page.click('[data-m="resume"]');
-await page.evaluate(() => { const g = window.game; g.setSpeed(1); g.state.messages.push({ day: g.state.day, text: 'Food shortage! 3 villagers went hungry.', kind: 'bad' }); g.hud.update(); });
+await page.evaluate(() => { const g = window.game; g.setSpeed(1); window.cl.log(g.state, 'Food shortage! 3 villagers went hungry.', 'bad'); g.hud.update(); });
 await page.waitForTimeout(300);
 check('bad news pauses the game when asked', (await page.evaluate(() => window.game.speed)) === 0);
 await page.evaluate(() => localStorage.removeItem('cornerlands.pauseOnBad'));
