@@ -1916,3 +1916,6 @@ table.prod td.num {
   .map-preview { flex-direction: column; align-items: stretch; }
   .map-preview canvas { width: 100%; height: auto; }
 }
+
+/* A villager's passing thought. */
+#inspector .thought { font-style: italic; margin: 8px 2px 2px; color: var(--ink-soft); line-height: 1.35; }

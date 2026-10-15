@@ -223,15 +223,7 @@ export const QUESTS: Quest[] = [
     reward: { gold: 500 },
     done: (s) => s.tier >= 4,
   },
-];
-
-export function activeQuests(s: GameState, n = 3): Quest[] {
-  return QUESTS.filter((q) => !s.quests.includes(q.id)).slice(0, n);
-}
-
-/** Completes any active quests that are satisfied and grants rewards. */
-export function checkQuests(s: GameState): Quest[] {
-  const done: Quest[] = [  {
+  {
     id: 'cathedral',
     title: 'Raise a cathedral',
     hint: 'The great work of a lifetime (Civic menu): a fortune in coin, dressed stone and tiles, most of a year to build. It cheers the whole town and brings prestige every month.',
@@ -246,6 +238,14 @@ export function checkQuests(s: GameState): Quest[] {
     done: (s) => count(s, 'wall') >= 40,
   },
 ];
+
+export function activeQuests(s: GameState, n = 3): Quest[] {
+  return QUESTS.filter((q) => !s.quests.includes(q.id)).slice(0, n);
+}
+
+/** Completes any active quests that are satisfied and grants rewards. */
+export function checkQuests(s: GameState): Quest[] {
+  const done: Quest[] = [];
   for (const q of activeQuests(s, 3)) {
     if (!q.done(s)) continue;
     s.quests.push(q.id);

@@ -48,6 +48,8 @@ export interface Overlay {
   hover?: { x: number; y: number };
   /** Range circle in tile coordinates. */
   range?: { cx: number; cy: number; r: number; highlight?: (i: number) => boolean };
+  /** The villager selected on the map (their key). */
+  agent?: string;
   /** Reach of every well (or market, tavern, church) and which homes it covers. */
   coverage?: { circles: { cx: number; cy: number; r: number }[]; homes: Map<number, boolean> };
 }
@@ -198,7 +200,7 @@ export class Renderer {
   private noteRenderTime(ms: number): void {
     this.renderMs = this.renderMs * 0.95 + ms * 0.05;
     if (!this.light && this.renderMs > 14) this.light = true;
-    else if (this.light && this.renderMs < 3) this.light = false;
+    else if (this.light && this.renderMs < 6) this.light = false;
   }
 
   private blit(sp: Sprite, wx: number, wy: number, alpha = 1): void {
@@ -220,10 +222,16 @@ export class Renderer {
   }
 
   private coverageHomes: Map<number, boolean> | null = null;
+  private selectedAgent: string | null = null;
+  /** Buildings by id, rebuilt each frame (walls look up their neighbours). */
+  private byId = new Map<number, Building>();
 
   private renderFrame(s: GameState, agents: Agent[], ov: Overlay, dt: number, animals: Animal[]): void {
     this.time += dt;
     this.coverageHomes = ov.coverage?.homes ?? null;
+    this.selectedAgent = ov.agent ?? null;
+    this.byId.clear();
+    for (const b of s.buildings) this.byId.set(b.id, b);
     const c = this.ctx;
     const season = seasonOf(s.day);
     const z = this.cam.zoom;
@@ -917,7 +925,7 @@ export class Renderer {
       const ny = y + dy;
       if (!inBounds(s, nx, ny)) return { wall: false, road: false };
       const i = idx(s, nx, ny);
-      const o = s.occ[i] >= 0 ? s.buildings.find((q) => q.id === s.occ[i]) : undefined;
+      const o = s.occ[i] >= 0 ? this.byId.get(s.occ[i]) : undefined;
       return { wall: o?.type === 'wall' && o.build >= 1, road: s.road[i] > 0 };
     };
     const gate = at(1, 0).road || at(-1, 0).road || at(0, 1).road || at(0, -1).road;
@@ -1161,6 +1169,14 @@ export class Renderer {
     const bob = walking ? Math.abs(Math.sin(a.step)) * 1.2 : 0;
     const legA = walking ? Math.sin(a.step) * 2 : 0;
     c.globalAlpha = a.fadeIn;
+    if (a.key === this.selectedAgent) {
+      // A gold ring at the feet of the villager being looked at.
+      c.strokeStyle = '#e8c048';
+      c.lineWidth = 1.6;
+      c.beginPath();
+      c.ellipse(wx, wy, 6.5, 3, 0, 0, Math.PI * 2);
+      c.stroke();
+    }
     // Shadow.
     c.fillStyle = 'rgba(20,20,10,0.3)';
     c.beginPath();

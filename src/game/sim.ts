@@ -872,7 +872,9 @@ export function recompute(s: GameState): void {
     b.workers = 0;
     b.builders = 0;
     // Pausing stops a workplace's production, not building work on it.
-    if (isProject(b)) jobs.push({ b, site: true, p: 100 + SITE_PRIORITY + b.id * 1e-6 });
+    // Town wall sections are a long project: after every workplace, so the
+    // masons who make their stone keep working.
+    if (isProject(b)) jobs.push({ b, site: true, p: 100 + (b.type === 'wall' ? WALL_SITE_PRIORITY : SITE_PRIORITY) + b.id * 1e-6 });
     if (b.paused) continue;
     if (b.build >= 1 && workDef(b).workers > 0 && (b.want ?? 1) > 0 && !restingNow(s, b)) {
       // Families working a craft from home always tend to it first.
@@ -881,7 +883,7 @@ export function recompute(s: GameState): void {
   }
   jobs.sort((a, c) => a.p - c.p || a.b.id - c.b.id);
   for (const j of jobs) {
-    const n = Math.min(free, j.site ? SITE_BUILDERS : Math.min(workersOf(j.b), j.b.want ?? Infinity));
+    const n = Math.min(free, j.site ? (j.b.type === 'wall' ? 1 : SITE_BUILDERS) : Math.min(workersOf(j.b), j.b.want ?? Infinity));
     if (j.site) j.b.builders = n;
     else j.b.workers = n;
     free -= n;
@@ -1085,6 +1087,7 @@ export function labourSummary(s: GameState): LabourSummary {
 /** Builders each construction site employs before idle villagers join in. */
 export const SITE_BUILDERS = 2;
 const SITE_PRIORITY = 1.5;
+const WALL_SITE_PRIORITY = 6;
 
 // ---------------------------------------------------------------- production
 

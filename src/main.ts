@@ -17,6 +17,7 @@ import {
   lockReason,
   isUnlocked,
   coveredBy,
+  hasProblem,
   monthOf,
   placeOrder,
   placementError,
@@ -40,6 +41,7 @@ import type { Building, BuildingType, GameState } from './game/types';
 import { FOOD_IDS } from './game/data';
 import { generateWorld, idx, inBounds } from './game/world';
 import { demolishWithUndo, undoPlacement, type UndoStep } from './game/undo';
+import type { Agent } from './render/agents';
 import { AgentSystem } from './render/agents';
 import { Wildlife } from './render/wildlife';
 import { type Overlay, Renderer } from './render/renderer';
@@ -96,10 +98,10 @@ export class Game {
   coverage: BuildingType | null = null;
 
   /** The last placement or demolition, which may be taken back for a few seconds. */
-  private undoStep: { step: UndoStep; until: number } | null = null;
+  private undoStep: { step: UndoStep; until: number; state: GameState } | null = null;
 
   offerUndo(step: UndoStep): void {
-    this.undoStep = { step, until: performance.now() + UNDO_MS };
+    this.undoStep = { step, until: performance.now() + UNDO_MS, state: this.state };
     this.hud.showUndo(step.label, UNDO_MS);
   }
 
@@ -116,7 +118,7 @@ export class Game {
     const u = this.undoStep;
     this.undoStep = null;
     this.hud.showUndo(null, 0);
-    if (!u || performance.now() > u.until) return;
+    if (!u || performance.now() > u.until || u.state !== this.state) return;
     const err = u.step.revert(this.state);
     if (err) this.hud.flash(err);
     else {
@@ -189,6 +191,10 @@ export class Game {
   }
 
   private afterLoad(): void {
+    // Undo belongs to the game it was made in.
+    this.undoStep = null;
+    this.hud.showUndo(null, 0);
+    this.selectedAgent = null;
     this.demo = false;
     this.renderer.showMarkers = true;
     document.getElementById('ui')!.classList.remove('demo');
@@ -290,11 +296,14 @@ export class Game {
   private overlay(): Overlay {
     const ov: Overlay = {};
     const s = this.state;
+    if (this.selectedAgent) ov.agent = this.selectedAgent;
     if (this.coverage) {
       const type = this.coverage;
+      // The same buildings coveredBy counts: staffed ones, and a cathedral for the church.
       const circles = s.buildings
-        .filter((b) => b.type === type && b.build >= 1)
-        .map((b) => ({ cx: bCenter(b).x, cy: bCenter(b).y, r: BUILDINGS[type].radius }));
+        .filter((b) => (b.type === type || (type === 'church' && b.type === 'cathedral')) && b.build >= 1)
+        .filter((b) => BUILDINGS[b.type].workers === 0 || (b.workers > 0 && !hasProblem(b)))
+        .map((b) => ({ cx: bCenter(b).x, cy: bCenter(b).y, r: BUILDINGS[b.type].radius }));
       const homes = new Map<number, boolean>();
       for (const b of s.buildings) if (b.type === 'house' && b.build >= 1) homes.set(b.id, coveredBy(s, b, type));
       ov.coverage = { circles, homes };
@@ -552,6 +561,7 @@ export class Game {
 
   select(id: number | null): void {
     this.selected = id;
+    this.selectedAgent = null;
     this.hud.update();
   }
 
@@ -599,10 +609,39 @@ export class Game {
         this.select(null);
         return;
       }
+      // A villager under the cursor comes before the building behind them.
+      const folk = this.pickAgent(sx, sy);
+      if (folk) {
+        this.select(null);
+        this.selectedAgent = folk.key;
+        this.hud.update();
+        this.hud.closeCategory();
+        return;
+      }
       const occ = this.pickBuilding(sx, sy);
       this.select(occ);
       this.hud.closeCategory();
     }
+  }
+
+  /** The villager selected on the map (their key), if any. */
+  selectedAgent: string | null = null;
+
+  /** The villager whose figure is under the cursor, if any. */
+  private pickAgent(sx: number, sy: number): Agent | null {
+    const z = this.renderer.cam.zoom;
+    let best: Agent | null = null;
+    let bestD = 9 * z;
+    for (const a of this.agents.agents) {
+      if (!a.visible || a.fadeIn < 0.5 || a.role.kind === 'cart') continue;
+      const [px, py] = this.renderer.tileToScreen(a.x + a.ox * 0.25, a.y + a.oy * 0.25);
+      const d = Math.hypot(px - sx, py - 8 * z - sy);
+      if (d < bestD) {
+        bestD = d;
+        best = a;
+      }
+    }
+    return best;
   }
 
   /** Picks the building under the cursor, accounting for sprite height. */
@@ -782,7 +821,7 @@ export class Game {
         if (this.tool.kind === 'road' && this.roadAnchor) this.roadAnchor = null;
         else if (this.tool.kind === 'zone' && this.zoneAnchor) this.zoneAnchor = null;
         else if (this.tool.kind !== 'select') this.setTool({ kind: 'select' });
-        else if (this.selected !== null) this.select(null);
+        else if (this.selected !== null || this.selectedAgent) this.select(null);
         else if (this.hud.categoryOpen) this.hud.closeCategory();
         else this.hud.showGameMenu();
         return;

@@ -482,7 +482,7 @@ export const EVENTS: DecisionEvent[] = [
     title: 'A Wandering Monk',
     text: () =>
       'A barefoot monk asks for a corner to pray in and a little bread. In return, he offers to preach and to teach the children their letters.',
-    weight: (s) => (s.population >= 15 && !s.buildings.some((b) => b.type === 'church' && b.build >= 1) ? 2 : 0),
+    weight: (s) => (s.population >= 15 && !s.buildings.some((b) => (b.type === 'church' || b.type === 'cathedral') && b.build >= 1) ? 2 : 0),
     choices: () => [
       {
         label: 'Give him lodging',

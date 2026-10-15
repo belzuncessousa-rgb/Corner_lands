@@ -130,6 +130,8 @@ then fall back to the browser's localStorage.
 - **Production chains** — the Production Book shows each chain (wheat → flour →
   bread, ore → iron → tools...) with last month's making and using, and flags
   the weakest link.
+- **Villagers** — click anyone walking the map to meet them: their name, trade,
+  home and what is on their mind (often what their home is missing).
 - **Steward, chronicle & ledger** — timely advice, the full story of your lands
   and monthly charts.
 - **Settings** — the game menu (Esc) scales every panel from 85% to 130% and

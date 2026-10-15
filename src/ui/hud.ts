@@ -85,6 +85,7 @@ import type { Game } from '../main';
 import { CATEGORY_ICONS, ICONS, SEASON_ICONS } from './icons';
 import { Minimap } from './minimap';
 import { Ambient } from './ambient';
+import { folkDoing, folkName, folkThought, workplaceOf } from './folk';
 
 const ZONE_COST_NOTE: Partial<Record<BuildingType, string>> = {
   field: '<small>Free · draw it</small>',
@@ -643,6 +644,10 @@ export class Hud {
     const s = g.state;
     const b = g.selected !== null ? s.buildings.find((o) => o.id === g.selected) : undefined;
     const box = this.el.inspector;
+    if (!b && g.selectedAgent) {
+      this.villagerCard(box);
+      return;
+    }
     if (!b) {
       box.style.display = 'none';
       this.lastInspectorKey = '';
@@ -1678,6 +1683,30 @@ export class Hud {
       this.closeModal(true);
       this.game.setSpeed(1);
     });
+  }
+
+  /** A card for the villager selected on the map: name, trade, home and a passing thought. */
+  private villagerCard(box: HTMLElement): void {
+    const g = this.game;
+    const s = g.state;
+    const a = g.agents.agents.find((x) => x.key === g.selectedAgent);
+    if (!a) {
+      g.selectedAgent = null;
+      box.style.display = 'none';
+      return;
+    }
+    const home = s.buildings.find((x) => x.id === a.home);
+    const work = workplaceOf(s, a);
+    const key = JSON.stringify(['folk', a.key, a.role, home?.unmet, s.report.shortage, monthOf(s.day)]);
+    if (key === this.lastInspectorKey) return;
+    this.lastInspectorKey = key;
+    box.style.display = 'block';
+    box.innerHTML = `<button class="close" data-action="deselect">✕</button>
+      <h2>${esc(folkName(s, a))}</h2>
+      <div class="desc">${esc(folkDoing(s, a))}</div>
+      ${home ? `<div class="kv link" data-action="goto-b" data-id="${home.id}"><span>Lives in</span><span>${esc(buildingName(home))}</span></div>` : ''}
+      ${work ? `<div class="kv link" data-action="goto-b" data-id="${work.id}"><span>${a.role.kind === 'build' ? 'Building' : 'Works at'}</span><span>${esc(buildingName(work))}</span></div>` : ''}
+      <p class="thought">“${esc(folkThought(s, a))}”</p>`;
   }
 
   /** The land a seed makes, from above, with what lies near the starting manor. */

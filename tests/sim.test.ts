@@ -1059,3 +1059,28 @@ describe('town walls', () => {
     expect(EVENTS.find((e) => e.id === 'wolves')!.choices(s)[0].label).toBe('Shut the gates');
   });
 });
+
+describe('review fixes', () => {
+  it('the late objectives are listed, and nothing completes on a fresh map', async () => {
+    const { QUESTS, checkQuests } = await import('../src/game/quests');
+    const ids = QUESTS.map((q) => q.id);
+    expect(ids).toContain('cathedral');
+    expect(ids).toContain('walls');
+    expect(checkQuests(generateWorld(99)).map((q) => q.id)).toEqual([]);
+  });
+
+  it('wall sites do not take the masons from their work', async () => {
+    const { placeOrder } = await import('../src/game/sim');
+    const s = generateWorld(100);
+    s.tier = 4;
+    s.res.gold = 9999;
+    const mason = placeNearRoad(s, 'stonemason');
+    mason.build = 1;
+    mason.need = undefined;
+    const h = hall(s);
+    for (let x = h.x - 10; x < h.x + 12; x++) placeOrder(s, 'wall', x, h.y - 9);
+    s.population = 6;
+    recompute(s);
+    expect(mason.workers).toBeGreaterThan(0);
+  });
+});

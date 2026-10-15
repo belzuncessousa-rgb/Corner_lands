@@ -26,7 +26,8 @@ export function undoPlacement(b: Building): UndoStep {
       if (!d.zone && o.build >= 1) return 'It is already built';
       // What builders carried over goes back to the stores, the rest of the cost too.
       const back = d.zone ? {} : deliveredTo(o);
-      for (const k in paid) s.res[k as ResourceId] += paid[k as ResourceId] ?? 0;
+      s.res.gold += paid.gold ?? 0;
+      for (const k in paid) if (k !== 'gold') store(s, k as ResourceId, paid[k as ResourceId] ?? 0);
       for (const k in back) store(s, k as ResourceId, back[k as ResourceId] ?? 0);
       removeQuietly(s, o);
       return null;
