@@ -183,7 +183,7 @@ A ten-seed sweep of the autoplayer exposed stalls a player can hit too.
 - [x] Steward warns when wheat piles up faster than the mills grind it (suggest a second windmill or bakery)
 - [x] Goods diagnose themselves (who makes, who waits); map markers show the missing good; needs overview per home need
 - [x] Feast visuals: trestle tables and bunting at the manor in the month of a feast
-- [ ] Late-game balance: twelve-year bot runs reach the Castle on most maps (check prestige and arms costs)
+- [x] Late-game balance: twelve-year bot runs reach the Castle on most maps (check prestige and arms costs)
 
 ### Phase 10 — Lessons from player research (for the scheduled runs)
 Research into what players praise and criticise in Manor Lords, Banished,

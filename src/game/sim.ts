@@ -517,10 +517,18 @@ export function enoughOf(s: GameState, out: Cost): ResourceId | null {
   for (const k in out) {
     const id = k as ResourceId;
     if (id === 'gold' || id === 'prestige') return null;
-    if (s.res[id] < keepOf(s, id)) return null;
+    // Materials still owed to building sites come on top of the stock target.
+    if (s.res[id] < keepOf(s, id) + owedTo(s, id)) return null;
     first ??= id;
   }
   return first;
+}
+
+/** How much of a good unfinished buildings and renovations still wait for. */
+export function owedTo(s: GameState, id: ResourceId): number {
+  let n = 0;
+  for (const b of s.buildings) n += b.need?.[id] ?? 0;
+  return n;
 }
 
 /** Goods the settlement has ever held, for menus that hide unknown goods. */

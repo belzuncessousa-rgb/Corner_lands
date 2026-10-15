@@ -522,7 +522,7 @@ export class Hud {
           <td class="ic">${ICONS[r]}</td><td>${g.name}${wanted ? ' <span class="neg" title="Workplaces are waiting for this">⚠</span>' : ''}</td>
           <td class="num"><b>${Math.floor(s.res[r])}</b></td>
           <td class="num flow ${flow > 0 ? 'pos' : flow < 0 ? 'neg' : ''}">${flow > 0 ? '+' : ''}${flow || ''}</td>
-          <td class="keep" data-tip="<b>Keep in stock</b><br>Workers making ${g.name.toLowerCase()} rest once there are ${keep}${market ? '; merchants buy what is above it if you sell' : ''}."><button data-action="keep" data-res="${r}" data-d="-10">−</button><span>${keep}</span><button data-action="keep" data-res="${r}" data-d="10">+</button></td>
+          <td class="keep" data-tip="<b>Keep in stock</b><br>Workers making ${g.name.toLowerCase()} rest once there are ${keep}, plus whatever building sites still need${market ? '; merchants buy what is above it if you sell' : ''}."><button data-action="keep" data-res="${r}" data-d="-10">−</button><span>${keep}</span><button data-action="keep" data-res="${r}" data-d="10">+</button></td>
           ${market && g.price ? `<td><button class="sell ${sell ? 'active' : ''}" data-action="sell" data-res="${r}" data-tip="${sell ? 'Selling the surplus above the target to merchants. Click to stop.' : 'Sell the surplus above the target to visiting merchants.'}">${ICONS.gold}</button></td>` : '<td></td>'}
         </tr>`;
       })

@@ -250,6 +250,7 @@ export interface BotReport {
   villageYear: number | null;
   townYear: number | null;
   boroughYear: number | null;
+  cityYear: number | null;
   log: string[];
 }
 
@@ -259,7 +260,7 @@ export function playBot(s: GameState, years: number, seed = 1): BotReport {
     r = (r * 1103515245 + 12345) & 0x7fffffff;
     return r / 0x7fffffff;
   };
-  const rep: BotReport = { villageYear: null, townYear: null, boroughYear: null, log: [] };
+  const rep: BotReport = { villageYear: null, townYear: null, boroughYear: null, cityYear: null, log: [] };
   for (let day = 0; day < years * 120; day++) {
     if (day % 5 === 0) act(s, rand);
     stepDay(s);
@@ -267,6 +268,7 @@ export function playBot(s: GameState, years: number, seed = 1): BotReport {
     if (s.tier >= 1 && rep.villageYear === null) rep.villageYear = year;
     if (s.tier >= 2 && rep.townYear === null) rep.townYear = year;
     if (s.tier >= 3 && rep.boroughYear === null) rep.boroughYear = year;
+    if (s.tier >= 4 && rep.cityYear === null) rep.cityYear = year;
     if (s.day % (DAYS_PER_MONTH * 12) === 0) {
       rep.log.push(
         `y${s.day / 120} pop=${s.population}/${totalHousing(s)} happy=${s.happiness} food=${Math.floor(totalFood(s))} wood=${Math.floor(s.res.wood)} stone=${Math.floor(s.res.stone)} planks=${Math.floor(s.res.planks)} tools=${s.res.tools} gold=${Math.floor(s.res.gold)} tier=${s.tier} b=${s.buildings.length}`,
@@ -329,7 +331,8 @@ function renovate(s: GameState): void {
   const plan = hall ? upgradePlan(s, hall) : null;
   let saving = false;
   if (hall && plan && !hall.upgrading && plan.reqs.every((r) => r.met)) {
-    if (!upgradeBlocker(s, hall) && affordsWithPromises(s, plan.cost)) {
+    // The manor goes first: start as soon as it is allowed and let the builders fetch materials as they come.
+    if (!upgradeBlocker(s, hall) && (s.tier >= 3 || affordsWithPromises(s, plan.cost))) {
       startUpgrade(s, hall);
     } else {
       // Save up for the manor: buy what is missing, and renovate one home at a time.

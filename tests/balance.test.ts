@@ -17,6 +17,8 @@ describe('balance', () => {
     // Every map reaches Town; the crude bot should reach Borough on most.
     for (const r of results) expect(r.townYear).not.toBeNull();
     expect(results.filter((r) => r.boroughYear !== null).length).toBeGreaterThanOrEqual(2);
+    // The castle crowns the late game: most maps get there within twelve years.
+    expect(results.filter((r) => r.cityYear !== null).length).toBeGreaterThanOrEqual(2);
   });
 
   // Slow: run with SWEEP=1 after changing the economy or the autoplayer.
