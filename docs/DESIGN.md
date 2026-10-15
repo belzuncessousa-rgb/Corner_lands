@@ -199,9 +199,17 @@ are listed in the README.
 When a phase is done, keep going: stress the game harder, look for new
 player insights on the web, and add what you learn here as new items.
 Save size was checked (about 200 KB after twenty years, fine for browser storage).
-- [ ] Production chains view in the Production Book: wheat → flour → bread drawn as a chain, each link showing made vs used last month and the weakest link highlighted (players say Anno's numbers do not diagnose)
+- [x] Production chains view in the Production Book: wheat → flour → bread drawn as a chain, each link showing made vs used last month and the weakest link highlighted (players say Anno's numbers do not diagnose)
 - [x] Coverage overlay (V): a toggle that tints the map by well, market, tavern and church reach, so homes out of reach stand out
 - [x] Undo the last placement or demolition (a few seconds' grace, refunding fully)
 - [x] Thirty-year soak with the meddling monkey (STRESS=1): watch for drift (gold or prestige running away, message and chronicle growth, frame time at 300+ villagers)
 - [x] Gold sinks for the late game (yearly fairs that grow dearer; the Cathedral great work): towns sit on 20,000+ coins after twenty years (the thirty-year soak); e.g. a cathedral or town walls built over years, festivals, buying land or charters with coin
-- [ ] Research pass: recent reviews of cozy city builders (2025–2026) for complaints this game could answer; add the best as items
+- [x] Research pass: recent reviews of cozy city builders (2025–2026) for complaints this game could answer; add the best as items
+
+### Phase 12 — Next ideas (for the scheduled runs)
+From the research pass (late-game variety is the most common complaint
+about medieval builders, Manor Lords' own roadmap included) and the soaks.
+- [ ] A second great work for Cities (town walls with gatehouses, built in sections), so the castle is not the end of the road
+- [ ] Late-game events that use the retinue, fairs and charters (a royal visit, a rival lord's challenge, a plague the apothecaries can fight)
+- [ ] Chronicle as a story: a year-end page summing up the year (harvest, newcomers, buildings raised, events)
+- [ ] Performance: draw static buildings into cached chunks when the camera stands still (large towns on machines without GPU canvas)

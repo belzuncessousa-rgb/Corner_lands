@@ -124,6 +124,9 @@ then fall back to the browser's localStorage.
 - **Events** — once or twice a year something happens (wanderers, a merchant,
   wolves, a harvest feast, the king's tax collector...) and you choose what to
   do.
+- **Production chains** — the Production Book shows each chain (wheat → flour →
+  bread, ore → iron → tools...) with last month's making and using, and flags
+  the weakest link.
 - **Steward, chronicle & ledger** — timely advice, the full story of your lands
   and monthly charts.
 - **Settings** — the game menu (Esc) scales every panel from 85% to 130% and

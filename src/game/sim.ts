@@ -1136,7 +1136,11 @@ export function charterBonus(s: GameState, b: Building, id: ResourceId): number 
 function addOutput(s: GameState, b: Building, out: Cost): boolean {
   if (fullFor(s, out)) return false;
   const bonus = b.trade ? HOME_TRADE_BONUS : 1;
-  for (const k in out) b.output += store(s, k as ResourceId, (out[k as ResourceId] ?? 0) * bonus * charterBonus(s, b, k as ResourceId));
+  for (const k in out) {
+    const n = store(s, k as ResourceId, (out[k as ResourceId] ?? 0) * bonus * charterBonus(s, b, k as ResourceId));
+    b.output += n;
+    tally(s, 'making', k as ResourceId, n);
+  }
   return true;
 }
 
@@ -1190,7 +1194,7 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
       // Deep shafts never exhaust a vein.
       if (!(b.type === 'mine' && hasCharter(s, 'metal1'))) arr[t]--;
       // Precious veins: now and then a load of silver.
-      if (b.type === 'mine' && hasCharter(s, 'metal2') && rng.next() < 0.3) b.output += store(s, 'silver', 1);
+      if (b.type === 'mine' && hasCharter(s, 'metal2') && rng.next() < 0.3) b.output += produced(s, 'silver', 1);
       addOutput(s, b, d.outputs);
       return null;
     }
@@ -1226,7 +1230,7 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
       const amount = Math.max(1, Math.round((d.outputs.meat ?? 0) * Math.min(1, forest / 40)));
       addOutput(s, b, { meat: amount });
       // Every few kills bring a hide worth tanning.
-      if (rng.next() < 0.5) store(s, 'hides', 1);
+      if (rng.next() < 0.5) produced(s, 'hides', 1);
       return null;
     }
     case 'claypit': {
@@ -1284,6 +1288,7 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
         for (const k in inputs) s.res[k as ResourceId] += inputs[k as ResourceId] ?? 0;
         return 'Storage full';
       }
+      for (const k in inputs) tally(s, 'using', k as ResourceId, inputs[k as ResourceId] ?? 0);
       return null;
     }
   }
@@ -1358,6 +1363,61 @@ export function harvestForecast(s: GameState): { kind: StorageKind; expected: nu
     expected: expected[kind]!,
     room: Math.max(0, storageCap(s, kind) - stored(s, kind)) + Math.floor((barns * expected[kind]!) / all),
   }));
+}
+
+/** Stores what a herd, orchard, yard or gatherer brought in, and counts it as made. */
+function produced(s: GameState, id: ResourceId, n: number): number {
+  const k = store(s, id, n);
+  tally(s, 'making', id, k);
+  return k;
+}
+
+function tally(s: GameState, key: 'making' | 'using', id: ResourceId, n: number): void {
+  if (n <= 0) return;
+  const t = (s[key] ??= {});
+  t[id] = (t[id] ?? 0) + n;
+}
+
+/** Production chains, raw good first, as the Production Book shows them. */
+export const CHAINS: { name: string; links: ResourceId[] }[] = [
+  { name: 'Bread', links: ['grain', 'flour', 'bread'] },
+  { name: 'Ale', links: ['barley', 'ale'] },
+  { name: 'Cider', links: ['apples', 'cider'] },
+  { name: 'Cheese', links: ['milk', 'cheese'] },
+  { name: 'Clothes', links: ['wool', 'cloth', 'clothes'] },
+  { name: 'Linen', links: ['flax', 'cloth'] },
+  { name: 'Boots', links: ['hides', 'leather', 'boots'] },
+  { name: 'Tools', links: ['ore', 'iron', 'tools'] },
+  { name: 'Wood', links: ['wood', 'planks', 'woodparts'] },
+  { name: 'Stone', links: ['stone', 'dressedstone'] },
+  { name: 'Tiles', links: ['clay', 'tiles'] },
+  { name: 'Medicine', links: ['herbs', 'medicine'] },
+];
+
+export interface ChainLink {
+  id: ResourceId;
+  stock: number;
+  made: number;
+  used: number;
+}
+
+/**
+ * A chain's links with last month's figures, and its weakest link: the first
+ * good the next workshop used faster than it was made while stocks ran low,
+ * or a good piling up because the next workshop cannot keep up.
+ */
+export function chainReport(s: GameState, links: ResourceId[]): { links: ChainLink[]; weak: number | null; why: string | null } {
+  const rows = links.map((id) => ({ id, stock: Math.floor(s.res[id]), made: Math.round(s.made?.[id] ?? 0), used: Math.round(s.used?.[id] ?? 0) }));
+  for (let i = 0; i < rows.length - 1; i++) {
+    const r = rows[i];
+    const next = rows[i + 1];
+    const name = GOODS[r.id].name.toLowerCase();
+    if (r.used > r.made && r.stock < Math.max(10, r.used)) return { links: rows, weak: i, why: `Short of ${name}: the next workshop used ${r.used} but only ${r.made} were made` };
+    if (r.stock >= keepOf(s, r.id) * 0.8 && r.made > 0 && next.made < r.made / 2) {
+      return { links: rows, weak: i + 1, why: `${GOODS[r.id].name} piles up: the ${GOODS[next.id].name.toLowerCase()} makers cannot keep up` };
+    }
+  }
+  return { links: rows, weak: null, why: null };
 }
 
 /** The day's harvest across every farm, summed up in one message. */
@@ -1452,6 +1512,7 @@ function stepFarm(s: GameState, b: Building): void {
         if (barned > 0) b.barn = { ...b.barn, [good]: (b.barn?.[good] ?? 0) + barned };
         inBarn += barned;
         got[good] = (got[good] ?? 0) + n + barned;
+        tally(s, 'making', good, n + barned);
         b.output += n + barned;
         f.lastOutput = n + barned;
         const lost = amount - n - barned;
@@ -1558,7 +1619,7 @@ function stepByre(s: GameState, b: Building): void {
     const n = Math.floor(b.work);
     if (n > 0) {
       b.work -= n;
-      b.output += store(s, 'milk', n);
+      b.output += produced(s, 'milk', n);
     }
     b.status = `Milking ${b.herd} cattle`;
   } else {
@@ -1577,7 +1638,7 @@ function monthlyHerds(s: GameState, month: number): void {
     if (month === 1 && herd > 0) {
       b.herd = Math.min(capy.fed, herd + Math.max(1, Math.round(herd * HERDS[kind].births)));
       if (kind === 'sheep' && staffed) {
-        const n = store(s, 'wool', Math.round(herd * 2 * (hasCharter(s, 'herd1') ? 1.3 : 1)));
+        const n = produced(s, 'wool', Math.round(herd * 2 * (hasCharter(s, 'herd1') ? 1.3 : 1)));
         b.output += n;
         if (n) log(s, `Shearing time: ${n} wool from the flock.`, 'info', b);
       }
@@ -1589,7 +1650,7 @@ function monthlyHerds(s: GameState, month: number): void {
         b.herd = herd - cull;
         const got: string[] = [];
         const add = (id: ResourceId, n: number) => {
-          const k = store(s, id, n);
+          const k = produced(s, id, n);
           if (k) got.push(`${k} ${GOODS[id].name.toLowerCase()}`);
           b.output += k;
         };
@@ -1646,7 +1707,7 @@ function stepOrchardist(s: GameState, b: Building): void {
     const n = Math.min(Math.floor(o.growth), Math.ceil(pick));
     if (n <= 0) continue;
     const good = (o.recipe ?? 'apples') as ResourceId;
-    const k = store(s, good, n);
+    const k = produced(s, good, n);
     o.growth -= n;
     o.lastOutput += k;
     b.output += k;
@@ -1706,10 +1767,10 @@ export function setYard(s: GameState, b: Building, kind: string | undefined): st
 function monthlyYards(s: GameState, month: number): void {
   for (const b of s.buildings) {
     if (b.type !== 'house' || !b.yard || b.residents === 0) continue;
-    if (b.yard === 'veg' && month >= 3 && month <= 8) b.lastOutput = store(s, 'vegetables', 3);
-    else if (b.yard === 'hens') b.lastOutput = store(s, 'eggs', month >= 9 ? 1 : 3);
+    if (b.yard === 'veg' && month >= 3 && month <= 8) b.lastOutput = produced(s, 'vegetables', 3);
+    else if (b.yard === 'hens') b.lastOutput = produced(s, 'eggs', month >= 9 ? 1 : 3);
     else if (b.yard === 'bees' && month === 6) {
-      b.lastOutput = store(s, 'honey', Math.round(8 * (hasCharter(s, 'orchard1') ? 1.3 : 1) * (hasCharter(s, 'orchard3b') ? 2 : 1)));
+      b.lastOutput = produced(s, 'honey', Math.round(8 * (hasCharter(s, 'orchard1') ? 1.3 : 1) * (hasCharter(s, 'orchard3b') ? 2 : 1)));
     }
   }
 }
@@ -2045,6 +2106,11 @@ export function monthly(s: GameState, rng: StateRng): void {
   updateTier(s);
   checkQuests(s);
   advise(s, month);
+  // What was made and used this month becomes last month's tally.
+  s.made = s.making ?? {};
+  s.used = s.using ?? {};
+  s.making = {};
+  s.using = {};
   // Monthly change of every stock, for the top bar.
   const prev = s.lastMonth ?? {};
   s.flow = {};

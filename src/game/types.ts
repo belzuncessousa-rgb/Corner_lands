@@ -267,6 +267,11 @@ export interface GameState {
   /** Stock at the end of last month, and the change over that month. */
   lastMonth?: Partial<Record<ResourceId, number>>;
   flow?: Partial<Record<ResourceId, number>>;
+  /** Goods workplaces made and workshops used last month, and this month so far. */
+  made?: Partial<Record<ResourceId, number>>;
+  used?: Partial<Record<ResourceId, number>>;
+  making?: Partial<Record<ResourceId, number>>;
+  using?: Partial<Record<ResourceId, number>>;
   /** Whether the university had its books and wood parts this month. */
   universityOk?: boolean;
   /** The lord keeps an armed retinue (Borough and up). */

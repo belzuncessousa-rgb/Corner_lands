@@ -44,6 +44,8 @@ import {
   zoneArea,
   fieldForecast,
   FARM_BARN,
+  CHAINS,
+  chainReport,
   settlerBlocker,
   herdCapacity,
   HERDS,
@@ -1452,9 +1454,21 @@ export class Hud {
         return rows ? `<h3>${CATEGORY_ICONS[cat]} ${CATEGORY_NAMES[cat]}</h3><table class="prod">${rows}</table>` : '';
       })
       .join('');
+    // The chains: each good's stock and last month's making and using, weakest link flagged.
+    const chains = CHAINS.filter((c) => c.links.some((id) => s.seen?.includes(id) || s.res[id] > 0))
+      .map((c) => {
+        const rep = chainReport(s, c.links);
+        const links = rep.links
+          .map(
+            (l, i) => `${i ? '<span class="arrow">→</span>' : ''}<span class="link ${rep.weak === i ? 'weak' : ''}" data-tip="<b>${GOODS[l.id].name}</b><br>In store ${l.stock}<br>Made last month ${l.made}<br>Used by workshops ${l.used}">${rep.weak === i ? '⚠ ' : ''}${ICONS[l.id] ?? ''}<b>${l.stock}</b><small>+${l.made}${l.used ? ` −${l.used}` : ''}</small></span>`,
+          )
+          .join('');
+        return `<tr><td><b>${esc(c.name)}</b></td><td><div class="chain">${links}</div>${rep.why ? `<div class="small neg">${esc(rep.why)}</div>` : ''}</td></tr>`;
+      })
+      .join('');
     this.openModal(`<h2>Production Book</h2>
       <p class="note">Every trade in your lands, what it takes and what it makes. Greyed trades unlock with rank or charters.</p>
-      <div class="prodbook">${sections}</div>
+      <div class="prodbook">${chains ? `<h3>Chains <small class="muted">in store, +made −used last month</small></h3><table class="prod chains">${chains}</table>` : ''}${sections}</div>
       <div class="row" style="justify-content:flex-end;margin-top:8px"><button class="primary" data-action="close-modal">Close</button></div>`).querySelector('.modal')!.classList.add('wide', 'prod-modal');
   }
 

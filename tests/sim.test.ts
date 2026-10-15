@@ -999,3 +999,23 @@ describe('cathedral', () => {
     expect(tried).toBeGreaterThan(0);
   });
 });
+
+describe('production chains', () => {
+  it('find the weakest link', async () => {
+    const { chainReport } = await import('../src/game/sim');
+    const s = generateWorld(96);
+    // Wheat runs out: the mills used more than the farms made.
+    s.res.grain = 2;
+    s.made = { grain: 10, flour: 20, bread: 30 };
+    s.used = { grain: 20, flour: 15 };
+    expect(chainReport(s, ['grain', 'flour', 'bread']).weak).toBe(0);
+    // Flour piles up while the ovens bake little: the bakery is the weak link.
+    s.res.grain = 100;
+    s.res.flour = 400;
+    s.made = { grain: 50, flour: 40, bread: 6 };
+    s.used = { grain: 40, flour: 3 };
+    const r = chainReport(s, ['grain', 'flour', 'bread']);
+    expect(r.weak).toBe(2);
+    expect(r.why).toMatch(/Flour piles up/);
+  });
+});
