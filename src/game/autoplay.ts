@@ -348,7 +348,8 @@ function renovate(s: GameState): void {
 /** The bot favours farming and trade charters. */
 const BOT_CHARTERS = ['farm1', 'trade1', 'farm2', 'herd1', 'trade2', 'farm3a', 'learning1'];
 
-function act(s: GameState, rand: () => number): void {
+/** One turn of the autoplayer: what a sensible player would do today. */
+export function act(s: GameState, rand: () => number): void {
   if (s.pendingEvent) autoResolve(s, new StateRng(s));
   for (const id of BOT_CHARTERS) if (grantCharter(s, id)) break;
   shop(s);

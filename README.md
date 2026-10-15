@@ -153,6 +153,7 @@ npm run typecheck
 npm test                         # unit tests + balance bot
 BALANCE_LOG=1 npx vitest run tests/balance.test.ts   # print bot progress
 SWEEP=1 npx vitest run tests/balance.test.ts         # ten-map robustness sweep (slow)
+STRESS=1 npx vitest run tests/stress.test.ts         # 15-year soak with a meddling monkey (slow)
 node scripts/showcase.mjs out    # screenshots of every building per season
 node scripts/uitest.mjs          # drives the real UI: build, draw fields, workers, targets
 ```

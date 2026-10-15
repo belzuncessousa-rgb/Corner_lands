@@ -1,5 +1,6 @@
 import { GOODS } from './data';
-import type { BuildingType, Cost, GameState } from './types';
+import { sellPrice, store } from './sim';
+import type { BuildingType, Cost, GameState, ResourceId } from './types';
 
 export interface Quest {
   id: string;
@@ -220,14 +221,20 @@ export function checkQuests(s: GameState): Quest[] {
   for (const q of activeQuests(s, 3)) {
     if (!q.done(s)) continue;
     s.quests.push(q.id);
+    // Rewards go into the stores; what does not fit is sold for coins.
+    let sold = 0;
     for (const k in q.reward) {
-      const id = k as keyof Cost;
-      s.res[id] += q.reward[id] ?? 0;
+      const id = k as ResourceId;
+      const n = q.reward[id] ?? 0;
+      const kept = store(s, id, n);
+      if (kept < n) sold += sellPrice(s, id, n - kept);
     }
+    s.res.gold += sold;
     const reward = Object.entries(q.reward)
       .map(([k, v]) => `${v} ${GOODS[k as keyof Cost].name.toLowerCase()}`)
       .join(', ');
-    s.messages.push({ day: s.day, text: `Objective complete: ${q.title}. Reward: ${reward}.`, kind: 'good' });
+    const note = sold ? ` (the stores were full, so some was sold for ${sold} coins)` : '';
+    s.messages.push({ day: s.day, text: `Objective complete: ${q.title}. Reward: ${reward}${note}.`, kind: 'good' });
     done.push(q);
   }
   return done;

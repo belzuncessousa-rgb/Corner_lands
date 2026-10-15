@@ -839,8 +839,9 @@ export function recompute(s: GameState): void {
   for (const b of s.buildings) {
     b.workers = 0;
     b.builders = 0;
-    if (b.paused) continue;
+    // Pausing stops a workplace's production, not building work on it.
     if (isProject(b)) jobs.push({ b, site: true, p: 100 + SITE_PRIORITY + b.id * 1e-6 });
+    if (b.paused) continue;
     if (b.build >= 1 && workDef(b).workers > 0 && (b.want ?? 1) > 0 && !restingNow(s, b)) {
       // Families working a craft from home always tend to it first.
       jobs.push({ b, site: false, p: b.trade ? -1 : prio(b) });
