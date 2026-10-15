@@ -906,3 +906,15 @@ describe('farm barn safety', () => {
     expect(stored(s, 'food')).toBe(before + 30);
   });
 });
+
+describe('steward on mills', () => {
+  it('says when wheat waits too long for the windmills', async () => {
+    const { advise } = await import('../src/game/advisor');
+    const s = generateWorld(91);
+    s.tier = 1;
+    s.res.grain = 200;
+    s.advice = { housing: s.day, 'food-low': s.day, firewood: s.day, granary: s.day, storage: s.day };
+    advise(s, 3);
+    expect(s.messages.at(-1)?.text).toMatch(/wheat sits unground/);
+  });
+});

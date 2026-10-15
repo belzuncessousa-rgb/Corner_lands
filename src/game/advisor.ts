@@ -25,6 +25,15 @@ function piles(s: GameState, kind: StorageKind): string {
   return top.length ? `, mostly ${top.join(' and ')}` : '';
 }
 
+/** Wheat each staffed-up windmill grinds in a month, roughly (walking included). */
+const MILL_PER_MONTH = 16;
+
+/** Months the windmills need to grind the wheat in store. */
+function millMonths(s: GameState): number {
+  const mills = s.buildings.filter((b) => b.type === 'windmill' && b.build >= 1).length;
+  return mills ? s.res.grain / (mills * MILL_PER_MONTH) : Infinity;
+}
+
 const ADVICE: Advice[] = [
   {
     id: 'food-low',
@@ -66,6 +75,21 @@ const ADVICE: Advice[] = [
     id: 'no-pasture',
     when: (s) => s.buildings.some((b) => (b.type === 'byre' || b.type === 'orchardist') && b.build >= 1 && !s.buildings.some((z) => z.owner === b.id)),
     text: () => 'Steward: the animal farm or orchard lodge has nothing to tend. Draw a pasture or plant an orchard next to it.',
+  },
+  {
+    id: 'mills',
+    when: (s) => s.tier >= 1 && s.res.grain >= 100 && millMonths(s) > 4,
+    text: (s) => {
+      const mills = s.buildings.filter((b) => b.type === 'windmill' && b.build >= 1).length;
+      return mills
+        ? `Steward: ${Math.floor(s.res.grain)} wheat waits in the granaries, about ${Math.round(millMonths(s))} months of grinding for our ${mills > 1 ? `${mills} windmills` : 'windmill'}. Another Windmill and Bakery would turn it into bread sooner.`
+        : `Steward: ${Math.floor(s.res.grain)} wheat sits unground. A Windmill grinds it into flour and a Bakery bakes the bread, which feeds three times as many as pottage.`;
+    },
+  },
+  {
+    id: 'ovens',
+    when: (s) => s.res.flour >= 60 && s.buildings.filter((b) => b.type === 'bakery' && b.build >= 1).length < 2,
+    text: () => 'Steward: flour is piling up faster than the ovens can bake it. Build another Bakery, or let a family bake at home.',
   },
   {
     id: 'tavern-dry',
