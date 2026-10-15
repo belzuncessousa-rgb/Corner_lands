@@ -98,6 +98,8 @@ then fall back to the browser's localStorage.
 - **The manor** — raise the Manor Hall to a Manor House, Stone Manor,
   Lord's Keep and finally a Castle to become a Village, Town, Borough and
   City. Each rank unlocks buildings and adds storage.
+- **Festivals** — May Day round the maypole in spring and a Midsummer bonfire
+  by the manor: small spends from the manor's panel for a season's cheer.
 - **Fairs and the Cathedral** — from Town on the treasury can endow a fair once
   a year (each dearer than the last) for prestige and cheer. A Borough may raise
   one Cathedral: a fortune and most of a year to build, it serves as a church

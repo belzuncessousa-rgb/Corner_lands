@@ -289,6 +289,9 @@ export interface GameState {
   moods?: { label: string; value: number; until: number }[];
   /** Year in which the lord last called a harvest feast. */
   lastFeast?: number;
+  /** Year each seasonal festival was last held, and the latest one (for decorations). */
+  festivals?: Record<string, number>;
+  festivalDay?: { id: string; day: number };
   /** This year's tally for the year-end page of the chronicle. */
   year?: { pop: number; gold: number; prestige: number; arrived: number; left: number; built: number; harvest: number };
   /** Fairs held so far (each costs more) and the year of the last. */

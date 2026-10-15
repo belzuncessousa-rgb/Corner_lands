@@ -15,7 +15,7 @@ import {
   RESOURCE_STORAGE,
   STORAGE_CAPACITY,
 } from '../game/data';
-import { fairCost, fairError, fairPrestige, FAIR_TIER, feastCost, feastError, getEvent, holdFair, holdFeast, resolveEvent } from '../game/events';
+import { fairCost, fairError, fairPrestige, FAIR_TIER, feastCost, feastError, FESTIVALS, festivalError, getEvent, holdFair, holdFeast, holdFestival, resolveEvent } from '../game/events';
 import { CHARTERS, CHARTER_TIER, PATHS, charterCost, charterError, grantCharter, hasCharter } from '../game/charters';
 import { HOUSE_LEVELS, MANOR_LEVELS, buildingName, houseNeeds, startUpgrade, upgradeBlocker, upgradePlan, workersOf } from '../game/levels';
 import { activeQuests } from '../game/quests';
@@ -658,7 +658,7 @@ export class Hud {
     const key = JSON.stringify([
       b.id, b.status, b.workers, b.builders, b.residents, b.build.toFixed(2), b.paused, b.level, b.lastOutput, b.growth.toFixed(2), b.want, b.priority, b.recipe, b.yard, b.trade, b.herd, b.owner, Math.floor(b.growth),
       s.tier, blocker, b.need, (b.upProgress ?? 0).toFixed(2), b.unmet, Math.floor(s.res.gold / 10), s.population,
-      s.lastFeast, monthOf(s.day), s.retinue, b.barn, Math.floor(s.res.prestige), Math.floor(s.res.weapons),
+      s.lastFeast, s.festivals, monthOf(s.day), s.retinue, b.barn, Math.floor(s.res.prestige), Math.floor(s.res.weapons),
       STORAGE_CAPACITY[b.type] ? RESOURCE_IDS.map((r) => (RESOURCE_STORAGE[r] ? Math.floor(s.res[r]) : 0)).join() : '',
     ]);
     if (key === this.lastInspectorKey) return;
@@ -721,6 +721,18 @@ export class Hud {
         rows.push(`<div class="kv feast" data-tip="Once each autumn: a meal for every villager and a cask for every eight. With drink for all it is merrier (+14 happiness for half a year, +10 prestige); without, +9 and +5."><span>Harvest feast</span><span>${
           err ? `<small class="muted">${esc(err)}</small>` : `<button data-action="feast">Call a feast <small>${c.food} food · ${c.drink} drink</small></button>`
         }</span></div>`);
+        // Seasonal festivals: shown in their season, or once the maypole needed stands.
+        for (const f of FESTIVALS) {
+          const month = monthOf(s.day);
+          if (!f.months.includes(month)) continue;
+          const err = festivalError(s, f.id);
+          const c = f.cost(s);
+          rows.push(`<div class="kv feast" data-tip="${esc(`<b>${f.name}</b><br>${f.desc}<br>+${f.mood} happiness for a season, +${f.prestige} prestige.`)}"><span>${f.name}</span><span>${
+            err
+              ? `<small class="muted">${esc(err)}</small>`
+              : `<button data-action="festival" data-id="${f.id}">Celebrate <small>${c.food} food${c.wood ? ` · ${c.wood} timber` : ''}</small></button>`
+          }</span></div>`);
+        }
         if (s.tier >= RETINUE_TIER - 1) {
           const err = retinueError(s);
           rows.push(`<div class="kv feast" data-tip="Men-at-arms guard the roads: +2 happiness, and when wolves or bandits come you can send them out. They cost ${RETINUE_PAY} coins a month and leave if unpaid."><span>Retinue</span><span>${
@@ -1361,6 +1373,18 @@ export class Hud {
         log(s, 'The lord pays off the men-at-arms.', 'info');
         this.lastInspectorKey = '';
         break;
+      case 'festival': {
+        const id = t.dataset.id!;
+        const err = holdFestival(s, id);
+        if (err) this.flash(err);
+        else {
+          const f = FESTIVALS.find((x) => x.id === id)!;
+          log(s, `${f.name}! ${f.desc}`, 'good');
+          this.sound('good');
+        }
+        this.lastInspectorKey = '';
+        break;
+      }
       case 'fair': {
         const err = holdFair(s);
         if (err) this.flash(err);

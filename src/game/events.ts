@@ -1,7 +1,7 @@
 import { DAYS_PER_MONTH, DAYS_PER_YEAR } from './data';
 import type { StateRng } from './rng';
 import { log, store, totalHousing, wallSections, WALL_SAFE } from './sim';
-import type { GameState, MessageKind, ResourceId } from './types';
+import type { BuildingType, GameState, MessageKind, ResourceId } from './types';
 import { FOOD_IDS } from './data';
 
 /**
@@ -62,6 +62,72 @@ export const FEAST_MONTHS = [6, 7, 8];
 /** What a harvest feast costs: a meal for everyone and a cask for every eight. */
 export function feastCost(s: GameState): { food: number; drink: number } {
   return { food: s.population, drink: Math.ceil(s.population / 8) };
+}
+
+// ---------------------------------------------------------------- festivals
+
+export interface Festival {
+  id: string;
+  name: string;
+  /** Months in which it can be held. */
+  months: number[];
+  /** A building it needs, if any. */
+  needs?: BuildingType;
+  desc: string;
+  cost: (s: GameState) => { food: number; wood: number };
+  mood: number;
+  prestige: number;
+}
+
+/** Small seasonal festivals beside the harvest feast. */
+export const FESTIVALS: Festival[] = [
+  {
+    id: 'mayday',
+    name: 'May Day',
+    months: [1, 2],
+    needs: 'maypole',
+    desc: 'Garlands, ribbons and dancing round the maypole.',
+    cost: (s) => ({ food: Math.ceil(s.population / 4), wood: 0 }),
+    mood: 6,
+    prestige: 3,
+  },
+  {
+    id: 'midsummer',
+    name: 'Midsummer',
+    months: [4, 5],
+    desc: 'A great bonfire by the manor on the shortest night; the young leap the embers.',
+    cost: (s) => ({ food: Math.ceil(s.population / 4), wood: 20 }),
+    mood: 6,
+    prestige: 3,
+  },
+];
+
+export function festivalError(s: GameState, id: string): string | null {
+  const f = FESTIVALS.find((x) => x.id === id);
+  if (!f) return 'Unknown festival';
+  const month = Math.floor(s.day / DAYS_PER_MONTH) % 12;
+  if (!f.months.includes(month)) return f.id === 'mayday' ? 'Held in spring' : 'Held at midsummer';
+  if (f.needs && !s.buildings.some((b) => b.type === f.needs && b.build >= 1)) return 'Needs a maypole (Decor)';
+  if (s.festivals?.[id] === Math.floor(s.day / DAYS_PER_YEAR)) return 'Already held this year';
+  if (s.population < 8) return 'Too few villagers';
+  const c = f.cost(s);
+  if (food(s) < c.food) return `Needs ${c.food} food`;
+  if (s.res.wood < c.wood) return `Needs ${c.wood} timber`;
+  return null;
+}
+
+export function holdFestival(s: GameState, id: string): string | null {
+  const err = festivalError(s, id);
+  if (err) return err;
+  const f = FESTIVALS.find((x) => x.id === id)!;
+  const c = f.cost(s);
+  takeFood(s, c.food);
+  s.res.wood -= c.wood;
+  addMood(s, f.name, f.mood, 3);
+  s.res.prestige += f.prestige;
+  s.festivals = { ...s.festivals, [id]: Math.floor(s.day / DAYS_PER_YEAR) };
+  s.festivalDay = { id, day: s.day };
+  return null;
 }
 
 // ---------------------------------------------------------------- fairs

@@ -865,6 +865,9 @@ export class Renderer {
     this.blit(sp, wx, wy);
     if (STORAGE_CAPACITY[b.type]) this.drawStock(s, b, season);
     if (b.type === 'townhall' && s.feastDay !== undefined && s.day - s.feastDay < DAYS_PER_MONTH) this.drawFeast(b);
+    const fest = s.festivalDay && s.day - s.festivalDay.day < DAYS_PER_MONTH ? s.festivalDay.id : null;
+    if (fest === 'mayday' && b.type === 'maypole') this.drawMayDance(b);
+    if (fest === 'midsummer' && b.type === 'townhall') this.drawBonfire(b);
     if (b.upgrading) this.drawScaffold(b);
     if (selected) {
       c.save();
@@ -948,6 +951,80 @@ export class Renderer {
       ]) {
         p.box(x + cx, y + cy, x + cx + 0.08, y + cy + 0.08, H + 4, 4, stone, top);
       }
+    }
+  }
+
+  /** Dancers circling the maypole, ribbons in hand, for a month after May Day. */
+  private drawMayDance(b: Building): void {
+    const c = this.ctx;
+    const cx = b.x + b.w / 2;
+    const cy = b.y + b.h / 2;
+    const [tx, ty] = iso(cx, cy, 40);
+    const colors = ['#b8483a', '#e8c048', '#3a5a8a', '#4f8a3a', '#e8e0d0', '#9a5aa0'];
+    for (let k = 0; k < 6; k++) {
+      const a = this.time * 0.8 + (k / 6) * Math.PI * 2;
+      const [x, y] = iso(cx + Math.cos(a) * 0.95, cy + Math.sin(a) * 0.95);
+      const hop = Math.abs(Math.sin(this.time * 6 + k)) * 1.5;
+      // Ribbon to the top of the pole.
+      c.strokeStyle = colors[k];
+      c.lineWidth = 0.9;
+      c.beginPath();
+      c.moveTo(x, y - 9 - hop);
+      c.lineTo(tx, ty);
+      c.stroke();
+      // A small dancer.
+      c.fillStyle = 'rgba(20,20,10,0.25)';
+      c.beginPath();
+      c.ellipse(x, y, 3, 1.3, 0, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = colors[(k + 2) % colors.length];
+      c.fillRect(x - 2, y - 9 - hop, 4, 6);
+      c.fillStyle = '#e8c4a0';
+      c.beginPath();
+      c.arc(x, y - 11 - hop, 1.8, 0, Math.PI * 2);
+      c.fill();
+    }
+  }
+
+  /** The Midsummer bonfire in the manor's yard, flickering for a month. */
+  private drawBonfire(b: Building): void {
+    const c = this.ctx;
+    const [x, y] = iso(b.x + 0.55, b.y + b.h - 0.45);
+    // Glow on the ground.
+    c.save();
+    c.globalCompositeOperation = 'lighter';
+    const g = c.createRadialGradient(x, y - 4, 2, x, y - 4, 26);
+    g.addColorStop(0, 'rgba(255,170,60,0.45)');
+    g.addColorStop(1, 'rgba(255,120,30,0)');
+    c.fillStyle = g;
+    c.beginPath();
+    c.ellipse(x, y - 2, 26, 13, 0, 0, Math.PI * 2);
+    c.fill();
+    c.restore();
+    // Logs.
+    c.strokeStyle = '#4a3020';
+    c.lineWidth = 2.2;
+    c.beginPath();
+    c.moveTo(x - 7, y + 1);
+    c.lineTo(x + 6, y - 3);
+    c.moveTo(x - 6, y - 3);
+    c.lineTo(x + 7, y + 1);
+    c.stroke();
+    // Flames, three tongues that flicker.
+    const tongues: [number, string, number][] = [
+      [0, '#e8602a', 16],
+      [-3, '#f0a030', 11],
+      [3, '#f0c040', 9],
+    ];
+    for (const [dx, col, h] of tongues) {
+      const f = h * (0.8 + 0.25 * Math.sin(this.time * 11 + dx * 2));
+      c.fillStyle = col;
+      c.beginPath();
+      c.moveTo(x + dx - 4, y - 1);
+      c.quadraticCurveTo(x + dx - 3, y - f * 0.6, x + dx + Math.sin(this.time * 7 + dx) * 1.5, y - f);
+      c.quadraticCurveTo(x + dx + 3, y - f * 0.6, x + dx + 4, y - 1);
+      c.closePath();
+      c.fill();
     }
   }
 

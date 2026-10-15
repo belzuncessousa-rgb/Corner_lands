@@ -1084,3 +1084,26 @@ describe('review fixes', () => {
     expect(mason.workers).toBeGreaterThan(0);
   });
 });
+
+describe('seasonal festivals', () => {
+  it('May Day needs a maypole in spring; Midsummer burns timber in summer', async () => {
+    const { festivalError, holdFestival } = await import('../src/game/events');
+    const s = generateWorld(101);
+    s.population = 16;
+    s.res.bread = 50;
+    s.res.wood = 50;
+    s.day = 1 * DAYS_PER_MONTH;
+    expect(festivalError(s, 'mayday')).toMatch(/maypole/);
+    s.tier = 1;
+    const pole = placeNearRoad(s, 'maypole');
+    pole.build = 1;
+    expect(holdFestival(s, 'mayday')).toBeNull();
+    expect(festivalError(s, 'mayday')).toMatch(/this year/);
+    expect(festivalError(s, 'midsummer')).toMatch(/midsummer/);
+    s.day = 4 * DAYS_PER_MONTH;
+    const wood = s.res.wood;
+    expect(holdFestival(s, 'midsummer')).toBeNull();
+    expect(s.res.wood).toBe(wood - 20);
+    expect(s.festivalDay?.id).toBe('midsummer');
+  });
+});
