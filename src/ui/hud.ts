@@ -1491,6 +1491,10 @@ export class Hud {
    * dialog cannot simply be dismissed. Returns true when a dialog consumed it.
    */
   handleEscape(): boolean {
+    if (!this.modal && this.pinnedChip) {
+      this.showChip(null);
+      return true;
+    }
     if (!this.modal) return this.game.modalOpen;
     if (this.closeModal()) return true;
     (this.modal.querySelector('[data-m="back"]') as HTMLElement | null)?.click();
@@ -1680,7 +1684,10 @@ export class Hud {
         <p><b>Prestige</b> comes from a fine manor, a church and monuments. From Town on, spend it on <b>charters</b> (crown button) to specialise your town.</p>
         <p>Your <b>steward</b> warns you when things go wrong; the <b>Chronicle</b> (scroll button) keeps the full story.</p>
         <div class="ornament">❦</div>
-        <p><kbd>Left-drag</kbd> / <kbd>WASD</kbd> pan · <kbd>Wheel</kbd> zoom · <kbd>R</kbd> road (click, click) · <kbd>X</kbd> demolish · <kbd>H</kbd> house · <kbd>T</kbd> paved road · <kbd>Space</kbd> pause · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> speed · <kbd>Right-click</kbd>/<kbd>Esc</kbd> cancel</p>
+        <p><b>Keys</b>: <kbd>Left-drag</kbd> / <kbd>WASD</kbd> / arrows pan · <kbd>Wheel</kbd> / <kbd>+</kbd><kbd>-</kbd> / pinch zoom · <kbd>R</kbd> road (click, click) · <kbd>T</kbd> paved road · <kbd>X</kbd> / <kbd>Del</kbd> demolish · ${BUILD_ORDER.filter((b) => BUILDINGS[b].hotkey)
+          .map((b) => `<kbd>${BUILDINGS[b].hotkey!.toUpperCase()}</kbd> ${BUILDINGS[b].name.toLowerCase()}`)
+          .join(' · ')} · <kbd>Space</kbd> pause · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> speed</p>
+        <p><kbd>Esc</kbd>, <kbd>Right-click</kbd> or a long press on touch screens backs out one step at a time: a dialog, a pinned panel, a half-drawn road or field, the tool, the selection, then opens the menu.</p>
       </div>
       <div class="row" style="justify-content:flex-end"><button class="primary" data-m="back">Back</button></div>`,
       !fromMain,
