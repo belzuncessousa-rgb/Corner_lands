@@ -35,6 +35,18 @@ export function undoPlacement(b: Building): UndoStep {
   };
 }
 
+/** Several placements taken back together (a stretch of town wall). */
+export function undoMany(steps: UndoStep[], label: string): UndoStep {
+  return {
+    label,
+    revert: (s) => {
+      let err: string | null = null;
+      for (const st of steps) err = st.revert(s) ?? err;
+      return err;
+    },
+  };
+}
+
 /** Demolishes a building and returns how to put it back exactly as it was. */
 export function demolishWithUndo(s: GameState, b: Building): UndoStep | null {
   const before: Partial<Record<ResourceId, number>> = { ...s.res };

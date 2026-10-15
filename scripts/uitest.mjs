@@ -190,6 +190,9 @@ check('reach overlay toggles', reach === 'well' && (await page.evaluate(() => wi
   await clickTile(hall.x + 5, wy);
   const walls = await page.evaluate(() => window.game.state.buildings.filter((b) => b.type === 'wall').length);
   check('lay a town wall with two clicks', walls >= 5, `${walls} sections`);
+  await page.keyboard.press('Control+z');
+  await page.waitForTimeout(150);
+  check('undo a whole stretch of wall', (await page.evaluate(() => window.game.state.buildings.filter((b) => b.type === 'wall').length)) === 0);
   await page.evaluate(() => { window.game.setTool({ kind: 'select' }); window.game.hud.closeCategory(); });
   await page.evaluate(() => { window.game.state.tier = 1; });
 }

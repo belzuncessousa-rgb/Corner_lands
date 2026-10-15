@@ -40,7 +40,7 @@ import {
 import type { Building, BuildingType, GameState } from './game/types';
 import { FOOD_IDS } from './game/data';
 import { generateWorld, idx, inBounds } from './game/world';
-import { demolishWithUndo, undoPlacement, type UndoStep } from './game/undo';
+import { demolishWithUndo, undoMany, undoPlacement, type UndoStep } from './game/undo';
 import type { Agent } from './render/agents';
 import { AgentSystem } from './render/agents';
 import { Wildlife } from './render/wildlife';
@@ -664,11 +664,16 @@ export class Game {
     const s = this.state;
     let n = 0;
     if (this.tool.kind === 'road' && this.tool.wall) {
+      const placed: UndoStep[] = [];
       for (const t of this.roadTiles(tx, ty)) {
-        if (s.road[idx(s, t.x, t.y)] > 0) continue;
-        if (!placementError(s, 'wall', t.x, t.y) && placeOrder(s, 'wall', t.x, t.y)) n++;
+        if (s.road[idx(s, t.x, t.y)] > 0 || placementError(s, 'wall', t.x, t.y)) continue;
+        const w = placeOrder(s, 'wall', t.x, t.y);
+        if (w) placed.push(undoPlacement(w));
       }
-      if (n) this.hud.sound('place');
+      if (placed.length) {
+        this.offerUndo(undoMany(placed, `Undo ${placed.length} wall section${placed.length > 1 ? 's' : ''}`));
+        this.hud.sound('place');
+      }
       return;
     }
     const paved = this.tool.kind === 'road' && !!this.tool.paved;
