@@ -116,6 +116,7 @@ then fall back to the browser's localStorage.
   do.
 - **Steward, chronicle & ledger** — timely advice, the full story of your lands
   and monthly charts.
+- **Text size** — the game menu (Esc) scales every panel from 85% to 130%.
 - **Relaxed mode** — double starting supplies and nobody ever leaves in anger.
 
 ## Project layout

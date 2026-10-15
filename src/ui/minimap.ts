@@ -44,7 +44,9 @@ export class Minimap {
     parent.appendChild(this.canvas);
     const move = (e: PointerEvent) => {
       const r = this.canvas.getBoundingClientRect();
-      const [tx, ty] = this.toTile(e.clientX - r.left, e.clientY - r.top);
+      // The UI layer may be scaled: convert screen pixels to the canvas's own.
+      const k = this.canvas.offsetWidth / Math.max(1, r.width);
+      const [tx, ty] = this.toTile((e.clientX - r.left) * k, (e.clientY - r.top) * k);
       this.renderer.centerOn(tx, ty);
       this.renderer.clampCamera(this.getState());
     };

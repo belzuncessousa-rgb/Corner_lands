@@ -7,6 +7,8 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+// SCALE=1.3 runs everything with the text size raised in the menu.
+if (process.env.SCALE) await page.addInitScript((z) => localStorage.setItem('cornerlands.uiScale', z), process.env.SCALE);
 await page.goto(process.env.URL || 'http://localhost:3001/');
 await page.waitForTimeout(800);
 await page.click('text=New Settlement');
@@ -24,7 +26,7 @@ const pick = async (cat, type) => {
   await page.click(`#buildbar [data-type="${type}"]`);
 };
 const results = [];
-const check = (name, ok, info = '') => results.push(`${ok ? 'PASS' : 'FAIL'} ${name} ${info}`);
+const check = (name, ok, info = '') => { results.push(`${ok ? 'PASS' : 'FAIL'} ${name} ${info}`); if (process.env.DEBUG) console.log(results.at(-1)); };
 // Farmstead from the menu (search a free spot near the hall).
 await pick('farming', 'farm');
 const spot = await page.evaluate(([hx, hy]) => (() => { for (let r = 4; r < 14; r++) for (const [dx, dy] of [[r, -r], [r, 0], [0, -r], [-r, 0], [0, r]]) if (!window.cl.placementError(window.game.state, 'farm', hx + dx, hy + dy)) return [hx + dx, hy + dy]; return null; })(), [hall.x, hall.y]);
@@ -83,6 +85,8 @@ check('place an animal farm', !!byreId);
 await page.keyboard.press('Escape');
 await pick('farming', 'pasture');
 const pz = await page.evaluate(([bx, by]) => { const s = window.game.state; for (let r = 1; r < 10; r++) for (const [dx, dy] of [[r + 1, 0], [0, r + 1], [-r - 5, 0], [0, -r - 5]]) { const x = bx + dx, y = by + dy; if (!window.cl.placementError(s, 'well', x, y)) { let ok = true; for (let yy = y; yy < y + 5; yy++) for (let xx = x; xx < x + 5; xx++) { const i = yy * s.width + xx; if (s.occ[i] >= 0 || s.terrain[i] || s.road[i] || s.rock[i] || s.ore[i]) ok = false; } if (ok) return [x, y]; } } return null; }, [bs[0], bs[1]]);
+// Bring the spot to the middle of the screen so no panel covers it.
+await page.evaluate(([x, y]) => window.game.renderer.centerOn(x + 2, y + 2), pz);
 await clickTile(pz[0], pz[1]);
 await clickTile(pz[0] + 4, pz[1] + 4);
 const past = await page.evaluate(() => { const s = window.game.state; window.cl.recompute(s); const p = s.buildings.find((b) => b.type === 'pasture'); return p && p.owner; });
@@ -146,7 +150,9 @@ check('raise a retinue', (await page.evaluate(() => window.game.state.retinue)) 
 await page.evaluate(() => { window.game.state.tier = 1; });
 await page.evaluate(() => window.game.select(null));
 // Save through the menu, then load it back.
+if (process.env.DEBUG) await page.screenshot({ path: '/tmp/claude-0/before-menu.png' });
 await page.keyboard.press('Escape');
+if (process.env.DEBUG) { await page.waitForTimeout(300); await page.screenshot({ path: '/tmp/claude-0/after-esc.png' }); }
 await page.click('[data-m="save"]');
 await page.fill('#slot', 'ui-test');
 await page.click('.modal [data-m="save"]');

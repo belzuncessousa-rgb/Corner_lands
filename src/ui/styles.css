@@ -895,7 +895,7 @@ button.active {
   }
   #inspector {
     right: 4px;
-    bottom: 150px;
+    --inspector-bottom: 150px;
     width: min(260px, calc(100vw - 8px));
     padding: 8px 10px;
   }
@@ -1333,7 +1333,10 @@ button.active {
 }
 
 #inspector {
-  bottom: 120px;
+  /* Room left for the build bar below; the panel scrolls rather than run off the top. */
+  bottom: var(--inspector-bottom, 120px);
+  max-height: calc(100% - var(--inspector-bottom, 120px) - 64px);
+  overflow-y: auto;
 }
 
 @media (max-width: 700px), (max-height: 520px) {

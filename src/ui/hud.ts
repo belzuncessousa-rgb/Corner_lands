@@ -153,9 +153,11 @@ export class Hud {
   ) {
     try {
       this.muted = localStorage.getItem('cornerlands.muted') === '1';
+      this.uiScale = Number(localStorage.getItem('cornerlands.uiScale')) || 1;
     } catch {
       /* ignore */
     }
+    this.applyScale();
     root.classList.toggle('demo', game.demo);
     root.innerHTML = `
       <div id="top">
@@ -320,6 +322,18 @@ export class Hud {
   private openChip: string | null = null;
   private pinnedChip = false;
   private chipTimer = 0;
+  /** Text and panel size chosen in the menu (CSS zoom on the UI layer). */
+  private uiScale = 1;
+
+  private applyScale(): void {
+    this.root.style.setProperty('zoom', this.uiScale === 1 ? '' : String(this.uiScale));
+  }
+
+  /** How much the UI layer is magnified on screen: client pixels per CSS pixel. */
+  private zoom(): number {
+    const w = this.root.offsetWidth;
+    return w ? this.root.getBoundingClientRect().width / w : 1;
+  }
 
   private showChip(id: string | null, pin = false): void {
     this.openChip = id;
@@ -369,10 +383,11 @@ export class Hud {
     panel.style.display = 'block';
     const anchor = this.el.topbar.querySelector(`[data-chip="${id}"]`) as HTMLElement | null;
     if (anchor) {
+      const z = this.zoom();
       const r = anchor.getBoundingClientRect();
       const w = panel.offsetWidth;
-      panel.style.left = `${Math.max(6, Math.min(window.innerWidth - w - 6, r.left + r.width / 2 - w / 2))}px`;
-      panel.style.top = `${r.bottom + 6}px`;
+      panel.style.left = `${Math.max(6, Math.min(window.innerWidth / z - w - 6, (r.left + r.width / 2) / z - w / 2))}px`;
+      panel.style.top = `${r.bottom / z + 6}px`;
     }
   }
 
@@ -945,10 +960,16 @@ export class Hud {
   private placeTip(x: number, y: number): void {
     const tip = this.el.tooltip;
     tip.style.display = 'block';
+    // Work in the UI layer's own pixels, which differ from the screen's when it is scaled.
+    const z = this.zoom();
+    x /= z;
+    y /= z;
+    const W = window.innerWidth / z;
+    const H = window.innerHeight / z;
     const w = tip.offsetWidth;
     const h = tip.offsetHeight;
-    tip.style.left = `${Math.min(window.innerWidth - w - 6, x + 14)}px`;
-    tip.style.top = `${y + h + 20 > window.innerHeight ? y - h - 10 : y + 18}px`;
+    tip.style.left = `${Math.min(W - w - 6, x + 14)}px`;
+    tip.style.top = `${y + h + 20 > H ? y - h - 10 : y + 18}px`;
   }
 
   /** Tooltip for whatever is under the cursor on the map. */
@@ -1485,6 +1506,7 @@ export class Hud {
         <button data-m="new">New Settlement</button>
         <button data-m="help">How to Play</button>
         <button data-m="sound">Sound: ${this.muted ? 'Off' : 'On'}</button>
+        <button data-m="scale">Text size: ${Math.round(this.uiScale * 100)}%</button>
       </div>`,
     );
     m.querySelector('[data-m="resume"]')!.addEventListener('click', () => this.closeModal());
@@ -1492,6 +1514,17 @@ export class Hud {
     m.querySelector('[data-m="load"]')!.addEventListener('click', () => this.showLoad(false));
     m.querySelector('[data-m="new"]')!.addEventListener('click', () => this.showNewGame(false));
     m.querySelector('[data-m="help"]')!.addEventListener('click', () => this.showHelp(false));
+    m.querySelector('[data-m="scale"]')!.addEventListener('click', () => {
+      const steps = [0.85, 1, 1.15, 1.3];
+      this.uiScale = steps[(steps.indexOf(this.uiScale) + 1) % steps.length];
+      this.applyScale();
+      try {
+        localStorage.setItem('cornerlands.uiScale', String(this.uiScale));
+      } catch {
+        /* ignore */
+      }
+      this.showGameMenu();
+    });
     m.querySelector('[data-m="sound"]')!.addEventListener('click', () => {
       this.muted = !this.muted;
       this.ambient?.setMuted(this.muted);
