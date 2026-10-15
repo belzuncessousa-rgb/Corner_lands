@@ -52,6 +52,7 @@ import {
   orchardMaturity,
   TEND_PER_TILE,
   labourSummary,
+  bCenter,
   coveredBy,
   PAVING_TIER,
   setWorkers,
@@ -79,7 +80,7 @@ import {
 import type { Building, BuildingType, Category, Cost, GoodsGroup, ResourceId } from '../game/types';
 import type { StorageKind } from '../game/data';
 import { RESOURCE_IDS } from '../game/types';
-import { idx, inBounds } from '../game/world';
+import { generateWorld, idx, inBounds } from '../game/world';
 import type { Game } from '../main';
 import { CATEGORY_ICONS, ICONS, SEASON_ICONS } from './icons';
 import { Minimap } from './minimap';
@@ -1638,6 +1639,7 @@ export class Hud {
       `<h2>New Settlement</h2>
       <p>Every map is generated from a seed. Share a seed to play the same land.</p>
       <div class="row"><label>Seed</label><input id="seed" value="${seed}" inputmode="numeric"><button data-m="dice">🎲</button></div>
+      <div class="map-preview"><canvas width="300" height="160" aria-label="The land from above"></canvas><div class="map-facts"></div></div>
       <div class="modes">
         <label class="mode"><input type="radio" name="mode" value="normal" checked><span><b>Normal</b><br><small>Hungry or unhappy villagers will leave.</small></span></label>
         <label class="mode"><input type="radio" name="mode" value="relaxed"><span><b>Relaxed</b><br><small>Double starting supplies; nobody ever leaves in anger.</small></span></label>
@@ -1650,20 +1652,88 @@ export class Hud {
       false,
     );
     const input = m.querySelector('#seed') as HTMLInputElement;
-    m.querySelector('[data-m="dice"]')!.addEventListener('click', () => (input.value = String(Math.floor(Math.random() * 999999))));
-    m.querySelector('[data-m="back"]')!.addEventListener('click', () => (fromMain ? this.showMainMenu() : this.showGameMenu()));
-    m.querySelector('[data-m="go"]')!.addEventListener('click', () => {
-      const v = input.value.trim();
+    const seedOf = (v: string) => {
       let n = Number(v);
       if (!Number.isFinite(n) || v === '') {
         n = 0;
         for (const ch of v) n = (n * 31 + ch.charCodeAt(0)) >>> 0;
       }
+      return Math.floor(Math.abs(n)) % 2147483647;
+    };
+    const preview = () => this.drawMapPreview(m.querySelector('.map-preview')!, seedOf(input.value.trim()));
+    let typing = 0;
+    input.addEventListener('input', () => {
+      clearTimeout(typing);
+      typing = window.setTimeout(preview, 250);
+    });
+    preview();
+    m.querySelector('[data-m="dice"]')!.addEventListener('click', () => {
+      input.value = String(Math.floor(Math.random() * 999999));
+      preview();
+    });
+    m.querySelector('[data-m="back"]')!.addEventListener('click', () => (fromMain ? this.showMainMenu() : this.showGameMenu()));
+    m.querySelector('[data-m="go"]')!.addEventListener('click', () => {
       const relaxed = (m.querySelector('input[name="mode"]:checked') as HTMLInputElement | null)?.value === 'relaxed';
-      this.game.newGame(Math.floor(Math.abs(n)) % 2147483647, relaxed);
+      this.game.newGame(seedOf(input.value.trim()), relaxed);
       this.closeModal(true);
       this.game.setSpeed(1);
     });
+  }
+
+  /** The land a seed makes, from above, with what lies near the starting manor. */
+  private drawMapPreview(box: HTMLElement, seed: number): void {
+    const s = generateWorld(seed);
+    const cv = box.querySelector('canvas')!;
+    const c = cv.getContext('2d')!;
+    const W = s.width;
+    const H = s.height;
+    const tiles = document.createElement('canvas');
+    tiles.width = W;
+    tiles.height = H;
+    const t = tiles.getContext('2d')!;
+    const img = t.createImageData(W, H);
+    for (let i = 0; i < W * H; i++) {
+      const col =
+        s.terrain[i] === 1 ? [64, 122, 156] : s.occ[i] >= 0 ? [200, 70, 50] : s.road[i] ? [170, 140, 96] : s.rock[i] ? [150, 148, 140] : s.ore[i] ? [120, 90, 70] : s.trees[i] ? [46, 92 + s.trees[i] * 4, 46] : [118 + s.fertility[i] * 20, 150 + s.fertility[i] * 30, 70];
+      img.data.set([col[0], col[1], col[2], 255], i * 4);
+    }
+    t.putImageData(img, 0, 0);
+    // Isometric: rotate the tile grid by 45 degrees and squash it vertically.
+    const k = Math.min(cv.width / (W + H), (cv.height * 2) / (W + H)) * Math.SQRT2;
+    c.clearRect(0, 0, cv.width, cv.height);
+    c.save();
+    c.translate(cv.width / 2, (cv.height - ((W + H) * k) / Math.SQRT2 / 2) / 2);
+    c.scale(1, 0.5);
+    c.rotate(Math.PI / 4);
+    c.imageSmoothingEnabled = false;
+    c.drawImage(tiles, 0, 0, W * k, H * k);
+    c.restore();
+    // What a settler would ask about the land.
+    const hall = s.buildings.find((b) => b.type === 'townhall')!;
+    const c0 = bCenter(hall);
+    let near = 0;
+    let rock = 0;
+    let ore = 0;
+    let fertile = 0;
+    let water = 0;
+    let forest = 0;
+    for (let i = 0; i < W * H; i++) {
+      if (s.terrain[i] === 1) water++;
+      else if (s.trees[i]) forest++;
+      const x = i % W;
+      const y = Math.floor(i / W);
+      if (Math.hypot(x + 0.5 - c0.x, y + 0.5 - c0.y) > 14) continue;
+      near++;
+      if (s.rock[i]) rock++;
+      if (s.ore[i]) ore++;
+      fertile += s.fertility[i];
+    }
+    const pct = (n: number, of: number) => Math.round((100 * n) / Math.max(1, of));
+    const soil = fertile / Math.max(1, near);
+    box.querySelector('.map-facts')!.innerHTML = `
+      <div>Forest ${pct(forest, W * H)}% · water ${pct(water, W * H)}%</div>
+      <div>Near the manor: ${rock ? 'rock' : '<span class="neg">no rock</span>'}, ${ore ? 'iron ore' : 'no ore'}</div>
+      <div>Soil around it: ${soil < 0.4 ? 'poor' : soil < 0.7 ? 'fair' : 'rich'}</div>`;
   }
 
   showGameMenu(): void {

@@ -1907,3 +1907,12 @@ table.prod td.num {
 .chain .link small { opacity: 0.75; }
 .chain .link.weak { border-color: var(--bad); background: rgba(184, 72, 58, 0.12); font-weight: bold; }
 .chain .link svg { width: 16px; height: 16px; }
+
+/* The new-game map preview. */
+.map-preview { display: flex; gap: 12px; align-items: center; margin: 8px 0; }
+.map-preview canvas { width: 300px; height: 160px; flex: none; filter: drop-shadow(0 2px 3px rgba(60, 40, 20, 0.35)); }
+.map-facts { font-size: 14px; line-height: 1.5; }
+@media (max-width: 700px) {
+  .map-preview { flex-direction: column; align-items: stretch; }
+  .map-preview canvas { width: 100%; height: auto; }
+}
