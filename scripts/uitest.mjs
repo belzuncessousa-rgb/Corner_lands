@@ -38,6 +38,20 @@ await page.keyboard.press('Escape');
 await page.waitForTimeout(200);
 if (process.env.DEBUG) console.log('pinned before Esc', pinned, 'menu', !!(await page.$('.modal-back')));
 check('Esc closes a pinned panel', pinned && (await page.$eval('#chip-panel', (e) => getComputedStyle(e).display)) === 'none' && !(await page.$('.modal-back')));
+// Undo: place a house, then take it back with Ctrl+Z.
+{
+  const before = await page.evaluate(() => ({ n: window.game.state.buildings.length, gold: window.game.state.res.gold }));
+  await page.keyboard.press('h');
+  const hs = await page.evaluate(([hx, hy]) => { for (let r = 3; r < 14; r++) for (const [dx, dy] of [[r, 0], [0, r], [-r, 0], [0, -r]]) if (!window.cl.placementError(window.game.state, 'house', hx + dx, hy + dy)) return [hx + dx, hy + dy]; return null; }, [hall.x, hall.y]);
+  await placeAt(hs[0], hs[1], 2);
+  const placed = (await page.evaluate(() => window.game.state.buildings.length)) === before.n + 1;
+  const shown = !!(await page.$('.undo-btn'));
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Control+z');
+  await page.waitForTimeout(200);
+  const after = await page.evaluate(() => ({ n: window.game.state.buildings.length, gold: window.game.state.res.gold }));
+  check('undo a placement with Ctrl+Z', placed && shown && after.n === before.n && after.gold === before.gold, JSON.stringify({ placed, shown, before, after }));
+}
 // Farmstead from the menu (search a free spot near the hall).
 await pick('farming', 'farm');
 const spot = await page.evaluate(([hx, hy]) => (() => { for (let r = 4; r < 14; r++) for (const [dx, dy] of [[r, -r], [r, 0], [0, -r], [-r, 0], [0, r]]) if (!window.cl.placementError(window.game.state, 'farm', hx + dx, hy + dy)) return [hx + dx, hy + dy]; return null; })(), [hall.x, hall.y]);

@@ -930,3 +930,31 @@ describe('chronicle', () => {
     expect(s.messages.at(-1)?.text).toBe('news 99');
   });
 });
+
+describe('undo', () => {
+  it('takes back a placement or a demolition in full', async () => {
+    const { demolishWithUndo, undoPlacement } = await import('../src/game/undo');
+    const { stored } = await import('../src/game/sim');
+    const s = generateWorld(93);
+    s.res.gold = 500;
+    const gold = s.res.gold;
+    const b = placeNearRoad(s, 'woodcutter');
+    const place = undoPlacement(b);
+    expect(place.revert(s)).toBeNull();
+    expect(s.buildings.includes(b)).toBe(false);
+    expect(s.res.gold).toBe(gold);
+    // A finished building comes back exactly as it was, and the refund goes back.
+    const w = placeNearRoad(s, 'woodcutter');
+    w.build = 1;
+    w.need = undefined;
+    w.want = 1;
+    const mats = stored(s, 'materials');
+    const step = demolishWithUndo(s, w)!;
+    expect(stored(s, 'materials')).toBeGreaterThan(mats - 1);
+    expect(step.revert(s)).toBeNull();
+    const back = s.buildings.find((x) => x.id === w.id)!;
+    expect(back.type).toBe('woodcutter');
+    expect(back.want).toBe(1);
+    expect(stored(s, 'materials')).toBeCloseTo(mats);
+  });
+});

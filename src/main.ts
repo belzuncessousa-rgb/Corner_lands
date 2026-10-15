@@ -13,7 +13,6 @@ import {
   bCenter,
   isBridge,
   centerOf,
-  demolish,
   log,
   coveredBy,
   monthOf,
@@ -35,9 +34,10 @@ import {
   yearOf,
   keepOf,
 } from './game/sim';
-import type { BuildingType, GameState } from './game/types';
+import type { Building, BuildingType, GameState } from './game/types';
 import { FOOD_IDS } from './game/data';
 import { generateWorld, idx, inBounds } from './game/world';
+import { demolishWithUndo, undoPlacement, type UndoStep } from './game/undo';
 import { AgentSystem } from './render/agents';
 import { Wildlife } from './render/wildlife';
 import { type Overlay, Renderer } from './render/renderer';
@@ -51,6 +51,9 @@ export type Tool =
   | { kind: 'demolish' };
 
 const SPEEDS = [0, 1, 3, 8];
+
+/** Seconds' grace to take back a placement or demolition. */
+const UNDO_MS = 10000;
 
 /** Services whose reach the V overlay can show. */
 const COVERAGE_TYPES: BuildingType[] = ['well', 'market', 'tavern', 'church'];
@@ -89,6 +92,37 @@ export class Game {
   private longPress = 0;
   /** Which service's reach the map is showing (V cycles), if any. */
   coverage: BuildingType | null = null;
+
+  /** The last placement or demolition, which may be taken back for a few seconds. */
+  private undoStep: { step: UndoStep; until: number } | null = null;
+
+  offerUndo(step: UndoStep): void {
+    this.undoStep = { step, until: performance.now() + UNDO_MS };
+    this.hud.showUndo(step.label, UNDO_MS);
+  }
+
+  /** Demolishes a building (from the tool or the inspector) and offers to undo it. */
+  demolishBuilding(b: Building): UndoStep | null {
+    const step = demolishWithUndo(this.state, b);
+    if (!step) return null;
+    log(this.state, `${BUILDINGS[b.type].name} demolished.`, 'info');
+    this.offerUndo(step);
+    return step;
+  }
+
+  undo(): void {
+    const u = this.undoStep;
+    this.undoStep = null;
+    this.hud.showUndo(null, 0);
+    if (!u || performance.now() > u.until) return;
+    const err = u.step.revert(this.state);
+    if (err) this.hud.flash(err);
+    else {
+      this.select(null);
+      this.hud.sound('place');
+      this.hud.update();
+    }
+  }
 
   /** Cycles the reach overlay: wells, markets, taverns, churches, off. */
   cycleCoverage(): void {
@@ -460,6 +494,7 @@ export class Game {
     const z = placeZone(s, type, a.x, a.y, tx, ty);
     this.zoneAnchor = null;
     if (z) {
+      this.offerUndo(undoPlacement(z));
       this.hud.sound('place');
       this.setTool({ kind: 'select' });
       this.hud.closeCategory();
@@ -516,6 +551,7 @@ export class Game {
       }
       const b = placeOrder(s, tool.type, p.x, p.y);
       if (b) {
+        this.offerUndo(undoPlacement(b));
         this.hud.sound('place');
         if (!canAfford(s, materialsOf(BUILDINGS[tool.type].cost))) this.hud.flash('Builders will start once the materials are in storage.');
         if (tool.type !== 'house' && tool.type !== 'well' && tool.type !== 'garden') {
@@ -531,10 +567,8 @@ export class Game {
       const occ = s.occ[idx(s, tx, ty)];
       if (occ >= 0) {
         const b = s.buildings.find((o) => o.id === occ);
-        if (b && demolish(s, b)) {
-          this.hud.sound('demolish');
-          log(s, `${BUILDINGS[b.type].name} demolished.`, 'info');
-        }
+        const step = b && this.demolishBuilding(b);
+        if (step) this.hud.sound('demolish');
       } else if (s.road[idx(s, tx, ty)]) {
         removeRoad(s, tx, ty);
         recompute(s);
@@ -727,6 +761,11 @@ export class Game {
         return;
       }
       if (this.modalOpen) return;
+      if (k === 'z' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        this.undo();
+        return;
+      }
       if (k === ' ') {
         e.preventDefault();
         this.togglePause();

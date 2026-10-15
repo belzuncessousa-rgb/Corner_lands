@@ -36,6 +36,7 @@ then fall back to the browser's localStorage.
 | Demolish | `X`, then click a building or drag across roads |
 | Cancel / deselect | Right-click, `Esc`, or a long press on touch screens |
 | Pause / speed | `Space`, `1` `2` `3` (normal, ×3, ×8) |
+| Undo | `Ctrl+Z` (or the button) within ten seconds takes back the last placement or demolition |
 | Reach overlay | `V` cycles wells, markets, taverns and churches: which homes each covers |
 
 ### How the settlement works
