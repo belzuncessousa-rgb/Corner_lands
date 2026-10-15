@@ -226,6 +226,28 @@ describe('stress', () => {
     expect(b.buildings.length).toBe(a.buildings.length);
   });
 
+  it('a save from an older version loads and plays on', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { gunzipSync } = await import('node:zlib');
+    // Made with the main branch (Phase 4 era): no barns, retinue, feasts or mead.
+    const json = gunzipSync(readFileSync(new URL('./fixtures/save-main-2y.json.gz', import.meta.url))).toString();
+    const s = deserialize(json);
+    recompute(s);
+    let r = 8;
+    const rand = () => {
+      r = (r * 1103515245 + 12345) & 0x7fffffff;
+      return r / 0x7fffffff;
+    };
+    const pop = s.population;
+    for (let d = 0; d < 240; d++) {
+      if (d % 5 === 0) act(s, rand);
+      stepDay(s);
+      const bad = invariants(s);
+      expect(bad, `day ${s.day}`).toBeNull();
+    }
+    expect(s.population).toBeGreaterThanOrEqual(pop);
+  });
+
   it.runIf(process.env.STRESS)('long soak: 10 maps for 15 years', { timeout: 1200000 }, () => {
     for (let seed = 1; seed <= 10; seed++) {
       const t = performance.now();
