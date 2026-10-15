@@ -194,3 +194,13 @@ are listed in the README.
 - [x] Colour-blind pass (scripts/cvdshots.mjs): simulate deuteranopia on screenshots of markers, charts and the charter tree; add shapes where colour alone carries meaning
 - [x] Keyboard: list every hotkey in the help screen; Esc closes tools, panels and menus in a predictable order
 - [x] Optional "pause on bad news" setting (events already pause)
+
+### Phase 11 — Deeper polish (for the scheduled runs)
+When a phase is done, keep going: stress the game harder, look for new
+player insights on the web, and add what you learn here as new items.
+Save size was checked (about 200 KB after twenty years, fine for browser storage).
+- [ ] Production chains view in the Production Book: wheat → flour → bread drawn as a chain, each link showing made vs used last month and the weakest link highlighted (players say Anno's numbers do not diagnose)
+- [ ] Coverage overlay: a toggle that tints the map by well, market, tavern and church reach, so homes out of reach stand out
+- [ ] Undo the last placement or demolition (a few seconds' grace, refunding fully)
+- [ ] Thirty-year soak with the meddling monkey: watch for drift (gold or prestige running away, message and chronicle growth, frame time at 300+ villagers)
+- [ ] Research pass: recent reviews of cozy city builders (2025–2026) for complaints this game could answer; add the best as items
