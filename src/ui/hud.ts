@@ -502,7 +502,7 @@ export class Hud {
     if (!makers.length && GOODS[r].group !== 'currency') lines.push('<i>Nothing in your lands makes this yet.</i>');
     const users = done.filter(uses);
     if (users.length) lines.push(`Used by ${users.length} workplace${users.length > 1 ? 's' : ''}`);
-    const waiting = done.filter((b) => b.lack === r);
+    const waiting = done.filter((b) => b.lack === r && hasProblem(b));
     if (waiting.length) lines.push(`<span class="neg">⚠ ${waiting.length} waiting for it: ${esc(waiting.slice(0, 3).map((b) => buildingName(b)).join(', '))}</span>`);
     return lines.length ? `<br><br>${lines.join('<br>')}` : '';
   }
@@ -517,7 +517,7 @@ export class Hud {
         const flow = s.flow?.[r] ?? 0;
         const keep = keepOf(s, r);
         const sell = selling(s, r);
-        const wanted = s.buildings.some((b) => b.lack === r && b.build >= 1);
+        const wanted = s.buildings.some((b) => b.lack === r && hasProblem(b));
         return `<tr data-tip="${esc(`<b>${g.name}</b><br>${esc(g.desc)}${g.food ? `<br>Feeds ${g.food} · ${g.foodGroup}` : ''}${this.goodDiagnosis(r)}`)}">
           <td class="ic">${ICONS[r]}</td><td>${g.name}${wanted ? ' <span class="neg" title="Workplaces are waiting for this">⚠</span>' : ''}</td>
           <td class="num"><b>${Math.floor(s.res[r])}</b></td>
@@ -797,7 +797,10 @@ export class Hud {
         rows.push(`<div class="kv"><span>Crop growth</span><span>${Math.round(b.growth * 100)}%</span></div>${bar(b.growth)}`);
         const fc = fieldForecast(s, b);
         const name = GOODS[fc.good].name.toLowerCase();
-        rows.push(`<div class="kv" data-tip="Harvest comes in early autumn. It grows with the farmers' work through spring and summer, the soil's richness and crop rotation."><span>Expected harvest</span><span>${b.growth > 0 ? `~${fc.now} ${name}` : '—'}${fc.full > fc.now ? ` <small>(up to ${fc.full})</small>` : ''}</span></div>`);
+        // Crops nobody brings in rot: say so rather than promise a harvest.
+        if (!owner) rows.push('<div class="kv"><span>Expected harvest</span><span class="neg">None: no farmstead tends it</span></div>');
+        else if (fc.crew === 0 && monthOf(s.day) <= 6 && b.growth > 0) rows.push('<div class="kv"><span>Expected harvest</span><span class="neg">At risk: no farmers at work</span></div>');
+        else rows.push(`<div class="kv" data-tip="Harvest comes in early autumn. It grows with the farmers' work through spring and summer, the soil's richness and crop rotation."><span>Expected harvest</span><span>${b.growth > 0 ? `~${fc.now} ${name}` : '—'}${fc.full > fc.now ? ` <small>(up to ${fc.full})</small>` : ''}</span></div>`);
         rows.push(`<div class="kv" data-tip="Richer soil yields up to twice as much as poor soil. Look for dark green, lush ground."><span>Soil</span><span class="${fc.soil < 0.4 ? 'neg' : ''}">${fc.soil < 0.4 ? 'Poor' : fc.soil < 0.7 ? 'Fair' : 'Rich'} (${Math.round(fc.soil * 100)}%)</span></div>`);
         if (b.lastCrop) rows.push(`<div class="kv" data-tip="Growing the same crop two years running yields less."><span>Last year</span><span>${esc(b.lastCrop)}${b.lastCrop === (b.recipe ?? 'wheat') ? ' <span class="neg">(same crop: −15%)</span>' : ''}</span></div>`);
       } else if (b.type === 'orchard') {

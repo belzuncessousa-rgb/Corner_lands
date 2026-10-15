@@ -880,3 +880,29 @@ describe('farm barn', () => {
     expect(s.res.grain).toBeGreaterThan(0);
   });
 });
+
+describe('farm barn safety', () => {
+  it('demolishing a farm or pausing it does not lose the barn', async () => {
+    const { barnTotal, demolish, stored } = await import('../src/game/sim');
+    const { RESOURCE_STORAGE } = await import('../src/game/data');
+    const { RESOURCE_IDS } = await import('../src/game/types');
+    const s = generateWorld(90);
+    s.tier = 1;
+    const a = placeNearRoad(s, 'farm');
+    a.build = 1;
+    a.need = undefined;
+    for (const k of RESOURCE_IDS) if (RESOURCE_STORAGE[k] === 'food') s.res[k] = 0;
+    // Paused, the barn still empties into the granary.
+    a.barn = { grain: 50 };
+    a.paused = true;
+    s.dirty = true;
+    run(s, 3);
+    expect(barnTotal(a)).toBe(0);
+    expect(s.res.grain).toBe(50);
+    // Demolished, what is in the barn goes to the stores.
+    a.barn = { grain: 30 };
+    const before = stored(s, 'food');
+    demolish(s, a);
+    expect(stored(s, 'food')).toBe(before + 30);
+  });
+});

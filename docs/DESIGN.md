@@ -181,6 +181,16 @@ A ten-seed sweep of the autoplayer exposed stalls a player can hit too.
 
 ### Phase 9 — Clearer economy (for the scheduled runs)
 - [ ] Steward warns when wheat piles up faster than the mills grind it (suggest a second windmill or bakery)
-- [ ] Steward names the jobs nobody fills when the town has more workplaces than hands
+- [x] Goods diagnose themselves (who makes, who waits); map markers show the missing good; needs overview per home need
 - [ ] Feast visuals: trestle tables and bunting at the manor in the month of a feast
 - [ ] Late-game balance: twelve-year bot runs reach the Castle on most maps (check prestige and arms costs)
+
+### Phase 10 — Lessons from player research (for the scheduled runs)
+Research into what players praise and criticise in Manor Lords, Banished,
+Anno, Farthest Frontier, Timberborn and cozy builders; the shipped answers
+are listed in the README.
+- [ ] Touch: check tap/drag thresholds (~10–20 px) and add long-press to inspect on phones
+- [ ] A funnel test that plays the objectives like a new player (including the teaching ones) and flags any step that takes over ten minutes
+- [ ] Colour-blind pass: simulate deuteranopia on screenshots of markers, charts and the charter tree; add shapes where colour alone carries meaning
+- [ ] Keyboard: list every hotkey in the help screen; Esc closes tools, panels and menus in a predictable order
+- [ ] Optional "pause when an event or a famine starts" setting

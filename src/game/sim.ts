@@ -127,6 +127,14 @@ export function totalFood(s: GameState): number {
   return n;
 }
 
+/** Villager-months of food in store: richer foods count for more, grain and oats as pottage. */
+export function larder(s: GameState): number {
+  let n = 0;
+  for (const f of FOOD_IDS) n += s.res[f] * (GOODS[f].food ?? 1);
+  for (const f of POTTAGE) n += s.res[f] * POTTAGE_FOOD;
+  return n;
+}
+
 // ---------------------------------------------------------------- placement
 
 export function footprintClear(s: GameState, x: number, y: number, w: number, h: number): string | null {
@@ -346,6 +354,13 @@ export function demolish(s: GameState, b: Building): boolean {
     const back = deliveredTo(b);
     for (const k in back) store(s, k as ResourceId, back[k as ResourceId] ?? 0);
   }
+  // A farm's barn is emptied into the stores first.
+  let lost = 0;
+  for (const k in b.barn) {
+    const n = b.barn[k as ResourceId] ?? 0;
+    lost += n - store(s, k as ResourceId, n);
+  }
+  if (lost > 0) log(s, `${Math.floor(lost)} sacks from the barn had no room in the stores and were lost.`, 'bad');
   removeBuilding(s, b);
   recompute(s);
   return true;
@@ -1226,6 +1241,7 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
         if (!r) {
           const fixed = chooseRecipe(s, b, true);
           const e = fixed && enoughOf(s, fixed.outputs);
+          b.lack = undefined;
           return e ? `Enough ${GOODS[e].name.toLowerCase()} in store` : 'Waiting for materials';
         }
         inputs = r.inputs;
@@ -1234,6 +1250,7 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
         if (e) return `Enough ${GOODS[e].name.toLowerCase()} in store`;
       }
       if ((inputs.wood ?? 0) > 0 && s.res.wood - (inputs.wood ?? 0) < WOOD_RESERVE) {
+        b.lack = 'wood';
         return 'Waiting for wood (keeping firewood reserve)';
       }
       if (!canAfford(s, inputs)) {
@@ -1290,7 +1307,7 @@ function fieldYield(s: GameState, f: Building, crew: number): number {
  * fully tended by harvest time, plus the soil's richness (0-1). Uses the same
  * formula as the harvest itself, so the preview never lies.
  */
-export function fieldForecast(s: GameState, f: Building): { good: ResourceId; now: number; full: number; soil: number } {
+export function fieldForecast(s: GameState, f: Building): { good: ResourceId; now: number; full: number; soil: number; crew: number } {
   const owner = s.buildings.find((o) => o.id === f.owner);
   const crew = owner ? Math.min(1, owner.workers / Math.max(1, workersOf(owner))) : 0;
   const good = CROP_GOOD[cropOf(f)];
@@ -1299,7 +1316,7 @@ export function fieldForecast(s: GameState, f: Building): { good: ResourceId; no
   f.growth = 1;
   const full = fieldYield(s, f, 1);
   f.growth = growth;
-  return { good, now, full, soil: farmFertility(s, f) };
+  return { good, now, full, soil: farmFertility(s, f), crew };
 }
 
 /**
@@ -1308,18 +1325,24 @@ export function fieldForecast(s: GameState, f: Building): { good: ResourceId; no
  */
 export function harvestForecast(s: GameState): { kind: StorageKind; expected: number; room: number }[] {
   const expected: Partial<Record<StorageKind, number>> = {};
+  const farms = new Set<Building>();
   for (const f of s.buildings) {
     if (f.type !== 'field' || f.growth <= 0) continue;
+    // Fields without a farmstead rot unharvested.
+    const owner = s.buildings.find((o) => o.id === f.owner && o.build >= 1);
+    if (!owner) continue;
+    farms.add(owner);
     const kind = RESOURCE_STORAGE[CROP_GOOD[cropOf(f)]];
     if (kind) expected[kind] = (expected[kind] ?? 0) + fieldYield(s, f, 1);
   }
-  // Barns take what the stores cannot.
+  // Each farm's barn takes only its own harvest; share the space across stores by size.
   let barns = 0;
-  for (const b of s.buildings) if (b.type === 'farm' && b.build >= 1) barns += FARM_BARN - barnTotal(b);
+  for (const b of farms) barns += FARM_BARN - barnTotal(b);
+  const all = Object.values(expected).reduce((a, n) => a + (n ?? 0), 0) || 1;
   return (Object.keys(expected) as StorageKind[]).map((kind) => ({
     kind,
     expected: expected[kind]!,
-    room: Math.max(0, storageCap(s, kind) - stored(s, kind)) + barns,
+    room: Math.max(0, storageCap(s, kind) - stored(s, kind)) + Math.floor((barns * expected[kind]!) / all),
   }));
 }
 
@@ -1727,6 +1750,8 @@ export function dailyProduction(s: GameState, rng: StateRng): void {
   for (const b of s.buildings) {
     const d = workDef(b);
     if (b.build < 1) continue;
+    // Carting the barn's harvest to the stores is not farm work: it goes on when paused.
+    if (b.type === 'farm' && b.paused) unloadBarn(s, b);
     if (b.paused) {
       b.status = 'Paused';
       b.blocked = 0;
@@ -2236,7 +2261,7 @@ function migrate(s: GameState, rng: StateRng): void {
   } else if (s.happiness >= 50 && r.shortage === 0) {
     const free = housing - s.population;
     // Newcomers only settle where the larders could feed everyone for a while.
-    const room = Math.floor(totalFood(s) / SETTLER_FOOD_MONTHS) - s.population;
+    const room = Math.floor(larder(s) / SETTLER_FOOD_MONTHS) - s.population;
     if (free > 0 && room > 0) {
       const n = Math.min(free, room, 1 + Math.floor((s.happiness - 50) / 12) + rng.int(2));
       s.population += n;
@@ -2255,7 +2280,11 @@ export function settlerBlocker(s: GameState): string | null {
   if (s.happiness < 50) return 'Villagers are not happy enough (50% needed)';
   if (s.report.shortage > 0) return 'Someone went hungry last month';
   if (totalHousing(s) <= s.population) return 'Every home is full';
-  if (totalFood(s) < (s.population + 1) * SETTLER_FOOD_MONTHS) return `The larders look thin: settlers want ${SETTLER_FOOD_MONTHS} months of food for everyone`;
+  if (larder(s) < (s.population + 1) * SETTLER_FOOD_MONTHS) {
+    // Full granaries that still cannot hold enough: the town needs more of them.
+    if (stored(s, 'food') >= storageCap(s, 'food') * 0.9) return `The granaries are too small to hold ${SETTLER_FOOD_MONTHS} months of food for everyone: build a Granary`;
+    return `The larders look thin: settlers want ${SETTLER_FOOD_MONTHS} months of food for everyone`;
+  }
   return null;
 }
 
