@@ -1960,3 +1960,29 @@ table.prod td.num {
 .mile small { color: var(--ink-soft); font-size: 12px; }
 @media (max-width: 600px) { .milestones { grid-template-columns: 1fr; } }
 .save .deeds { color: #8a6a2a; font-style: italic; }
+
+/* Phones: fit every build-bar tab (categories and tools) on one row. */
+@media (max-width: 420px) {
+  #buildbar .tabs {
+    gap: 2px;
+  }
+  #buildbar .tabs button.tab {
+    min-width: 26px;
+    padding: 4px 2px;
+  }
+  #buildbar .tab svg {
+    width: 20px;
+    height: 20px;
+  }
+  #buildbar .divider {
+    margin: 2px 1px;
+  }
+}
+
+/* The narrowest phones may still scroll the tabs: fade the right edge as a hint. */
+@media (max-width: 340px) {
+  #buildbar .tabs {
+    -webkit-mask-image: linear-gradient(to right, #000 88%, transparent);
+    mask-image: linear-gradient(to right, #000 88%, transparent);
+  }
+}
