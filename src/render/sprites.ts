@@ -136,7 +136,11 @@ export function grassTile(month: number, fert: number, variant: number): Sprite 
 }
 
 /** Water tile; mask bits mark land on sides +x(1), +y(2), -x(4), -y(8). */
-export function waterTile(season: Season, mask: number): Sprite {
+/**
+ * Water tile; `deco` adds life to quiet water: 1 reeds along the shore,
+ * 2 lily pads, 3 both.
+ */
+export function waterTile(season: Season, mask: number, deco = 0): Sprite {
   return makeSprite(TW + 4, TH + 4, TW / 2 + 2, 2, (ctx) => {
     const base = WATER[season];
     diamond(ctx);
@@ -185,6 +189,54 @@ export function waterTile(season: Season, mask: number): Sprite {
       ctx.fill();
     }
     ctx.restore();
+    const rand = mulberry32(mask * 131 + deco * 17 + season);
+    if (deco & 2 && season !== 3) {
+      // Lily pads floating in the open part of the tile, flowering in spring and summer.
+      for (let k = 0; k < 3; k++) {
+        const x = (rand() - 0.5) * TW * 0.36;
+        const y = TH / 2 + (rand() - 0.5) * TH * 0.36;
+        ctx.fillStyle = season === 2 ? '#7a8a3a' : '#4f8a3c';
+        ctx.beginPath();
+        ctx.ellipse(x, y, 4.2, 2.1, 0, 0.35, Math.PI * 2);
+        ctx.lineTo(x, y);
+        ctx.fill();
+        if (season <= 1 && k === 0) {
+          ctx.fillStyle = rand() < 0.5 ? '#f2d4dc' : '#f6f0e4';
+          ctx.beginPath();
+          ctx.arc(x + 0.8, y - 0.8, 1.6, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+    if (deco & 1 && mask) {
+      // Reeds at the water's edge on the shore sides, cattails in summer and autumn.
+      const mids: [number, number, number][] = [
+        [1, TW / 4, (TH * 3) / 4],
+        [2, -TW / 4, (TH * 3) / 4],
+        [4, -TW / 4, TH / 4],
+        [8, TW / 4, TH / 4],
+      ];
+      for (const [bit, mx, my] of mids) {
+        if (!(mask & bit)) continue;
+        const bx = mx * 0.55;
+        const by = TH / 2 + (my - TH / 2) * 0.55;
+        for (let k = 0; k < 9; k++) {
+          const x = bx + (rand() - 0.5) * 14;
+          const y = by + (rand() - 0.5) * 4;
+          const h = 7 + rand() * 5;
+          ctx.strokeStyle = season === 3 ? '#b8a878' : season === 2 ? '#9a8a4a' : '#5f8a3a';
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.quadraticCurveTo(x + 0.5, y - h * 0.6, x + (rand() - 0.5) * 2, y - h);
+          ctx.stroke();
+          if ((season === 1 || season === 2) && k % 2 === 0) {
+            ctx.fillStyle = '#6b4a2e';
+            ctx.fillRect(x - 0.6, y - h - 0.5, 1.4, 2.6);
+          }
+        }
+      }
+    }
   });
 }
 

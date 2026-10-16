@@ -1,0 +1,27 @@
+import { chromium } from 'playwright';
+const SP = process.argv[2];
+const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell' });
+const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+const errors = [];
+page.on('pageerror', (e) => errors.push(String(e)));
+await page.goto('http://localhost:3001/');
+await page.waitForTimeout(600);
+await page.click('text=New Settlement');
+await page.fill('#seed', '4242');
+await page.click('text=Found the Settlement');
+await page.waitForTimeout(400);
+const n = await page.evaluate(() => { const g = window.game; const s = g.state; window.cl.playBot(s, 4, 3); while (s.day % 120 !== 45) window.cl.stepDay(s); s.pendingEvent = null; g.setSpeed(0);
+  g.renderer.noteRenderTime = () => { g.renderer.light = false; }; g.renderer.light = false;
+  const st = Object.keys(s.stumps ?? {}).map(Number); const i = st[Math.floor(st.length / 2)] ?? 0;
+  const wc = s.buildings.find((b) => b.type === 'woodcutter');
+  g.renderer.centerOn(wc.x + 1, wc.y + 1); g.renderer.cam.zoom = 1.8; g.hud.update(); return st.length; });
+console.log('stumps', n);
+await page.evaluate(() => document.querySelectorAll('.banner, .msg, #season-banner, .modal-back').forEach((b) => b.remove()));
+await page.waitForTimeout(1200);
+await page.screenshot({ path: `${SP}/stumps.png` });
+await page.evaluate(() => { const g = window.game; const s = g.state; let best = 0; for (let i = 0; i < s.terrain.length; i++) if (s.terrain[i] === 1 && s.variant[i] % 7 <= 2) { best = i; break; }
+  g.renderer.centerOn(best % s.width, Math.floor(best / s.width)); g.renderer.cam.zoom = 2.2; });
+await page.waitForTimeout(1200);
+await page.screenshot({ path: `${SP}/shore.png` });
+console.log(errors);
+await browser.close();

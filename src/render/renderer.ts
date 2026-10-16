@@ -1,4 +1,4 @@
-import { BUILDINGS, DAYS_PER_MONTH, RESOURCE_STORAGE, STORAGE_CAPACITY, type StorageKind } from '../game/data';
+import { BUILDINGS, DAYS_PER_MONTH, DAYS_PER_YEAR, RESOURCE_STORAGE, STORAGE_CAPACITY, type StorageKind } from '../game/data';
 import { upgradeBlocker } from '../game/levels';
 import { hasCharter } from '../game/charters';
 import { HOME_TRADES, deliveredTo, hasProblem, isMarketDay, monthOf, orchardMaturity, seasonOf, storageCap } from '../game/sim';
@@ -333,7 +333,7 @@ export class Renderer {
       for (let x = Math.max(0, d - H + 1); x <= Math.min(W - 1, d); x++) {
         const y = d - x;
         const i = y * W + x;
-        if (!s.trees[i] && !s.rock[i] && !s.ore[i] && !s.berriesMax[i]) continue;
+        if (!s.trees[i] && !s.rock[i] && !s.ore[i] && !s.berriesMax[i] && !s.stumps?.[i]) continue;
         const [wx, wy] = iso(x, y);
         if (!visible(wx, wy)) continue;
         this.buckets[Math.max(d, this.boost[i])].push(i * 4);
@@ -427,7 +427,10 @@ export class Renderer {
         let sp: Sprite;
         if (s.terrain[i] === 1) {
           const mask = this.landMask(s, x, y);
-          sp = this.sprite(`w:${season}:${mask}`, () => waterTile(season, mask));
+          // Some quiet water gets reeds by the shore or lily pads.
+          const v7 = s.variant[i] % 7;
+          const deco = v7 === 0 ? 1 : v7 === 1 ? 2 : v7 === 2 && mask ? 3 : 0;
+          sp = this.sprite(`w:${season}:${mask}:${deco}`, () => waterTile(season, mask, deco));
         } else {
           const f = Math.min(3, Math.floor(s.fertility[i] * 4));
           const v = s.variant[i] % GRASS_VARIANTS;
@@ -844,6 +847,41 @@ export class Renderer {
       if (s.berriesMax[i] > 2) {
         const [wx2, wy2] = iso(x + 0.25, y + 0.75);
         this.blit(sp, wx2, wy2);
+      }
+    }
+    const felled = s.stumps?.[i];
+    if (felled !== undefined && !s.trees[i] && s.occ[i] < 0 && !s.road[i]) {
+      // Stumps where the woodcutters were, fading into the grass over two years.
+      const age = (s.day - felled) / (2 * DAYS_PER_YEAR);
+      if (age < 1) {
+        const c = this.ctx;
+        c.globalAlpha = 1 - age * 0.8;
+        const rv = mulberry32(i * 7 + 3);
+        for (let k = 0; k < 2 + (v % 2); k++) {
+          const [sx, sy] = iso(x + 0.25 + rv() * 0.5, y + 0.25 + rv() * 0.5);
+          c.fillStyle = '#6b4a2e';
+          c.beginPath();
+          c.ellipse(sx, sy - 1.5, 3.2, 2.2, 0, 0, Math.PI * 2);
+          c.fill();
+          c.fillStyle = season === 3 ? '#e8ecee' : '#c8a06a';
+          c.beginPath();
+          c.ellipse(sx, sy - 3, 3, 1.5, 0, 0, Math.PI * 2);
+          c.fill();
+          c.strokeStyle = '#9a7346';
+          c.lineWidth = 0.5;
+          c.beginPath();
+          c.ellipse(sx, sy - 3, 1.6, 0.8, 0, 0, Math.PI * 2);
+          c.stroke();
+        }
+        if (season !== 3) {
+          // A few chips of wood in the grass.
+          c.fillStyle = '#c8a06a';
+          for (let k = 0; k < 4; k++) {
+            const [sx, sy] = iso(x + rv(), y + rv());
+            c.fillRect(sx, sy, 1.6, 0.9);
+          }
+        }
+        c.globalAlpha = 1;
       }
     }
     const n = s.trees[i];

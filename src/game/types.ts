@@ -302,6 +302,8 @@ export interface GameState {
   festivalDay?: { id: string; day: number };
   /** This year's tally for the year-end page of the chronicle. */
   year?: { pop: number; gold: number; prestige: number; arrived: number; left: number; built: number; harvest: number; stock?: Partial<Record<ResourceId, number>>; hungry?: number };
+  /** Tiles cleared by woodcutters and the day the last tree fell (stumps on the map). */
+  stumps?: Record<number, number>;
   /** Years that ended with no one having gone hungry. */
   fedYears?: number;
   /** The cathedral holds a relic (bought from a travelling friar). */

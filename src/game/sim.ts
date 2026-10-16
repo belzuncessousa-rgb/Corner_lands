@@ -1173,6 +1173,7 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
       if (t < 0) return s.groves?.length && nearestTile(s, b, d.radius, (i, dist) => (s.trees[i] > 0 ? dist : null)) >= 0 ? 'Only protected woods in range' : 'No trees in range';
       b.resDist = tileDist(s, b, t);
       s.trees[t]--;
+      if (s.trees[t] === 0) (s.stumps ??= {})[t] = s.day;
       addOutput(s, b, r.outputs);
       return null;
     }
@@ -2198,6 +2199,13 @@ export function monthly(s: GameState, rng: StateRng): void {
   if (month <= 5) regrowForests(s, rng);
   if (month <= 5 && hasCharter(s, 'nature2')) regrowForests(s, rng);
   monthlyPrestige(s);
+  // Stumps grass over in two years, or go when the tile is used or regrows.
+  if (s.stumps) {
+    for (const k in s.stumps) {
+      const i = Number(k);
+      if (s.day - s.stumps[i] > 2 * DAYS_PER_YEAR || s.trees[i] > 0 || s.occ[i] >= 0 || s.road[i]) delete s.stumps[i];
+    }
+  }
 
   // Bushes fruit in spring and again in summer.
   if (month === 0 || month === 4) s.berries.set(s.berriesMax);

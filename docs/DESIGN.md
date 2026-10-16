@@ -306,7 +306,7 @@ Note for later runs: when a feature players would notice goes in, add a line to 
 The 3D view (built from the game's own drawings) and the first gridless steps (buildings at any angle, roads as free curves) live on the branch `claude/3d-gridless`. The player chose to keep this branch on the flat, hand-drawn look and invest in more art for it; the 3D branch can be picked up again later.
 
 ### Phase 29 — More art for the flat look (the chosen direction)
-- [ ] Stumps where trees were felled, slowly grassing over; reeds and water lilies along quiet shores
+- [x] Stumps where trees were felled, slowly grassing over; reeds and water lilies along quiet shores
 - [ ] Wildflowers and stones scattered in meadows, thicker on rich soil, changing with the seasons
 - [ ] More house looks: flower boxes, laundry lines, a bench by the door, varied chimneys and roof patches
 - [ ] Workshop signs and small working details (a cart at the sawpit, hides on frames at the tannery, cloth drying at the weaver)
