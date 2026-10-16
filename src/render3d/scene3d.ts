@@ -44,7 +44,7 @@ function treeTexture(kind: TreeKind, season: Season, v: number) {
 }
 
 /** The ground as one texture, painted from the map in the style of the flat tiles. */
-function groundTexture(s: GameState, season: Season): THREE.CanvasTexture {
+export function groundTexture(s: GameState, season: Season): THREE.CanvasTexture {
   const P = 24;
   const W = s.width * P;
   const H = s.height * P;

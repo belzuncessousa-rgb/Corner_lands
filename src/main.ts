@@ -171,6 +171,12 @@ export class Game {
     this.bindInput();
     window.addEventListener('resize', () => this.renderer.resize());
     requestAnimationFrame((t) => this.frame(t));
+    // The 3D view, if the player turned it on last time.
+    try {
+      if (localStorage.getItem('cornerlands.3d') === '1') void this.set3D(true);
+    } catch {
+      /* ignore */
+    }
     // A shared link (…?seed=123) goes straight to founding a town on that land.
     const shared = new URLSearchParams(location.search).get('seed');
     if (shared) history.replaceState(null, '', location.pathname);
@@ -286,6 +292,18 @@ export class Game {
     this.afterLoad();
   }
 
+  /** The 3D view (a test): loaded on demand so the flat game stays light. */
+  private view3d: import('./render3d/view3d').View3D | null = null;
+
+  async set3D(on: boolean): Promise<void> {
+    if (on && !this.view3d) {
+      const { View3D } = await import('./render3d/view3d');
+      this.view3d = new View3D(this.canvas);
+    }
+    if (this.view3d) this.view3d.visible = on;
+    this.renderer.threeD = on;
+  }
+
   /** Photo mode: the interface, markers and selection are hidden for a clean view. */
   photo = false;
 
@@ -373,6 +391,7 @@ export class Game {
     this.wildlife.update(this.state, gameDt);
     // Dusk only at normal speed: faster, the days would flicker.
     this.renderer.setDayTime(this.simAcc / DAY_SECONDS, !this.demo && this.speed <= 1, dt);
+    if (this.view3d && this.renderer.threeD) this.view3d.render(this.state, this.renderer.cam, this.renderer.width, this.renderer.height, this.renderer.dpr);
     this.renderer.render(this.state, this.agents.agents, this.overlay(), running ? dt : 0, this.wildlife.animals);
     this.hud.minimap.update(dt);
     this.hud.tickAudio(dt, running);

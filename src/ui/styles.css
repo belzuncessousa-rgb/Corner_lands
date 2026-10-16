@@ -2013,3 +2013,12 @@ table.prod td.num {
 .news li { margin: 2px 0; }
 .news li.fresh { color: var(--ink, #3a2a1e); font-weight: 600; }
 .news li.fresh::after { content: ' · new'; color: #b8483a; font-weight: normal; font-style: italic; }
+/* The 3D view sits under the flat canvas, which stays on top for input. */
+#game3d {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+}
