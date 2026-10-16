@@ -1,6 +1,6 @@
 import { BUILDINGS, DAYS_PER_MONTH, FOOD_IDS, GOODS, RESOURCE_STORAGE } from './data';
 import type { StorageKind } from './data';
-import { harvestForecast, isUnlocked, labourSummary, log, winterBundles, storageCap, stored, totalHousing } from './sim';
+import { harvestForecast, isUnlocked, keepOf, labourSummary, log, winterBundles, storageCap, stored, totalHousing } from './sim';
 import { RESOURCE_IDS } from './types';
 import type { BuildingType, GameState, ResourceId } from './types';
 
@@ -14,6 +14,8 @@ interface Advice {
 }
 
 const food = (s: GameState) => FOOD_IDS.reduce((a, f) => a + s.res[f], 0);
+/** Villager-months the stored food would feed (bread goes three times as far). */
+const fed = (s: GameState) => FOOD_IDS.reduce((a, f) => a + s.res[f] * (GOODS[f].food ?? 1), 0);
 const homes = (s: GameState) => s.buildings.filter((b) => b.residents > 0).length;
 
 /** ", mostly planks (87) and dressed stone (64)": the biggest piles in a store. */
@@ -67,7 +69,7 @@ function millMonths(s: GameState): number {
 const ADVICE: Advice[] = [
   {
     id: 'food-low',
-    when: (s) => s.population > 0 && food(s) < s.population * 2 && s.report.shortage === 0,
+    when: (s) => s.population > 0 && fed(s) < s.population * 2 && s.report.shortage === 0,
     text: (s) =>
       s.res.grain + s.res.oats >= s.population * 2
         ? `Steward: our food stores (${Math.floor(food(s))}) will last barely two months, though ${Math.floor(s.res.grain + s.res.oats)} sacks of grain wait unground. Windmills and Bakeries would turn them into bread that feeds three times as many.`
@@ -113,6 +115,9 @@ const ADVICE: Advice[] = [
     when: (s) => s.tier >= 1 && s.res.grain >= 100 && millMonths(s) > 4,
     text: (s) => {
       const mills = s.buildings.filter((b) => b.type === 'windmill' && b.build >= 1).length;
+      // The bakers rest once the bread in store reaches its target: more mills would not help.
+      if (mills && s.res.bread >= keepOf(s, 'bread'))
+        return `Steward: ${Math.floor(s.res.grain)} wheat waits in the granaries, but the bakers rest: the bread in store has reached its target of ${keepOf(s, 'bread')}. Raise the bread target in the Food panel to bake more, or sell the surplus wheat.`;
       return mills
         ? `Steward: ${Math.floor(s.res.grain)} wheat waits in the granaries, about ${Math.round(millMonths(s))} months of grinding for our ${mills > 1 ? `${mills} windmills` : 'windmill'}. Another Windmill and Bakery would turn it into bread sooner.`
         : `Steward: ${Math.floor(s.res.grain)} wheat sits unground. A Windmill grinds it into flour and a Bakery bakes the bread, which feeds three times as many as pottage.`;
@@ -120,7 +125,7 @@ const ADVICE: Advice[] = [
   },
   {
     id: 'ovens',
-    when: (s) => s.res.flour >= 60 && s.buildings.filter((b) => b.type === 'bakery' && b.build >= 1).length < 2,
+    when: (s) => s.res.flour >= 60 && s.res.bread < keepOf(s, 'bread') && s.buildings.filter((b) => b.type === 'bakery' && b.build >= 1).length < 2,
     text: () => 'Steward: flour is piling up faster than the ovens can bake it. Build another Bakery, or let a family bake at home.',
   },
   {

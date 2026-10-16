@@ -917,6 +917,22 @@ describe('steward on mills', () => {
     advise(s, 3);
     expect(s.messages.at(-1)?.text).toMatch(/wheat sits unground/);
   });
+  it('points to the bread target when the bakers rest with bread in store', async () => {
+    const { advise } = await import('../src/game/advisor');
+    const s = generateWorld(93);
+    s.tier = 1;
+    s.res.grain = 900;
+    s.res.bread = 400;
+    const hall = s.buildings.find((b) => b.type === 'townhall')!;
+    let mill = null;
+    for (let r = 3; r < 30 && !mill; r++)
+      for (let dy = -r; dy <= r && !mill; dy++)
+        for (let dx = -r; dx <= r && !mill; dx++) if (!placementError(s, 'windmill', hall.x + dx, hall.y + dy)) mill = placeOrder(s, 'windmill', hall.x + dx, hall.y + dy);
+    mill!.build = 1;
+    for (let i = 0; i < 25; i++) advise(s, 3);
+    expect(s.messages.some((m) => /bakers rest: the bread in store has reached its target/.test(m.text))).toBe(true);
+    expect(s.messages.some((m) => /food stores .* barely two months/.test(m.text))).toBe(false);
+  });
 });
 
 describe('chronicle', () => {
