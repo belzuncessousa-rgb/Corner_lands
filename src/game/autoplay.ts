@@ -524,7 +524,7 @@ export function act(s: GameState, rand: () => number): void {
   if (s.tier >= 1 && count(s, 'tavern') < 1 + Math.floor(pop / 70)) wants.push('tavern');
   // Many idle hands: more workshops wherever their inputs are to hand; the
   // market sells what they make.
-  if (s.tier >= 4 && idle > Math.max(10, pop * 0.15)) {
+  if (s.tier >= 4 && idle > Math.max(10, pop * 0.15) && food >= pop * 3) {
     const has = (r: ResourceId, n: number) => s.res[r] >= n;
     const extra: [BuildingType, boolean][] = [
       ['farm', true],
