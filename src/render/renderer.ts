@@ -729,18 +729,23 @@ export class Renderer {
         c.fill();
       }
     }
-    // Protected woods: a dashed green border, plain while the tool is in hand.
+    // Protected woods: a light dashed border over a dark one, so it reads by
+    // brightness on grass and trees alike; bolder while the tool is in hand.
     if (s.groves?.length) {
       c.save();
-      c.setLineDash(ov.groves ? [] : [6, 5]);
-      c.lineWidth = ov.groves ? 2.4 : 1.6;
-      c.strokeStyle = ov.groves ? 'rgba(150,230,120,0.95)' : 'rgba(110,170,80,0.6)';
       for (const g of s.groves) {
         const pts = [iso(g.x, g.y), iso(g.x + g.w, g.y), iso(g.x + g.w, g.y + g.h), iso(g.x, g.y + g.h)];
         c.beginPath();
         c.moveTo(pts[0][0], pts[0][1]);
         for (const q of pts.slice(1)) c.lineTo(q[0], q[1]);
         c.closePath();
+        c.setLineDash([]);
+        c.lineWidth = ov.groves ? 4 : 3;
+        c.strokeStyle = 'rgba(25,40,15,0.45)';
+        c.stroke();
+        c.setLineDash(ov.groves ? [] : [7, 5]);
+        c.lineWidth = ov.groves ? 2 : 1.4;
+        c.strokeStyle = ov.groves ? 'rgba(240,250,210,0.95)' : 'rgba(235,240,200,0.8)';
         c.stroke();
       }
       c.restore();

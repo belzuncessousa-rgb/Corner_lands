@@ -69,7 +69,9 @@ const ADVICE: Advice[] = [
     id: 'food-low',
     when: (s) => s.population > 0 && food(s) < s.population * 2 && s.report.shortage === 0,
     text: (s) =>
-      `Steward: our food stores (${Math.floor(food(s))}) will last barely two months. Build another forager, hunter, fisher or farm.`,
+      s.res.grain + s.res.oats >= s.population * 2
+        ? `Steward: our food stores (${Math.floor(food(s))}) will last barely two months, though ${Math.floor(s.res.grain + s.res.oats)} sacks of grain wait unground. Windmills and Bakeries would turn them into bread that feeds three times as many.`
+        : `Steward: our food stores (${Math.floor(food(s))}) will last barely two months. Build another forager, hunter, fisher or farm.`,
   },
   {
     id: 'firewood',

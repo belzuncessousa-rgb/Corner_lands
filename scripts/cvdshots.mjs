@@ -12,7 +12,9 @@ await page.click('text=New Settlement');
 await page.fill('#seed', '4242');
 await page.click('text=Found the Settlement');
 await page.waitForTimeout(500);
-await page.evaluate(() => { const g = window.game; window.cl.playBot(g.state, 5, 3); g.state.pendingEvent = undefined; g.setSpeed(0); g.hud.update(); });
+await page.evaluate(() => { const g = window.game; window.cl.playBot(g.state, 5, 3); g.state.pendingEvent = undefined; g.setSpeed(0);
+  // A protected wood beside the manor, to check its border is visible.
+  const h = g.state.buildings.find((b) => b.type === 'townhall'); g.state.groves = [{ x: h.x - 9, y: h.y - 3, w: 7, h: 7 }]; g.renderer.centerOn(h.x - 3, h.y + 1); g.hud.update(); });
 for (let i = 0; i < 3 && (await page.$('.modal-back')); i++) { await page.click('.modal button >> nth=0').catch(() => {}); await page.waitForTimeout(300); }
 // Deuteranopia (Machado et al. 2009, severity 1).
 await page.evaluate(() => {
