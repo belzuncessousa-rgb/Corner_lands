@@ -56,6 +56,8 @@ export interface Overlay {
   agent?: string;
   /** Reach of every well (or market, tavern, church) and which homes it covers. */
   coverage?: { circles: { cx: number; cy: number; r: number }[]; homes: Map<number, boolean> };
+  /** A farm or field is being placed: tint the land by how fertile it is. */
+  fertility?: boolean;
 }
 
 interface Particle {
@@ -716,6 +718,36 @@ export class Renderer {
       c.lineTo(a - TW / 2, b + TH / 2);
       c.closePath();
     };
+    if (ov.fertility) {
+      // Poor soil red, fair yellow, rich green; batched by shade so it stays cheap.
+      const shades = ['rgba(200,70,50,0.38)', 'rgba(220,150,50,0.34)', 'rgba(220,210,70,0.3)', 'rgba(140,200,70,0.32)', 'rgba(60,170,60,0.38)'];
+      const z = this.cam.zoom;
+      const hw = this.width / 2 / z + TW;
+      const hh = this.height / 2 / z + TH;
+      const buckets: number[][] = shades.map(() => []);
+      for (let i = 0; i < s.terrain.length; i++) {
+        if (s.terrain[i] || s.occ[i] >= 0 || s.road[i]) continue;
+        const x = i % s.width;
+        const y = (i / s.width) | 0;
+        const [wx, wy] = iso(x + 0.5, y + 0.5);
+        if (Math.abs(wx - this.cam.x) > hw || Math.abs(wy - this.cam.y) > hh) continue;
+        buckets[Math.min(4, Math.floor(s.fertility[i] * 5))].push(i);
+      }
+      buckets.forEach((list, k) => {
+        if (!list.length) return;
+        c.fillStyle = shades[k];
+        c.beginPath();
+        for (const i of list) {
+          const [a, b] = iso(i % s.width, (i / s.width) | 0);
+          c.moveTo(a, b);
+          c.lineTo(a + TW / 2, b + TH / 2);
+          c.lineTo(a, b + TH);
+          c.lineTo(a - TW / 2, b + TH / 2);
+          c.closePath();
+        }
+        c.fill();
+      });
+    }
     if (ov.coverage) {
       // Tint each tile once, however many circles reach it.
       const seen = new Set<number>();

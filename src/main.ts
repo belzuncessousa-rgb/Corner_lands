@@ -412,6 +412,7 @@ export class Game {
     const ty = Math.floor(fty);
     if (inBounds(s, tx, ty)) ov.hover = { x: tx, y: ty };
     const tool = this.tool;
+    if ((tool.kind === 'build' || tool.kind === 'zone') && (tool.type === 'farm' || tool.type === 'field')) ov.fertility = true;
     if (tool.kind === 'build') {
       const p = this.ghostPos(tool.type, ftx, fty);
       const err = placementError(s, tool.type, p.x, p.y);
