@@ -15,7 +15,7 @@ import {
   RESOURCE_STORAGE,
   STORAGE_CAPACITY,
 } from '../game/data';
-import { fairCost, fairError, fairPrestige, FAIR_TIER, feastCost, feastError, FESTIVALS, festivalError, getEvent, holdFair, holdFeast, holdFestival, resolveEvent } from '../game/events';
+import { nextTitle, takeTitle, titleError, TITLES, fairCost, fairError, fairPrestige, FAIR_TIER, feastCost, feastError, FESTIVALS, festivalError, getEvent, holdFair, holdFeast, holdFestival, resolveEvent } from '../game/events';
 import { CHARTERS, CHARTER_TIER, PATHS, charterCost, charterError, grantCharter, hasCharter } from '../game/charters';
 import { HOUSE_LEVELS, MANOR_LEVELS, buildingName, houseNeeds, startUpgrade, upgradeBlocker, upgradePlan, workersOf } from '../game/levels';
 import { activeQuests } from '../game/quests';
@@ -510,6 +510,18 @@ export class Hud {
       <p class="note">Select a workplace to set its workers and priority. Idle villagers help on building sites.</p>`;
   }
 
+  /** The lord's title, and the next one prestige can buy. */
+  private titleRow(): string {
+    const s = this.game.state;
+    const now = TITLES[s.title ?? 0];
+    const next = nextTitle(s);
+    if (!next) return `<div class="kv"><span>Title</span><b>${now.name}</b></div>`;
+    if (s.tier < next.tier && !(s.title ?? 0)) return '';
+    const err = titleError(s);
+    const tip = `<b>${next.name}</b><br>${esc(next.boon)}.<br>Costs ${next.prestige} prestige${err ? `<br><span class=neg>${esc(err)}</span>` : ''}`;
+    return `<div class="kv feast" data-tip="${esc(tip)}"><span>Title: <b>${now.name}</b></span><span><button data-action="title" ${err ? 'disabled' : ''}>Become ${next.name} <small>${next.prestige} ${ICONS.prestige}</small></button></span></div>`;
+  }
+
   private treasuryPanel(): string {
     const s = this.game.state;
     const r = s.report;
@@ -533,6 +545,7 @@ export class Hud {
             }</span></div>`
           : ''
       }
+      ${this.titleRow()}
       <div class="row">${hasBuilt(s, 'market') ? '<button data-action="trade">⚖ Trade</button>' : ''}<button data-action="ledger">Ledger</button><button data-action="charters">${ICONS.prestige} Charters</button></div>`;
   }
 
@@ -1480,6 +1493,13 @@ export class Hud {
           this.sound('jig');
         }
         this.lastInspectorKey = '';
+        break;
+      }
+      case 'title': {
+        const err = takeTitle(s);
+        if (err) this.flash(err);
+        else this.sound('fanfare');
+        this.renderChipPanel();
         break;
       }
       case 'fair': {

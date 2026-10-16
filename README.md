@@ -104,6 +104,9 @@ then fall back to the browser's localStorage.
   a year (each dearer than the last) for prestige and cheer. A Borough may raise
   one Cathedral: a fortune and most of a year to build, it serves as a church
   far and wide, cheers everyone and brings prestige every month.
+- **Titles** — prestige makes the lord a Baron (a Town; taxes +10%), an Earl
+  (a Borough; +3 happiness) and at last a Duke (a City; merchants buy half as
+  much again). Each rise goes into the chronicle's milestones.
 - **Great works for rich towns** — a Borough may also ring the hours from a
   Bell Tower (wide beauty, prestige), and a City may found a Guildhall:
   merchants pay a fifth more, the town takes pride in it, prestige every month.

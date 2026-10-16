@@ -300,6 +300,8 @@ export interface GameState {
   festivalDay?: { id: string; day: number };
   /** This year's tally for the year-end page of the chronicle. */
   year?: { pop: number; gold: number; prestige: number; arrived: number; left: number; built: number; harvest: number };
+  /** The lord's rank: 0 Lord, 1 Baron, 2 Earl, 3 Duke (see TITLES). */
+  title?: number;
   /** Woods the woodcutters leave standing (tile rectangles). */
   groves?: { x: number; y: number; w: number; h: number }[];
   /** Milestones reached, oldest first, for the chronicle. */

@@ -1,6 +1,6 @@
 import { DAYS_PER_MONTH, DAYS_PER_YEAR } from './data';
 import type { StateRng } from './rng';
-import { log, store, totalHousing, wallSections, WALL_SAFE } from './sim';
+import { checkMilestones, log, store, totalHousing, wallSections, WALL_SAFE } from './sim';
 import type { BuildingType, GameState, MessageKind, ResourceId } from './types';
 import { FOOD_IDS } from './data';
 
@@ -161,6 +161,41 @@ export function holdFair(s: GameState): string | null {
   addMood(s, 'The great fair', 8, 4);
   s.fairs = (s.fairs ?? 0) + 1;
   s.lastFair = Math.floor(s.day / DAYS_PER_YEAR);
+  return null;
+}
+
+/** Ranks the lord can buy with prestige, each with a lasting boon. */
+export const TITLES = [
+  { name: 'Lord', tier: 0, prestige: 0, boon: '' },
+  { name: 'Baron', tier: 2, prestige: 500, boon: 'Taxes bring a tenth more' },
+  { name: 'Earl', tier: 3, prestige: 1500, boon: 'Villagers are proud to serve an Earl: +3 happiness' },
+  { name: 'Duke', tier: 4, prestige: 4000, boon: 'Merchants come from afar: they buy half as much again' },
+];
+
+/** The next title, if any is left to take. */
+export function nextTitle(s: GameState): (typeof TITLES)[number] | null {
+  return TITLES[(s.title ?? 0) + 1] ?? null;
+}
+
+/** Why the lord cannot take the next title, or null. */
+export function titleError(s: GameState): string | null {
+  const t = nextTitle(s);
+  if (!t) return 'You are a Duke: there is no higher title to take';
+  if (s.tier < t.tier) return `A ${t.name} needs a ${['Hamlet', 'Village', 'Town', 'Borough', 'City'][t.tier]}`;
+  if (s.res.prestige < t.prestige) return `Needs ${t.prestige} prestige`;
+  return null;
+}
+
+/** Takes the next title, paying its prestige; returns why not, or null. */
+export function takeTitle(s: GameState): string | null {
+  const err = titleError(s);
+  if (err) return err;
+  const t = nextTitle(s)!;
+  checkMilestones(s);
+  s.res.prestige -= t.prestige;
+  s.title = (s.title ?? 0) + 1;
+  (s.milestones ??= []).push({ id: `title${s.title}`, day: s.day, text: `The lord was made ${t.name}` });
+  log(s, `By the king's letters you are made ${t.name}! ${t.boon}.`, 'good');
   return null;
 }
 

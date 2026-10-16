@@ -547,7 +547,7 @@ export function noteSeen(s: GameState): void {
 /** Monthly visit of merchants buying surplus goods at staffed markets. */
 export function exportGoods(s: GameState): number {
   const markets = s.buildings.filter((b) => b.type === 'market' && b.build >= 1 && b.workers > 0).length;
-  let budget = markets * EXPORT_PER_MARKET * (hasCharter(s, 'trade2') ? 2 : 1);
+  let budget = markets * EXPORT_PER_MARKET * (hasCharter(s, 'trade2') ? 2 : 1) * ((s.title ?? 0) >= 3 ? 1.5 : 1);
   const guild = s.buildings.some((b) => b.type === 'guildhall' && b.build >= 1 && b.workers > 0);
   let gold = 0;
   const sold: string[] = [];
@@ -2113,7 +2113,8 @@ export function monthly(s: GameState, rng: StateRng): void {
     if (b.residents === 0) continue;
     taxes += b.residents * tax.perHead * (b.type === 'house' ? (HOUSE_LEVELS[b.level]?.tax ?? 1) * (hasLuxury(s, b) ? 1.3 : 1) : 1);
   }
-  report.taxes = Math.floor(taxes);
+  // A Baron and above collects a tenth more.
+  report.taxes = Math.floor(taxes * ((s.title ?? 0) >= 1 ? 1.1 : 1));
   s.res.gold += report.taxes;
   serveAle(s);
   supplyHomes(s);
@@ -2357,6 +2358,7 @@ export function updateHappiness(s: GameState): void {
   }
   for (const m of s.moods ?? []) if (m.until > s.day) factors.push({ label: m.label, value: m.value });
   if (s.buildings.some((b) => b.type === 'cathedral' && b.build >= 1)) factors.push({ label: 'The cathedral', value: 6 });
+  if ((s.title ?? 0) >= 2) factors.push({ label: `Proud to serve ${(s.title ?? 0) >= 3 ? 'a Duke' : 'an Earl'}`, value: 3 });
   if (s.buildings.some((b) => b.type === 'guildhall' && b.build >= 1)) factors.push({ label: 'Pride in the guildhall', value: 3 });
   if (wallSections(s) >= WALL_SAFE) factors.push({ label: 'Safe behind the town walls', value: 4 });
   if (s.retinue) factors.push({ label: "The lord's guard", value: 2 });

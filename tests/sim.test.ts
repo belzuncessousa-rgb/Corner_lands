@@ -1205,3 +1205,23 @@ describe('protected woods', () => {
     expect(deserialize(serialize(s)).groves).toEqual([{ x: 2, y: 2, w: 4, h: 4 }]);
   });
 });
+
+describe('titles', () => {
+  it('prestige buys Baron, Earl and Duke in turn, each needing a larger town', async () => {
+    const { takeTitle, titleError } = await import('../src/game/events');
+    const s = generateWorld(4);
+    s.res.prestige = 10000;
+    expect(titleError(s)).toMatch(/Baron needs a Town/);
+    s.tier = 2;
+    expect(takeTitle(s)).toBeNull();
+    expect(s.title).toBe(1);
+    expect(s.res.prestige).toBe(9500);
+    expect(titleError(s)).toMatch(/Earl needs a Borough/);
+    s.tier = 4;
+    expect(takeTitle(s)).toBeNull();
+    expect(takeTitle(s)).toBeNull();
+    expect(s.title).toBe(3);
+    expect(titleError(s)).toMatch(/no higher title/);
+    expect(s.milestones!.map((m) => m.id)).toEqual(expect.arrayContaining(['title1', 'title2', 'title3']));
+  });
+});
