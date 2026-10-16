@@ -7,6 +7,11 @@ hamlet into a village, a town and finally a borough.
 Everything — terrain, forests, timber-framed houses, villagers and UI icons —
 is drawn procedurally in code, so there are no image assets.
 
+**Play it in your browser:** https://belzuncessousa-rgb.github.io/Corner_lands/
+(saves stay in your own browser).
+
+![A city in high summer: timber-framed houses, the castle, markets, fields and a church by the river](docs/screenshot.jpg)
+
 ## Playing
 
 ```bash
@@ -203,6 +208,7 @@ SWEEP=1 npx vitest run tests/balance.test.ts         # ten-map robustness sweep 
 FUNNEL=1 npx vitest run tests/balance.test.ts        # minutes to each objective for a new player (slow)
 STRESS=1 npx vitest run tests/stress.test.ts         # 15-year soak with a meddling monkey (slow)
 node scripts/showcase.mjs out    # screenshots of every building per season
+node scripts/readme-shot.mjs     # the README screenshot (docs/screenshot.jpg)
 node scripts/uitest.mjs          # drives the real UI: build, draw fields, workers, targets
 node scripts/cvdshots.mjs        # map, ledger and charters as seen with deuteranopia (OUT=dir)
 node scripts/touchtest.mjs       # phone: wobbly taps still select, long press cancels

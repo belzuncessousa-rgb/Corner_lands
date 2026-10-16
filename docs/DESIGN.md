@@ -266,5 +266,5 @@ Note from the morning run: the 30-year soak's famine on seed 3 comes from its ra
 
 ### Phase 21 — Ideas for the next runs
 - [x] The cathedral's windows glow in colour once the stained glass is commissioned, and the manor shows a banner for the tapestry
-- [ ] Refresh the showcase screenshots (scripts/showcase.mjs) with the great works, titles, market day and protected woods
-- [ ] A soak with a player who never touches stock targets, to check the defaults suit a town of 300+
+- [x] Refresh the showcase screenshots (scripts/showcase.mjs) with the great works, titles, market day and protected woods
+- [x] A soak with a player who never touches stock targets, to check the defaults suit a town of 300+ (they do: three 25-year towns of 164–443 villagers had no hunger and no pottage in their last ten years; the only effect is a wheat surplus the steward suggests selling)

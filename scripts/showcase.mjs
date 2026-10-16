@@ -18,13 +18,14 @@ const placed = await page.evaluate(() => {
   const { game, cl } = window;
   const s = game.state;
   for (const k of Object.keys(s.res)) s.res[k] = 5000;
-  s.tier = 2;
+  s.tier = 4;
+  s.commissions = ['tapestry', 'glass'];
   s.population = 60;
   const hall = s.buildings.find((b) => b.type === 'townhall');
   const ry = hall.y + 3;
   for (let x = hall.x - 16; x <= hall.x + 16; x++) cl.buildRoad(s, x, ry);
   for (let y = ry - 12; y <= ry + 12; y++) { cl.buildRoad(s, hall.x + 5, y); cl.buildRoad(s, hall.x - 6, y); }
-  const want = ['farm', 'market', 'church', 'storehouse', 'house', 'house', 'house', 'bakery', 'sawmill', 'smithy', 'mine', 'quarry', 'woodcutter', 'forester', 'forager', 'hunter', 'fisher', 'well', 'garden', 'maypole', 'statue', 'garden', 'tavern', 'granary', 'house', 'house', 'house', 'house'];
+  const want = ['farm', 'market', 'church', 'storehouse', 'house', 'house', 'house', 'bakery', 'sawmill', 'smithy', 'mine', 'quarry', 'woodcutter', 'forester', 'forager', 'hunter', 'fisher', 'well', 'garden', 'maypole', 'statue', 'garden', 'tavern', 'granary', 'house', 'house', 'house', 'house', 'belltower', 'guildhall', 'cathedral'];
   const placed = [];
   for (const type of want) {
     let done = false;
