@@ -209,7 +209,8 @@ export class Game {
     this.selectedAgent = null;
     this.demo = false;
     this.renderer.showMarkers = true;
-    document.getElementById('ui')!.classList.remove('demo');
+    this.photo = false;
+    document.getElementById('ui')!.classList.remove('demo', 'photo');
     this.agents.reset();
     this.wildlife.reset();
     this.selected = null;
@@ -281,8 +282,31 @@ export class Game {
     this.afterLoad();
   }
 
+  /** Photo mode: the interface, markers and selection are hidden for a clean view. */
+  photo = false;
+
+  setPhoto(on: boolean): void {
+    this.photo = on;
+    if (on) {
+      this.setTool({ kind: 'select' });
+      this.select(null);
+      this.hud.closeCategory();
+    }
+    this.renderer.showMarkers = !on && !this.demo;
+    document.getElementById('ui')!.classList.toggle('photo', on);
+  }
+
   /** A picture of the view with the town's name, rank and year along the bottom. */
-  savePicture(): void {
+  async savePicture(): Promise<void> {
+    // Taken in photo mode, so no markers or selection rings spoil it.
+    const was = this.photo;
+    if (!was) this.setPhoto(true);
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    this.capture();
+    if (!was) this.setPhoto(false);
+  }
+
+  private capture(): void {
     const src = this.canvas;
     const c = document.createElement('canvas');
     c.width = src.width;
@@ -698,6 +722,7 @@ export class Game {
   }
 
   private clickTile(sx: number, sy: number): void {
+    if (this.photo) return;
     const s = this.state;
     const [ftx, fty] = this.renderer.screenToTile(sx, sy);
     const tx = Math.floor(ftx);
@@ -848,7 +873,8 @@ export class Game {
           if (!this.dragFrom || this.moved || this.pointers.size !== 1) return;
           this.dragFrom = null;
           this.dragTile = null;
-          this.cancelOrDeselect();
+          if (this.photo) this.setPhoto(false);
+          else this.cancelOrDeselect();
           navigator.vibrate?.(15);
         }, LONG_PRESS_MS);
       }
@@ -902,7 +928,8 @@ export class Game {
       const tx = Math.floor(ftx);
       const ty = Math.floor(fty);
       if (df.button === 2 && !this.moved) {
-        this.cancelOrDeselect();
+        if (this.photo) this.setPhoto(false);
+        else this.cancelOrDeselect();
         return;
       }
       if (df.button !== 0) return;
@@ -953,6 +980,10 @@ export class Game {
       const k = e.key.toLowerCase();
       this.keys.add(k);
       if (k === 'escape') {
+        if (this.photo) {
+          this.setPhoto(false);
+          return;
+        }
         if (this.hud.handleEscape()) return;
         if (this.coverage) {
           this.coverage = null;
@@ -984,6 +1015,8 @@ export class Game {
         this.setTool({ kind: 'road', paved: true });
       } else if (k === 'v') {
         this.cycleCoverage();
+      } else if (k === 'u') {
+        this.setPhoto(!this.photo);
       } else if (k === 'x' || k === 'delete') {
         this.setTool({ kind: 'demolish' });
       } else if (k === 'p') {

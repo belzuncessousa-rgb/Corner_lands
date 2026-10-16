@@ -163,7 +163,7 @@ then fall back to the browser's localStorage.
   friends; download your town as a file (Save Game) and a
   friend opens it from Load Game to carry on; the game menu shows the map seed
   to copy, so friends can found the same land, and "Save a picture" downloads
-  a captioned view of your town. A town score (villagers, rank, title, great
+  a captioned view of your town; photo mode (U) hides the interface. A town score (villagers, rank, title, great
   works, art, milestones and years without hunger) shows on the load cards.
 - **Tips** — the first time you open a panel or pick a tool, one short line
   says what it does; switch them off (or back on) in the game menu.

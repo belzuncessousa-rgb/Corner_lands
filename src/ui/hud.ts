@@ -1978,6 +1978,7 @@ export class Hud {
         <button data-m="scale">Text size: ${Math.round(this.uiScale * 100)}%</button>
         <button data-m="pausebad">Pause on bad news: ${this.pauseOnBad ? 'On' : 'Off'}</button>
         <button data-m="tips">Tips: ${this.tipsOn ? 'On' : 'Off'}</button>
+        <button data-m="photo">Photo mode (U)</button>
         <button data-m="picture">📷 Save a picture</button>
       </div>
       <div class="seed-line" data-tip="Start a New Settlement with this seed to play the same land.">Map seed <b>${this.game.state.seed}</b> <button data-m="seed">Copy</button></div>`,
@@ -1995,6 +1996,10 @@ export class Hud {
         /* ignore */
       }
       this.showGameMenu();
+    });
+    m.querySelector('[data-m="photo"]')!.addEventListener('click', () => {
+      this.closeModal();
+      this.game.setPhoto(true);
     });
     m.querySelector('[data-m="picture"]')!.addEventListener('click', () => {
       // Close the menu first so the picture shows the town, not the dialog.
@@ -2136,7 +2141,7 @@ export class Hud {
         <p><b>Prestige</b> comes from a fine manor, a church and monuments. From Town on, spend it on <b>charters</b> (crown button) to specialise your town.</p>
         <p>Your <b>steward</b> warns you when things go wrong; the <b>Chronicle</b> (scroll button) keeps the full story.</p>
         <div class="ornament">❦</div>
-        <p><b>Keys</b>: <kbd>Left-drag</kbd> / <kbd>WASD</kbd> / arrows pan · <kbd>Wheel</kbd> / <kbd>+</kbd><kbd>-</kbd> / pinch zoom · <kbd>R</kbd> road (click, click) · <kbd>T</kbd> paved road · <kbd>X</kbd> / <kbd>Del</kbd> demolish · <kbd>P</kbd> protect a wood · <kbd>V</kbd> reach of wells, markets, taverns, churches · <kbd>Ctrl+Z</kbd> undo the last placement or demolition · ${BUILD_ORDER.filter((b) => BUILDINGS[b].hotkey)
+        <p><b>Keys</b>: <kbd>Left-drag</kbd> / <kbd>WASD</kbd> / arrows pan · <kbd>Wheel</kbd> / <kbd>+</kbd><kbd>-</kbd> / pinch zoom · <kbd>R</kbd> road (click, click) · <kbd>T</kbd> paved road · <kbd>X</kbd> / <kbd>Del</kbd> demolish · <kbd>P</kbd> protect a wood · <kbd>U</kbd> photo mode (hide the interface) · <kbd>V</kbd> reach of wells, markets, taverns, churches · <kbd>Ctrl+Z</kbd> undo the last placement or demolition · ${BUILD_ORDER.filter((b) => BUILDINGS[b].hotkey)
           .map((b) => `<kbd>${BUILDINGS[b].hotkey!.toUpperCase()}</kbd> ${BUILDINGS[b].name.toLowerCase()}`)
           .join(' · ')} · <kbd>Space</kbd> pause · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> speed</p>
         <p><b>Playing with friends:</b> found the same land with the seed of the week, download your town from Save Game for a friend to open, and compare <b>scores</b> on the load cards: villagers and rank, the lord's title, great works, works of art, milestones and every year in which no one went hungry.</p>

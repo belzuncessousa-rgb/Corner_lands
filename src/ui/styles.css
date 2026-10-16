@@ -1989,3 +1989,20 @@ table.prod td.num {
 /* Game menu: the map seed, and the file picker that looks like a button. */
 .seed-line { margin-top: 10px; text-align: center; color: var(--ink-soft); }
 .seed-line button { margin-left: 6px; padding: 2px 10px; }
+/* Photo mode: only the town, and a quiet note on how to come back. */
+#ui.photo > * { display: none !important; }
+#ui.photo::after {
+  content: 'Photo mode · U, Esc or a long press to return';
+  position: fixed;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  padding: 4px 12px;
+  border-radius: 12px;
+  background: rgba(40, 28, 16, 0.55);
+  color: #f4ead2;
+  font-size: 13px;
+  pointer-events: none;
+  animation: photoHint 4s forwards;
+}
+@keyframes photoHint { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
