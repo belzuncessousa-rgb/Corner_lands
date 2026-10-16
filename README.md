@@ -141,6 +141,9 @@ then fall back to the browser's localStorage.
 - **Steward, chronicle & ledger** — timely advice, the full story of your lands
   with its milestones (first harvest, a hundred villagers, the cathedral...)
   and monthly charts.
+- **Protected woods** — the Protect tool (P) marks a wood the woodcutters
+  leave standing: click one corner, then the other; click twice inside one to
+  lift it.
 - **Tips** — the first time you open a panel or pick a tool, one short line
   says what it does; switch them off (or back on) in the game menu.
 - **Weather** — snow drifts in winter, leaves fall in autumn and spring brings

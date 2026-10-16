@@ -36,6 +36,10 @@ import {
   updateHappiness,
   yearOf,
   keepOf,
+  GROVE_MAX,
+  groveAt,
+  protectGrove,
+  unprotectGrove,
 } from './game/sim';
 import type { Building, BuildingType, GameState } from './game/types';
 import { FOOD_IDS } from './game/data';
@@ -52,7 +56,8 @@ export type Tool =
   | { kind: 'build'; type: BuildingType }
   | { kind: 'road'; paved?: boolean; wall?: boolean }
   | { kind: 'zone'; type: BuildingType }
-  | { kind: 'demolish' };
+  | { kind: 'demolish' }
+  | { kind: 'grove' };
 
 const SPEEDS = [0, 1, 3, 8];
 
@@ -141,7 +146,7 @@ export class Game {
   /** Right-click (or a long press): drop the half-drawn road or zone, then the tool, then the selection. */
   private cancelOrDeselect(): void {
     if (this.tool.kind === 'road' && this.roadAnchor) this.roadAnchor = null;
-    else if (this.tool.kind === 'zone' && this.zoneAnchor) this.zoneAnchor = null;
+    else if ((this.tool.kind === 'zone' || this.tool.kind === 'grove') && this.zoneAnchor) this.zoneAnchor = null;
     else if (this.tool.kind !== 'select') this.setTool({ kind: 'select' });
     else this.select(null);
   }
@@ -394,6 +399,30 @@ export class Game {
         }
         this.hud.setHint(err ? `${d.name} ${w}×${h}: ${err}` : `${d.name} ${w}×${h} (${w * h} tiles)${soil}${costText}${where} · click to place`, !!err || !near);
       }
+    } else if (tool.kind === 'grove') {
+      ov.groves = true;
+      const a = this.zoneAnchor ?? { x: tx, y: ty };
+      const x0 = Math.min(a.x, tx);
+      const y0 = Math.min(a.y, ty);
+      const w = Math.abs(tx - a.x) + 1;
+      const h = Math.abs(ty - a.y) + 1;
+      const big = w > GROVE_MAX || h > GROVE_MAX;
+      ov.tiles = [];
+      for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) if (inBounds(s, x, y)) ov.tiles.push({ x, y, ok: !big });
+      ov.tileColor = 'grove';
+      let trees = 0;
+      for (const t of ov.tiles) if (s.trees[idx(s, t.x, t.y)] > 0) trees++;
+      const inside = inBounds(s, tx, ty) && groveAt(s, tx, ty) >= 0;
+      this.hud.setHint(
+        !this.zoneAnchor
+          ? inside
+            ? 'Protected wood: click twice here to lift the protection, or click a corner to mark another'
+            : 'Protect a wood: click one corner, then the opposite corner · woodcutters leave its trees standing'
+          : big
+            ? `Protected wood ${w}×${h}: at most ${GROVE_MAX} tiles a side`
+            : `Protected wood ${w}×${h} · ${trees} tree${trees === 1 ? "" : "s"} kept standing · click to mark it`,
+        big,
+      );
     } else if (tool.kind === 'road' && tool.wall) {
       // Town walls: laid like a road; road tiles become gates.
       const tiles = this.roadTiles(tx, ty);
@@ -518,6 +547,32 @@ export class Game {
       }
     }
     return out;
+  }
+
+  /** Protect-wood click: two corners mark a wood; two clicks on one inside lift it. */
+  private clickGrove(tx: number, ty: number): void {
+    const s = this.state;
+    if (!inBounds(s, tx, ty)) return;
+    if (!this.zoneAnchor) {
+      this.zoneAnchor = { x: tx, y: ty };
+      return;
+    }
+    const a = this.zoneAnchor;
+    this.zoneAnchor = null;
+    if (a.x === tx && a.y === ty) {
+      if (unprotectGrove(s, tx, ty)) {
+        this.hud.sound('demolish');
+        this.hud.flashInfo('The woodcutters may fell those trees again');
+      }
+      return;
+    }
+    const err = protectGrove(s, a.x, a.y, tx, ty);
+    if (err) {
+      this.hud.flash(err);
+      return;
+    }
+    this.hud.sound('place');
+    s.dirty = true;
   }
 
   /** Zone tool click: first corner, then the opposite corner places it. */
@@ -800,6 +855,10 @@ export class Game {
         if (!this.moved) this.clickZone(this.tool.type, tx, ty);
         return;
       }
+      if (this.tool.kind === 'grove') {
+        if (!this.moved) this.clickGrove(tx, ty);
+        return;
+      }
       if (this.tool.kind === 'demolish' && this.dragTile) {
         const single = this.dragTile.x === tx && this.dragTile.y === ty;
         this.dragTile = null;
@@ -842,7 +901,7 @@ export class Game {
           return;
         }
         if (this.tool.kind === 'road' && this.roadAnchor) this.roadAnchor = null;
-        else if (this.tool.kind === 'zone' && this.zoneAnchor) this.zoneAnchor = null;
+        else if ((this.tool.kind === 'zone' || this.tool.kind === 'grove') && this.zoneAnchor) this.zoneAnchor = null;
         else if (this.tool.kind !== 'select') this.setTool({ kind: 'select' });
         else if (this.selected !== null || this.selectedAgent) this.select(null);
         else if (this.hud.categoryOpen) this.hud.closeCategory();
@@ -868,6 +927,8 @@ export class Game {
         this.cycleCoverage();
       } else if (k === 'x' || k === 'delete') {
         this.setTool({ kind: 'demolish' });
+      } else if (k === 'p') {
+        this.setTool(this.tool.kind === 'grove' ? { kind: 'select' } : { kind: 'grove' });
       } else if (k === '+' || k === '=') {
         this.setZoom(this.renderer.cam.zoom * 1.2);
       } else if (k === '-') {

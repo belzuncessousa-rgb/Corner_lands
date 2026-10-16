@@ -237,5 +237,5 @@ about medieval builders, Manor Lords' own roadmap included) and the soaks.
 - [x] Idle hands: when many villagers have had no work for months, the steward says so and names the jobs a town of this size usually lacks
 - [x] Piles nobody uses (hides, flax, wool, barley): the steward names the workshop that would use them
 - [x] A late-game use for coins: rich towns end up with tens of thousands of coins and nothing to buy. Commissions after the cathedral (a guildhall, a bell tower, a market cross) that turn coins into prestige and happiness
-- [ ] Protected woods: mark an area the woodcutters leave alone (a Manor Lords request), so groves near homes and the cathedral survive
+- [x] Protected woods: mark an area the woodcutters leave alone (a Manor Lords request), so groves near homes and the cathedral survive
 - [ ] UI fuzz on a thirty-year city: the monkey test on the largest towns, with frame times

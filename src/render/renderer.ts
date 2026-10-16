@@ -43,7 +43,9 @@ export interface Overlay {
   ghost?: Ghost;
   /** Tiles to preview for road building / demolition. */
   tiles?: { x: number; y: number; ok: boolean }[];
-  tileColor?: 'road' | 'remove';
+  tileColor?: 'road' | 'remove' | 'grove';
+  /** The protect-wood tool is in hand: show the protected woods clearly. */
+  groves?: boolean;
   selected?: number;
   hover?: { x: number; y: number };
   /** Range circle in tile coordinates. */
@@ -720,9 +722,27 @@ export class Renderer {
           ? 'rgba(220,60,40,0.45)'
           : ov.tileColor === 'remove'
             ? 'rgba(220,120,40,0.45)'
-            : 'rgba(240,220,150,0.55)';
+            : ov.tileColor === 'grove'
+              ? 'rgba(120,200,110,0.4)'
+              : 'rgba(240,220,150,0.55)';
         c.fill();
       }
+    }
+    // Protected woods: a dashed green border, plain while the tool is in hand.
+    if (s.groves?.length) {
+      c.save();
+      c.setLineDash(ov.groves ? [] : [6, 5]);
+      c.lineWidth = ov.groves ? 2.4 : 1.6;
+      c.strokeStyle = ov.groves ? 'rgba(150,230,120,0.95)' : 'rgba(110,170,80,0.6)';
+      for (const g of s.groves) {
+        const pts = [iso(g.x, g.y), iso(g.x + g.w, g.y), iso(g.x + g.w, g.y + g.h), iso(g.x, g.y + g.h)];
+        c.beginPath();
+        c.moveTo(pts[0][0], pts[0][1]);
+        for (const q of pts.slice(1)) c.lineTo(q[0], q[1]);
+        c.closePath();
+        c.stroke();
+      }
+      c.restore();
     }
     if (ov.hover && !ov.ghost && !ov.tiles) {
       tileDiamond(ov.hover.x, ov.hover.y);

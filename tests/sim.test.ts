@@ -1176,3 +1176,32 @@ describe('great works', () => {
     expect(prestigeIncome(s)).toBeGreaterThanOrEqual(6);
   });
 });
+
+describe('protected woods', () => {
+  it('woodcutters leave a protected wood standing and fell again once it is lifted', async () => {
+    const { protectGrove, unprotectGrove, inGrove } = await import('../src/game/sim');
+    const s = generateWorld(5);
+    const hall = s.buildings.find((b) => b.type === 'townhall')!;
+    let at: { x: number; y: number } | null = null;
+    for (let r = 3; r < 30 && !at; r++)
+      for (let dy = -r; dy <= r && !at; dy++)
+        for (let dx = -r; dx <= r && !at; dx++) if (!placementError(s, 'woodcutter', hall.x + dx, hall.y + dy)) at = { x: hall.x + dx, y: hall.y + dy };
+    const wc = placeOrder(s, 'woodcutter', at!.x, at!.y)!;
+    wc.build = 1;
+    const R = BUILDINGS.woodcutter.radius + 2;
+    expect(protectGrove(s, wc.x - R, wc.y - R, wc.x + R, wc.y + R)).toBeNull();
+    expect(protectGrove(s, 0, 0, 0, 0)).toMatch(/at least/);
+    const before = Array.from(s.trees).reduce((a, t, i) => a + (inGrove(s, i) ? t : 0), 0);
+    expect(before).toBeGreaterThan(0);
+    for (let d = 0; d < 33; d++) stepDay(s);
+    const after = Array.from(s.trees).reduce((a, t, i) => a + (inGrove(s, i) ? t : 0), 0);
+    expect(wc.status).toBe('Only protected woods in range');
+    // Trees may grow back, but none are felled inside the wood.
+    expect(after).toBeGreaterThanOrEqual(before);
+    expect(unprotectGrove(s, wc.x, wc.y)).toBe(true);
+    expect(s.groves!.length).toBe(1 - 1);
+    // Saves carry the protected woods.
+    protectGrove(s, 2, 2, 5, 5);
+    expect(deserialize(serialize(s)).groves).toEqual([{ x: 2, y: 2, w: 4, h: 4 }]);
+  });
+});

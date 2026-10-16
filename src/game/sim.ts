@@ -619,6 +619,7 @@ export function resourceInRange(s: GameState, type: BuildingType, c: { x: number
   const d = BUILDINGS[type];
   switch (d.gathers) {
     case 'trees':
+      return countInRadius(s, c, d.radius, (i) => s.trees[i] > 0 && !inGrove(s, i));
     case 'forest':
       return countInRadius(s, c, d.radius, (i) => s.trees[i] > 0);
     case 'rock':
@@ -1167,8 +1168,8 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
       const e = enoughOf(s, r.outputs);
       if (e) return `Enough ${GOODS[e].name.toLowerCase()} in store`;
       if (fullFor(s, r.outputs)) return 'Storage full';
-      const t = nearestTile(s, b, d.radius, (i, dist) => (s.trees[i] > 0 ? dist - s.trees[i] * 1.2 : null));
-      if (t < 0) return 'No trees in range';
+      const t = nearestTile(s, b, d.radius, (i, dist) => (s.trees[i] > 0 && !inGrove(s, i) ? dist - s.trees[i] * 1.2 : null));
+      if (t < 0) return s.groves?.length && nearestTile(s, b, d.radius, (i, dist) => (s.trees[i] > 0 ? dist : null)) >= 0 ? 'Only protected woods in range' : 'No trees in range';
       b.resDist = tileDist(s, b, t);
       s.trees[t]--;
       addOutput(s, b, r.outputs);
@@ -2438,6 +2439,43 @@ export function settlerBlocker(s: GameState): string | null {
     return `The larders look thin: settlers want ${settlerMonths(s)} months of food for everyone`;
   }
   return null;
+}
+
+/** Largest protected wood, tiles a side. */
+export const GROVE_MAX = 30;
+
+/** Whether a tile lies in a wood the woodcutters must leave alone. */
+export function inGrove(s: GameState, i: number): boolean {
+  const g = s.groves;
+  if (!g?.length) return false;
+  const x = i % s.width;
+  const y = (i - x) / s.width;
+  return g.some((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h);
+}
+
+/** The protected wood covering a tile, if any. */
+export function groveAt(s: GameState, x: number, y: number): number {
+  return (s.groves ?? []).findIndex((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h);
+}
+
+/** Marks the rectangle between two corners as a protected wood; returns why not, or null. */
+export function protectGrove(s: GameState, x0: number, y0: number, x1: number, y1: number): string | null {
+  const x = Math.max(0, Math.min(x0, x1));
+  const y = Math.max(0, Math.min(y0, y1));
+  const w = Math.min(s.width, Math.max(x0, x1) + 1) - x;
+  const h = Math.min(s.height, Math.max(y0, y1) + 1) - y;
+  if (w < 2 || h < 2) return 'A protected wood is at least 2×2 tiles';
+  if (w > GROVE_MAX || h > GROVE_MAX) return `A protected wood is at most ${GROVE_MAX} tiles a side`;
+  (s.groves ??= []).push({ x, y, w, h });
+  return null;
+}
+
+/** Lifts the protection from the wood covering a tile. */
+export function unprotectGrove(s: GameState, x: number, y: number): boolean {
+  const i = groveAt(s, x, y);
+  if (i < 0) return false;
+  s.groves!.splice(i, 1);
+  return true;
 }
 
 /** Firsts and round numbers worth a line in the chronicle, checked daily until reached. */

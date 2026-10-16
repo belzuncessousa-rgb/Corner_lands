@@ -151,6 +151,7 @@ const TIPS: Record<string, string> = {
   zone: 'Fields, pastures and orchards are drawn: click one corner, then the opposite one. Bigger fields need more hands.',
   road: 'Click to start a road, click again to end it. Roads are optional, but villagers walk faster on them.',
   wall: 'Wall sections keep wolves and bandits out once there are enough of them. Small gates are left so villagers can pass.',
+  grove: 'Woods you protect stay standing: woodcutters fell elsewhere. Good beside homes, the church or the cathedral.',
   demolish: 'Demolishing returns part of the cost. Changed your mind? Ctrl+Z puts it back for a few seconds.',
   'chip-happy': 'Happiness brings settlers. Town talk tells you what villagers wish for; click a line to see one of their homes.',
   'chip-pop': 'Who works where, and who is short of hands. Click a workplace in the list to go there and raise its priority.',
@@ -290,6 +291,7 @@ export class Hud {
     const tools = `<span class="divider"></span>
       <button data-action="road" class="tab ${tool.kind === 'road' && !tool.paved ? 'active' : ''}" data-tip="<b>Road</b> (R)<br>Click to start, click again to lay it. Roads speed up walking; buildings work without them.">${ICONS.road}<span>Road</span></button>
       ${this.game.state.tier >= PAVING_TIER ? `<button data-action="road" data-paved="1" class="tab ${tool.kind === 'road' && tool.paved ? 'active' : ''}" data-tip="<b>Paved road</b> (T)<br>Cobbled stone: villagers walk a third faster than on dirt. 2 stone per tile; lay it over a dirt road to pave it.">${ICONS.paved}<span>Paving</span></button>` : ''}
+      <button data-action="grove" class="tab ${tool.kind === 'grove' ? 'active' : ''}" data-tip="<b>Protect woods</b> (P)<br>Mark a wood the woodcutters must leave standing: click one corner, then the other. Click twice inside one to lift it.">${ICONS.grove}<span>Protect</span></button>
       <button data-action="demolish" class="tab ${tool.kind === 'demolish' ? 'active' : ''}" data-tip="<b>Demolish</b> (X)<br>Remove buildings or roads. Finished buildings return half their cost.">${ICONS.demolish}<span>Demolish</span></button>`;
     let cards = '';
     if (this.category) {
@@ -655,7 +657,8 @@ export class Hud {
     if (g.demo || !this.tipsOn || this.modal) return;
     const t = g.tool;
     const key =
-      t.kind === 'road' ? (t.wall ? 'wall' : 'road')
+      t.kind === 'grove' ? 'grove'
+      : t.kind === 'road' ? (t.wall ? 'wall' : 'road')
       : t.kind === 'demolish' ? 'demolish'
       : t.kind === 'zone' ? 'zone'
       : t.kind === 'build' ? 'build'
@@ -1169,6 +1172,13 @@ export class Hud {
     this.el.hint.style.display = text ? 'block' : 'none';
   }
 
+  /** A passing note in the hint bar, without the alarm. */
+  flashInfo(text: string): void {
+    this.flashUntil = 0;
+    this.setHint(text, false);
+    this.flashUntil = performance.now() + 2200;
+  }
+
   flash(text: string): void {
     this.flashUntil = 0;
     this.setHint(text, true);
@@ -1294,6 +1304,10 @@ export class Hud {
         g.setTool(g.tool.kind === 'road' && !!g.tool.paved === paved ? { kind: 'select' } : { kind: 'road', paved });
         break;
       }
+      case 'grove':
+        this.category = null;
+        g.setTool(g.tool.kind === 'grove' ? { kind: 'select' } : { kind: 'grove' });
+        break;
       case 'demolish':
         this.category = null;
         g.setTool(g.tool.kind === 'demolish' ? { kind: 'select' } : { kind: 'demolish' });

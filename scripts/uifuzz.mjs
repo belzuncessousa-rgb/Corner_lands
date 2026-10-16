@@ -22,7 +22,7 @@ console.log('town', await page.evaluate(() => ({ pop: window.game.state.populati
 
 let seed = Number(process.env.SEED || 777);
 const r = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
-const keys = ['Escape', 'Space', '1', '2', '3', 'r', 't', 'x', 'h', 'e', 'q', 'g', '+', '-', 'w', 'a', 's', 'd', 'ArrowLeft', 'ArrowUp'];
+const keys = ['Escape', 'Space', '1', '2', '3', 'r', 't', 'x', 'p', 'v', 'h', 'e', 'q', 'g', '+', '-', 'w', 'a', 's', 'd', 'ArrowLeft', 'ArrowUp'];
 const steps = Number(process.env.STEPS || 600);
 for (let i = 0; i < steps; i++) {
   const roll = r();
