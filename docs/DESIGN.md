@@ -294,4 +294,4 @@ Note for later runs: when a feature players would notice goes in, add a line to 
 ### Phase 26 — Ideas for the next runs
 - [ ] A second map type: a river valley with islands and fords, or a hilly land with more rock and less soil, chosen on New Settlement
 - [ ] Villagers react to evening: they walk home at dusk and the lanes are quieter until morning
-- [ ] The uitest covers the new menus (photo mode, town files, seed link, music switch) so later changes cannot break them unnoticed
+- [x] The uitest covers the new menus (photo mode, town files, seed link, music switch) so later changes cannot break them unnoticed
