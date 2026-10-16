@@ -335,3 +335,56 @@ The 3D view (built from the game's own drawings) and the first gridless steps (b
 
 ### Phase 33 — Proportions
 - [x] Buildings stand 30% taller (every height is stretched in the projection, so chimneys, sails and glows follow), trees 30% larger, villagers 15% smaller, and dirt lanes narrower, so doors stand above people and lanes no longer dominate
+
+## Playtest feedback, October (the player's own notes, kept as the brief)
+
+The look is right ("loving the cute forms and the overall aesthetics"). Before more
+art, the logic and balance get this pass. Grouped by how deep each change goes.
+
+### Phase 34 — Quick fixes from the playtest
+- [ ] Construction is much faster: building is not where the time should go
+- [ ] Dirt and stone roads take a little time to build (laid tile by tile)
+- [ ] Objectives and rewards only in Easy (the tutorial-like mode), not in the regular game
+- [ ] The build bar keeps a fixed size however many buildings a category holds
+- [ ] No undo (Ctrl+Z): no room for regrets
+- [ ] The game pauses when the town grows a size
+- [ ] A fertility heatmap on the ground while placing a farm
+- [ ] Buildings whose requirements are not met yet (charters and the like) are hidden from the menus, not shown locked
+- [ ] Stone roads easy to find (they are under Paving; make that obvious)
+- [ ] Trading post lists every good, in tabs by kind
+- [ ] Bug: the manor stopped improving in one playthrough
+- [ ] Haulers visibly carry what they move
+- [ ] Fishers sit in their boats (no legs or shadow); fewer duck families, more ducklings each
+- [ ] Less stone early: level 1 buildings are timber; stone is for better buildings
+- [ ] Coins only for what must be imported: woodcutter and forester cost timber only; orchards, decorations and backyard extensions cost coins (and some materials). Coins hard to come by and worth spending
+
+### Phase 35 — How work and goods move
+- [ ] Yield is throughput: what a workplace makes depends on how much its workers get done in a day (walking included)
+- [ ] Workplaces have more jobs and each worker yields less, so labour is a real (but not harsh) concern; idle workers become rare
+- [ ] Workplaces keep a small local store; granary and warehouse workers fetch from them
+- [ ] No gathering areas: foragers, hunters and fishers go as far as they must, and the walking costs them time
+- [ ] Resources are concentrated but sparse: stone, berries and mushrooms in patches, hunting in the woods where deer and rabbits roam, fishing where fish shoal. Animals keep to their region and clearing the forest drives them off
+- [ ] Mushrooms to gather (visible on the map)
+
+### Phase 36 — Villagers' days
+- [ ] Villagers spend time on their needs: fetch food and goods at the market, water at the well, go to church, the tavern, and sleep once a "day" (a month)
+- [ ] Food and goods can only be had where there is a market
+- [ ] The market is free: a drawn area where stalls pop up, stocked from the storehouses
+- [ ] Trade with the outside world needs a Trading Post (its own building, separate from the market)
+
+### Phase 37 — The manor and the town
+- [ ] The game starts without a manor; the town grows sizes by meeting conditions on its own, and the game pauses when it does
+- [ ] The manor is built by choice, anywhere: it gives bonuses and allows feasts and celebrations, and grows towards a castle, needing more room as it does
+- [ ] Specialised houses are built as such (not converted between each other), cost a lot, and get their own looks
+
+### Phase 38 — Herds
+- [ ] Each animal is bought separately, only once there is a trading post
+- [ ] Each animal needs room in a pasture; kinds can share a pasture
+- [ ] Oats removed
+- [ ] Fix animals' glitchy look, and better interaction between animals and pastures (herders, feeding, shelter)
+
+### For the visual refinement phase (later)
+- [ ] Construction stages as different structures (scaffold, frame, walls, roof) instead of revealing the building
+- [ ] Stone roads look like gravel; a third, dressed-stone cobbled street
+- [ ] Fields worked and filling up progressively, and each crop easy to tell apart
+- [ ] Liked: children playing, people with dogs, fishers' boats
