@@ -133,12 +133,12 @@ export class Renderer {
   }
 
   clampCamera(s: GameState): void {
-    const [lx] = iso(0, s.height);
-    const [rx] = iso(s.width, 0);
-    const [, ty] = iso(0, 0);
-    const [, by] = iso(s.width, s.height);
-    this.cam.x = Math.max(lx, Math.min(rx, this.cam.x));
-    this.cam.y = Math.max(ty, Math.min(by, this.cam.y));
+    // Keep the centre of the view over the map's diamond, not its empty corners.
+    const u = this.cam.x / (TW / 2);
+    const v = this.cam.y / (TH / 2);
+    const tx = Math.max(0, Math.min(s.width, (u + v) / 2));
+    const ty = Math.max(0, Math.min(s.height, (v - u) / 2));
+    [this.cam.x, this.cam.y] = iso(tx, ty);
   }
 
   // ---------------------------------------------------------------- sprites

@@ -238,4 +238,10 @@ about medieval builders, Manor Lords' own roadmap included) and the soaks.
 - [x] Piles nobody uses (hides, flax, wool, barley): the steward names the workshop that would use them
 - [x] A late-game use for coins: rich towns end up with tens of thousands of coins and nothing to buy. Commissions after the cathedral (a guildhall, a bell tower, a market cross) that turn coins into prestige and happiness
 - [x] Protected woods: mark an area the woodcutters leave alone (a Manor Lords request), so groves near homes and the cathedral survive
-- [ ] UI fuzz on a thirty-year city: the monkey test on the largest towns, with frame times
+- [x] UI fuzz on a thirty-year city: the monkey test on the largest towns, with frame times (553 villagers, no errors, frames at the 60 fps cap; found the camera could wander into the empty corners beyond the map, now kept over the land)
+
+### Phase 17 — Ideas for the next runs
+- [ ] Titles for the lord: prestige piles up in the thousands late on. Spend it to rise from Lord to Baron, Earl and Duke, each with a lasting boon and a line in the chronicle
+- [ ] The autoplayer builds workplaces for idle hands (a thirty-year city has hundreds idle), so soaks look like a played game
+- [ ] Market days: once a month the market square fills with stalls and people for a day, a visible pulse of the economy
+- [ ] A "what changed" line on the year-in-review page: the three biggest rises and falls in stock
