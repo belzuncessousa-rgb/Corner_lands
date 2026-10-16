@@ -263,3 +263,8 @@ Note from the morning run: the 30-year soak's famine on seed 3 comes from its ra
 - [x] Prestige still piles up past Duke (2,000–2,600 at year 30): a few repeatable prestige uses, e.g. commission a tapestry or a stained-glass window for the cathedral (+happiness, one each)
 - [x] The save server test failed once under load, right after a typecheck; give its server start a readiness wait so it cannot race
 - [x] Look again at mobile layout with the new build-bar tab (Protect) and the longer objectives panel at 360 px wide
+
+### Phase 21 — Ideas for the next runs
+- [ ] The cathedral's windows glow in colour once the stained glass is commissioned, and the manor shows a banner for the tapestry
+- [ ] Refresh the showcase screenshots (scripts/showcase.mjs) with the great works, titles, market day and protected woods
+- [ ] A soak with a player who never touches stock targets, to check the defaults suit a town of 300+
