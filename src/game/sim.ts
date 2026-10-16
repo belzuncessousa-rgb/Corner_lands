@@ -44,6 +44,7 @@ import { checkQuests } from './quests';
 import { StateRng } from './rng';
 import type { Building, BuildingType, Category, Cost, GameState, MessageKind, ResourceId, Season } from './types';
 import { RESOURCE_IDS } from './types';
+import { curveTiles } from './curves';
 import { cellsOf, footprintCells, getBuilding, idx, inBounds, makeBuilding, placeBuilding, removeBuilding, setRoad } from './world';
 
 // ---------------------------------------------------------------- time helpers
@@ -381,7 +382,39 @@ export function buildRoad(s: GameState, x: number, y: number, paved = false): bo
 export function removeRoad(s: GameState, x: number, y: number): boolean {
   if (!inBounds(s, x, y) || !s.road[idx(s, x, y)]) return false;
   setRoad(s, x, y, false);
+  // A curve broken here is drawn tile by tile from now on.
+  const i = idx(s, x, y);
+  if (s.curves?.some((c) => c.tiles.includes(i))) s.curves = s.curves.filter((c) => !c.tiles.includes(i));
   return true;
+}
+
+/** Why a road cannot follow this curve (bends in tiles), or null. */
+export function curveError(s: GameState, pts: [number, number][], paved = false): string | null {
+  if (pts.length < 2) return 'Click where the road should bend, then where it ends';
+  const tiles = curveTiles(s, pts);
+  let fresh = 0;
+  for (const i of tiles) {
+    const x = i % s.width;
+    const y = (i - x) / s.width;
+    const err = roadError(s, x, y, paved);
+    if (!err) fresh++;
+    else if (err !== 'Already a road' && err !== 'Already paved') return err;
+  }
+  return fresh ? null : 'The road is already there';
+}
+
+/** Lays a road along a free curve; returns the tiles newly laid. */
+export function layCurve(s: GameState, pts: [number, number][], paved = false): number {
+  if (curveError(s, pts, paved)) return 0;
+  const tiles = curveTiles(s, pts);
+  let n = 0;
+  for (const i of tiles) {
+    const x = i % s.width;
+    if (buildRoad(s, x, (i - x) / s.width, paved)) n++;
+  }
+  (s.curves ??= []).push({ pts: pts.map(([x, y]) => [x, y] as [number, number]), paved, tiles });
+  s.dirty = true;
+  return n;
 }
 
 export function demolish(s: GameState, b: Building): boolean {

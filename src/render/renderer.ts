@@ -51,6 +51,8 @@ export interface Overlay {
   hover?: { x: number; y: number };
   /** Range circle in tile coordinates. */
   range?: { cx: number; cy: number; r: number; highlight?: (i: number) => boolean };
+  /** A curved road being drawn: points along it, in tiles. */
+  curve?: [number, number][];
   /** The villager selected on the map (their key). */
   agent?: string;
   /** Reach of every well (or market, tavern, church) and which homes it covers. */
@@ -756,6 +758,21 @@ export class Renderer {
         c.strokeStyle = ov.groves ? 'rgba(240,250,210,0.95)' : 'rgba(235,240,200,0.8)';
         c.stroke();
       }
+      c.restore();
+    }
+    if (ov.curve && ov.curve.length > 1) {
+      c.save();
+      c.strokeStyle = 'rgba(250,236,180,0.9)';
+      c.lineWidth = 3;
+      c.lineCap = 'round';
+      c.lineJoin = 'round';
+      c.beginPath();
+      ov.curve.forEach(([x, y], k) => {
+        const [a, b] = iso(x, y);
+        if (k) c.lineTo(a, b);
+        else c.moveTo(a, b);
+      });
+      c.stroke();
       c.restore();
     }
     if (ov.hover && !ov.ghost && !ov.tiles) {

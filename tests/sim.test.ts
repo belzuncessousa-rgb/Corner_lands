@@ -1419,3 +1419,46 @@ describe('free placement', () => {
     for (const i of b.cells!) expect(s.occ[i]).toBe(-1);
   });
 });
+
+describe('curved roads', () => {
+  it('lays a joined chain of road tiles under a smooth curve and forgets it when cut', async () => {
+    const { layCurve, curveError, removeRoad } = await import('../src/game/sim');
+    const s = generateWorld(18);
+    s.res.wood = 999;
+    // Clear a patch of land to draw on.
+    const hall = s.buildings.find((b) => b.type === 'townhall')!;
+    const ox = hall.x + 8;
+    const oy = hall.y - 6;
+    for (let y = oy - 2; y < oy + 14; y++)
+      for (let x = ox - 2; x < ox + 14; x++) {
+        const i = y * s.width + x;
+        s.terrain[i] = 0;
+        s.trees[i] = 0;
+        s.rock[i] = 0;
+        s.ore[i] = 0;
+        if (s.occ[i] >= 0) continue;
+      }
+    const pts: [number, number][] = [
+      [ox + 0.5, oy + 0.5],
+      [ox + 5.2, oy + 3.1],
+      [ox + 9.7, oy + 9.4],
+    ];
+    expect(curveError(s, pts)).toBeNull();
+    const n = layCurve(s, pts);
+    expect(n).toBeGreaterThan(9);
+    const tiles = s.curves![0].tiles;
+    // Every step along the chain moves to an edge neighbour.
+    for (let k = 1; k < tiles.length; k++) {
+      const a = tiles[k - 1];
+      const b = tiles[k];
+      const d = Math.abs((a % s.width) - (b % s.width)) + Math.abs(Math.floor(a / s.width) - Math.floor(b / s.width));
+      expect(d).toBe(1);
+    }
+    for (const i of tiles) expect(s.road[i]).toBe(1);
+    // Cutting it in the middle keeps the tiles but drops the curve.
+    const mid = tiles[Math.floor(tiles.length / 2)];
+    removeRoad(s, mid % s.width, Math.floor(mid / s.width));
+    expect(s.curves!.length).toBe(0);
+    expect(s.road[tiles[0]]).toBe(1);
+  });
+});

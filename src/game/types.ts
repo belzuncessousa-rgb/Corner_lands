@@ -311,6 +311,8 @@ export interface GameState {
   festivalDay?: { id: string; day: number };
   /** This year's tally for the year-end page of the chronicle. */
   year?: { pop: number; gold: number; prestige: number; arrived: number; left: number; built: number; harvest: number; stock?: Partial<Record<ResourceId, number>>; hungry?: number };
+  /** Roads laid as free curves: the clicked bends, dirt or paved, and the tiles under them. */
+  curves?: { pts: [number, number][]; paved: boolean; tiles: number[] }[];
   /** Years that ended with no one having gone hungry. */
   fedYears?: number;
   /** The cathedral holds a relic (bought from a travelling friar). */

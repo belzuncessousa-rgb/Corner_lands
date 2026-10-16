@@ -4,6 +4,7 @@ import { seasonOf } from '../game/sim';
 import type { GameState, Season } from '../game/types';
 import { drawBuilding, treeSprite, wallMaterial } from '../render/sprites';
 import type { TreeKind } from '../render/sprites';
+import { curveSamples } from '../game/curves';
 import { mulberry32 } from '../game/rng';
 import { Pen3D } from './pen3d';
 
@@ -126,13 +127,32 @@ export function groundTexture(s: GameState, season: Season): THREE.CanvasTexture
       g.stroke();
     }
   }
-  // Roads: continuous bands with a darker verge, bending at corners.
+  // Roads: continuous bands with a darker verge, bending at corners. Roads
+  // laid as free curves are drawn along their curve instead of tile by tile.
   const road = (x: number, y: number) => x >= 0 && y >= 0 && x < s.width && y < s.height && s.road[y * s.width + x] > 0;
+  const curved = new Set<number>();
+  // Ordinary roads join a curve only at its ends, so they do not ladder along it.
+  const curveEnds = new Set<number>();
+  for (const cv of s.curves ?? []) {
+    for (const i of cv.tiles) curved.add(i);
+    curveEnds.add(cv.tiles[0]);
+    curveEnds.add(cv.tiles[cv.tiles.length - 1]);
+  }
+  const curveLines = (s.curves ?? []).map((cv) => ({ paved: cv.paved, pts: curveSamples(cv.pts, 0.2) }));
   for (const layer of ['edge', 'fill'] as const) {
+    for (const cv of curveLines) {
+      g.strokeStyle = layer === 'edge' ? (season === 3 ? '#b9ad9c' : cv.paved ? '#6e6658' : '#8d7149') : cv.paved ? '#a8a092' : season === 3 ? '#cfc6b8' : '#a88a5c';
+      g.lineWidth = P * (layer === 'edge' ? 0.62 : 0.48);
+      g.lineCap = 'round';
+      g.lineJoin = 'round';
+      g.beginPath();
+      cv.pts.forEach(([x, y], k) => (k ? g.lineTo(x * P, y * P) : g.moveTo(x * P, y * P)));
+      g.stroke();
+    }
     for (let y = 0; y < s.height; y++) {
       for (let x = 0; x < s.width; x++) {
         const i = y * s.width + x;
-        if (!s.road[i]) continue;
+        if (!s.road[i] || curved.has(i)) continue;
         const paved = s.road[i] === 2;
         g.strokeStyle = layer === 'edge' ? (season === 3 ? '#b9ad9c' : paved ? '#6e6658' : '#8d7149') : paved ? '#a8a092' : season === 3 ? '#cfc6b8' : '#a88a5c';
         g.lineWidth = P * (layer === 'edge' ? 0.62 : 0.48);
@@ -140,10 +160,16 @@ export function groundTexture(s: GameState, season: Season): THREE.CanvasTexture
         const cx = (x + 0.5) * P;
         const cy = (y + 0.5) * P;
         const ends: [number, number][] = [];
-        if (road(x + 1, y)) ends.push([(x + 1) * P, cy]);
-        if (road(x - 1, y)) ends.push([x * P, cy]);
-        if (road(x, y + 1)) ends.push([cx, (y + 1) * P]);
-        if (road(x, y - 1)) ends.push([cx, y * P]);
+        // Towards a curved road, run on to the middle of its tile to meet the curve.
+        const to = (nx: number, ny: number, ex: number, ey: number) => {
+          const j = ny * s.width + nx;
+          if (!curved.has(j)) ends.push([ex, ey]);
+          else if (curveEnds.has(j)) ends.push([(nx + 0.5) * P, (ny + 0.5) * P]);
+        };
+        if (road(x + 1, y)) to(x + 1, y, (x + 1) * P, cy);
+        if (road(x - 1, y)) to(x - 1, y, x * P, cy);
+        if (road(x, y + 1)) to(x, y + 1, cx, (y + 1) * P);
+        if (road(x, y - 1)) to(x, y - 1, cx, y * P);
         g.beginPath();
         const corner = ends.length === 2 && ends[0][0] !== ends[1][0] && ends[0][1] !== ends[1][1];
         if (corner) {

@@ -4,6 +4,7 @@ import { BUILDINGS, BUILD_ORDER, DAY_SECONDS, MONTH_NAMES, TIERS } from './game/
 import { playBot } from './game/autoplay';
 import { autoResolve, TITLES } from './game/events';
 import { placeName, townName } from './game/names';
+import { curveSamples, curveTiles } from './game/curves';
 import { StateRng } from './game/rng';
 import { deserialize, serialize } from './game/save';
 import {
@@ -41,6 +42,8 @@ import {
   townScore,
   freePlacementError,
   placeFree,
+  curveError,
+  layCurve,
   GROVE_MAX,
   groveAt,
   protectGrove,
@@ -150,6 +153,10 @@ export class Game {
 
   /** Right-click (or a long press): drop the half-drawn road or zone, then the tool, then the selection. */
   private cancelOrDeselect(): void {
+    if (this.curvePts.length) {
+      this.finishCurve();
+      return;
+    }
     if (this.tool.kind === 'road' && this.roadAnchor) this.roadAnchor = null;
     else if ((this.tool.kind === 'zone' || this.tool.kind === 'grove') && this.zoneAnchor) this.zoneAnchor = null;
     else if (this.tool.kind !== 'select') this.setTool({ kind: 'select' });
@@ -567,6 +574,22 @@ export class Game {
             : 'Click where the wall starts, then where it ends · roads it crosses get gate towers',
         !!err,
       );
+    } else if (tool.kind === 'road' && this.curving()) {
+      const pts = [...this.curvePts, this.snapToRoad(ftx, fty)];
+      if (pts.length >= 2) {
+        ov.curve = curveSamples(pts, 0.25);
+        ov.tiles = curveTiles(s, pts).map((i) => {
+          const x = i % s.width;
+          const y = (i - x) / s.width;
+          const e = roadError(s, x, y, !!tool.paved);
+          return { x, y, ok: !e || e === 'Already a road' || e === 'Already paved' };
+        });
+        ov.tileColor = 'road';
+        const err = curveError(s, pts, !!tool.paved);
+        this.hud.setHint(err ? `Road: ${err}` : `Road: ${ov.tiles.filter((t) => !s.road[idx(s, t.x, t.y)]).length} new tiles · click to add a bend · click the last bend again, Enter or right-click to finish`, !!err);
+      } else {
+        this.hud.setHint('Road: click where it starts, then click each bend; it follows a smooth curve', false);
+      }
     } else if (tool.kind === 'road') {
       const paved = !!tool.paved;
       const tiles = this.roadTiles(tx, ty);
@@ -753,6 +776,64 @@ export class Game {
   }
 
   /** Road tool click: start a road, or lay the segment and continue from its end. */
+  /** Bends of the curved road being drawn (3D view), in tiles. */
+  private curvePts: [number, number][] = [];
+
+  /** Roads are drawn as free curves in the 3D view (walls stay on the grid). */
+  private curving(): boolean {
+    return this.tool.kind === 'road' && !this.tool.wall && this.renderer.threeD && !!this.view3d;
+  }
+
+  /** Starts and ends snap to a road close by, so curves join the network. */
+  private snapToRoad(fx: number, fy: number): [number, number] {
+    const s = this.state;
+    const tx = Math.floor(fx);
+    const ty = Math.floor(fy);
+    let best: [number, number] | null = null;
+    let bd = 0.8;
+    for (let y = ty - 1; y <= ty + 1; y++) {
+      for (let x = tx - 1; x <= tx + 1; x++) {
+        if (!inBounds(s, x, y) || !s.road[idx(s, x, y)]) continue;
+        const d = Math.hypot(x + 0.5 - fx, y + 0.5 - fy);
+        if (d < bd) {
+          bd = d;
+          best = [x + 0.5, y + 0.5];
+        }
+      }
+    }
+    return best ?? [fx, fy];
+  }
+
+  private clickCurve(fx: number, fy: number): void {
+    if (!inBounds(this.state, Math.floor(fx), Math.floor(fy))) return;
+    const p = this.snapToRoad(fx, fy);
+    const last = this.curvePts[this.curvePts.length - 1];
+    // Clicking the last bend again finishes the road.
+    if (last && Math.hypot(last[0] - p[0], last[1] - p[1]) < 0.5) {
+      this.finishCurve();
+      return;
+    }
+    this.curvePts.push(p);
+  }
+
+  private finishCurve(): void {
+    const s = this.state;
+    const pts = this.curvePts;
+    this.curvePts = [];
+    if (pts.length < 2) return;
+    const paved = this.tool.kind === 'road' && !!this.tool.paved;
+    const err = curveError(s, pts, paved);
+    if (err) {
+      this.hud.flash(err);
+      return;
+    }
+    const n = layCurve(s, pts, paved);
+    if (n) {
+      recompute(s);
+      this.hud.sound('road');
+    }
+  }
+
   private clickRoad(tx: number, ty: number): void {
     if (!inBounds(this.state, tx, ty)) return;
     if (!this.roadAnchor) {
@@ -774,6 +855,7 @@ export class Game {
   setTool(t: Tool): void {
     this.tool = t;
     this.freeTurn = null;
+    this.curvePts = [];
     if (t.kind !== 'build') this.view3d?.setGhost(null, 0);
     this.dragTile = null;
     this.roadAnchor = null;
@@ -1016,7 +1098,10 @@ export class Game {
       }
       if (df.button !== 0) return;
       if (this.tool.kind === 'road') {
-        if (!this.moved) this.clickRoad(tx, ty);
+        if (!this.moved) {
+          if (this.curving()) this.clickCurve(ftx, fty);
+          else this.clickRoad(tx, ty);
+        }
         return;
       }
       if (this.tool.kind === 'zone') {
@@ -1072,6 +1157,10 @@ export class Game {
           this.hud.showCoverage(null);
           return;
         }
+        if (this.curvePts.length) {
+          this.curvePts = [];
+          return;
+        }
         if (this.tool.kind === 'road' && this.roadAnchor) this.roadAnchor = null;
         else if ((this.tool.kind === 'zone' || this.tool.kind === 'grove') && this.zoneAnchor) this.zoneAnchor = null;
         else if (this.tool.kind !== 'select') this.setTool({ kind: 'select' });
@@ -1097,6 +1186,8 @@ export class Game {
         this.setTool({ kind: 'road', paved: true });
       } else if (k === 'v') {
         this.cycleCoverage();
+      } else if (k === 'enter' && this.curvePts.length) {
+        this.finishCurve();
       } else if (k === 'u') {
         this.setPhoto(!this.photo);
       } else if ((k === ',' || k === '.') && this.tool.kind === 'build' && this.renderer.threeD) {

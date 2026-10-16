@@ -296,7 +296,7 @@ export class View3D {
       .filter((b) => b.type === 'field' || b.type === 'pasture')
       .map((b) => `${b.id}:${b.x}:${b.y}:${b.w}:${b.h}:${Math.round(b.growth * 5)}`)
       .join();
-    const key = `${season}:${roads}:${fields}`;
+    const key = `${season}:${roads}:${fields}:${(s.curves ?? []).length}:${(s.curves ?? []).map((c) => c.pts.length).join()}`;
     if (key === this.groundKey) return;
     this.groundKey = key;
     const mat = this.ground.material as THREE.MeshLambertMaterial;
