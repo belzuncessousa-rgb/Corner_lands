@@ -394,22 +394,22 @@ export function roadTile(season: Season, mask: number, layer: 'edge' | 'fill'): 
       ctx.stroke();
     };
     if (layer === 'edge') {
-      draw(edge, 19);
+      draw(edge, 15);
       return;
     }
-    draw(dirt, 15);
+    draw(dirt, 12);
     // Wheel ruts.
     ctx.save();
     ctx.globalAlpha = 0.5;
-    draw(shade(dirt, 0.85), 7);
+    draw(shade(dirt, 0.85), 6);
     ctx.globalAlpha = 1;
-    draw(dirt, 4);
+    draw(dirt, 3.4);
     ctx.restore();
     // Pebbles.
     const rand = mulberry32(mask * 31 + season);
     for (let i = 0; i < 6; i++) {
       ctx.fillStyle = shade(dirt, rand() < 0.5 ? 0.8 : 1.15);
-      ctx.fillRect(cx + (rand() - 0.5) * 14, cy + (rand() - 0.5) * 8, 1.4, 1.1);
+      ctx.fillRect(cx + (rand() - 0.5) * 11, cy + (rand() - 0.5) * 6, 1.4, 1.1);
     }
   });
 }
@@ -761,7 +761,7 @@ const WOOD = '#9a7247';
 const BEAM = '#4a3020';
 
 export function buildingSprite(type: BuildingType, w: number, h: number, level: number, season: Season, variant = 0): Sprite {
-  const top = 150;
+  const top = 200;
   const sw = (w + h) * (TW / 2) + 30;
   const sh = (w + h) * (TH / 2) + top + 14;
   return makeSprite(sw, sh, h * (TW / 2) + 15, top, (ctx) => {

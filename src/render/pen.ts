@@ -4,8 +4,15 @@ export const TH = 32;
 
 export type V3 = [number, number, number];
 
+/**
+ * How tall things stand against the ground: every height (z) is stretched by
+ * this, so buildings and their chimneys, sails and glows grow together while
+ * footprints, lanes and villagers keep their size.
+ */
+export const ZS = 1.3;
+
 export function iso(x: number, y: number, z = 0): [number, number] {
-  return [(x - y) * (TW / 2), (x + y) * (TH / 2) - z];
+  return [(x - y) * (TW / 2), (x + y) * (TH / 2) - z * ZS];
 }
 
 export function hexToRgb(hex: string): [number, number, number] {

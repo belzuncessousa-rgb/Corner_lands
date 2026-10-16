@@ -209,10 +209,10 @@ export class Renderer {
     else if (this.light && this.renderMs < 6) this.light = false;
   }
 
-  private blit(sp: Sprite, wx: number, wy: number, alpha = 1): void {
+  private blit(sp: Sprite, wx: number, wy: number, alpha = 1, scale = 1): void {
     const c = this.ctx;
     if (alpha !== 1) c.globalAlpha = alpha;
-    c.drawImage(this.lod(sp.canvas), wx - sp.ax, wy - sp.ay, sp.w, sp.h);
+    c.drawImage(this.lod(sp.canvas), wx - sp.ax * scale, wy - sp.ay * scale, sp.w * scale, sp.h * scale);
     if (alpha !== 1) c.globalAlpha = 1;
   }
 
@@ -875,7 +875,7 @@ export class Renderer {
       const blossom = month <= 1 && stage >= 0.5;
       const sp = this.sprite(`ft:${fruit}:${season}:${stage}:${fruiting}:${blossom}`, () => fruitTreeSprite(fruit, season, stage, fruiting, blossom));
       const [wx, wy] = iso(x + 0.5, y + 0.5);
-      this.blit(sp, wx, wy);
+      this.blit(sp, wx, wy, 1, TREE_SCALE * 0.92);
       return;
     }
     if (s.rock[i] || s.ore[i]) {
@@ -947,13 +947,15 @@ export class Renderer {
 
   private treeClump(kind: TreeKind, n: number, base: number, mixBirch: boolean, season: Season): Sprite {
     const slots = TREE_SLOTS[n - 1];
-    return makeSprite(TW + 50, TH + 84, TW / 2 + 25, 80, (ctx) => {
+    // Trees stand a third taller than their drawings, to sit right by the houses.
+    const k2 = TREE_SCALE;
+    return makeSprite(TW + 70, TH + 112, TW / 2 + 35, 108, (ctx) => {
       for (let k = 0; k < slots.length; k++) {
         const tv = (base + k * 3) % TREE_VARIANTS;
         const kk: TreeKind = k === 1 && mixBirch ? 'birch' : kind;
         const t = this.sprite(`t:${kk}:${season}:${tv}`, () => treeSprite(kk, season, tv));
         const [lx, ly] = iso(slots[k][0], slots[k][1]);
-        ctx.drawImage(t.canvas, lx - t.ax, ly - t.ay, t.w, t.h);
+        ctx.drawImage(t.canvas, lx - t.ax * k2, ly - t.ay * k2, t.w * k2, t.h * k2);
       }
     });
   }
@@ -1276,7 +1278,7 @@ export class Renderer {
       const y = cy + Math.sin(a) * 0.22;
       const [sx, sy] = iso(x, y);
       const face = -Math.sin(a) > 0 ? 1 : -1;
-      this.drawFolk(sx, sy, 0.68, tunics[(b.id + k) % tunics.length], hairs[(b.id + k * 2) % hairs.length], this.time * 9 + k, face, season === 3);
+      this.drawFolk(sx, sy, 0.68 * FOLK_SCALE, tunics[(b.id + k) % tunics.length], hairs[(b.id + k * 2) % hairs.length], this.time * 9 + k, face, season === 3);
     }
     if (n === 1 && season !== 3) {
       // A lone child bounces a leather ball.
@@ -1312,8 +1314,8 @@ export class Renderer {
     const [ax, ay] = iso(x, y);
     const [bx, by] = iso(x + 0.42, y + 0.06);
     const tunics = ['#9a5a48', '#5a7a8a', '#7a6a9a', '#a08850', '#6a8a5a'];
-    this.drawFolk(ax, ay, 1, tunics[b.id % tunics.length], '#5a3a22', 0, 1, season === 3);
-    this.drawFolk(bx, by, 1, tunics[(b.id + 2) % tunics.length], '#2a2018', 0, -1, season === 3);
+    this.drawFolk(ax, ay, FOLK_SCALE, tunics[b.id % tunics.length], '#5a3a22', 0, 1, season === 3);
+    this.drawFolk(bx, by, FOLK_SCALE, tunics[(b.id + 2) % tunics.length], '#2a2018', 0, -1, season === 3);
     // Whoever is talking lifts a hand, and a little speech mark rises now and then.
     const talk = Math.sin(this.time * 1.3 + b.id) > 0;
     const [hx, hy] = talk ? [ax + 3, ay - 9 - Math.abs(Math.sin(this.time * 5)) * 1.5] : [bx - 3, by - 9 - Math.abs(Math.sin(this.time * 5)) * 1.5];
@@ -1591,7 +1593,7 @@ export class Renderer {
       c.fillStyle = '#7a5636';
       c.fillRect(Math.min(sx - 10 * f, sx + 11 * f), sy - 5, 21, 1.4);
       // The fisher, seated, rod out over the water.
-      this.drawFolk(sx - 3 * f, sy - 1.5, 0.85, '#6a7a5a', '#4a3020', 0, f, false);
+      this.drawFolk(sx - 3 * f, sy - 1.5, 0.85 * FOLK_SCALE, '#6a7a5a', '#4a3020', 0, f, false);
       const rx = sx + 1 * f;
       const ry = sy - 9;
       const tx = rx + 16 * f;
@@ -1944,7 +1946,19 @@ export class Renderer {
     void s;
   }
 
+  /** Villagers are drawn a little under their sprite size, so doors and eaves stand above them. */
   private drawAgent(a: Agent): void {
+    const c = this.ctx;
+    const [wx, wy] = iso(a.x + a.ox * 0.25, a.y + a.oy * 0.25);
+    c.save();
+    c.translate(wx, wy);
+    c.scale(FOLK_SCALE, FOLK_SCALE);
+    c.translate(-wx, -wy);
+    this.drawAgentBody(a);
+    c.restore();
+  }
+
+  private drawAgentBody(a: Agent): void {
     if (a.role.kind === 'cart') {
       this.drawCart(a);
       return;
@@ -2547,7 +2561,7 @@ export class Renderer {
     const folk = (list: [number, number, number][]) => {
       for (const [sx, sy, k] of list.sort((a, b) => a[1] - b[1])) {
         const face = sx < px ? 1 : -1;
-        this.drawFolk(sx, sy, 0.95, tunics[k % tunics.length], hairs[k % hairs.length], may ? t * 8 + k : 0, face, false);
+        this.drawFolk(sx, sy, 0.95 * FOLK_SCALE, tunics[k % tunics.length], hairs[k % hairs.length], may ? t * 8 + k : 0, face, false);
       }
     };
     if (may) {
@@ -3122,3 +3136,9 @@ function hashKey(k: string): number {
   for (let i = 0; i < k.length; i++) h = Math.imul(h ^ k.charCodeAt(i), 16777619);
   return h >>> 0;
 }
+
+/** How much larger trees are drawn than their sprites. */
+const TREE_SCALE = 1.3;
+
+/** Villagers' size against their drawings (smaller than buildings' scale). */
+const FOLK_SCALE = 0.85;

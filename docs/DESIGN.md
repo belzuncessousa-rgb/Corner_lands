@@ -332,3 +332,6 @@ The 3D view (built from the game's own drawings) and the first gridless steps (b
 - [x] A harvest bonfire with villagers gathered round when the harvest is in
 - [x] Wreaths on doors and candles in the windows in midwinter
 - [x] Dogs trotting after some villagers, and cats sunning on doorsteps
+
+### Phase 33 — Proportions
+- [x] Buildings stand 30% taller (every height is stretched in the projection, so chimneys, sails and glows follow), trees 30% larger, villagers 15% smaller, and dirt lanes narrower, so doors stand above people and lanes no longer dominate
