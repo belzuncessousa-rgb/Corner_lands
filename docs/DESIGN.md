@@ -268,3 +268,8 @@ Note from the morning run: the 30-year soak's famine on seed 3 comes from its ra
 - [x] The cathedral's windows glow in colour once the stained glass is commissioned, and the manor shows a banner for the tapestry
 - [x] Refresh the showcase screenshots (scripts/showcase.mjs) with the great works, titles, market day and protected woods
 - [x] A soak with a player who never touches stock targets, to check the defaults suit a town of 300+ (they do: three 25-year towns of 164–443 villagers had no hunger and no pottage in their last ten years; the only effect is a wheat surplus the steward suggests selling)
+
+### Phase 22 — Playing with friends (the game is now on GitHub Pages, saves stay in each browser)
+- [x] Export a town to a file and import one, so friends can swap towns and continue each other's games
+- [x] The map seed shown in the menu with a copy button: play the same land as a friend and compare
+- [x] "Save a picture" in the menu: a screenshot of the town with its name, rank and year, to share

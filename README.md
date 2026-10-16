@@ -158,6 +158,10 @@ then fall back to the browser's localStorage.
 - **Protected woods** — the Protect tool (P) marks a wood the woodcutters
   leave standing: click one corner, then the other; click twice inside one to
   lift it.
+- **Playing with friends** — download your town as a file (Save Game) and a
+  friend opens it from Load Game to carry on; the game menu shows the map seed
+  to copy, so friends can found the same land, and "Save a picture" downloads
+  a captioned view of your town.
 - **Tips** — the first time you open a panel or pick a tool, one short line
   says what it does; switch them off (or back on) in the game menu.
 - **Market days** — on the fifth day of each month (outside winter) every

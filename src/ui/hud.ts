@@ -1965,7 +1965,9 @@ export class Hud {
         <button data-m="scale">Text size: ${Math.round(this.uiScale * 100)}%</button>
         <button data-m="pausebad">Pause on bad news: ${this.pauseOnBad ? 'On' : 'Off'}</button>
         <button data-m="tips">Tips: ${this.tipsOn ? 'On' : 'Off'}</button>
-      </div>`,
+        <button data-m="picture">📷 Save a picture</button>
+      </div>
+      <div class="seed-line" data-tip="Start a New Settlement with this seed to play the same land.">Map seed <b>${this.game.state.seed}</b> <button data-m="seed">Copy</button></div>`,
     );
     m.querySelector('[data-m="resume"]')!.addEventListener('click', () => this.closeModal());
     m.querySelector('[data-m="save"]')!.addEventListener('click', () => this.showSave());
@@ -1980,6 +1982,20 @@ export class Hud {
         /* ignore */
       }
       this.showGameMenu();
+    });
+    m.querySelector('[data-m="picture"]')!.addEventListener('click', () => {
+      // Close the menu first so the picture shows the town, not the dialog.
+      this.closeModal();
+      requestAnimationFrame(() => requestAnimationFrame(() => this.game.savePicture()));
+    });
+    m.querySelector('[data-m="seed"]')!.addEventListener('click', async (e) => {
+      const btn = e.currentTarget as HTMLButtonElement;
+      try {
+        await navigator.clipboard.writeText(String(this.game.state.seed));
+        btn.textContent = 'Copied';
+      } catch {
+        btn.textContent = 'Copy failed';
+      }
     });
     m.querySelector('[data-m="tips"]')!.addEventListener('click', () => {
       this.tipsOn = !this.tipsOn;
@@ -2022,8 +2038,13 @@ export class Hud {
       `<h2>Save Game</h2>
       <div class="row"><input id="slot" value="my-village" maxlength="40"><button class="primary" data-m="save">Save</button></div>
       <p id="save-msg" style="min-height:1.2em"></p>
-      <div class="row" style="justify-content:flex-end"><button data-m="back">Back</button></div>`,
+      <p class="note">To share this town with a friend, download it as a file; they open it from Load Game.</p>
+      <div class="row" style="justify-content:space-between"><button data-m="file">⬇ Download as a file</button><button data-m="back">Back</button></div>`,
     );
+    m.querySelector('[data-m="file"]')!.addEventListener('click', () => {
+      this.game.exportFile();
+      this.sound('good');
+    });
     const input = m.querySelector('#slot') as HTMLInputElement;
     const msg = m.querySelector('#save-msg')!;
     m.querySelector('[data-m="save"]')!.addEventListener('click', async () => {
@@ -2049,9 +2070,22 @@ export class Hud {
     const m = this.openModal(
       `<h2>Load Game</h2>
       <div class="saves">${list || '<i>No saved games yet.</i>'}</div>
-      <div class="row" style="justify-content:flex-end"><button data-m="back">Back</button></div>`,
+      <div class="row" style="justify-content:space-between"><button data-m="open-file">📂 Open a town file…</button><input class="file-pick" type="file" accept=".json,application/json" hidden><button data-m="back">Back</button></div>`,
       !fromMain,
     );
+    const pick = m.querySelector('input.file-pick') as HTMLInputElement;
+    m.querySelector('[data-m="open-file"]')!.addEventListener('click', () => pick.click());
+    pick.addEventListener('change', async () => {
+      const f = pick.files?.[0];
+      if (!f) return;
+      try {
+        this.game.importText(await f.text());
+        this.closeModal(true);
+        this.sound('good');
+      } catch (err) {
+        this.flash(String((err as Error).message));
+      }
+    });
     m.querySelectorAll('[data-load]').forEach((btn) =>
       btn.addEventListener('click', async () => {
         const s = saves[Number((btn as HTMLElement).dataset.load)];

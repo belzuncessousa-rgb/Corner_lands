@@ -251,6 +251,50 @@ export class Game {
     this.afterLoad();
   }
 
+  /** A file name for this town: rank, year and map seed. */
+  private fileStem(): string {
+    const s = this.state;
+    return `corner-lands-${TIERS[s.tier].name.toLowerCase()}-year${yearOf(s.day)}-seed${s.seed}`;
+  }
+
+  /** Downloads the town as a file a friend can open. */
+  exportFile(): void {
+    const blob = new Blob([serialize(this.state)], { type: 'application/json' });
+    download(blob, `${this.fileStem()}.json`);
+  }
+
+  /** Opens a town from a file's text; throws with a short reason if it is not one. */
+  importText(text: string): void {
+    let s: GameState;
+    try {
+      s = deserialize(text);
+    } catch {
+      throw new Error('That file is not a Corner Lands town.');
+    }
+    if (!s.buildings || !s.terrain || !s.width) throw new Error('That file is not a Corner Lands town.');
+    this.state = s;
+    this.afterLoad();
+  }
+
+  /** A picture of the view with the town's name, rank and year along the bottom. */
+  savePicture(): void {
+    const src = this.canvas;
+    const c = document.createElement('canvas');
+    c.width = src.width;
+    c.height = src.height;
+    const ctx = c.getContext('2d')!;
+    ctx.drawImage(src, 0, 0);
+    const k = src.width / Math.max(1, src.clientWidth);
+    const h = 54 * k;
+    ctx.fillStyle = 'rgba(40, 28, 16, 0.72)';
+    ctx.fillRect(0, c.height - h, c.width, h);
+    ctx.fillStyle = '#f4ead2';
+    ctx.font = `${22 * k}px Cinzel, Georgia, serif`;
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`Corner Lands — ${this.summary()}`, 18 * k, c.height - h / 2, c.width - 36 * k);
+    c.toBlob((b) => b && download(b, `${this.fileStem()}.png`), 'image/png');
+  }
+
   async hasAutosave(): Promise<boolean> {
     return (await listSaves()).some((s) => s.slot.startsWith('autosave'));
   }
@@ -1030,3 +1074,15 @@ const game = new Game();
 // Handy hooks for debugging and automated screenshots.
 (window as unknown as Record<string, unknown>).game = game;
 (window as unknown as Record<string, unknown>).cl = { placeOrder, buildRoad, stepDay, recompute, placementError, playBot, placeZone, setYard, keepOf, log };
+
+/** Hands the player a file to save. */
+function download(blob: Blob, name: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}

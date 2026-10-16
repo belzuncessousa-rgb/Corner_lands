@@ -1986,3 +1986,6 @@ table.prod td.num {
     mask-image: linear-gradient(to right, #000 88%, transparent);
   }
 }
+/* Game menu: the map seed, and the file picker that looks like a button. */
+.seed-line { margin-top: 10px; text-align: center; color: var(--ink-soft); }
+.seed-line button { margin-left: 6px; padding: 2px 10px; }
