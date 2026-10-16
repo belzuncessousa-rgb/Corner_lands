@@ -136,7 +136,12 @@ then fall back to the browser's localStorage.
 - **Villagers** — click anyone walking the map to meet them: their name, trade,
   home and what is on their mind (often what their home is missing).
 - **Steward, chronicle & ledger** — timely advice, the full story of your lands
+  with its milestones (first harvest, a hundred villagers, the cathedral...)
   and monthly charts.
+- **Tips** — the first time you open a panel or pick a tool, one short line
+  says what it does; switch them off (or back on) in the game menu.
+- **Weather** — snow drifts in winter, leaves fall in autumn and spring brings
+  passing showers (all off in light mode).
 - **Settings** — the game menu (Esc) scales every panel from 85% to 130% and
   can pause the game whenever bad news arrives.
 - **Relaxed and Hardy modes** — Relaxed doubles the starting supplies and nobody

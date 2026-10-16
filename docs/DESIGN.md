@@ -229,6 +229,6 @@ about medieval builders, Manor Lords' own roadmap included) and the soaks.
 
 ### Phase 15 — Next ideas (for the scheduled runs)
 - [x] Just-in-time tips: the first time a tool or panel is opened, one short line on what it does (players drop long tutorials; short contextual help works)
-- [ ] Weather you can see: drifting snow in winter, rain showers in spring, falling leaves in autumn (light particles, off in light mode)
+- [x] Weather you can see: drifting snow in winter, rain showers in spring, falling leaves in autumn (light particles, off in light mode)
 - [x] Milestones in the chronicle: first harvest, first Timber House, a hundred villagers, the castle raised — each with the date
 - [x] The autoplayer raises a cathedral when rich, so the soak exercises it

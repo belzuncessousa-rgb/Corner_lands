@@ -381,7 +381,8 @@ export class Renderer {
     }
 
     this.drawSky(s, season, dt);
-    this.drawWeather(s, season, dt);
+    if (!this.light) this.drawWeather(s, season, dt);
+    else this.snow = [];
     this.drawAtmosphere(season, s.day);
     this.mark('effects');
   }
@@ -1574,7 +1575,41 @@ export class Renderer {
     } else if (this.snow.length) {
       this.snow = [];
     }
-    void s;
+    this.drawRain(s, season, dt, wrap);
+  }
+
+  private rain: { x: number; y: number; s: number }[] = [];
+  /** How heavy the shower is now, easing towards today's weather. */
+  private rainLevel = 0;
+
+  /** Spring brings a passing shower about one day in three, chosen by the date. */
+  private drawRain(s: GameState, season: Season, dt: number, wrap: (f: { x: number; y: number }) => void): void {
+    const showery = season === 0 && ((s.day * 2654435761) >>> 0) % 3 === 0;
+    const goal = showery ? 1 : 0;
+    this.rainLevel += Math.max(-dt * 0.4, Math.min(dt * 0.4, goal - this.rainLevel));
+    if (this.rainLevel <= 0.01) {
+      if (this.rain.length) this.rain = [];
+      return;
+    }
+    const c = this.ctx;
+    // The light dims a little under the clouds.
+    c.fillStyle = `rgba(40,55,75,${0.12 * this.rainLevel})`;
+    c.fillRect(0, 0, this.width, this.height);
+    const n = Math.round(260 * this.rainLevel);
+    while (this.rain.length < n) this.rain.push({ x: Math.random() * this.width, y: Math.random() * this.height, s: Math.random() });
+    if (this.rain.length > n) this.rain.length = n;
+    c.strokeStyle = 'rgba(205,220,240,0.55)';
+    c.lineWidth = 1;
+    c.beginPath();
+    for (const f of this.rain) {
+      f.y += (420 + f.s * 200) * dt;
+      f.x -= (60 + f.s * 30) * dt;
+      wrap(f);
+      const len = 8 + f.s * 6;
+      c.moveTo(f.x, f.y);
+      c.lineTo(f.x + len * 0.15, f.y - len);
+    }
+    c.stroke();
   }
 
   private birds: { x: number; y: number; vx: number; vy: number; n: number; seed: number }[] = [];
