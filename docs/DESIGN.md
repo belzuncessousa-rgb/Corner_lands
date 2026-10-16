@@ -331,4 +331,4 @@ The 3D view (built from the game's own drawings) and the first gridless steps (b
 - [x] A maypole with dancers by the town hall in late spring
 - [x] A harvest bonfire with villagers gathered round when the harvest is in
 - [x] Wreaths on doors and candles in the windows in midwinter
-- [ ] Dogs trotting after some villagers, and cats sunning on walls and log piles
+- [x] Dogs trotting after some villagers, and cats sunning on doorsteps

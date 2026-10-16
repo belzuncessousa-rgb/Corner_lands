@@ -3,6 +3,7 @@
  * something worth telling returning players goes in; the number only grows.
  */
 export const NEWS: { n: number; text: string }[] = [
+  { n: 19, text: 'Evenings and festivals: lanterns after dark, a maypole in late spring, a harvest bonfire, wreaths and candles in midwinter, and dogs and cats about the town' },
   { n: 18, text: 'Water and weather: ducks with their broods, fishers out in rowing boats, puddles after the spring rain, morning mist on the river, and smoke drifting with the wind' },
   { n: 17, text: 'Village life: children at play and neighbours chatting by their doors, hens in the yards, stooks at harvest, glowing ovens, and heavy snow and icicles in midwinter' },
   { n: 16, text: 'A livelier land: turning windmills, forge sparks, wildflower meadows, reeds and lilies, stumps where the woodcutters were, and homes with flower boxes and washing lines' },

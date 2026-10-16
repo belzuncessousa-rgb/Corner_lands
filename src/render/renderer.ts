@@ -980,6 +980,7 @@ export class Renderer {
     const yard = b.type === 'house' && !this.light && this.yardClear(s, b);
     if (yard && b.residents > 0 && season !== 3 && (b.id * 2654435761) % 3 === 0) this.drawChickens(b);
     if (b.type === 'farm' && b.build >= 1 && monthOf(s.day) >= 7) this.drawHayRick(b, season);
+    if (b.type === 'house' && b.residents > 0 && !this.light && season !== 3 && this.dusk < 0.3 && ((b.id * 2246822519) >>> 0) % 5 === 3) this.drawCat(b);
     if (yard && b.residents > 1 && this.dusk < 0.3) {
       const hsh = ((b.id * 2654435761) >>> 0) >>> 9;
       // Children come out to play for a while, then go back in.
@@ -1337,6 +1338,73 @@ export class Renderer {
       for (let i = -1; i <= 1; i++) c.fillRect(px + (talk ? 3 : -3) + i * 1.3 - 0.35, py - 20.3 - ph * 3, 0.7, 0.7);
       c.globalAlpha = 1;
     }
+  }
+
+  /** A small dog trotting at its villager's heels. */
+  private drawDog(x: number, y: number, dir: number, step: number): void {
+    const c = this.ctx;
+    const bob = Math.abs(Math.sin(step * 1.3)) * 0.8;
+    const leg = Math.sin(step * 1.3) * 1.4;
+    c.fillStyle = 'rgba(20,20,10,0.25)';
+    c.beginPath();
+    c.ellipse(x, y, 3.6, 1.3, 0, 0, Math.PI * 2);
+    c.fill();
+    c.strokeStyle = '#5a4030';
+    c.lineWidth = 1;
+    c.beginPath();
+    c.moveTo(x - 2, y - 2.5);
+    c.lineTo(x - 2 + leg, y);
+    c.moveTo(x + 2, y - 2.5);
+    c.lineTo(x + 2 - leg, y);
+    c.stroke();
+    c.fillStyle = '#8a6040';
+    c.beginPath();
+    c.ellipse(x, y - 3.4 - bob, 3.2, 1.6, 0, 0, Math.PI * 2);
+    c.fill();
+    // Head up and forward, ears, and a wagging tail.
+    c.beginPath();
+    c.ellipse(x + dir * 3.2, y - 5.2 - bob, 1.6, 1.3, 0, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = '#5a4030';
+    c.fillRect(x + dir * 2.6 - 0.5, y - 7 - bob, 1, 1.4);
+    c.strokeStyle = '#8a6040';
+    c.lineWidth = 1.1;
+    c.beginPath();
+    c.moveTo(x - dir * 3, y - 3.8 - bob);
+    c.lineTo(x - dir * 4.6, y - 6 - bob + Math.sin(this.time * 14) * 1);
+    c.stroke();
+  }
+
+  /** A cat curled on a sunny doorstep, flicking its tail. */
+  private drawCat(b: Building): void {
+    const c = this.ctx;
+    const [x, y] = iso(b.x + 0.55, b.y + b.h - 0.2);
+    const col = ['#3a3430', '#d08a40', '#e8e0d0', '#8a8078'][b.id % 4];
+    c.fillStyle = 'rgba(20,20,10,0.22)';
+    c.beginPath();
+    c.ellipse(x, y, 3.4, 1.2, 0, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = col;
+    c.beginPath();
+    c.ellipse(x, y - 1.6, 3, 1.8, 0, 0, Math.PI * 2);
+    c.fill();
+    c.beginPath();
+    c.arc(x + 2.4, y - 3.2, 1.5, 0, Math.PI * 2);
+    c.fill();
+    c.beginPath();
+    c.moveTo(x + 1.3, y - 4.2);
+    c.lineTo(x + 1.6, y - 5.8);
+    c.lineTo(x + 2.4, y - 4.6);
+    c.moveTo(x + 2.6, y - 4.6);
+    c.lineTo(x + 3.4, y - 5.8);
+    c.lineTo(x + 3.6, y - 4.1);
+    c.fill();
+    c.strokeStyle = col;
+    c.lineWidth = 1;
+    c.beginPath();
+    c.moveTo(x - 2.8, y - 1);
+    c.quadraticCurveTo(x - 5, y - 1 + Math.sin(this.time * 2 + b.id) * 1.5, x - 4, y + 0.6);
+    c.stroke();
   }
 
   /** Quiet stretches of water near the shore where ducks paddle (terrain never changes). */
@@ -1900,6 +1968,7 @@ export class Renderer {
     c.beginPath();
     c.ellipse(wx, wy, 4, 1.8, 0, 0, Math.PI * 2);
     c.fill();
+    if (!this.light && a.role.kind !== 'guard' && walking && hashKey(a.key) % 9 === 0) this.drawDog(wx - 9 * a.dir, wy + 1, a.dir, a.step);
     if (this.dusk > 0.35 && !this.light && a.key.charCodeAt(a.key.length - 1) % 3 !== 0) {
       // A lantern after dark, and the warm light it throws on the ground.
       const glow = Math.min(1, (this.dusk - 0.35) / 0.3) * (0.9 + 0.1 * Math.sin(this.time * 9 + a.step));
@@ -3045,4 +3114,11 @@ function organicOutline(b: { x: number; y: number; w: number; h: number }, inset
 /** Spring days with showers (the same every playthrough, so puddles follow the rain). */
 function showeryDay(day: number): boolean {
   return seasonOf(day) === 0 && day > 10 && ((day * 2654435761) >>> 0) % 3 === 0;
+}
+
+/** A small stable hash of a string key. */
+function hashKey(k: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < k.length; i++) h = Math.imul(h ^ k.charCodeAt(i), 16777619);
+  return h >>> 0;
 }
