@@ -1301,11 +1301,15 @@ describe('pottage', () => {
 });
 
 describe('year goals', () => {
-  it('a City gets a goal each year, judged when spring comes', async () => {
+  it('a City gets a goal each year in the Easy game, judged when spring comes', async () => {
     const { yearGoal, YEAR_GOALS } = await import('../src/game/sim');
     const s = generateWorld(14);
     expect(yearGoal(s)).toBeNull();
     s.tier = 4;
+    s.day = 2 * DAYS_PER_YEAR + 50;
+    // The regular game sets no goals.
+    expect(yearGoal(s)).toBeNull();
+    s.relaxed = true;
     s.day = 2 * DAYS_PER_YEAR + 50;
     expect(yearGoal(s)?.id).toBe(YEAR_GOALS[2].id);
     stepDay(s);

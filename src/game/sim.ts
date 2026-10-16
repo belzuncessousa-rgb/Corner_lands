@@ -1528,6 +1528,8 @@ export const YEAR_GOALS: { id: string; title: string; goal: number; have: (s: Ga
 
 /** This year's goal, for a City only. */
 export function yearGoal(s: GameState): (typeof YEAR_GOALS)[number] | null {
+  // Set goals and their rewards belong to the Easy game.
+  if (!s.relaxed) return null;
   if (s.tier < TIERS.length - 1) return null;
   return YEAR_GOALS[Math.floor(s.day / DAYS_PER_YEAR) % YEAR_GOALS.length];
 }

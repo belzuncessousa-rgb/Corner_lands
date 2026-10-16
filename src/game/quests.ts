@@ -239,7 +239,9 @@ export const QUESTS: Quest[] = [
   },
 ];
 
+/** Objectives guide new players: they are part of the Easy game only. */
 export function activeQuests(s: GameState, n = 3): Quest[] {
+  if (!s.relaxed) return [];
   return QUESTS.filter((q) => !s.quests.includes(q.id)).slice(0, n);
 }
 

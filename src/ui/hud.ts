@@ -753,12 +753,12 @@ export class Hud {
     setHTML(
       this.el.objectives,
       this.objectivesMin
-        ? `<button class="pill" data-action="toggle-obj"><b>${tier.name}</b><span class="sep-dot">·</span>Objectives${active.length ? ` <span class="count">${active.length - ready}</span>` : ' ✓'} <span class="chev">▾</span></button>`
+        ? `<button class="pill" data-action="toggle-obj"><b>${tier.name}</b>${s.relaxed ? `<span class="sep-dot">·</span>Objectives${active.length ? ` <span class="count">${active.length - ready}</span>` : ' ✓'}` : ''} <span class="chev">▾</span></button>`
         : `<button class="pill" data-action="toggle-obj"><b>${tier.name}</b><span class="chev">▴</span></button>
       <div class="body">
         ${next ? `<div class="tier-next">Next: <b>${next.name}</b> — ${req.join(', ')}</div>` : `<div class="tier-next">${tier.desc}</div>`}
-        <h3>Objectives</h3>
-        ${quests || (goal ? '' : '<div class="quest"><i>All objectives complete. Your lands flourish!</i></div>')}
+        ${s.relaxed ? `<h3>Objectives</h3>
+        ${quests || (goal ? '' : '<div class="quest"><i>All objectives complete. Your lands flourish!</i></div>')}` : ''}
         ${goal ? this.goalHtml(goal) : ''}
       </div>`,
     );
@@ -1846,7 +1846,7 @@ export class Hud {
       <div class="map-preview"><canvas width="300" height="160" aria-label="The land from above"></canvas><div class="map-facts"></div></div>
       <div class="modes">
         <label class="mode"><input type="radio" name="mode" value="normal" checked><span><b>Normal</b><br><small>Hungry or unhappy villagers will leave.</small></span></label>
-        <label class="mode"><input type="radio" name="mode" value="relaxed"><span><b>Relaxed</b><br><small>Double starting supplies; nobody ever leaves in anger.</small></span></label>
+        <label class="mode"><input type="radio" name="mode" value="relaxed"><span><b>Easy</b><br><small>Objectives to guide you, double starting supplies; nobody ever leaves in anger.</small></span></label>
         <label class="mode"><input type="radio" name="mode" value="hardy"><span><b>Hardy</b><br><small>A scarcer start, bitter winters, choosier settlers.</small></span></label>
       </div>
       <div class="ornament">❦</div>

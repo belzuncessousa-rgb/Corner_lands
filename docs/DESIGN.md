@@ -344,7 +344,7 @@ art, the logic and balance get this pass. Grouped by how deep each change goes.
 ### Phase 34 — Quick fixes from the playtest
 - [x] Construction is much faster: building is not where the time should go
 - [x] Dirt and stone roads take a little time to build: drawn roads are pegged out (dashed) and laid in order, 16 dirt or 6 paved tiles a day, paid up front and refunded if struck off
-- [ ] Objectives and rewards only in Easy (the tutorial-like mode), not in the regular game
+- [x] Objectives and rewards (and a City's yearly goals) only in Easy (renamed from Relaxed), not in the regular game
 - [x] The build bar keeps a fixed size however many buildings a category holds
 - [x] No undo (Ctrl+Z): no room for regrets
 - [ ] The game pauses when the town grows a size
