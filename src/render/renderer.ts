@@ -362,6 +362,7 @@ export class Renderer {
       const d = Math.max(tx + ty, this.boost[ty * W + tx]);
       this.buckets[Math.min(nb - 1, d)].push(ai * 4 + 3);
     });
+    if (!this.light && season !== 3) this.drawDucks(s, visible);
     for (const bucket of this.buckets) {
       for (const code of bucket) {
         const kind = code & 3;
@@ -1320,6 +1321,84 @@ export class Renderer {
       c.fillStyle = 'rgba(80,60,40,0.8)';
       for (let i = -1; i <= 1; i++) c.fillRect(px + (talk ? 3 : -3) + i * 1.3 - 0.35, py - 20.3 - ph * 3, 0.7, 0.7);
       c.globalAlpha = 1;
+    }
+  }
+
+  /** Quiet stretches of water near the shore where ducks paddle (terrain never changes). */
+  private duckSpots: number[] | null = null;
+  private duckMap: Uint8Array | null = null;
+
+  /** A duck and her ducklings paddling slow circles near the bank, spring to autumn. */
+  private drawDucks(s: GameState, visible: (x: number, y: number) => boolean): void {
+    const W = s.width;
+    if (!this.duckSpots || this.duckMap !== s.terrain) {
+      this.duckMap = s.terrain;
+      this.duckSpots = [];
+      const water = (x: number, y: number) => inBounds(s, x, y) && s.terrain[idx(s, x, y)] === 1;
+      for (let i = 0; i < s.terrain.length; i++) {
+        if (s.terrain[i] !== 1 || (Math.imul(i, 2654435761) >>> 0) % 13 !== 0) continue;
+        const x = i % W;
+        const y = (i / W) | 0;
+        // Open water a tile from the bank: room to swim, close to the reeds.
+        let open = true;
+        let bank = false;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) open &&= water(x + dx, y + dy);
+        for (const [dx, dy] of [[2, 0], [-2, 0], [0, 2], [0, -2]]) bank ||= !water(x + dx, y + dy);
+        if (open && bank) this.duckSpots.push(i);
+      }
+    }
+    const c = this.ctx;
+    for (const i of this.duckSpots) {
+      const x0 = (i % W) + 0.5;
+      const y0 = ((i / W) | 0) + 0.5;
+      const [vx, vy] = iso(x0, y0);
+      if (!visible(vx, vy)) continue;
+      const n = 2 + (i % 3);
+      const t = this.time * 0.12 + i;
+      const at = (a: number) => iso(x0 + Math.cos(a) * 0.7, y0 + Math.sin(a) * 0.7);
+      const brood: [number, number, number, number][] = [];
+      for (let k = 0; k < n; k++) {
+        // The brood follows in a line behind the mother.
+        const a = t - k * 0.42;
+        const [sx, sy] = at(a);
+        const [nx] = at(a + 0.05);
+        brood.push([sx, sy, nx > sx ? 1 : -1, k]);
+      }
+      brood.sort((p, q) => p[1] - q[1]);
+      for (const [sx, sy, face, k] of brood) {
+        const r = k === 0 ? 1.5 : 0.95;
+        // A little wake behind.
+        c.strokeStyle = 'rgba(230,242,248,0.55)';
+        c.lineWidth = 0.7;
+        c.beginPath();
+        c.moveTo(sx - face * 2.4 * r, sy);
+        c.lineTo(sx - face * 6 * r, sy - 1);
+        c.moveTo(sx - face * 2.4 * r, sy);
+        c.lineTo(sx - face * 5.5 * r, sy + 1.5);
+        c.stroke();
+        c.fillStyle = k === 0 ? '#8a6a48' : '#c8b070';
+        c.beginPath();
+        c.ellipse(sx, sy - 1 * r, 3 * r, 1.5 * r, 0, 0, Math.PI * 2);
+        c.fill();
+        // Tail tip up behind.
+        c.beginPath();
+        c.moveTo(sx - face * 2.4 * r, sy - 1.6 * r);
+        c.lineTo(sx - face * 3.6 * r, sy - 2.6 * r);
+        c.lineTo(sx - face * 2 * r, sy - 0.6 * r);
+        c.fill();
+        const hx = sx + face * 2.2 * r;
+        const hy = sy - 3.2 * r;
+        c.fillStyle = k === 0 ? '#2f6a44' : '#b89a58';
+        c.beginPath();
+        c.arc(hx, hy, 1.15 * r, 0, Math.PI * 2);
+        c.fill();
+        if (k === 0) {
+          c.fillStyle = '#f2ece0';
+          c.fillRect(hx - 1 * r, hy + 0.9 * r, 2 * r, 0.4 * r);
+        }
+        c.fillStyle = '#e8a030';
+        c.fillRect(face > 0 ? hx + 0.9 * r : hx - 2.1 * r, hy - 0.1, 1.2 * r, 0.6 * r);
+      }
     }
   }
 

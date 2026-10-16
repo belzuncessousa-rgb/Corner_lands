@@ -318,3 +318,10 @@ The 3D view (built from the game's own drawings) and the first gridless steps (b
 - [x] Bakery ovens glowing at the mouth, and steam from the brewhouse
 - [x] Harvest sheaves stooked in the fields after the harvest, and hay ricks by the farmsteads in autumn
 - [x] Icicles and snow-heavy roofs in deep winter
+
+### Phase 31 — Water and weather in the flat look
+- [x] Ducks and their broods paddling near the banks, spring to autumn
+- [ ] A fishing boat out on the water near a working fishery
+- [ ] Puddles on dirt lanes after rain, drying out over the following days
+- [ ] Morning mist over water and low meadows in spring and autumn
+- [ ] Chimney smoke and washing lines leaning with a shared, slowly shifting wind
