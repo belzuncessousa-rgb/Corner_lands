@@ -9,6 +9,8 @@ import { deserialize, serialize } from './game/save';
 import {
   BRIDGE_COST,
   buildRoad,
+  layRoads,
+  planRoad,
   canAfford,
   materialsOf,
   bCenter,
@@ -363,6 +365,7 @@ export class Game {
         stepDay(this.state);
         steps++;
       }
+      if (layRoads(this.state, gameDt / DAY_SECONDS)) recompute(this.state);
       const m = monthOf(this.state.day);
       if (m !== this.lastMonth) {
         this.lastMonth = m;
@@ -840,7 +843,7 @@ export class Game {
       return;
     }
     const paved = this.tool.kind === 'road' && !!this.tool.paved;
-    for (const t of this.roadTiles(tx, ty)) if (buildRoad(s, t.x, t.y, paved)) n++;
+    for (const t of this.roadTiles(tx, ty)) if (planRoad(s, t.x, t.y, paved)) n++;
     if (n) {
       recompute(s);
       this.hud.sound('road');
@@ -1117,7 +1120,7 @@ function rangeHighlighter(s: GameState, type: BuildingType): ((i: number) => boo
 const game = new Game();
 // Handy hooks for debugging and automated screenshots.
 (window as unknown as Record<string, unknown>).game = game;
-(window as unknown as Record<string, unknown>).cl = { placeOrder, buildRoad, stepDay, recompute, placementError, playBot, placeZone, setYard, keepOf, log };
+(window as unknown as Record<string, unknown>).cl = { placeOrder, buildRoad, planRoad, stepDay, recompute, placementError, playBot, placeZone, setYard, keepOf, log };
 
 /** Hands the player a file to save. */
 function download(blob: Blob, name: string): void {

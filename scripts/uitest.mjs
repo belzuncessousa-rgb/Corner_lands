@@ -98,7 +98,7 @@ await page.click('#chip-panel [data-action="chip-close"]');
 await page.keyboard.press('t');
 await clickTile(hall.x + 1, hall.y + 3);
 await clickTile(hall.x + 4, hall.y + 3);
-check('pave a road with T', (await page.evaluate(() => window.game.state.road.filter((v) => v === 2).length)) >= 3);
+check('pave a road with T (planned, then laid)', (await page.evaluate(() => { const s = window.game.state; return s.road.filter((v) => v === 2).length + (s.roadPlan ?? []).filter((c) => (c & 3) === 2).length; })) >= 3);
 await page.keyboard.press('Escape');
 // Animal farm and a pasture; switch to cattle.
 await page.evaluate(() => { const s = window.game.state; s.tier = 2; s.res.prestige = 200; s.res.wood = 300; s.res.gold = 800; s.population = 30; });

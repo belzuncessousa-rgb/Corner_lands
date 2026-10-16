@@ -6,6 +6,9 @@ import {
   demolish,
   doorTile,
   isBlocked,
+  layRoads,
+  planRoad,
+  removeRoad,
   placeOrder,
   placementError,
   recompute,
@@ -226,6 +229,30 @@ describe('bridges', () => {
     s.res.wood = 2;
     const next = s.terrain.findIndex((t, i) => t === 1 && i !== water);
     expect(buildRoad(s, next % s.width, Math.floor(next / s.width))).toBe(false);
+  });
+});
+
+describe('planned roads', () => {
+  it('are paid at once and laid over the following moments, in order', () => {
+    const s = generateWorld(777);
+    const h = hall(s);
+    const y = h.y + h.h + 3;
+    const xs: number[] = [];
+    for (let x = h.x - 10; x < h.x + 10 && xs.length < 20; x++) if (planRoad(s, x, y)) xs.push(x);
+    expect(xs.length).toBeGreaterThan(10);
+    expect(s.road[idx(s, xs[0], y)]).toBe(0);
+    expect(planRoad(s, xs[0], y)).toBe(false);
+    // Half a day lays about half a day's worth.
+    const laid = layRoads(s, 0.5);
+    expect(laid).toBe(8);
+    expect(s.road[idx(s, xs[0], y)]).toBe(1);
+    expect(s.road[idx(s, xs[xs.length - 1], y)]).toBe(0);
+    // Striking an unlaid tile takes it off the plan.
+    expect(removeRoad(s, xs[xs.length - 1], y)).toBe(true);
+    layRoads(s, 5);
+    expect(s.roadPlan).toHaveLength(0);
+    expect(s.road[idx(s, xs[xs.length - 1], y)]).toBe(0);
+    expect(s.road[idx(s, xs[xs.length - 2], y)]).toBe(1);
   });
 });
 

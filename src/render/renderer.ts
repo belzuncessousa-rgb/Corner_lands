@@ -367,6 +367,7 @@ export class Renderer {
       const d = Math.max(tx + ty, this.boost[ty * W + tx]);
       this.buckets[Math.min(nb - 1, d)].push(ai * 4 + 3);
     });
+    this.drawRoadPlan(s, visible);
     if (!this.light) this.drawPuddles(s, season, dt, visible);
     if (!this.light && season !== 3) {
       this.drawDucks(s, visible);
@@ -1485,6 +1486,38 @@ export class Renderer {
         c.fillRect(face > 0 ? hx + 0.9 * r : hx - 2.1 * r, hy - 0.1, 1.2 * r, 0.6 * r);
       }
     }
+  }
+
+  /** Road tiles drawn but not laid yet: pegged out with a dashed line, the next one filling in. */
+  private drawRoadPlan(s: GameState, visible: (x: number, y: number) => boolean): void {
+    const plan = s.roadPlan;
+    if (!plan?.length) return;
+    const c = this.ctx;
+    const W = s.width;
+    c.save();
+    c.setLineDash([3, 3]);
+    c.lineWidth = 1.2;
+    for (let k = 0; k < plan.length; k++) {
+      const i = plan[k] >> 2;
+      const paved = (plan[k] & 3) === 2;
+      const x = i % W;
+      const y = (i / W) | 0;
+      const [cx, cy] = iso(x + 0.5, y + 0.5);
+      if (!visible(cx, cy)) continue;
+      const pts = [iso(x + 0.2, y + 0.2), iso(x + 0.8, y + 0.2), iso(x + 0.8, y + 0.8), iso(x + 0.2, y + 0.8)];
+      c.beginPath();
+      c.moveTo(pts[0][0], pts[0][1]);
+      for (const [px, py] of pts.slice(1)) c.lineTo(px, py);
+      c.closePath();
+      if (k === 0) {
+        const f = Math.min(1, (s.roadWork ?? 0) * (paved ? 6 : 16));
+        c.fillStyle = paved ? `rgba(150,145,135,${0.25 + 0.5 * f})` : `rgba(168,138,92,${0.25 + 0.5 * f})`;
+        c.fill();
+      }
+      c.strokeStyle = paved ? 'rgba(120,115,105,0.9)' : 'rgba(120,90,50,0.85)';
+      c.stroke();
+    }
+    c.restore();
   }
 
   /** How wet the lanes are: up with the rain, then drying over the next days. */

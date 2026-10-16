@@ -314,6 +314,8 @@ export const PAVING_TIER = 1;
 export function roadError(s: GameState, x: number, y: number, paved = false): string | null {
   if (!inBounds(s, x, y)) return 'Outside the map';
   const i = idx(s, x, y);
+  const planned = plannedRoad(s, i);
+  if (planned && (paved ? planned === 2 : true)) return 'Already planned';
   if (s.occ[i] >= 0) return 'Occupied';
   if (s.rock[i] || s.ore[i]) return 'Rocky ground';
   if (paved) {
@@ -338,9 +340,76 @@ export function buildRoad(s: GameState, x: number, y: number, paved = false): bo
 }
 
 export function removeRoad(s: GameState, x: number, y: number): boolean {
-  if (!inBounds(s, x, y) || !s.road[idx(s, x, y)]) return false;
+  if (!inBounds(s, x, y)) return false;
+  const i = idx(s, x, y);
+  if (plannedRoad(s, i)) {
+    // An unlaid tile is simply struck from the plan, and what was paid comes back.
+    const k = s.roadPlan!.findIndex((c) => c >> 2 === i);
+    refundRoad(s, i, s.roadPlan![k] & 3);
+    s.roadPlan!.splice(k, 1);
+    return true;
+  }
+  if (!s.road[i]) return false;
   setRoad(s, x, y, false);
   return true;
+}
+
+/** Dirt road tiles a town lays in a day, and paved ones (stone is slower work). */
+export const ROAD_LAY_PER_DAY = 16;
+export const PAVE_LAY_PER_DAY = 6;
+
+/** The kind of road planned on a tile and not laid yet (0 if none). */
+export function plannedRoad(s: GameState, i: number): number {
+  if (!s.roadPlan?.length) return 0;
+  for (const c of s.roadPlan) if (c >> 2 === i) return c & 3;
+  return 0;
+}
+
+function refundRoad(s: GameState, i: number, kind: number): void {
+  if (kind === 2) refund(s, PAVING_COST, 1);
+  else if (s.terrain[i] === 1) refund(s, BRIDGE_COST, 1);
+}
+
+/**
+ * Plans a road tile for the villagers to lay: it is paid for now and laid in
+ * a moment, in the order drawn (see layRoads).
+ */
+export function planRoad(s: GameState, x: number, y: number, paved = false): boolean {
+  if (roadError(s, x, y, paved)) return false;
+  if (paved) pay(s, PAVING_COST);
+  else if (isBridge(s, x, y)) pay(s, BRIDGE_COST);
+  const i = idx(s, x, y);
+  (s.roadPlan ??= []).push(i * 4 + (paved ? 2 : 1));
+  return true;
+}
+
+/** Lays planned road tiles as the days pass; returns how many were laid. */
+export function layRoads(s: GameState, days: number): number {
+  if (!s.roadPlan?.length) {
+    s.roadWork = 0;
+    return 0;
+  }
+  let work = (s.roadWork ?? 0) + days;
+  let n = 0;
+  while (s.roadPlan.length) {
+    const c: number = s.roadPlan[0];
+    const i = c >> 2;
+    const kind = c & 3;
+    const need = 1 / (kind === 2 ? PAVE_LAY_PER_DAY : ROAD_LAY_PER_DAY);
+    if (work < need) break;
+    work -= need;
+    s.roadPlan.shift();
+    if (s.occ[i] >= 0 || s.rock[i] || s.ore[i]) {
+      // Something was built there meanwhile.
+      refundRoad(s, i, kind);
+      continue;
+    }
+    if (kind === 1 && s.road[i]) continue;
+    setRoad(s, i % s.width, Math.floor(i / s.width), true, kind);
+    n++;
+  }
+  s.roadWork = s.roadPlan.length ? work : 0;
+  return n;
 }
 
 export function demolish(s: GameState, b: Building): boolean {

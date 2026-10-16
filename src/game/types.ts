@@ -306,6 +306,10 @@ export interface GameState {
   year?: { pop: number; gold: number; prestige: number; arrived: number; left: number; built: number; harvest: number; stock?: Partial<Record<ResourceId, number>>; hungry?: number };
   /** Tiles cleared by woodcutters and the day the last tree fell (stumps on the map). */
   stumps?: Record<number, number>;
+  /** Road tiles drawn by the player and not laid yet: tile index * 4 + kind (1 dirt, 2 paved), in order. */
+  roadPlan?: number[];
+  /** Progress towards laying the next planned road tile (in tiles). */
+  roadWork?: number;
   /** Years that ended with no one having gone hungry. */
   fedYears?: number;
   /** The cathedral holds a relic (bought from a travelling friar). */
