@@ -1,13 +1,14 @@
 import { BUILDINGS, DAYS_PER_MONTH, RESOURCE_STORAGE, STORAGE_CAPACITY, type StorageKind } from '../game/data';
 import { upgradeBlocker } from '../game/levels';
 import { hasCharter } from '../game/charters';
-import { HOME_TRADES, deliveredTo, hasProblem, monthOf, orchardMaturity, seasonOf, storageCap } from '../game/sim';
+import { HOME_TRADES, deliveredTo, hasProblem, isMarketDay, monthOf, orchardMaturity, seasonOf, storageCap } from '../game/sim';
 import type { Building, BuildingType, GameState, ResourceId, Season } from '../game/types';
 import { idx, inBounds } from '../game/world';
 import type { Agent } from './agents';
 import { ICONS } from '../ui/icons';
 import type { Animal } from './wildlife';
 import { Pen, TH, TW, iso, mix } from './pen';
+import { mulberry32 } from '../game/rng';
 import {
   type Sprite,
   type TreeKind,
@@ -889,6 +890,7 @@ export class Renderer {
     const fest = s.festivalDay && s.day - s.festivalDay.day < DAYS_PER_MONTH ? s.festivalDay.id : null;
     if (fest === 'mayday' && b.type === 'maypole') this.drawMayDance(b);
     if (fest === 'midsummer' && b.type === 'townhall') this.drawBonfire(b);
+    if (b.type === 'market' && !this.light && isMarketDay(s, b)) this.drawMarketDay(b);
     if (b.upgrading) this.drawScaffold(b);
     if (selected) {
       c.save();
@@ -1055,6 +1057,46 @@ export class Renderer {
   }
 
   /** Trestle tables and bunting in the manor's yard for a month after a feast. */
+  /** Market day: a crowd among the stalls, a cart, and bunting over the square. */
+  private drawMarketDay(b: Building): void {
+    const p = new Pen(this.ctx);
+    const t = this.time;
+    const rand = mulberry32(b.id * 977 + 5);
+    const cloth = ['#9a2a2a', '#3a5a8a', '#5a7a3a', '#c8913c', '#6a4a7a', '#8a6238'];
+    // A dozen townsfolk drifting between the stalls.
+    for (let k = 0; k < 12; k++) {
+      const bx = b.x + 0.3 + rand() * (b.w - 0.6);
+      const by = b.y + 0.3 + rand() * (b.h - 0.6);
+      const ph = rand() * Math.PI * 2;
+      const x = bx + Math.sin(t * 0.4 + ph) * 0.25;
+      const y = by + Math.cos(t * 0.3 + ph) * 0.2;
+      p.box(x - 0.05, y - 0.05, x + 0.05, y + 0.05, 0, 7, cloth[k % cloth.length]);
+      p.circle(x, y, 9, 1.8, '#e8c8a0');
+    }
+    // A farmer's cart at the edge of the square.
+    const cx = b.x + b.w + 0.15;
+    const cy = b.y + b.h * 0.5;
+    p.box(cx - 0.18, cy - 0.35, cx + 0.18, cy + 0.35, 3, 4, '#8a6238', '#a87a48');
+    p.circle(cx + 0.2, cy - 0.2, 3, 2.6, '#4a3020');
+    p.circle(cx + 0.2, cy + 0.2, 3, 2.6, '#4a3020');
+    for (let k = 0; k < 3; k++) p.circle(cx - 0.05, cy - 0.2 + k * 0.2, 8, 1.8, ['#c8913c', '#7a9a3a', '#b8483a'][k]);
+    // Bunting across the square.
+    const a: [number, number, number] = [b.x + 0.1, b.y + b.h - 0.1, 18];
+    const c: [number, number, number] = [b.x + b.w - 0.1, b.y + 0.1, 18];
+    p.line([a[0], a[1], 0], a, '#6b4a2e', 1.2);
+    p.line([c[0], c[1], 0], c, '#6b4a2e', 1.2);
+    const colors = ['#b8483a', '#e8c048', '#3a5a8a', '#f2ead8'];
+    let prev = a;
+    for (let k = 1; k <= 8; k++) {
+      const f = k / 8;
+      const pt: [number, number, number] = [a[0] + (c[0] - a[0]) * f, a[1] + (c[1] - a[1]) * f, a[2] - Math.sin(f * Math.PI) * 4];
+      p.line(prev, pt, '#5a4030', 0.7);
+      const mid: [number, number, number] = [(prev[0] + pt[0]) / 2, (prev[1] + pt[1]) / 2, (prev[2] + pt[2]) / 2];
+      p.poly([prev, pt, [mid[0], mid[1], mid[2] - 4]], colors[k % colors.length]);
+      prev = pt;
+    }
+  }
+
   private drawFeast(b: Building): void {
     const p = new Pen(this.ctx);
     const y = b.y + b.h - 0.32;

@@ -243,5 +243,5 @@ about medieval builders, Manor Lords' own roadmap included) and the soaks.
 ### Phase 17 — Ideas for the next runs
 - [x] Titles for the lord: prestige piles up in the thousands late on. Spend it to rise from Lord to Baron, Earl and Duke, each with a lasting boon and a line in the chronicle
 - [x] The autoplayer builds workplaces for idle hands (a thirty-year city has hundreds idle), so soaks look like a played game
-- [ ] Market days: once a month the market square fills with stalls and people for a day, a visible pulse of the economy
+- [x] Market days: once a month the market square fills with stalls and people for a day, a visible pulse of the economy
 - [x] A "what changed" line on the year-in-review page: the three biggest rises and falls in stock

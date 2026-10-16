@@ -2468,6 +2468,14 @@ export function settlerBlocker(s: GameState): string | null {
   return null;
 }
 
+/** The day of each month (0-based) when the market squares fill. */
+export const MARKET_DAY = 4;
+
+/** Whether today is market day at a market: staffed, built, and not deep winter. */
+export function isMarketDay(s: GameState, b: Building): boolean {
+  return b.type === 'market' && b.build >= 1 && b.workers > 0 && s.day % DAYS_PER_MONTH === MARKET_DAY && seasonOf(s.day) !== 3;
+}
+
 /** Largest protected wood, tiles a side. */
 export const GROVE_MAX = 30;
 

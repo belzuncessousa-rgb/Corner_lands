@@ -149,6 +149,8 @@ then fall back to the browser's localStorage.
   lift it.
 - **Tips** — the first time you open a panel or pick a tool, one short line
   says what it does; switch them off (or back on) in the game menu.
+- **Market days** — on the fifth day of each month (outside winter) every
+  staffed market fills with townsfolk, a farmer's cart and bunting.
 - **Weather** — snow drifts in winter, leaves fall in autumn and spring brings
   passing showers (all off in light mode).
 - **Settings** — the game menu (Esc) scales every panel from 85% to 130% and
