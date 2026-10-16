@@ -8,6 +8,25 @@ import { bushSprite, fruitTreeSprite, rockSprite, treeSprite } from '../render/s
 import type { Sprite, TreeKind } from '../render/sprites';
 import { buildingModel, groundTexture } from './scene3d';
 
+/**
+ * A building's model where it stands: on its grid rectangle, or for a freely
+ * placed building turned about its centre (the model is drawn from 0..w).
+ */
+export function placedModel(type: Building['type'], level: number, season: Season, variant: number, at: { x: number; y: number; cx?: number; cy?: number; rot?: number }): THREE.Object3D {
+  const model = buildingModel(type, level, season, variant).clone();
+  if (at.rot === undefined || at.cx === undefined || at.cy === undefined) {
+    model.position.set(at.x, 0, at.y);
+    return model;
+  }
+  const d = BUILDINGS[type];
+  model.position.set(-d.w / 2, 0, -d.h / 2);
+  const pivot = new THREE.Group();
+  pivot.add(model);
+  pivot.position.set(at.cx, 0, at.cy);
+  pivot.rotation.y = -at.rot;
+  return pivot;
+}
+
 /** Screen pixels per world unit across the view at zoom 1 (a tile edge). */
 const PPU = 64 / Math.SQRT2;
 
@@ -162,6 +181,26 @@ export class View3D {
   private moving = new MovingBillboards();
   private sprites = new Map<string, Sprite>();
   private seed = -1;
+  private ghost: { key: string; obj: THREE.Object3D } | null = null;
+
+  /** The building being placed, see-through, green where it fits and red where not. */
+  setGhost(g: { type: Building['type']; cx: number; cy: number; rot: number; ok: boolean } | null, season: Season): void {
+    const key = g ? `${g.type}:${g.cx.toFixed(2)}:${g.cy.toFixed(2)}:${g.rot.toFixed(3)}:${g.ok}:${season}` : '';
+    if (this.ghost?.key === key) return;
+    if (this.ghost) this.scene.remove(this.ghost.obj);
+    this.ghost = null;
+    if (!g) return;
+    const obj = placedModel(g.type, 1, season, 0, { x: 0, y: 0, cx: g.cx, cy: g.cy, rot: g.rot });
+    const tint = new THREE.MeshBasicMaterial({ color: g.ok ? '#7fe07a' : '#e05a4a', transparent: true, opacity: 0.55, depthWrite: false });
+    obj.traverse((o) => {
+      if ((o as THREE.Mesh).isMesh) {
+        (o as THREE.Mesh).material = tint;
+        o.castShadow = false;
+      }
+    });
+    this.scene.add(obj);
+    this.ghost = { key, obj };
+  }
 
   constructor(under: HTMLElement) {
     this.canvas = document.createElement('canvas');
@@ -273,12 +312,11 @@ export class View3D {
       const d = BUILDINGS[b.type];
       if (d.zone || b.type === 'wall') continue;
       seen.add(b.id);
-      const key = `${b.type}:${b.level}:${season}:${variantOf(s, b)}:${b.build >= 1 ? 1 : Math.ceil(b.build * 6)}:${b.x}:${b.y}`;
+      const key = `${b.type}:${b.level}:${season}:${variantOf(s, b)}:${b.build >= 1 ? 1 : Math.ceil(b.build * 6)}:${b.x}:${b.y}:${b.rot ?? ''}`;
       const cur = this.buildings.get(b.id);
       if (cur?.key === key) continue;
       if (cur) this.scene.remove(cur.obj);
-      const obj = buildingModel(b.type, b.level, season, variantOf(s, b)).clone();
-      obj.position.set(b.x, 0, b.y);
+      const obj = placedModel(b.type, b.level, season, variantOf(s, b), b);
       // Building sites rise as the work goes on.
       if (b.build < 1) obj.scale.y = Math.max(0.12, Math.ceil(b.build * 6) / 6);
       this.scene.add(obj);

@@ -1380,3 +1380,42 @@ describe('new events', () => {
     }
   });
 });
+
+describe('free placement', () => {
+  it('a turned building covers the tiles under it, faces its door forward and saves', async () => {
+    const { freePlacementError, placeFree, doorTile, bCenter } = await import('../src/game/sim');
+    const s = generateWorld(17);
+    s.res.gold = 9999;
+    const hall = s.buildings.find((b) => b.type === 'townhall')!;
+    // Find open ground near the manor for a house turned 30 degrees.
+    const rot = Math.PI / 6;
+    let at: { x: number; y: number } | null = null;
+    for (let r = 4; r < 25 && !at; r++)
+      for (let a = 0; a < 16 && !at; a++) {
+        const x = hall.x + 2 + Math.cos(a) * r;
+        const y = hall.y + 2 + Math.sin(a) * r;
+        if (!freePlacementError(s, 'house', x, y, rot)) at = { x, y };
+      }
+    expect(at).not.toBeNull();
+    const b = placeFree(s, 'house', at!.x, at!.y, rot)!;
+    const d = BUILDINGS.house;
+    // About as many tiles as the footprint's area, all marked as this building.
+    expect(b.cells!.length).toBeGreaterThanOrEqual(d.w * d.h - 2);
+    expect(b.cells!.length).toBeLessThanOrEqual(d.w * d.h + 3);
+    for (const i of b.cells!) expect(s.occ[i]).toBe(b.id);
+    expect(bCenter(b)).toEqual({ x: at!.x, y: at!.y });
+    // The same spot is now taken.
+    expect(freePlacementError(s, 'house', at!.x, at!.y, rot)).toMatch(/occupied/);
+    // Without a road the door is on the front side (+y turned by rot).
+    const door = doorTile(s, b);
+    const front = (door.x + 0.5 - at!.x) * -Math.sin(rot) + (door.y + 0.5 - at!.y) * Math.cos(rot);
+    expect(front).toBeGreaterThan(0);
+    // Saves keep the turn and the footprint.
+    const back = deserialize(serialize(s)).buildings.find((o) => o.id === b.id)!;
+    expect(back.rot).toBeCloseTo(rot);
+    expect(back.cells).toEqual(b.cells);
+    // Demolishing frees exactly its tiles.
+    demolish(s, b);
+    for (const i of b.cells!) expect(s.occ[i]).toBe(-1);
+  });
+});

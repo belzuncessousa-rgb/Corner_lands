@@ -280,24 +280,51 @@ function findSite(s: GameState, rand: () => number): { x: number; y: number } {
   return best;
 }
 
-export function placeBuilding(s: GameState, b: Building): void {
-  for (let y = b.y; y < b.y + b.h; y++) {
-    for (let x = b.x; x < b.x + b.w; x++) {
-      const i = idx(s, x, y);
-      s.occ[i] = b.id;
-      s.trees[i] = 0;
-      s.berries[i] = 0;
-      s.berriesMax[i] = 0;
+/** The tiles a building stands on: its turned footprint, or its rectangle. */
+export function cellsOf(s: GameState, b: Building): number[] {
+  if (b.cells) return b.cells;
+  const out: number[] = [];
+  for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) if (inBounds(s, x, y)) out.push(idx(s, x, y));
+  return out;
+}
+
+/**
+ * The tiles under a w×h footprint centred at (cx, cy) and turned by rot:
+ * every tile whose centre lies inside it (and at least the tile under the
+ * centre). Tiles off the map are returned as -1.
+ */
+export function footprintCells(s: GameState, w: number, h: number, cx: number, cy: number, rot: number): number[] {
+  const out: number[] = [];
+  const c = Math.cos(rot);
+  const sn = Math.sin(rot);
+  const r = Math.ceil(Math.hypot(w, h) / 2) + 1;
+  for (let y = Math.floor(cy - r); y <= Math.ceil(cy + r); y++) {
+    for (let x = Math.floor(cx - r); x <= Math.ceil(cx + r); x++) {
+      // Into the footprint's own frame: undo the turn.
+      const dx = x + 0.5 - cx;
+      const dy = y + 0.5 - cy;
+      const lx = dx * c + dy * sn;
+      const ly = -dx * sn + dy * c;
+      if (Math.abs(lx) <= w / 2 && Math.abs(ly) <= h / 2) out.push(inBounds(s, x, y) ? idx(s, x, y) : -1);
     }
+  }
+  if (!out.length) out.push(inBounds(s, Math.floor(cx), Math.floor(cy)) ? idx(s, Math.floor(cx), Math.floor(cy)) : -1);
+  return out;
+}
+
+export function placeBuilding(s: GameState, b: Building): void {
+  for (const i of cellsOf(s, b)) {
+    s.occ[i] = b.id;
+    s.trees[i] = 0;
+    s.berries[i] = 0;
+    s.berriesMax[i] = 0;
   }
   s.buildings.push(b);
   s.dirty = true;
 }
 
 export function removeBuilding(s: GameState, b: Building): void {
-  for (let y = b.y; y < b.y + b.h; y++) {
-    for (let x = b.x; x < b.x + b.w; x++) s.occ[idx(s, x, y)] = -1;
-  }
+  for (const i of cellsOf(s, b)) if (s.occ[i] === b.id) s.occ[i] = -1;
   s.buildings = s.buildings.filter((o) => o !== b);
   s.dirty = true;
 }

@@ -311,4 +311,7 @@ The player wants a virtually gridless town and 3D only if it keeps our own desig
 - [x] The 3D view in the game behind a setting: same camera as the flat view, the flat canvas on top for overlays, ghosts and villagers; picking through the 3D view (not needed while the view is not turned: the projection matches)
 - [x] Villagers, carts and deer in 3D (smoke, overlays and the ghost still draw flat on top, which is right while the view is not turned), so buildings hide what stands behind them
 - [ ] Turn the view (Q/E or two-finger twist), with picking by ray casting
-- [ ] Then no grid: buildings at any position and angle on a fine hidden grid, roads as free curves, fields drawn as free shapes
+- [x] No grid, step 1: buildings at any position and angle in the 3D view. The simulation keeps its tile grid underneath: a turned building covers the tiles its footprint covers (used for space, paths, its door and demolition) and keeps the nearest grid rectangle for rough distances and the flat view. Placing in 3D, the ghost follows the pointer, turns to face the nearest road (5° steps) and , . turn it by hand
+- [ ] No grid, step 2: roads as free curves (click points, a smooth band drawn through them; the tiles under it carry the walking speed)
+- [ ] No grid, step 3: fields, pastures and orchards drawn as free shapes, with the tiles inside counted for area
+- [ ] No grid, step 4: the autoplayer and the flat view cope with turned buildings (the flat view draws them square on their rectangle)

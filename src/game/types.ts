@@ -125,6 +125,15 @@ export interface Building {
   w: number;
   h: number;
   level: number;
+  /**
+   * Free placement: the exact centre in tiles, the angle (radians, turning
+   * the front from +y towards -x) and the tiles the turned footprint covers.
+   * Absent for buildings laid square on the grid, which cover x, y, w, h.
+   */
+  cx?: number;
+  cy?: number;
+  rot?: number;
+  cells?: number[];
   /** Construction progress 0..1; building is complete at 1. */
   build: number;
   workers: number;

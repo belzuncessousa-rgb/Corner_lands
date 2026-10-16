@@ -39,6 +39,8 @@ import {
   yearOf,
   keepOf,
   townScore,
+  freePlacementError,
+  placeFree,
   GROVE_MAX,
   groveAt,
   protectGrove,
@@ -465,7 +467,15 @@ export class Game {
     const ty = Math.floor(fty);
     if (inBounds(s, tx, ty)) ov.hover = { x: tx, y: ty };
     const tool = this.tool;
-    if (tool.kind === 'build') {
+    if (tool.kind === 'build' && this.renderer.threeD && this.view3d && !BUILDINGS[tool.type].zone) {
+      // Free placement in 3D: anywhere, turned to face the nearest road.
+      const f = this.freeSpot(tool.type, ftx, fty);
+      const err = freePlacementError(s, tool.type, f.cx, f.cy, f.rot);
+      this.view3d.setGhost({ type: tool.type, cx: f.cx, cy: f.cy, rot: f.rot, ok: !err }, seasonOf(s.day));
+      const d = BUILDINGS[tool.type];
+      if (d.radius) ov.range = { cx: f.cx, cy: f.cy, r: d.radius, highlight: rangeHighlighter(s, tool.type) };
+      this.hud.setHint(err ? `${d.name}: ${err}` : `${d.name}: click to place · it turns to face the nearest road · , and . turn it by hand`, !!err);
+    } else if (tool.kind === 'build') {
       const p = this.ghostPos(tool.type, ftx, fty);
       const err = placementError(s, tool.type, p.x, p.y);
       ov.ghost = { type: tool.type, x: p.x, y: p.y, ok: !err };
@@ -603,6 +613,31 @@ export class Game {
     return ov;
   }
 
+  /** A hand-chosen turn for free placement (, and .), or null to face the nearest road. */
+  private freeTurn: number | null = null;
+
+  /** Where a freely placed building would stand under the pointer, and its angle. */
+  private freeSpot(type: BuildingType, fx: number, fy: number): { cx: number; cy: number; rot: number } {
+    const s = this.state;
+    if (this.freeTurn !== null) return { cx: fx, cy: fy, rot: this.freeTurn };
+    // Face the nearest road tile within a few tiles: the front (+y) turned towards it.
+    const d = BUILDINGS[type];
+    const reach = Math.max(d.w, d.h) / 2 + 3;
+    let best: { x: number; y: number; d: number } | null = null;
+    for (let y = Math.floor(fy - reach); y <= Math.ceil(fy + reach); y++) {
+      for (let x = Math.floor(fx - reach); x <= Math.ceil(fx + reach); x++) {
+        if (!inBounds(s, x, y) || !s.road[idx(s, x, y)]) continue;
+        const dist = Math.hypot(x + 0.5 - fx, y + 0.5 - fy);
+        if (!best || dist < best.d) best = { x: x + 0.5, y: y + 0.5, d: dist };
+      }
+    }
+    if (!best) return { cx: fx, cy: fy, rot: 0 };
+    // Snap the turn to 5° steps so rows of houses line up.
+    const raw = Math.atan2(-(best.x - fx), best.y - fy);
+    const rot = Math.round(raw / (Math.PI / 36)) * (Math.PI / 36);
+    return { cx: fx, cy: fy, rot };
+  }
+
   private buildHint(type: BuildingType, x: number, y: number, err: string | null): string {
     const d = BUILDINGS[type];
     if (err) return `${d.name}: ${err}`;
@@ -738,6 +773,8 @@ export class Game {
 
   setTool(t: Tool): void {
     this.tool = t;
+    this.freeTurn = null;
+    if (t.kind !== 'build') this.view3d?.setGhost(null, 0);
     this.dragTile = null;
     this.roadAnchor = null;
     this.zoneAnchor = null;
@@ -763,13 +800,24 @@ export class Game {
     const ty = Math.floor(fty);
     const tool = this.tool;
     if (tool.kind === 'build') {
-      const p = this.ghostPos(tool.type, ftx, fty);
-      const err = placementError(s, tool.type, p.x, p.y);
-      if (err) {
-        this.hud.flash(err);
-        return;
+      let b: Building | null;
+      if (this.renderer.threeD && this.view3d && !BUILDINGS[tool.type].zone) {
+        const f = this.freeSpot(tool.type, ftx, fty);
+        const err = freePlacementError(s, tool.type, f.cx, f.cy, f.rot);
+        if (err) {
+          this.hud.flash(err);
+          return;
+        }
+        b = placeFree(s, tool.type, f.cx, f.cy, f.rot);
+      } else {
+        const p = this.ghostPos(tool.type, ftx, fty);
+        const err = placementError(s, tool.type, p.x, p.y);
+        if (err) {
+          this.hud.flash(err);
+          return;
+        }
+        b = placeOrder(s, tool.type, p.x, p.y);
       }
-      const b = placeOrder(s, tool.type, p.x, p.y);
       if (b) {
         this.offerUndo(undoPlacement(b));
         this.hud.sound('place');
@@ -1051,6 +1099,12 @@ export class Game {
         this.cycleCoverage();
       } else if (k === 'u') {
         this.setPhoto(!this.photo);
+      } else if ((k === ',' || k === '.') && this.tool.kind === 'build' && this.renderer.threeD) {
+        // Turn the building being placed by 15°, from where it currently faces.
+        const lp = this.lastPointer;
+        const [fx, fy] = lp ? this.renderer.screenToTile(lp.x, lp.y) : [0, 0];
+        const cur = this.freeSpot(this.tool.type, fx, fy).rot;
+        this.freeTurn = cur + (k === ',' ? -1 : 1) * (Math.PI / 12);
       } else if (k === 'x' || k === 'delete') {
         this.setTool({ kind: 'demolish' });
       } else if (k === 'p') {
