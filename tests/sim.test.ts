@@ -1272,3 +1272,20 @@ describe('pottage', () => {
     expect(s.messages.some((m) => /40 villagers lived on pottage/.test(m.text))).toBe(true);
   });
 });
+
+describe('year goals', () => {
+  it('a City gets a goal each year, judged when spring comes', async () => {
+    const { yearGoal, YEAR_GOALS } = await import('../src/game/sim');
+    const s = generateWorld(14);
+    expect(yearGoal(s)).toBeNull();
+    s.tier = 4;
+    s.day = 2 * DAYS_PER_YEAR + 50;
+    expect(yearGoal(s)?.id).toBe(YEAR_GOALS[2].id);
+    stepDay(s);
+    s.year!.built = 9;
+    s.day = 3 * DAYS_PER_YEAR - 1;
+    stepDay(s);
+    expect(s.messages.some((m) => /goal is met: raise 8 buildings/.test(m.text))).toBe(true);
+    expect(s.moods?.some((m) => m.label === 'A year well kept')).toBe(true);
+  });
+});

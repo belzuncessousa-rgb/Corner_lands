@@ -2,6 +2,7 @@ import {
   BUILDINGS,
   CARRY_LOAD,
   DAYS_PER_MONTH,
+  DAYS_PER_YEAR,
   OFFROAD_TILES_PER_DAY,
   RESOURCE_STORAGE,
   ROAD_TILES_PER_DAY,
@@ -1447,7 +1448,34 @@ function stockChanges(s: GameState, before: Partial<Record<ResourceId, number>>,
     .join(', ');
 }
 
+/** A goal for each year once the town is a City: there is always something to aim for. */
+export const YEAR_GOALS: { id: string; title: string; goal: number; have: (s: GameState) => number; done?: (s: GameState) => boolean }[] = [
+  { id: 'arrive', title: 'Welcome 30 newcomers', goal: 30, have: (s) => s.year?.arrived ?? 0 },
+  { id: 'fed', title: 'Let no one go hungry', goal: 0, have: (s) => s.year?.hungry ?? 0, done: (s) => (s.year?.hungry ?? 0) === 0 },
+  { id: 'build', title: 'Raise 8 buildings', goal: 8, have: (s) => s.year?.built ?? 0 },
+  { id: 'harvest', title: 'Bring in 800 sacks at harvest', goal: 800, have: (s) => s.year?.harvest ?? 0 },
+];
+
+/** This year's goal, for a City only. */
+export function yearGoal(s: GameState): (typeof YEAR_GOALS)[number] | null {
+  if (s.tier < TIERS.length - 1) return null;
+  return YEAR_GOALS[Math.floor(s.day / DAYS_PER_YEAR) % YEAR_GOALS.length];
+}
+
+export function yearGoalMet(s: GameState, g: (typeof YEAR_GOALS)[number]): boolean {
+  return g.done ? g.done(s) : g.have(s) >= g.goal;
+}
+
 function yearInReview(s: GameState): void {
+  // Judge the year's goal before the tally starts afresh (the day has just turned).
+  const last = s.day - 1;
+  const g = s.tier >= TIERS.length - 1 && s.year ? YEAR_GOALS[Math.floor(last / DAYS_PER_YEAR) % YEAR_GOALS.length] : null;
+  if (g && yearGoalMet(s, g)) {
+    s.res.prestige += 25;
+    s.moods = (s.moods ?? []).filter((m) => m.label !== 'A year well kept');
+    s.moods.push({ label: 'A year well kept', value: 4, until: s.day + 3 * DAYS_PER_MONTH });
+    log(s, `The year's goal is met: ${g.title.toLowerCase()}. +25 prestige, and the town is merry for a season.`, 'good');
+  }
   const y = s.year;
   s.year = { pop: s.population, gold: s.res.gold, prestige: s.res.prestige, arrived: 0, left: 0, built: 0, harvest: 0, stock: stockSnapshot(s) };
   if (!y) return;
@@ -2113,6 +2141,7 @@ export function monthly(s: GameState, rng: StateRng): void {
   report.pottage = eaten.pottage;
   const need = eaten.hungry;
   if (need > 0) log(s, `Food shortage! ${need} villagers went hungry.`, 'bad');
+  if (s.year) s.year.hungry = (s.year.hungry ?? 0) + need;
 
   // Heating in winter: each household burns a bundle of split firewood, or
   // twice as much raw timber (two bundles in hardy winters).

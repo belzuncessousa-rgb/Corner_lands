@@ -79,6 +79,8 @@ import {
   retinueError,
   isMarketDay,
   MARKET_DAY,
+  yearGoal,
+  yearGoalMet,
 } from '../game/sim';
 import type { Building, BuildingType, Category, Cost, GoodsGroup, ResourceId } from '../game/types';
 import type { StorageKind } from '../game/data';
@@ -723,6 +725,7 @@ export class Hud {
       .join('');
     const active = activeQuests(s, 3);
     const ready = active.filter((q) => q.done(s)).length;
+    const goal = yearGoal(s);
     this.el.objectives.className = `panel pill-panel ${this.objectivesMin ? 'min' : ''}`;
     setHTML(
       this.el.objectives,
@@ -732,9 +735,20 @@ export class Hud {
       <div class="body">
         ${next ? `<div class="tier-next">Next: <b>${next.name}</b> — ${req.join(', ')}</div>` : `<div class="tier-next">${tier.desc}</div>`}
         <h3>Objectives</h3>
-        ${quests || '<div class="quest"><i>All objectives complete. Your lands flourish!</i></div>'}
+        ${quests || (goal ? '' : '<div class="quest"><i>All objectives complete. Your lands flourish!</i></div>')}
+        ${goal ? this.goalHtml(goal) : ''}
       </div>`,
     );
+  }
+
+  /** This year's goal for a City, with progress. */
+  private goalHtml(g: NonNullable<ReturnType<typeof yearGoal>>): string {
+    const s = this.game.state;
+    const met = yearGoalMet(s, g);
+    const progress = g.done ? (met ? 'So far, so good' : `${g.have(s)} went hungry`) : `${Math.min(g.have(s), g.goal)} / ${g.goal}`;
+    return `<div class="quest"><div class="t ${met && !g.done ? 'done' : ''}">${met && !g.done ? '✔ ' : '◇ '}This year: ${esc(g.title)}</div>
+      <div class="h">${progress} · judged when spring comes</div>
+      <div class="rw">Reward: +25 ${ICONS.prestige}, a merry season</div></div>`;
   }
 
   private updateInspector(): void {

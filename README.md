@@ -107,6 +107,9 @@ then fall back to the browser's localStorage.
 - **Titles** — prestige makes the lord a Baron (a Town; taxes +10%), an Earl
   (a Borough; +3 happiness) and at last a Duke (a City; merchants buy half as
   much again). Each rise goes into the chronicle's milestones.
+- **A goal each year** — once a City, the objectives panel sets a goal for the
+  year (welcome 30 newcomers, let no one go hungry, raise 8 buildings, bring in
+  800 sacks); meet it by spring for prestige and a merry season.
 - **Great works for rich towns** — a Borough may also ring the hours from a
   Bell Tower (wide beauty, prestige), and a City may found a Guildhall:
   merchants pay a fifth more, the town takes pride in it, prestige every month.
