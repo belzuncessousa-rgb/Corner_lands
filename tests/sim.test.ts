@@ -931,6 +931,8 @@ describe('steward on mills', () => {
     mill!.build = 1;
     for (let i = 0; i < 25; i++) advise(s, 3);
     expect(s.messages.some((m) => /bakers rest: the bread in store has reached its target/.test(m.text))).toBe(true);
+    // The advice points at a windmill, so its toast can show the spot.
+    expect(s.messages.find((m) => /bakers rest/.test(m.text))?.at).toEqual({ x: mill!.x + mill!.w / 2, y: mill!.y + mill!.h / 2 });
     expect(s.messages.some((m) => /food stores .* barely two months/.test(m.text))).toBe(false);
   });
 });

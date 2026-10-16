@@ -2,7 +2,7 @@ import { BUILDINGS, DAYS_PER_MONTH, FOOD_IDS, GOODS, RESOURCE_STORAGE } from './
 import type { StorageKind } from './data';
 import { harvestForecast, isUnlocked, keepOf, labourSummary, log, winterBundles, storageCap, stored, totalHousing } from './sim';
 import { RESOURCE_IDS } from './types';
-import type { BuildingType, GameState, ResourceId } from './types';
+import type { Building, BuildingType, GameState, ResourceId } from './types';
 
 /** Minimum days between repeats of the same piece of advice. */
 const COOLDOWN = DAYS_PER_MONTH * 6;
@@ -11,6 +11,8 @@ interface Advice {
   id: string;
   when: (s: GameState, month: number) => boolean;
   text: (s: GameState) => string;
+  /** The building the advice is about, so the toast can show it. */
+  at?: (s: GameState) => Building | undefined;
 }
 
 const food = (s: GameState) => FOOD_IDS.reduce((a, f) => a + s.res[f], 0);
@@ -97,22 +99,26 @@ const ADVICE: Advice[] = [
       const l = labourSummary(s);
       return l.idle === 0 && l.short.some((x) => x.have === 0);
     },
+    at: (s) => labourSummary(s).short.find((x) => x.have === 0)?.b,
     text: () =>
       'Steward: some workplaces stand empty for lack of hands. More houses bring more workers; or raise the priority of the work that matters and give less to the rest.',
   },
   {
     id: 'no-fields',
     when: (s) => s.buildings.some((b) => b.type === 'farm' && b.build >= 1 && !s.buildings.some((z) => z.owner === b.id)),
+    at: (s) => s.buildings.find((b) => b.type === 'farm' && b.build >= 1 && !s.buildings.some((z) => z.owner === b.id)),
     text: () => 'Steward: our farmstead has no fields. Choose Field in the Farming menu and draw it beside the farm: click one corner, then the other.',
   },
   {
     id: 'no-pasture',
     when: (s) => s.buildings.some((b) => (b.type === 'byre' || b.type === 'orchardist') && b.build >= 1 && !s.buildings.some((z) => z.owner === b.id)),
+    at: (s) => s.buildings.find((b) => (b.type === 'byre' || b.type === 'orchardist') && b.build >= 1 && !s.buildings.some((z) => z.owner === b.id)),
     text: () => 'Steward: the animal farm or orchard lodge has nothing to tend. Draw a pasture or plant an orchard next to it.',
   },
   {
     id: 'mills',
     when: (s) => s.tier >= 1 && s.res.grain >= 100 && millMonths(s) > 4,
+    at: (s) => s.buildings.find((b) => b.type === 'windmill' && b.build >= 1) ?? s.buildings.find((b) => b.type === 'granary'),
     text: (s) => {
       const mills = s.buildings.filter((b) => b.type === 'windmill' && b.build >= 1).length;
       // The bakers rest once the bread in store reaches its target: more mills would not help.
@@ -131,6 +137,7 @@ const ADVICE: Advice[] = [
   {
     id: 'tavern-dry',
     when: (s) => s.buildings.some((b) => b.type === 'tavern' && b.build >= 1 && b.blocked === 1),
+    at: (s) => s.buildings.find((b) => b.type === 'tavern' && b.build >= 1 && b.blocked === 1),
     text: (s) => {
       const brewers = s.buildings.filter((b) => b.type === 'brewhouse' && b.build >= 1).length;
       if (s.res.barley >= 20)
@@ -143,6 +150,7 @@ const ADVICE: Advice[] = [
   {
     id: 'clothes',
     when: (s) => s.res.clothes < 1 && s.buildings.some((b) => b.type === 'house' && b.level >= 2 && b.unmet?.includes('Clothes')),
+    at: (s) => s.buildings.find((b) => b.type === 'house' && b.level >= 2 && b.unmet?.includes('Clothes')),
     text: () => 'Steward: the families in Timber Houses need clothes. Shear sheep or grow flax, weave cloth and have a tailor sew it, or buy clothes at the market.',
   },
   {
@@ -158,12 +166,14 @@ const ADVICE: Advice[] = [
   {
     id: 'storage',
     when: (s) => storageCap(s, 'materials') > 0 && stored(s, 'materials') >= storageCap(s, 'materials') - 5,
+    at: (s) => s.buildings.find((b) => b.type === 'storehouse'),
     text: (s) =>
       `Steward: the storehouses are full${piles(s, 'materials')}, so quarries and woodcutters stand idle. Build another Storehouse, sell the surplus, or lower some stock targets.`,
   },
   {
     id: 'granary',
     when: (s) => storageCap(s, 'food') > 0 && stored(s, 'food') >= storageCap(s, 'food') - 5,
+    at: (s) => s.buildings.find((b) => b.type === 'granary'),
     text: (s) =>
       `Steward: the granaries are full${piles(s, 'food')}, so the harvest and the hunt go to waste. Build a Granary or sell what we cannot eat.`,
   },
@@ -204,7 +214,7 @@ export function advise(s: GameState, month: number): void {
     const last = s.advice[a.id] ?? -Infinity;
     if (s.day - last < COOLDOWN || !a.when(s, month)) continue;
     s.advice[a.id] = s.day;
-    log(s, a.text(s), 'advice');
+    log(s, a.text(s), 'advice', a.at?.(s));
     return;
   }
 }
