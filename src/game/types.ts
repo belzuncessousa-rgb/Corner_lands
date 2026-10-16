@@ -304,6 +304,8 @@ export interface GameState {
   year?: { pop: number; gold: number; prestige: number; arrived: number; left: number; built: number; harvest: number; stock?: Partial<Record<ResourceId, number>>; hungry?: number };
   /** Years that ended with no one having gone hungry. */
   fedYears?: number;
+  /** The cathedral holds a relic (bought from a travelling friar). */
+  relic?: boolean;
   /** The settlement's name, chosen when founding it. */
   name?: string;
   /** Works of art commissioned with prestige (see COMMISSIONS). */

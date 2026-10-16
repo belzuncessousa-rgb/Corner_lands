@@ -1342,3 +1342,41 @@ describe('town score', () => {
     expect(s.fedYears).toBe(1);
   });
 });
+
+describe('new events', () => {
+  it('each choice of the six new events applies cleanly where it is offered', async () => {
+    const { EVENTS } = await import('../src/game/events');
+    for (const id of ['pilgrims', 'comet', 'flood', 'beekeeper', 'border', 'relic']) {
+      const e = EVENTS.find((x) => x.id === id)!;
+      expect(e, id).toBeTruthy();
+      for (let i = 0; i < e.choices(generateWorld(1)).length; i++) {
+        const s = generateWorld(30 + i);
+        s.tier = 4;
+        s.res.gold = 5000;
+        s.res.prestige = 500;
+        s.res.wood = 100;
+        s.res.grain = 100;
+        s.res.bread = 200;
+        s.retinue = true;
+        s.population = 40;
+        const hall = s.buildings.find((b) => b.type === 'townhall')!;
+        for (const t of ['church', 'granary', 'cathedral'] as BuildingType[]) {
+          let done = false;
+          for (let r = 3; r < 30 && !done; r++)
+            for (let dy = -r; dy <= r && !done; dy++)
+              for (let dx = -r; dx <= r && !done; dx++)
+                if (!placementError(s, t, hall.x + dx, hall.y + dy)) {
+                  placeOrder(s, t, hall.x + dx, hall.y + dy)!.build = 1;
+                  done = true;
+                }
+        }
+        expect(e.weight(s, 1), id).toBeGreaterThan(0);
+        const c = e.choices(s)[i];
+        expect(c.blocked?.(s) ?? null, `${id} ${c.label}`).toBeNull();
+        const out = c.apply(s, { next: () => 0.5 } as never);
+        expect(out.text.length, `${id} ${c.label}`).toBeGreaterThan(5);
+        for (const k of Object.keys(s.res)) expect(s.res[k as keyof typeof s.res], `${id} ${k}`).toBeGreaterThanOrEqual(0);
+      }
+    }
+  });
+});

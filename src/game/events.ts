@@ -1105,6 +1105,208 @@ export const EVENTS: DecisionEvent[] = [
       },
     ],
   },
+  {
+    id: 'pilgrims',
+    title: 'Pilgrims on the Road',
+    text: (s) =>
+      `A band of pilgrims on the way to a distant shrine asks to rest a while${s.buildings.some((b) => b.type === 'cathedral' && b.build >= 1) ? ', and to pray in your famous cathedral' : ''}. They have coin to spend, and long stories to tell.`,
+    weight: (s) => (s.tier >= 2 && s.buildings.some((b) => (b.type === 'church' || b.type === 'cathedral') && b.build >= 1) ? 2 : 0),
+    choices: (s) => {
+      const holy = s.buildings.some((b) => b.type === 'cathedral' && b.build >= 1);
+      return [
+        {
+          label: 'Lodge and feed them',
+          detail: `−30 food. +${holy ? 160 : 90} coins, +${holy ? 10 : 5} prestige.`,
+          blocked: (st) => (food(st) >= 30 ? null : 'Needs 30 food'),
+          apply: (st) => {
+            takeFood(st, 30);
+            st.res.gold += holy ? 160 : 90;
+            st.res.prestige += holy ? 10 : 5;
+            return { text: 'The pilgrims filled the tavern, paid in good silver and carried word of your town down the road.', kind: 'good' };
+          },
+        },
+        {
+          label: 'Let them camp by the church',
+          detail: 'Happiness +3 for two months.',
+          apply: (st) => {
+            addMood(st, 'Pilgrims singing at the church', 3, 2);
+            return { text: 'Their hymns drifted over the rooftops each evening.', kind: 'good' };
+          },
+        },
+        {
+          label: 'Wish them a safe road',
+          detail: 'Nothing happens.',
+          apply: () => ({ text: 'The pilgrims walked on toward the hills.', kind: 'info' }),
+        },
+      ];
+    },
+  },
+  {
+    id: 'comet',
+    title: 'A Star with a Tail',
+    text: () => 'For three nights a bright star with a fiery tail has hung over the forest. The villagers gather in the lanes to stare, and whisper about what it foretells.',
+    weight: (s) => (s.population >= 15 ? 0.8 : 0),
+    choices: (s) => [
+      {
+        label: 'Proclaim it a sign of good fortune',
+        detail: '−5 prestige. Happiness +4 for three months.',
+        blocked: (st) => need(st, 'prestige', 5, 'prestige'),
+        apply: (st) => {
+          st.res.prestige -= 5;
+          addMood(st, 'A lucky star', 4, 3);
+          return { text: 'Your herald declared the star a blessing on your house. The lanes are cheerful again.', kind: 'good' };
+        },
+      },
+      {
+        label: 'Hold a night vigil at the church',
+        detail: 'Needs a church. Happiness +6 for two months, +3 prestige.',
+        blocked: () => (s.buildings.some((b) => (b.type === 'church' || b.type === 'cathedral') && b.build >= 1) ? null : 'Needs a church'),
+        apply: (st) => {
+          addMood(st, 'The vigil under the comet', 6, 2);
+          st.res.prestige += 3;
+          return { text: 'Candles burned all night; by dawn the fear had turned to wonder.', kind: 'good' };
+        },
+      },
+      {
+        label: 'Pay it no mind',
+        detail: 'Happiness −3 for two months.',
+        apply: (st) => {
+          addMood(st, 'Whispers about the comet', -3, 2);
+          return { text: 'The whispers went on for weeks, until the star faded.', kind: 'bad' };
+        },
+      },
+    ],
+  },
+  {
+    id: 'flood',
+    title: 'The River Rises',
+    text: () => 'Weeks of spring rain have swollen the river. The water is creeping over the low meadows and towards the granaries.',
+    weight: (s, month) => (month <= 2 && s.buildings.some((b) => b.type === 'granary' && b.build >= 1) ? 1.2 : 0),
+    choices: () => [
+      {
+        label: 'Raise earth banks',
+        detail: '−30 timber. The stores stay dry.',
+        blocked: (st) => need(st, 'wood', 30, 'timber'),
+        apply: (st) => {
+          st.res.wood -= 30;
+          return { text: 'Every hand dug and staked through the night. The banks held.', kind: 'good' };
+        },
+      },
+      {
+        label: 'Carry the grain to high ground',
+        detail: 'Lose a tenth of the grain and flour; happiness −2 for a month.',
+        apply: (st) => {
+          const lost = Math.floor(st.res.grain * 0.1) + Math.floor(st.res.flour * 0.1);
+          st.res.grain -= Math.floor(st.res.grain * 0.1);
+          st.res.flour -= Math.floor(st.res.flour * 0.1);
+          addMood(st, 'Wet feet and lost sacks', -2, 1);
+          return { text: `Most of the stores were saved, but ${lost} sacks were spoiled by the flood.`, kind: 'bad' };
+        },
+      },
+    ],
+  },
+  {
+    id: 'beekeeper',
+    title: 'The Beekeeper',
+    text: () => 'An old beekeeper with a cart of straw skeps offers to settle a few hives on your meadows, if the price is right.',
+    weight: (s) => (s.tier >= 1 ? 1.2 : 0),
+    choices: () => [
+      {
+        label: 'Buy his honey',
+        detail: '−40 coins. +20 honey.',
+        blocked: (st) => need(st, 'gold', 40, 'coins'),
+        apply: (st) => {
+          st.res.gold -= 40;
+          store(st, 'honey', 20);
+          return { text: 'Twenty pots of golden honey went into the stores.', kind: 'good' };
+        },
+      },
+      {
+        label: 'Let his bees work the meadows',
+        detail: '−25 coins. Happiness +2 for half a year (the orchards bloom).',
+        blocked: (st) => need(st, 'gold', 25, 'coins'),
+        apply: (st) => {
+          st.res.gold -= 25;
+          addMood(st, 'Bees in the meadows', 2, 6);
+          return { text: 'All summer the meadows hummed, and the orchards were thick with blossom.', kind: 'good' };
+        },
+      },
+      {
+        label: 'No, thank you',
+        detail: 'Nothing happens.',
+        apply: () => ({ text: 'The beekeeper rattled away with his skeps.', kind: 'info' }),
+      },
+    ],
+  },
+  {
+    id: 'border',
+    title: 'A Quarrel over the Forest',
+    text: () => "A neighbouring lord claims the forest on your eastern edge and his foresters have been seen marking trees. His steward waits at the manor for your answer.",
+    weight: (s) => (s.tier >= 3 ? 1.2 : 0),
+    choices: (s) => [
+      {
+        label: 'Pay him to drop the claim',
+        detail: '−200 coins.',
+        blocked: (st) => need(st, 'gold', 200, 'coins'),
+        apply: (st) => {
+          st.res.gold -= 200;
+          return { text: 'The steward counted the silver twice, and the claim was forgotten.', kind: 'info' };
+        },
+      },
+      {
+        label: 'Send your guard to the border',
+        detail: s.retinue ? '+20 prestige; happiness +3 for three months.' : 'Needs the lord\'s guard (raised at the manor).',
+        blocked: (st) => (st.retinue ? null : "Needs the lord's guard"),
+        apply: (st) => {
+          st.res.prestige += 20;
+          addMood(st, 'The border held', 3, 3);
+          return { text: "Your men-at-arms rode out under your banner. The neighbour's foresters fled without a word.", kind: 'good' };
+        },
+      },
+      {
+        label: 'Let him have it',
+        detail: '−15 prestige; happiness −3 for four months.',
+        apply: (st) => {
+          st.res.prestige = Math.max(0, st.res.prestige - 15);
+          addMood(st, 'We gave up the eastern wood', -3, 4);
+          return { text: 'The villagers grumble that their lord gave away good timber without a fight.', kind: 'bad' };
+        },
+      },
+    ],
+  },
+  {
+    id: 'relic',
+    title: 'A Holy Relic',
+    text: () => 'A travelling friar offers a relic in a silver casket: a finger bone of a saint, he swears. Pilgrims would come from far and wide to see it in your cathedral.',
+    weight: (s) => (s.buildings.some((b) => b.type === 'cathedral' && b.build >= 1) && !s.relic ? 1 : 0),
+    choices: () => [
+      {
+        label: 'Buy the relic for the cathedral',
+        detail: '−400 coins. +30 prestige; happiness +5 for half a year.',
+        blocked: (st) => need(st, 'gold', 400, 'coins'),
+        apply: (st) => {
+          st.res.gold -= 400;
+          st.res.prestige += 30;
+          st.relic = true;
+          addMood(st, 'The saint in our cathedral', 5, 6);
+          return { text: 'The relic was carried to the cathedral in procession, with candles and bells.', kind: 'good' };
+        },
+      },
+      {
+        label: 'Ask the bishop whether it is genuine',
+        detail: '−5 prestige. You may hear more.',
+        apply: (st) => {
+          st.res.prestige = Math.max(0, st.res.prestige - 5);
+          return { text: 'The bishop wrote back that he has seen that very bone in three other towns. The friar has vanished.', kind: 'info' };
+        },
+      },
+      {
+        label: 'Send the friar away',
+        detail: 'Nothing happens.',
+        apply: () => ({ text: 'The friar packed his casket and went to try his luck elsewhere.', kind: 'info' }),
+      },
+    ],
+  },
 ];
 
 /** Days between decision events (randomised in this range). */
