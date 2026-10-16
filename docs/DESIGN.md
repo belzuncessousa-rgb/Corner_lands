@@ -314,7 +314,7 @@ The 3D view (built from the game's own drawings) and the first gridless steps (b
 
 ### Phase 30 — More life in the flat look
 - [x] Chickens pecking about the yards of lived-in homes (spring to autumn)
-- [ ] Children playing in the lanes near homes, and neighbours stopping to chat
+- [x] Children playing in the lanes near homes, and neighbours stopping to chat
 - [x] Bakery ovens glowing at the mouth, and steam from the brewhouse
 - [x] Harvest sheaves stooked in the fields after the harvest, and hay ricks by the farmsteads in autumn
 - [x] Icicles and snow-heavy roofs in deep winter

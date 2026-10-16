@@ -961,8 +961,16 @@ export class Renderer {
       const [hx, hy] = iso(b.x + 1.0, b.y + 1.42, 34);
       drawSails(c, hx, hy, this.time * 0.9 + b.id, season);
     }
-    if (b.type === 'house' && b.residents > 0 && season !== 3 && !this.light && (b.id * 2654435761) % 3 === 0) this.drawChickens(b);
+    const yard = b.type === 'house' && !this.light && this.yardClear(s, b);
+    if (yard && b.residents > 0 && season !== 3 && (b.id * 2654435761) % 3 === 0) this.drawChickens(b);
     if (b.type === 'farm' && b.build >= 1 && monthOf(s.day) >= 7) this.drawHayRick(b, season);
+    if (yard && b.residents > 1 && this.dusk < 0.3) {
+      const hsh = ((b.id * 2654435761) >>> 0) >>> 9;
+      // Children come out to play for a while, then go back in.
+      if (hsh % 3 === 1 && Math.sin(this.time * 0.05 + b.id) > -0.2) this.drawChildren(b, season);
+      // Neighbours stop at the door to chat now and then.
+      if (hsh % 4 === 2 && Math.sin(this.time * 0.04 + b.id * 1.7) > 0.25) this.drawGossips(b, season);
+    }
     if (b.type === 'bakery' && b.build >= 1 && b.workers > 0 && !b.paused && (b.output > 0 || b.lastOutput > 0)) {
       // The oven mouth glows and flickers while the baker bakes.
       const [ox, oy] = iso(b.x + 1.6, b.y + 0.85, 0);
@@ -1174,6 +1182,145 @@ export class Renderer {
     c.quadraticCurveTo(sx, sy - 26, sx + 9.5, sy - 11);
     c.quadraticCurveTo(sx, sy - 17, sx - 9.5, sy - 11);
     c.fill();
+  }
+
+  /**
+   * Whether the ground in front of a building's door is open, so yard life
+   * drawn there is not hidden behind the next building along.
+   */
+  private yardClear(s: GameState, b: Building): boolean {
+    for (let dy = 0; dy < 2; dy++) {
+      const y = b.y + b.h + dy;
+      if (y >= s.height) return false;
+      for (let x = b.x; x < b.x + b.w; x++) {
+        const i = y * s.width + x;
+        if (s.occ[i] >= 0 || s.terrain[i]) return false;
+      }
+    }
+    return true;
+  }
+
+  /** A small standing or running figure, used for the lane folk by homes. */
+  private drawFolk(sx: number, sy: number, scale: number, tunic: string, hair: string, run: number, face: number, winter: boolean): void {
+    const c = this.ctx;
+    c.save();
+    c.translate(sx, sy);
+    c.scale(scale, scale);
+    const bob = Math.abs(Math.sin(run)) * 1.2 * (run ? 1 : 0);
+    const leg = run ? Math.sin(run) * 2 : 0;
+    c.fillStyle = 'rgba(20,20,10,0.28)';
+    c.beginPath();
+    c.ellipse(0, 0, 4, 1.8, 0, 0, Math.PI * 2);
+    c.fill();
+    c.strokeStyle = '#3a2c20';
+    c.lineWidth = 1.4;
+    c.beginPath();
+    c.moveTo(-1, -4 - bob);
+    c.lineTo(-1 + leg, 0);
+    c.moveTo(1, -4 - bob);
+    c.lineTo(1 - leg, 0);
+    c.stroke();
+    c.fillStyle = tunic;
+    c.beginPath();
+    c.moveTo(-3, -4 - bob);
+    c.lineTo(3, -4 - bob);
+    c.lineTo(2.4, -10.5 - bob);
+    c.lineTo(-2.4, -10.5 - bob);
+    c.closePath();
+    c.fill();
+    if (winter) {
+      // A woollen shawl over the shoulders.
+      c.fillStyle = '#8a6a4a';
+      c.fillRect(-2.8, -10.8 - bob, 5.6, 2);
+    }
+    c.fillStyle = '#e8c4a0';
+    c.beginPath();
+    c.arc(face * 0.4, -12.5 - bob, 2.2, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = hair;
+    c.beginPath();
+    c.arc(face * 0.4, -13.2 - bob, 2.2, Math.PI, 0);
+    c.fill();
+    c.restore();
+  }
+
+  /** Two children chasing each other (or a ball) round a home's front yard. */
+  private drawChildren(b: Building, season: Season): void {
+    const c = this.ctx;
+    const n = 1 + (b.id % 2);
+    const cx = b.x + b.w * 0.5;
+    const cy = b.y + b.h + 0.45;
+    const tunics = ['#7a9ab8', '#c07850', '#8aa060', '#b89048'];
+    const hairs = ['#e0c070', '#6a4428', '#3a2818'];
+    const t = this.time * 0.9 + b.id;
+    for (let k = 0; k < n; k++) {
+      const a = t + k * 2.4;
+      const x = cx + Math.cos(a) * 0.55;
+      const y = cy + Math.sin(a) * 0.22;
+      const [sx, sy] = iso(x, y);
+      const face = -Math.sin(a) > 0 ? 1 : -1;
+      this.drawFolk(sx, sy, 0.68, tunics[(b.id + k) % tunics.length], hairs[(b.id + k * 2) % hairs.length], this.time * 9 + k, face, season === 3);
+    }
+    if (n === 1 && season !== 3) {
+      // A lone child bounces a leather ball.
+      const [bx, by] = iso(cx + Math.cos(t - 0.5) * 0.55, cy + Math.sin(t - 0.5) * 0.22);
+      const hop = Math.abs(Math.sin(this.time * 6)) * 5;
+      c.fillStyle = '#8a5a30';
+      c.beginPath();
+      c.arc(bx, by - 1.2 - hop, 1.3, 0, Math.PI * 2);
+      c.fill();
+    }
+    if (season === 3) {
+      // A snowman they have built by the door.
+      const [mx, my] = iso(b.x + b.w - 0.25, b.y + b.h + 0.3);
+      c.fillStyle = '#f6f8fa';
+      c.strokeStyle = 'rgba(120,140,160,0.6)';
+      c.lineWidth = 0.6;
+      for (const [r, z] of [[3, 3], [2.2, 7.6], [1.6, 11]] as const) {
+        c.beginPath();
+        c.arc(mx, my - z, r, 0, Math.PI * 2);
+        c.fill();
+        c.stroke();
+      }
+      c.fillStyle = '#e07830';
+      c.fillRect(mx, my - 11.2, 1.8, 0.6);
+    }
+  }
+
+  /** Two neighbours standing at a home's door, talking with their hands. */
+  private drawGossips(b: Building, season: Season): void {
+    const c = this.ctx;
+    const x = b.x + 0.4 + ((b.id * 7) % 3) * 0.2;
+    const y = b.y + b.h + 0.3;
+    const [ax, ay] = iso(x, y);
+    const [bx, by] = iso(x + 0.42, y + 0.06);
+    const tunics = ['#9a5a48', '#5a7a8a', '#7a6a9a', '#a08850', '#6a8a5a'];
+    this.drawFolk(ax, ay, 1, tunics[b.id % tunics.length], '#5a3a22', 0, 1, season === 3);
+    this.drawFolk(bx, by, 1, tunics[(b.id + 2) % tunics.length], '#2a2018', 0, -1, season === 3);
+    // Whoever is talking lifts a hand, and a little speech mark rises now and then.
+    const talk = Math.sin(this.time * 1.3 + b.id) > 0;
+    const [hx, hy] = talk ? [ax + 3, ay - 9 - Math.abs(Math.sin(this.time * 5)) * 1.5] : [bx - 3, by - 9 - Math.abs(Math.sin(this.time * 5)) * 1.5];
+    c.strokeStyle = '#e8c4a0';
+    c.lineWidth = 1.2;
+    c.beginPath();
+    c.moveTo(talk ? ax + 2 : bx - 2, (talk ? ay : by) - 9.5);
+    c.lineTo(hx, hy);
+    c.stroke();
+    const ph = (this.time * 0.6 + b.id) % 3;
+    if (ph < 1.2) {
+      const [px, py] = talk ? [ax, ay] : [bx, by];
+      c.globalAlpha = Math.min(1, ph * 3) * (1 - ph / 1.2);
+      c.fillStyle = '#fbf6ea';
+      c.strokeStyle = 'rgba(80,60,40,0.6)';
+      c.lineWidth = 0.7;
+      c.beginPath();
+      c.ellipse(px + (talk ? 3 : -3), py - 20 - ph * 3, 3.6, 2.4, 0, 0, Math.PI * 2);
+      c.fill();
+      c.stroke();
+      c.fillStyle = 'rgba(80,60,40,0.8)';
+      for (let i = -1; i <= 1; i++) c.fillRect(px + (talk ? 3 : -3) + i * 1.3 - 0.35, py - 20.3 - ph * 3, 0.7, 0.7);
+      c.globalAlpha = 1;
+    }
   }
 
   /** Two or three hens pecking about a home's front yard. */
