@@ -1225,3 +1225,14 @@ describe('titles', () => {
     expect(s.milestones!.map((m) => m.id)).toEqual(expect.arrayContaining(['title1', 'title2', 'title3']));
   });
 });
+
+describe('year in review', () => {
+  it('names the goods that piled up and ran down over the year', async () => {
+    const { playBot } = await import('../src/game/autoplay');
+    const s = generateWorld(12);
+    playBot(s, 3, 3);
+    const review = s.messages.map((m) => m.text).filter((t) => t.includes('in review'));
+    expect(review.length).toBeGreaterThan(0);
+    expect(review.some((t) => /Stocked up: [a-z ]+ \(\+\d+\)/.test(t))).toBe(true);
+  });
+});

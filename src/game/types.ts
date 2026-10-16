@@ -299,7 +299,7 @@ export interface GameState {
   festivals?: Record<string, number>;
   festivalDay?: { id: string; day: number };
   /** This year's tally for the year-end page of the chronicle. */
-  year?: { pop: number; gold: number; prestige: number; arrived: number; left: number; built: number; harvest: number };
+  year?: { pop: number; gold: number; prestige: number; arrived: number; left: number; built: number; harvest: number; stock?: Partial<Record<ResourceId, number>> };
   /** The lord's rank: 0 Lord, 1 Baron, 2 Earl, 3 Duke (see TITLES). */
   title?: number;
   /** Woods the woodcutters leave standing (tile rectangles). */

@@ -1429,9 +1429,27 @@ export function chainReport(s: GameState, links: ResourceId[]): { links: ChainLi
 }
 
 /** A page for the chronicle as each year ends: how the lands fared. */
+/** Stored goods at a moment, for the year's rises and falls. */
+function stockSnapshot(s: GameState): Partial<Record<ResourceId, number>> {
+  const out: Partial<Record<ResourceId, number>> = {};
+  for (const id of RESOURCE_IDS) if (RESOURCE_STORAGE[id] && s.res[id] >= 1) out[id] = Math.floor(s.res[id]);
+  return out;
+}
+
+/** "planks (+120) and tools (+30)": the largest changes one way over the year. */
+function stockChanges(s: GameState, before: Partial<Record<ResourceId, number>>, sign: 1 | -1): string {
+  return RESOURCE_IDS.filter((id) => RESOURCE_STORAGE[id])
+    .map((id) => ({ id, d: Math.floor(s.res[id]) - (before[id] ?? 0) }))
+    .filter((x) => x.d * sign >= 20)
+    .sort((a, b) => (b.d - a.d) * sign)
+    .slice(0, 3)
+    .map((x) => `${GOODS[x.id].name.toLowerCase()} (${x.d > 0 ? '+' : ''}${x.d})`)
+    .join(', ');
+}
+
 function yearInReview(s: GameState): void {
   const y = s.year;
-  s.year = { pop: s.population, gold: s.res.gold, prestige: s.res.prestige, arrived: 0, left: 0, built: 0, harvest: 0 };
+  s.year = { pop: s.population, gold: s.res.gold, prestige: s.res.prestige, arrived: 0, left: 0, built: 0, harvest: 0, stock: stockSnapshot(s) };
   if (!y) return;
   const done = yearOf(s.day) - 1;
   const parts: string[] = [];
@@ -1446,7 +1464,14 @@ function yearInReview(s: GameState): void {
   parts.push(`the treasury ${gold >= 0 ? 'gained' : 'lost'} ${Math.abs(gold)} coins`);
   const prestige = Math.round(s.res.prestige - y.prestige);
   if (prestige) parts.push(`${prestige > 0 ? '+' : ''}${prestige} prestige`);
-  log(s, `The year ${done} in review: ${parts.join(', ')}.`, 'good');
+  let stock = '';
+  if (y.stock) {
+    const up = stockChanges(s, y.stock, 1);
+    const down = stockChanges(s, y.stock, -1);
+    if (up) stock += ` Stocked up: ${up}.`;
+    if (down) stock += ` Ran down: ${down}.`;
+  }
+  log(s, `The year ${done} in review: ${parts.join(', ')}.${stock}`, 'good');
 }
 
 /** The day's harvest across every farm, summed up in one message. */
@@ -2532,7 +2557,7 @@ export function nextTierRequirements(s: GameState): string[] {
 
 export function stepDay(s: GameState): void {
   const rng = new StateRng(s);
-  s.year ??= { pop: s.population, gold: s.res.gold, prestige: s.res.prestige, arrived: 0, left: 0, built: 0, harvest: 0 };
+  s.year ??= { pop: s.population, gold: s.res.gold, prestige: s.res.prestige, arrived: 0, left: 0, built: 0, harvest: 0, stock: stockSnapshot(s) };
   recompute(s);
   dailyConstruction(s);
   dailyOrchards(s);
