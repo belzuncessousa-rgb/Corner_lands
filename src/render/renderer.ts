@@ -362,6 +362,7 @@ export class Renderer {
       const d = Math.max(tx + ty, this.boost[ty * W + tx]);
       this.buckets[Math.min(nb - 1, d)].push(ai * 4 + 3);
     });
+    if (!this.light) this.drawPuddles(s, season, dt, visible);
     if (!this.light && season !== 3) {
       this.drawDucks(s, visible);
       this.drawBoats(s, visible);
@@ -1405,6 +1406,54 @@ export class Renderer {
     }
   }
 
+  /** How wet the lanes are: up with the rain, then drying over the next days. */
+  private wetness = 0;
+
+  /** Puddles in the ruts of dirt lanes after rain, rippling while it still falls. */
+  private drawPuddles(s: GameState, season: Season, dt: number, visible: (x: number, y: number) => boolean): void {
+    const goal = season === 3 ? 0 : showeryDay(s.day) ? 1 : showeryDay(s.day - 1) ? 0.65 : showeryDay(s.day - 2) ? 0.3 : 0;
+    this.wetness += Math.max(-dt * 0.05, Math.min(dt * 0.08, goal - this.wetness));
+    if (this.wetness < 0.03) return;
+    const W = s.width;
+    const c = this.ctx;
+    const raining = showeryDay(s.day);
+    for (let i = 0; i < s.road.length; i++) {
+      if (s.road[i] !== 1 || s.terrain[i] || s.occ[i] >= 0) continue;
+      const h = (Math.imul(i, 2654435761) >>> 0) % 7;
+      if (h > 2) continue;
+      const x = (i % W) + 0.3 + h * 0.18;
+      const y = ((i / W) | 0) + 0.65 - h * 0.12;
+      const [sx, sy] = iso(x, y);
+      if (!visible(sx, sy)) continue;
+      // Smaller puddles dry first.
+      const size = (0.5 + h * 0.3) * Math.min(1, this.wetness * (1.4 - h * 0.15));
+      if (size < 0.15) continue;
+      const rx = 9 * size;
+      const ry = 3.8 * size;
+      c.fillStyle = 'rgba(70,82,92,0.32)';
+      c.beginPath();
+      c.ellipse(sx, sy, rx + 1, ry + 0.6, 0, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = 'rgba(160,190,210,0.55)';
+      c.beginPath();
+      c.ellipse(sx, sy, rx, ry, 0, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = 'rgba(235,245,250,0.55)';
+      c.beginPath();
+      c.ellipse(sx - rx * 0.3, sy - ry * 0.25, rx * 0.35, ry * 0.25, 0, 0, Math.PI * 2);
+      c.fill();
+      if (raining) {
+        // Rain rings spreading on the water.
+        const ph = (this.time * 1.7 + h * 0.37 + i * 0.13) % 1;
+        c.strokeStyle = `rgba(240,248,252,${0.6 * (1 - ph)})`;
+        c.lineWidth = 0.5;
+        c.beginPath();
+        c.ellipse(sx + ((i * 3) % 5) - 2, sy, rx * 0.6 * ph + 0.3, ry * 0.6 * ph + 0.2, 0, 0, Math.PI * 2);
+        c.stroke();
+      }
+    }
+  }
+
   /** For each fishery, the open water tile its boat rows out to (or -1). */
   private boatSpots = new Map<number, number>();
 
@@ -2188,7 +2237,8 @@ export class Renderer {
 
   /** Spring brings a passing shower about one day in three, chosen by the date. */
   private drawRain(s: GameState, season: Season, dt: number, wrap: (f: { x: number; y: number }) => void): void {
-    const showery = season === 0 && s.day > 10 && ((s.day * 2654435761) >>> 0) % 3 === 0;
+    const showery = showeryDay(s.day);
+    void season;
     const goal = showery ? 1 : 0;
     this.rainLevel += Math.max(-dt * 0.4, Math.min(dt * 0.4, goal - this.rainLevel));
     if (this.rainLevel <= 0.01) {
@@ -2733,4 +2783,9 @@ function organicOutline(b: { x: number; y: number; w: number; h: number }, inset
   side(x0, y1 - r, x0, y0 + r, 1, 0);
   arc(x0 + r, y0 + r, Math.PI);
   return pts;
+}
+
+/** Spring days with showers (the same every playthrough, so puddles follow the rain). */
+function showeryDay(day: number): boolean {
+  return seasonOf(day) === 0 && day > 10 && ((day * 2654435761) >>> 0) % 3 === 0;
 }
