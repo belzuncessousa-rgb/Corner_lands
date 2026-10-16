@@ -258,3 +258,8 @@ Note from the morning run: the 30-year soak's famine on seed 3 comes from its ra
 - [x] Unground grain in big towns: a Year-17 bot city had 626 sacks of grain waiting while the steward asked for mills. Find out why the mills lag (hands, flour storage, distance) and fix the cause in the game if it is not just the bot (Found: the bakers rest once bread reaches its stock target, so the surplus is wheat, not hunger. The steward now counts food by how many it feeds and points to the bread target instead of asking for mills.)
 - [x] The steward's advice gets a "show me" link to the building or spot it is about, like the harvest toasts
 - [x] A seasonal goal on the objectives panel for players past City: "this year: raise prestige by 200", "this year: no one goes hungry"
+
+### Phase 20 — Ideas for the next runs
+- [ ] Prestige still piles up past Duke (2,000–2,600 at year 30): a few repeatable prestige uses, e.g. commission a tapestry or a stained-glass window for the cathedral (+happiness, one each)
+- [ ] The save server test failed once under load, right after a typecheck; give its server start a readiness wait so it cannot race
+- [ ] Look again at mobile layout with the new build-bar tab (Protect) and the longer objectives panel at 360 px wide
