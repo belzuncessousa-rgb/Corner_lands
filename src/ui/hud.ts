@@ -1763,7 +1763,7 @@ export class Hud {
       <div class="sub">Raise a humble hamlet into a thriving medieval city</div>
       <div class="ornament">❦ ❦ ❦</div>
       <div class="menu">
-        ${latest ? `<button class="primary" data-m="continue">Continue <small>(${esc(latest.summary)})</small></button>` : ''}
+        ${latest ? `<button class="primary" data-m="continue">Continue <small>(${esc(latest.summary.split(' — ')[0])})</small></button>` : ''}
         <button class="${latest ? '' : 'primary'}" data-m="new">New Settlement</button>
         ${saves.length ? '<button data-m="load">Load Game</button>' : ''}
         <button data-m="help">How to Play</button>
@@ -2006,7 +2006,7 @@ export class Hud {
     const saves = await listSaves().catch(() => [] as SaveInfo[]);
     const list = saves
       .map(
-        (s, i) => `<div class="save">${s.thumb ? `<img class="thumb" src="${esc(s.thumb)}" alt="">` : ''}<div class="n">${s.slot.startsWith('autosave') ? '<i>Autosave</i>' : esc(s.slot)}<br><small>${esc(s.summary)} · ${new Date(s.updated).toLocaleString()} · ${s.where}</small></div>
+        (s, i) => `<div class="save">${s.thumb ? `<img class="thumb" src="${esc(s.thumb)}" alt="">` : ''}<div class="n">${s.slot.startsWith('autosave') ? '<i>Autosave</i>' : esc(s.slot)}<br><small>${esc(s.summary.split(' — ')[0])} · ${new Date(s.updated).toLocaleString()} · ${s.where}</small>${s.summary.includes(' — ') ? `<br><small class="deeds">${esc(s.summary.split(' — ')[1])}</small>` : ''}</div>
         <button class="primary" data-load="${i}">Load</button><button data-del="${i}" title="Delete">✖</button></div>`,
       )
       .join('');

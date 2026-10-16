@@ -1959,3 +1959,4 @@ table.prod td.num {
 }
 .mile small { color: var(--ink-soft); font-size: 12px; }
 @media (max-width: 600px) { .milestones { grid-template-columns: 1fr; } }
+.save .deeds { color: #8a6a2a; font-style: italic; }

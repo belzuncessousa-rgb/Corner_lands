@@ -252,4 +252,4 @@ Note from the morning run: the 30-year soak's famine on seed 3 comes from its ra
 - [x] Big cities run their larders thin (22 food for 568 villagers at year 30 without hunger, living on pottage): the food chip and steward should warn when the town eats grain as pottage month after month
 - [x] The market panel says when the next market day is, and the merchants' cart arrives on that day
 - [x] Colour check of the new overlays (protected woods, rain) with the colour-vision screenshots
-- [ ] A short "Lord's ledger of deeds" on the main menu's load cards: title, great works and milestones of each saved settlement
+- [x] A short "Lord's ledger of deeds" on the main menu's load cards: title, great works and milestones of each saved settlement

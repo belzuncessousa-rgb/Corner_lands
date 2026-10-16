@@ -2,7 +2,7 @@ import './ui/styles.css';
 import { deleteSave, listSaves, loadGame, saveGame } from './api';
 import { BUILDINGS, BUILD_ORDER, DAY_SECONDS, MONTH_NAMES, TIERS } from './game/data';
 import { playBot } from './game/autoplay';
-import { autoResolve } from './game/events';
+import { autoResolve, TITLES } from './game/events';
 import { StateRng } from './game/rng';
 import { deserialize, serialize } from './game/save';
 import {
@@ -227,7 +227,17 @@ export class Game {
 
   summary(): string {
     const s = this.state;
-    return `${TIERS[s.tier].name} · ${s.population} villagers · Year ${yearOf(s.day)}, ${MONTH_NAMES[monthOf(s.day)]}${s.relaxed ? ' · Relaxed' : s.hardy ? ' · Hardy' : ''}`;
+    const base = `${TIERS[s.tier].name} · ${s.population} villagers · Year ${yearOf(s.day)}, ${MONTH_NAMES[monthOf(s.day)]}${s.relaxed ? ' · Relaxed' : s.hardy ? ' · Hardy' : ''}`;
+    // Deeds for the load cards: the lord's title, great works and milestones.
+    const deeds: string[] = [];
+    if (s.title) deeds.push(TITLES[s.title].name);
+    for (const t of ['castle', 'cathedral', 'guildhall', 'belltower'] as const) {
+      const done = t === 'castle' ? s.tier >= TIERS.length - 1 : s.buildings.some((b) => b.type === t && b.build >= 1);
+      if (done) deeds.push(t === 'castle' ? 'Castle' : BUILDINGS[t].name);
+    }
+    const miles = (s.milestones ?? []).length;
+    if (miles) deeds.push(`${miles} milestone${miles > 1 ? 's' : ''}`);
+    return deeds.length ? `${base} — ${deeds.join(' · ')}` : base;
   }
 
   async save(slot: string): Promise<string> {
