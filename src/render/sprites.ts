@@ -745,12 +745,46 @@ function wallMaterial(color: string): Material | undefined {
 }
 
 /** Wall colour, roof tint and yard prop for each house variant. */
-const HOUSE_VARIANTS: { wall: string; tint: { color: string; t: number } | null; roof2: 'shingle' | 'tile' | 'slate'; prop: 'logs' | 'hive' | 'cart' | 'well' }[] = [
-  { wall: PLASTER_BASE, tint: null, roof2: 'shingle', prop: 'logs' },
-  { wall: '#dfbd88', tint: { color: '#5a3a1a', t: 0.35 }, roof2: 'tile', prop: 'hive' },
-  { wall: '#f6f2ea', tint: { color: '#f2d070', t: 0.32 }, roof2: 'slate', prop: 'cart' },
-  { wall: '#dcb6a4', tint: { color: '#6a665e', t: 0.42 }, roof2: 'shingle', prop: 'logs' },
+type HouseExtra = 'flowers' | 'laundry' | 'bench' | 'both';
+const HOUSE_VARIANTS: { wall: string; tint: { color: string; t: number } | null; roof2: 'shingle' | 'tile' | 'slate'; prop: 'logs' | 'hive' | 'cart' | 'well'; extra: HouseExtra }[] = [
+  { wall: PLASTER_BASE, tint: null, roof2: 'shingle', prop: 'logs', extra: 'flowers' },
+  { wall: '#dfbd88', tint: { color: '#5a3a1a', t: 0.35 }, roof2: 'tile', prop: 'hive', extra: 'laundry' },
+  { wall: '#f6f2ea', tint: { color: '#f2d070', t: 0.32 }, roof2: 'slate', prop: 'cart', extra: 'bench' },
+  { wall: '#dcb6a4', tint: { color: '#6a665e', t: 0.42 }, roof2: 'shingle', prop: 'logs', extra: 'both' },
 ];
+
+/**
+ * Small signs of the family inside: window boxes of flowers, washing on a
+ * line, a bench by the door. `front` is the y of the front wall, `wins` the
+ * x of the ground-floor windows and `wz` their sill height.
+ */
+function drawHouseExtra(p: Pen, extra: HouseExtra, season: Season, front: number, wins: number[], wz: number): void {
+  if ((extra === 'flowers' || extra === 'both') && season !== 3) {
+    const colors = season === 2 ? ['#d88a3a', '#b8482a'] : ['#e84a6a', '#f2d34a', '#f4f0e0', '#b97ae0'];
+    for (const x of wins) {
+      p.box(x - 0.03, front, x + 0.18, front + 0.06, wz - 2.5, 2.5, '#7b5a36');
+      for (let k = 0; k < 4; k++) p.circle(x + 0.0 + k * 0.05, front + 0.05, wz + 0.6, 1.1, colors[k % colors.length]);
+    }
+  }
+  if (extra === 'bench' || extra === 'both') {
+    // A plank bench against the wall beside the door.
+    p.box(1.1, front + 0.04, 1.42, front + 0.13, 2.5, 1.2, '#8a6a44');
+    p.line([1.13, front + 0.12, 0], [1.13, front + 0.12, 2.5], '#5e4129', 1);
+    p.line([1.39, front + 0.12, 0], [1.39, front + 0.12, 2.5], '#5e4129', 1);
+  }
+  if (extra === 'laundry' && season !== 3) {
+    // Washing drying on a line between two posts by the house.
+    const x = 1.98;
+    p.line([x, 0.55, 0], [x, 0.55, 13], '#5e4129', 1.1);
+    p.line([x, 1.45, 0], [x, 1.45, 13], '#5e4129', 1.1);
+    p.line([x, 0.55, 12.5], [x, 1.45, 12], '#d8cfc0', 0.6);
+    const cloth = ['#f2ece0', '#9ab0c8', '#c8a878', '#f2ece0'];
+    for (let k = 0; k < 4; k++) {
+      const y = 0.65 + k * 0.2;
+      p.wallR(x + 0.01, y, y + 0.13, 7 + (k % 2) * 1.5, 12.2, cloth[k]);
+    }
+  }
+}
 
 function drawBuilding(p: Pen, type: BuildingType, level: number, season: Season, variant = 0): V3[] {
   const smoke: V3[] = [];
@@ -788,6 +822,7 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
         p.doorL(1.62, 0.85, 0.22, 11);
         p.windowL(1.62, 0.38, 4, 0.16, 5, season === 3);
         p.windowL(1.62, 1.4, 4, 0.16, 5);
+        drawHouseExtra(p, hv.extra, season, 1.62, [0.38, 1.4], 4);
         for (const x of [0.35, 0.85, 1.4]) {
           p.windowL(1.67, x, 15, 0.14, 6, season === 3 && x > 1);
           p.windowL(1.72, x, 28, 0.14, 6);
@@ -820,6 +855,7 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
         p.doorL(1.6, 0.9, 0.2, 11);
         p.windowL(1.6, 0.42, 4, 0.14, 5);
         p.windowL(1.6, 1.4, 4, 0.14, 5);
+        drawHouseExtra(p, hv.extra, season, 1.6, [0.42, 1.4], 4);
         p.windowL(1.65, 0.45, 17, 0.14, 6, season === 3);
         p.windowL(1.65, 1.35, 17, 0.14, 6);
         p.windowR(1.8, 0.6, 17, 0.14, 6);
@@ -853,6 +889,7 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
         p.windowL(1.45, 1.32, 7, 0.14, 5);
         p.doorL(1.45, 0.9, 0.18, 11);
         p.windowR(1.65, 0.8, 7, 0.14, 5);
+        drawHouseExtra(p, hv.extra, season, 1.45, [0.52, 1.32], 7);
         p.roofX(0.35, 0.45, 1.65, 1.45, 17, 15, 'thatch', WALL, 0.13);
         smoke.push(p.chimney(1.3, 1.08, 24, 14, '#8a7d70'));
         if (!yard) drawHouseProp(p, hv.prop === 'hive' ? 'logs' : hv.prop, season);
