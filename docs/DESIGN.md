@@ -287,6 +287,6 @@ Note from the morning run: the 30-year soak's famine on seed 3 comes from its ra
 Note for later runs: when a feature players would notice goes in, add a line to the top of `src/ui/news.ts` (with the next number) so returning friends see it marked as new.
 
 ### Phase 25 — Ideas for the next runs
-- [ ] A link to share the land: the menu copies the game's address with `?seed=…`, and opening it goes straight to New Settlement with that seed
+- [x] A link to share the land: the menu copies the game's address with `?seed=…`, and opening it goes straight to New Settlement with that seed
 - [ ] Evening light: the day ends in a warm dusk with lit windows before the next morning (off in light mode)
 - [ ] A quiet tune for each season from the existing sound engine, with its own volume switch

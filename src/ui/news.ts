@@ -3,6 +3,7 @@
  * something worth telling returning players goes in; the number only grows.
  */
 export const NEWS: { n: number; text: string }[] = [
+  { n: 13, text: 'Copy a link to your land from the menu: friends who open it start on the same map' },
   { n: 12, text: 'Six new events: pilgrims, a comet, a spring flood, a beekeeper, a border quarrel and a holy relic' },
   { n: 11, text: 'Photo mode (U) hides the interface; Save a picture shares your town' },
   { n: 10, text: 'Name your town, race friends on the seed of the week and compare town scores' },

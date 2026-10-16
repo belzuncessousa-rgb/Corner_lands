@@ -162,7 +162,7 @@ then fall back to the browser's localStorage.
   seed of the week (the same land for everyone until Monday) and race your
   friends; download your town as a file (Save Game) and a
   friend opens it from Load Game to carry on; the game menu shows the map seed
-  to copy, so friends can found the same land, and "Save a picture" downloads
+  to copy (or a link that opens New Settlement on that land), and "Save a picture" downloads
   a captioned view of your town; photo mode (U) hides the interface. A town score (villagers, rank, title, great
   works, art, milestones and years without hunger) shows on the load cards.
 - **Tips** — the first time you open a panel or pick a tool, one short line

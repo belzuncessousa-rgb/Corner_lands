@@ -1841,8 +1841,8 @@ export class Hud {
     m.querySelector('[data-m="help"]')!.addEventListener('click', () => this.showHelp(true));
   }
 
-  showNewGame(fromMain: boolean): void {
-    const seed = Math.floor(Math.random() * 999999);
+  showNewGame(fromMain: boolean, presetSeed?: number): void {
+    const seed = presetSeed ?? Math.floor(Math.random() * 999999);
     const m = this.openModal(
       `<h2>New Settlement</h2>
       <div class="row"><label>Name</label><input id="town" value="${esc(placeName(seed))}" maxlength="40"><button data-m="rename" data-tip="Another name">🎲</button></div>
@@ -1998,7 +1998,7 @@ export class Hud {
         <button data-m="photo">Photo mode (U)</button>
         <button data-m="picture">📷 Save a picture</button>
       </div>
-      <div class="seed-line" data-tip="Start a New Settlement with this seed to play the same land.">Map seed <b>${this.game.state.seed}</b> <button data-m="seed">Copy</button></div>`,
+      <div class="seed-line" data-tip="Start a New Settlement with this seed to play the same land.">Map seed <b>${this.game.state.seed}</b> <button data-m="seed">Copy</button> <button data-m="seed-link" data-tip="A link that opens New Settlement on this land">Copy a link to this land</button></div>`,
     );
     m.querySelector('[data-m="resume"]')!.addEventListener('click', () => this.closeModal());
     m.querySelector('[data-m="save"]')!.addEventListener('click', () => this.showSave());
@@ -2030,6 +2030,16 @@ export class Hud {
         btn.textContent = 'Copied';
       } catch {
         btn.textContent = 'Copy failed';
+      }
+    });
+    m.querySelector('[data-m="seed-link"]')!.addEventListener('click', async (e) => {
+      const btn = e.currentTarget as HTMLButtonElement;
+      const url = `${location.origin}${location.pathname}?seed=${this.game.state.seed}`;
+      try {
+        await navigator.clipboard.writeText(url);
+        btn.textContent = 'Link copied';
+      } catch {
+        btn.textContent = url;
       }
     });
     m.querySelector('[data-m="tips"]')!.addEventListener('click', () => {

@@ -171,7 +171,11 @@ export class Game {
     this.bindInput();
     window.addEventListener('resize', () => this.renderer.resize());
     requestAnimationFrame((t) => this.frame(t));
-    this.hud.showMainMenu();
+    // A shared link (…?seed=123) goes straight to founding a town on that land.
+    const shared = new URLSearchParams(location.search).get('seed');
+    if (shared) history.replaceState(null, '', location.pathname);
+    if (shared && /^\d{1,9}$/.test(shared)) void this.hud.showMainMenu().then(() => this.hud.showNewGame(true, Number(shared)));
+    else this.hud.showMainMenu();
   }
 
   // ---------------------------------------------------------------- game lifecycle
