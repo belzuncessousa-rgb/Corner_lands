@@ -243,5 +243,13 @@ about medieval builders, Manor Lords' own roadmap included) and the soaks.
 ### Phase 17 — Ideas for the next runs
 - [x] Titles for the lord: prestige piles up in the thousands late on. Spend it to rise from Lord to Baron, Earl and Duke, each with a lasting boon and a line in the chronicle
 - [x] The autoplayer builds workplaces for idle hands (a thirty-year city has hundreds idle), so soaks look like a played game
-- [x] Market days: once a month the market square fills with stalls and people for a day, a visible pulse of the economy
+- [x] Market days: once a month the market square fills with stalls and people for a day, a visible pulse of the economy Idle villagers flock to the square that day.
 - [x] A "what changed" line on the year-in-review page: the three biggest rises and falls in stock
+
+Note from the morning run: the 30-year soak's famine on seed 3 comes from its random meddling (10% of days); played without it the same map reaches 568 villagers with no hunger at all.
+
+### Phase 18 — Ideas for the next runs
+- [ ] Big cities run their larders thin (22 food for 568 villagers at year 30 without hunger, living on pottage): the food chip and steward should warn when the town eats grain as pottage month after month
+- [ ] The market panel says when the next market day is, and the merchants' cart arrives on that day
+- [ ] Colour check of the new overlays (protected woods, rain) with the colour-vision screenshots
+- [ ] A short "Lord's ledger of deeds" on the main menu's load cards: title, great works and milestones of each saved settlement

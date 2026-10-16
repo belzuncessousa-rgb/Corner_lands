@@ -1,6 +1,6 @@
 import { BUILDINGS, DAY_SECONDS, OFFROAD_TILES_PER_DAY, ROAD_TILES_PER_DAY, STONE_ROAD_TILES_PER_DAY, STORAGE_CAPACITY } from '../game/data';
 import { findPath } from '../game/path';
-import { chooseRecipe, doorTile, forTilesInRadius, bCenter, isWinter, needsMaterials } from '../game/sim';
+import { chooseRecipe, doorTile, forTilesInRadius, bCenter, isMarketDay, isWinter, needsMaterials } from '../game/sim';
 import type { Building, GameState, ResourceId } from '../game/types';
 import { getBuilding, idx, inBounds } from '../game/world';
 
@@ -468,11 +468,15 @@ export class AgentSystem {
       });
       // Sometimes visit a gathering place: market, well, church or maypole.
       const spots = s.buildings.filter((b) => GATHERING.has(b.type) && b.build >= 1);
-      if (spots.length && Math.random() < 0.35) {
-        const near = spots.filter((b) => {
-          const bc = bCenter(b);
-          return Math.hypot(bc.x - c.x, bc.y - c.y) < 18;
-        });
+      // On market day most of the idle head for the market square.
+      const fair = spots.filter((b) => isMarketDay(s, b) && Math.hypot(bCenter(b).x - c.x, bCenter(b).y - c.y) < 24);
+      if (spots.length && Math.random() < (fair.length ? 0.75 : 0.35)) {
+        const near = fair.length
+          ? fair
+          : spots.filter((b) => {
+              const bc = bCenter(b);
+              return Math.hypot(bc.x - c.x, bc.y - c.y) < 18;
+            });
         const spot = near[Math.floor(Math.random() * near.length)];
         if (spot) {
           if (home) {
