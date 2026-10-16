@@ -878,7 +878,7 @@ export class Renderer {
   }
 
   private drawBuilding(s: GameState, b: Building, season: Season, selected: boolean): void {
-    const sp = this.buildingSprite(b.type, b.level, season, variantOf(b));
+    const sp = this.buildingSprite(b.type, b.level, season, variantOf(s, b));
     const [wx, wy] = iso(b.x, b.y);
     const c = this.ctx;
     if (b.build < 1) {
@@ -896,6 +896,7 @@ export class Renderer {
     if (fest === 'mayday' && b.type === 'maypole') this.drawMayDance(b);
     if (fest === 'midsummer' && b.type === 'townhall') this.drawBonfire(b);
     if (b.type === 'market' && !this.light && isMarketDay(s, b)) this.drawMarketDay(b);
+    if (b.type === 'townhall' && s.commissions?.includes('tapestry')) this.drawHeraldry(b);
     if (b.upgrading) this.drawScaffold(b);
     if (selected) {
       c.save();
@@ -1062,6 +1063,20 @@ export class Renderer {
   }
 
   /** Trestle tables and bunting in the manor's yard for a month after a feast. */
+  /** The great tapestry's design flies on a tall banner beside the manor. */
+  private drawHeraldry(b: Building): void {
+    const p = new Pen(this.ctx);
+    const x = b.x + b.w + 0.25;
+    const y = b.y + b.h - 0.4;
+    p.line([x, y, 0], [x, y, 58], '#4a3020', 1.6);
+    p.line([x - 0.25, y + 0.25, 56], [x + 0.25, y - 0.25, 56], '#4a3020', 1.4);
+    const sway = Math.sin(this.time * 1.3) * 1.5;
+    // A long swallow-tailed banner: crimson field, gold band, a blue lozenge.
+    p.poly([[x - 0.22, y + 0.22, 55], [x + 0.22, y - 0.22, 55], [x + 0.22, y - 0.22, 26 + sway], [x, y, 31 + sway], [x - 0.22, y + 0.22, 26 + sway]], '#9a2a2a');
+    p.poly([[x - 0.22, y + 0.22, 47], [x + 0.22, y - 0.22, 47], [x + 0.22, y - 0.22, 43], [x - 0.22, y + 0.22, 43]], '#d8b84a');
+    p.poly([[x, y, 41], [x + 0.1, y - 0.1, 36], [x, y, 31], [x - 0.1, y + 0.1, 36]], '#2a4a8a');
+  }
+
   /** Market day: a crowd among the stalls, a cart, and bunting over the square. */
   private drawMarketDay(b: Building): void {
     const p = new Pen(this.ctx);
@@ -1542,7 +1557,7 @@ export class Renderer {
         if (b.build < 1) continue;
         const active = b.residents > 0 || b.workers > 0;
         if (!active || Math.random() > 0.35) continue;
-        const sp = this.buildingSprite(b.type, b.level, season, variantOf(b));
+        const sp = this.buildingSprite(b.type, b.level, season, variantOf(s, b));
         for (const [x, y, z] of sp.smoke) {
           const [wx, wy] = iso(b.x + x, b.y + y, z);
           this.particles.push({
@@ -1827,7 +1842,9 @@ function drawBeast(c: CanvasRenderingContext2D, x: number, y: number, f: number,
   }
 }
 
-function variantOf(b: Building): number {
+function variantOf(s: GameState, b: Building): number {
+  // The cathedral shows its stained glass once commissioned.
+  if (b.type === 'cathedral') return s.commissions?.includes('glass') ? 1 : 0;
   if (b.type !== 'house') return 0;
   const trade = b.trade ? HOME_TRADES.indexOf(b.trade) + 1 : 0;
   return ((b.id * 7 + b.x) % 4) + 4 * Math.max(0, YARD_CODES.indexOf(b.yard ?? null)) + 16 * trade;

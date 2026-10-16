@@ -1827,7 +1827,11 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
     case 'cathedral': {
       const stone = '#bdb4a3';
       const dark = '#a69d8c';
-      const glass = season === 3 ? '#e8b850' : '#5a6a9a';
+      // Plain glazing, or once commissioned, stained glass in jewel colours.
+      const jewels = ['#c83a3a', '#3a6ac8', '#e8b840', '#3a9a5a', '#9a4ac8'];
+      let pane = 0;
+      const plain = season === 3 ? '#e8b850' : '#5a6a9a';
+      const glassAt = () => (variant === 1 ? jewels[pane++ % jewels.length] : plain);
       p.shadow(0.3, 0.2, 4.7, 5.8);
       // Apse at the back.
       p.box(1.7, 0.35, 3.3, 1.2, 0, 34, dark);
@@ -1837,13 +1841,13 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       for (const y of [1.5, 2.1, 3.5, 4.1]) {
         p.box(3.6, y - 0.06, 3.75, y + 0.06, 0, 30, dark);
         p.wallR(3.602, y + 0.14, y + 0.34, 16, 38, '#3a3a52');
-        p.wallR(3.603, y + 0.17, y + 0.31, 18, 36, glass);
+        p.wallR(3.603, y + 0.17, y + 0.31, 18, 36, glassAt());
       }
       p.roofY(1.4, 1.1, 3.6, 4.7, 46, 34, 'slate', stone, 0.1);
       // Transept across the crossing.
       p.box(0.4, 2.45, 4.6, 3.3, 0, 46, stone);
       p.wallR(4.602, 2.65, 3.1, 14, 40, '#3a3a52');
-      p.wallR(4.603, 2.7, 3.05, 16, 38, glass);
+      p.wallR(4.603, 2.7, 3.05, 16, 38, glassAt());
       p.roofX(0.4, 2.45, 4.6, 3.3, 46, 30, 'slate', stone, 0.1);
       // Spire over the crossing.
       p.box(2.2, 2.6, 2.8, 3.15, 46, 40, stone);
@@ -1865,7 +1869,7 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       p.ctx.beginPath();
       p.ctx.arc(rx, ry, 8, 0, Math.PI * 2);
       p.ctx.fill();
-      p.ctx.fillStyle = season === 3 ? '#e8b850' : '#7a5a9a';
+      p.ctx.fillStyle = variant === 1 ? '#c83a3a' : season === 3 ? '#e8b850' : '#7a5a9a';
       p.ctx.beginPath();
       p.ctx.arc(rx, ry, 5.5, 0, Math.PI * 2);
       p.ctx.fill();
