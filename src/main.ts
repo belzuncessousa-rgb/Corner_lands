@@ -35,6 +35,7 @@ import {
   PAVING_TIER,
   stepDay,
   updateHappiness,
+  seasonOf,
   yearOf,
   keepOf,
   townScore,
@@ -391,7 +392,15 @@ export class Game {
     this.wildlife.update(this.state, gameDt);
     // Dusk only at normal speed: faster, the days would flicker.
     this.renderer.setDayTime(this.simAcc / DAY_SECONDS, !this.demo && this.speed <= 1, dt);
-    if (this.view3d && this.renderer.threeD) this.view3d.render(this.state, this.renderer.cam, this.renderer.width, this.renderer.height, this.renderer.dpr);
+    if (this.view3d && this.renderer.threeD) {
+      // Villagers, carts and deer stand in the 3D world, so buildings hide them.
+      const season = seasonOf(this.state.day);
+      const figures = this.agents.agents
+        .filter((a) => a.visible)
+        .map((a) => ({ sprite: this.renderer.figureSprite(a), x: a.x + (a.role.kind === 'cart' ? 0 : a.ox * 0.25), y: a.y + (a.role.kind === 'cart' ? 0 : a.oy * 0.25) }));
+      for (const an of this.wildlife.animals) figures.push({ sprite: this.renderer.animalSprite(an, season), x: an.x, y: an.y });
+      this.view3d.render(this.state, this.renderer.cam, this.renderer.width, this.renderer.height, this.renderer.dpr, figures);
+    }
     this.renderer.render(this.state, this.agents.agents, this.overlay(), running ? dt : 0, this.wildlife.animals);
     this.hud.minimap.update(dt);
     this.hud.tickAudio(dt, running);

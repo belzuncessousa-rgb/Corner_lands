@@ -309,6 +309,6 @@ The player wants a virtually gridless town and 3D only if it keeps our own desig
 - [x] Details on every side: windows, doors and timbers mirrored onto the walls the flat view never showed
 - [x] Ground: grass, water and roads painted in our style at a finer scale (curved road bands, shorelines; the shore still follows the tile edges until the map itself loses its grid)
 - [x] The 3D view in the game behind a setting: same camera as the flat view, the flat canvas on top for overlays, ghosts and villagers; picking through the 3D view (not needed while the view is not turned: the projection matches)
-- [ ] Villagers, animals, smoke and the ghost in 3D, so buildings hide what stands behind them (today the flat canvas draws them on top)
+- [x] Villagers, carts and deer in 3D (smoke, overlays and the ghost still draw flat on top, which is right while the view is not turned), so buildings hide what stands behind them
 - [ ] Turn the view (Q/E or two-finger twist), with picking by ray casting
 - [ ] Then no grid: buildings at any position and angle on a fine hidden grid, roads as free curves, fields drawn as free shapes

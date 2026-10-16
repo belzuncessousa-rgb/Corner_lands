@@ -376,6 +376,7 @@ export class Renderer {
         } else if (kind === 1) {
           if (!this.threeD) this.drawBuilding(s, s.buildings[n], season, ov.selected === s.buildings[n].id);
         }
+        else if (this.threeD) continue;
         else if (kind === 2) this.drawAgent(agents[n]);
         else this.drawAnimal(animals[n], season);
       }
@@ -1352,6 +1353,36 @@ export class Renderer {
     const [wx, wy] = iso(g.x, g.y);
     this.blit(sp, wx, wy, 0.65);
     void s;
+  }
+
+  /**
+   * A villager (or cart) in its current pose as a small image, for the 3D
+   * view to stand in the world: the same drawing, cached per look and frame.
+   */
+  figureSprite(a: Agent): Sprite {
+    const frame = a.phase === 'walk' || a.phase === 'act' ? Math.round((((a.step % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) / (Math.PI / 3)) % 6 : 0;
+    const key = `ag:${a.role.kind}:${a.tunic}:${a.hair}:${a.phase}:${a.dir}:${a.carry ?? ''}:${a.act ?? ''}:${frame}:${a.key === this.selectedAgent}`;
+    return this.sprite(key, () =>
+      makeSprite(70, 64, 35, 50, (ctx) => {
+        const old = this.ctx;
+        this.ctx = ctx;
+        this.drawAgent({ ...a, x: 0, y: 0, ox: 0, oy: 0, fadeIn: 1, step: (frame * Math.PI) / 3 });
+        this.ctx = old;
+      }),
+    );
+  }
+
+  /** A deer in its current pose as a small image, for the 3D view. */
+  animalSprite(a: Animal, season: Season): Sprite {
+    const frame = a.grazing ? 0 : Math.round((((a.step % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) / (Math.PI / 3)) % 6;
+    return this.sprite(`an:${a.kind}:${a.dir}:${a.grazing}:${frame}:${season}`, () =>
+      makeSprite(40, 36, 20, 28, (ctx) => {
+        const old = this.ctx;
+        this.ctx = ctx;
+        this.drawAnimal({ ...a, x: 0, y: 0, alpha: 1, step: (frame * Math.PI) / 3 }, season);
+        this.ctx = old;
+      }),
+    );
   }
 
   private drawAgent(a: Agent): void {

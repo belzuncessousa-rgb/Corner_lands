@@ -54,6 +54,56 @@ class Billboards {
   }
 }
 
+/**
+ * Billboards that move every frame (villagers, carts, deer): meshes keep
+ * their capacity and only their positions and counts change.
+ */
+class MovingBillboards {
+  private groups = new Map<Sprite, { mesh: THREE.InstancedMesh; n: number; idle: number }>();
+  readonly root = new THREE.Group();
+  private m = new THREE.Matrix4();
+
+  begin(): void {
+    for (const g of this.groups.values()) g.n = 0;
+  }
+
+  add(sp: Sprite, x: number, y: number): void {
+    let g = this.groups.get(sp);
+    if (!g || g.n >= g.mesh.instanceMatrix.count) {
+      const cap = Math.max(8, (g?.mesh.instanceMatrix.count ?? 4) * 2);
+      const mesh = new THREE.InstancedMesh(PLANE, material(sp), cap);
+      mesh.frustumCulled = false;
+      if (g) {
+        for (let i = 0; i < g.n; i++) {
+          g.mesh.getMatrixAt(i, this.m);
+          mesh.setMatrixAt(i, this.m);
+        }
+        this.root.remove(g.mesh);
+        g.mesh.dispose();
+      }
+      this.root.add(mesh);
+      g = { mesh, n: g?.n ?? 0, idle: 0 };
+      this.groups.set(sp, g);
+    }
+    this.m.makeTranslation(x, 0, y);
+    g.mesh.setMatrixAt(g.n++, this.m);
+  }
+
+  end(): void {
+    for (const [sp, g] of this.groups) {
+      g.mesh.count = g.n;
+      g.mesh.instanceMatrix.needsUpdate = true;
+      g.idle = g.n ? 0 : g.idle + 1;
+      // Poses unused for a while are let go.
+      if (g.idle > 120) {
+        this.root.remove(g.mesh);
+        g.mesh.dispose();
+        this.groups.delete(sp);
+      }
+    }
+  }
+}
+
 const PLANE = new THREE.PlaneGeometry(1, 1);
 const spriteMats = new WeakMap<Sprite, THREE.ShaderMaterial>();
 
@@ -109,6 +159,7 @@ export class View3D {
   private objectsKey = '';
   private buildings = new Map<number, { key: string; obj: THREE.Object3D }>();
   private billboards = new Billboards();
+  private moving = new MovingBillboards();
   private sprites = new Map<string, Sprite>();
   private seed = -1;
 
@@ -129,7 +180,7 @@ export class View3D {
     this.ground = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshLambertMaterial());
     this.ground.rotation.x = -Math.PI / 2;
     this.ground.receiveShadow = true;
-    this.scene.add(this.ground, this.billboards.root);
+    this.scene.add(this.ground, this.billboards.root, this.moving.root);
   }
 
   set visible(on: boolean) {
@@ -142,7 +193,14 @@ export class View3D {
   }
 
   /** Draws the town as the flat camera (centre in iso pixels, zoom) sees it. */
-  render(s: GameState, cam: { x: number; y: number; zoom: number }, width: number, height: number, dpr: number): void {
+  render(
+    s: GameState,
+    cam: { x: number; y: number; zoom: number },
+    width: number,
+    height: number,
+    dpr: number,
+    figures: { sprite: Sprite; x: number; y: number }[] = [],
+  ): void {
     if (this.seed !== s.seed) this.reset(s);
     if (this.canvas.width !== Math.round(width * dpr) || this.canvas.height !== Math.round(height * dpr)) {
       this.renderer.setPixelRatio(dpr);
@@ -152,6 +210,9 @@ export class View3D {
     this.syncGround(s, season);
     this.syncBuildings(s, season);
     this.syncObjects(s, season);
+    this.moving.begin();
+    for (const f of figures) this.moving.add(f.sprite, f.x, f.y);
+    this.moving.end();
     // The camera centre, from iso pixels back to the tile plane.
     const a = cam.x / 32;
     const b = cam.y / 16;
