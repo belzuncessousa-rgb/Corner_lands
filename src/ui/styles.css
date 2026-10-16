@@ -2006,3 +2006,10 @@ table.prod td.num {
   animation: photoHint 4s forwards;
 }
 @keyframes photoHint { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
+/* What's new, under the title menu. */
+.news { margin-top: 12px; text-align: left; font-size: 14px; color: var(--ink-soft); }
+.news summary { cursor: pointer; text-align: center; font-family: var(--title); letter-spacing: 0.04em; }
+.news ul { margin: 6px 0 0; padding-left: 18px; }
+.news li { margin: 2px 0; }
+.news li.fresh { color: var(--ink, #3a2a1e); font-weight: 600; }
+.news li.fresh::after { content: ' · new'; color: #b8483a; font-weight: normal; font-style: italic; }

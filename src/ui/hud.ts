@@ -1,3 +1,4 @@
+import { NEWS } from './news';
 import { placeName, townName, weeklySeed } from '../game/names';
 import { deleteSave, listSaves, type SaveInfo } from '../api';
 import {
@@ -1790,6 +1791,21 @@ export class Hud {
     return true;
   }
 
+  /** The latest additions; those since this player's last visit are marked. */
+  private newsHtml(): string {
+    let seen = 0;
+    try {
+      seen = Number(localStorage.getItem('cornerlands.newsSeen')) || 0;
+      localStorage.setItem('cornerlands.newsSeen', String(NEWS[0].n));
+    } catch {
+      /* ignore */
+    }
+    const rows = NEWS.slice(0, 5)
+      .map((x) => `<li class="${seen && x.n > seen ? 'fresh' : ''}">${esc(x.text)}</li>`)
+      .join('');
+    return `<details class="news" ${seen && NEWS[0].n > seen ? 'open' : ''}><summary>What's new</summary><ul>${rows}</ul></details>`;
+  }
+
   async showMainMenu(): Promise<void> {
     // Block game input while the save list loads, before the title appears.
     this.game.modalOpen = true;
@@ -1804,7 +1820,8 @@ export class Hud {
         <button class="${latest ? '' : 'primary'}" data-m="new">New Settlement</button>
         ${saves.length ? '<button data-m="load">Load Game</button>' : ''}
         <button data-m="help">How to Play</button>
-      </div>`,
+      </div>
+      ${this.newsHtml()}`,
       false,
     );
     m.querySelector('[data-m="continue"]')?.addEventListener('click', async () => {

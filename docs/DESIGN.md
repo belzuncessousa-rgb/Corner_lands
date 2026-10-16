@@ -282,4 +282,6 @@ Note from the morning run: the 30-year soak's famine on seed 3 comes from its ra
 ### Phase 24 — More to discover, nicer to share
 - [x] Photo mode (U): hide the interface for a clean view of the town; the picture button uses it
 - [x] Six new decision events (pilgrims, a comet, a spring flood, a beekeeper, a border quarrel, a holy relic), some only for larger towns, so each game tells a different story
-- [ ] "What's new" on the title screen: a short list of the latest additions, for friends coming back to the link
+- [x] "What's new" on the title screen: a short list of the latest additions, for friends coming back to the link
+
+Note for later runs: when a feature players would notice goes in, add a line to the top of `src/ui/news.ts` (with the next number) so returning friends see it marked as new.
