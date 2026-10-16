@@ -298,6 +298,6 @@ Note for later runs: when a feature players would notice goes in, add a line to 
 
 ### Phase 27 — Hide the grid (art direction agreed: de-square first, AI art for standalone pictures later, 3D only as a separate experiment)
 - [x] Curved roads: draw each road as a smooth band through its tiles, with soft verges, instead of square tiles
-- [ ] Organic edges: fields, pastures and forest borders get soft, irregular outlines
-- [ ] Buildings face the nearest road (four directions) and small props sit a little off-grid
+- [x] Organic edges: fields get round-cornered, slightly irregular plots with a grassy headland (pastures keep straight fences; forests were already irregular)
+- [ ] Buildings face the nearest road (four directions) and small props sit a little off-grid (deferred: sprites carry baked shadows, so mirroring would light them from the wrong side; revisit with a lighting rework or 3D)
 - [ ] Image slots for standalone art (title screen, event cards) so pictures made elsewhere drop in without code changes

@@ -575,19 +575,10 @@ export class Renderer {
     const x0 = b.x;
     const y0 = b.y;
     const x1 = b.x + b.w;
-    const y1 = b.y + b.h;
     const soil = season === 3 ? '#cfd4d4' : '#7a5a3a';
-    p.poly(
-      [
-        [x0 + 0.06, y0 + 0.06, 0],
-        [x1 - 0.06, y0 + 0.06, 0],
-        [x1 - 0.06, y1 - 0.06, 0],
-        [x0 + 0.06, y1 - 0.06, 0],
-      ],
-      soil,
-      '#5e4129',
-      1,
-    );
+    // A grassy headland around an irregular, round-cornered plot.
+    p.poly(organicOutline(b, 0.02, 0.1, b.id), season === 3 ? 'rgba(225,230,230,0.6)' : 'rgba(110,140,60,0.45)');
+    p.poly(organicOutline(b, 0.12, 0.12, b.id + 7), soil, '#5e4129', 1);
     const crop = b.recipe ?? 'wheat';
     const ripe: Record<string, string> = { wheat: '#d8b44a', barley: '#e0cc84', oats: '#d4c070', flax: '#9a8a5a' };
     const young: Record<string, string> = { wheat: '#5e9a34', barley: '#7aa83e', oats: '#88b04a', flax: '#5a8a4a' };
@@ -607,10 +598,15 @@ export class Renderer {
     const rows = Math.round(b.h * 4);
     for (let r = 0; r < rows; r++) {
       const y = y0 + (r + 0.5) / 4;
-      p.line([x0 + 0.15, y, 0], [x1 - 0.15, y, 0], season === 3 ? '#b8bebe' : '#5e4129', 1.4);
+      // Rows near the rounded corners are shorter, so they stay inside the plot.
+      const edge = Math.min(r + 0.5, rows - r - 0.5) / 4;
+      const cut = edge < 0.45 ? 0.45 - edge : 0;
+      const a = x0 + 0.25 + cut;
+      const z = x1 - 0.25 - cut;
+      p.line([a, y, 0], [z, y, 0], season === 3 ? '#b8bebe' : '#5e4129', 1.4);
       if (color) {
-        p.line([x0 + 0.15, y - 0.05, height * 0.5], [x1 - 0.15, y - 0.05, height * 0.5], color, height + 1.5);
-        p.line([x0 + 0.15, y - 0.08, height], [x1 - 0.15, y - 0.08, height], shadeCrop(color), 1.2);
+        p.line([a, y - 0.05, height * 0.5], [z, y - 0.05, height * 0.5], color, height + 1.5);
+        p.line([a, y - 0.08, height], [z, y - 0.08, height], shadeCrop(color), 1.2);
       }
     }
   }
@@ -2194,4 +2190,45 @@ const GOOD_COLORS: Partial<Record<ResourceId, string>> = {
 
 function shadeCrop(c: string): string {
   return c === '#d8b44a' ? '#e8c860' : c === '#b89a5a' ? '#a08850' : '#8ac04e';
+}
+
+/**
+ * The outline of a field or pasture as an irregular ring with rounded
+ * corners, so plots look hand-ploughed rather than ruled. The same seed
+ * gives the same shape every frame.
+ */
+function organicOutline(b: { x: number; y: number; w: number; h: number }, inset: number, wobble: number, seed: number): [number, number, number][] {
+  const r = Math.min(0.55, b.w / 3, b.h / 3);
+  const x0 = b.x + inset;
+  const y0 = b.y + inset;
+  const x1 = b.x + b.w - inset;
+  const y1 = b.y + b.h - inset;
+  const pts: [number, number, number][] = [];
+  let k = 0;
+  const jitter = () => (fract(Math.sin(seed * 12.9898 + k++ * 78.233) * 43758.5453) - 0.5) * wobble;
+  // Straight sides with a little wander, joined by quarter circles.
+  const side = (ax: number, ay: number, bx: number, by: number, nx: number, ny: number) => {
+    const len = Math.hypot(bx - ax, by - ay);
+    const n = Math.max(1, Math.round(len / 0.6));
+    for (let i = 0; i < n; i++) {
+      const t = i / n;
+      const j = i === 0 ? 0 : jitter();
+      pts.push([ax + (bx - ax) * t + nx * j, ay + (by - ay) * t + ny * j, 0]);
+    }
+  };
+  const arc = (cx: number, cy: number, from: number) => {
+    for (let i = 0; i <= 4; i++) {
+      const a = from + (i / 4) * (Math.PI / 2);
+      pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r, 0]);
+    }
+  };
+  side(x0 + r, y0, x1 - r, y0, 0, 1);
+  arc(x1 - r, y0 + r, -Math.PI / 2);
+  side(x1, y0 + r, x1, y1 - r, -1, 0);
+  arc(x1 - r, y1 - r, 0);
+  side(x1 - r, y1, x0 + r, y1, 0, -1);
+  arc(x0 + r, y1 - r, Math.PI / 2);
+  side(x0, y1 - r, x0, y0 + r, 1, 0);
+  arc(x0 + r, y0 + r, Math.PI);
+  return pts;
 }
