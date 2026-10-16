@@ -345,12 +345,12 @@ art, the logic and balance get this pass. Grouped by how deep each change goes.
 - [x] Construction is much faster: building is not where the time should go
 - [x] Dirt and stone roads take a little time to build: drawn roads are pegged out (dashed) and laid in order, 16 dirt or 6 paved tiles a day, paid up front and refunded if struck off
 - [ ] Objectives and rewards only in Easy (the tutorial-like mode), not in the regular game
-- [ ] The build bar keeps a fixed size however many buildings a category holds
+- [x] The build bar keeps a fixed size however many buildings a category holds
 - [ ] No undo (Ctrl+Z): no room for regrets
 - [ ] The game pauses when the town grows a size
 - [ ] A fertility heatmap on the ground while placing a farm
-- [ ] Buildings whose requirements are not met yet (charters and the like) are hidden from the menus, not shown locked
-- [ ] Stone roads easy to find (they are under Paving; make that obvious)
+- [x] Buildings whose requirements are not met yet (charters and the like) are hidden from the menus, not shown locked
+- [x] Stone roads easy to find: the button is "Stone road" and is there from the start (it used to appear only at Village rank)
 - [ ] Trading post lists every good, in tabs by kind
 - [x] Bug: the manor stopped improving in one playthrough (renovations never said what they were waiting for; now the upgrade box shows it, e.g. "Waiting for dressed stone in storage")
 - [ ] Haulers visibly carry what they move

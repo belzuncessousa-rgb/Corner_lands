@@ -322,13 +322,24 @@ button.active {
   left: 50%;
   transform: translateX(-50%);
   padding: 6px 8px 8px;
-  width: max-content;
-  max-width: calc(100vw - 16px);
+  /* A fixed width whatever the category holds: long categories scroll. */
+  width: min(780px, calc(100vw - 16px));
+  box-sizing: border-box;
 }
-/* Leave room for the minimap on wide screens; long categories scroll. */
+/* Leave room for the minimap on wide screens. */
 @media (min-width: 900px) {
   #buildbar {
-    max-width: calc(100vw - 420px);
+    width: min(780px, calc(100vw - 420px));
+  }
+}
+/* Too narrow for the category names: icons only (names show on hover). */
+@media (max-width: 1200px) {
+  #buildbar .tab span {
+    display: none;
+  }
+  #buildbar .tab {
+    min-width: 36px;
+    padding: 4px;
   }
 }
 #buildbar .tabs {
@@ -1204,6 +1215,7 @@ button.active {
   margin: 0;
   flex-wrap: nowrap;
   align-items: center;
+  justify-content: center;
 }
 #buildbar .tab {
   display: flex;
@@ -2013,3 +2025,10 @@ table.prod td.num {
 .news li { margin: 2px 0; }
 .news li.fresh { color: var(--ink, #3a2a1e); font-weight: 600; }
 .news li.fresh::after { content: ' · new'; color: #b8483a; font-weight: normal; font-style: italic; }
+
+#buildbar .cards-empty {
+  padding: 18px 8px;
+  text-align: center;
+  font-style: italic;
+  opacity: 0.75;
+}

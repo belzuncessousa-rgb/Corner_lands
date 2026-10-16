@@ -428,15 +428,15 @@ describe('labour', () => {
 });
 
 describe('paved roads', () => {
-  it('cost stone, need a village and make walking cheaper', async () => {
+  it('cost stone (from the start) and make walking cheaper', async () => {
     const { stepCost, roadError } = await import('../src/game/sim');
     const s = generateWorld(24);
     const h = hall(s);
     const x = h.x + 1;
     const y = h.y + 3;
     expect(s.road[idx(s, x, y)]).toBe(1);
-    expect(roadError(s, x, y, true)).toMatch(/Village/);
-    s.tier = 1;
+    s.res.stone = 1;
+    expect(roadError(s, x, y, true)).toMatch(/stone/);
     s.res.stone = 10;
     expect(buildRoad(s, x, y, true)).toBe(true);
     expect(s.res.stone).toBe(8);

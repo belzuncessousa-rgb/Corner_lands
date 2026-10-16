@@ -302,26 +302,26 @@ export class Hud {
       .join('');
     const tools = `<span class="divider"></span>
       <button data-action="road" class="tab ${tool.kind === 'road' && !tool.paved ? 'active' : ''}" data-tip="<b>Road</b> (R)<br>Click to start, click again to lay it. Roads speed up walking; buildings work without them.">${ICONS.road}<span>Road</span></button>
-      ${this.game.state.tier >= PAVING_TIER ? `<button data-action="road" data-paved="1" class="tab ${tool.kind === 'road' && tool.paved ? 'active' : ''}" data-tip="<b>Paved road</b> (T)<br>Cobbled stone: villagers walk a third faster than on dirt. 2 stone per tile; lay it over a dirt road to pave it.">${ICONS.paved}<span>Paving</span></button>` : ''}
+      ${this.game.state.tier >= PAVING_TIER ? `<button data-action="road" data-paved="1" class="tab ${tool.kind === 'road' && tool.paved ? 'active' : ''}" data-tip="<b>Stone road</b> (T)<br>Villagers walk a third faster than on dirt. 2 stone per tile; lay it over a dirt road to pave it.">${ICONS.paved}<span>Stone road</span></button>` : ''}
       <button data-action="grove" class="tab ${tool.kind === 'grove' ? 'active' : ''}" data-tip="<b>Protect woods</b> (P)<br>Mark a wood the woodcutters must leave standing: click one corner, then the other. Click twice inside one to lift it.">${ICONS.grove}<span>Protect</span></button>
       <button data-action="demolish" class="tab ${tool.kind === 'demolish' ? 'active' : ''}" data-tip="<b>Demolish</b> (X)<br>Remove buildings or roads. Finished buildings return half their cost.">${ICONS.demolish}<span>Demolish</span></button>`;
     let cards = '';
     if (this.category) {
-      cards = BUILD_ORDER.filter((t) => BUILDINGS[t].category === this.category)
+      // Buildings not yet open to the town stay out of the menu until they are.
+      cards = BUILD_ORDER.filter((t) => BUILDINGS[t].category === this.category && isUnlocked(s, t))
         .map((t) => {
           const d = BUILDINGS[t];
-          const locked = !isUnlocked(s, t);
           const poor = !canAfford(s, d.cost);
           const sel = (tool.kind === 'build' || tool.kind === 'zone') && tool.type === t;
-          return `<div class="card ${sel ? 'sel' : ''} ${locked ? 'locked' : ''} ${poor ? 'poor' : ''}" data-action="build" data-type="${t}" data-tip="${esc(this.buildingTip(t))}">
+          return `<div class="card ${sel ? 'sel' : ''} ${poor ? 'poor' : ''}" data-action="build" data-type="${t}" data-tip="${esc(this.buildingTip(t))}">
             ${d.hotkey ? `<span class="key">${d.hotkey}</span>` : ''}
             <img src="${this.cardImage(t)}" alt="" draggable="false">
-            ${locked ? `<div class="lock">${d.tier > s.tier ? TIERS[d.tier].name : 'Charter'}</div>` : ''}
             <div class="name">${d.name}</div>
             <div class="cost">${d.zone ? ZONE_COST_NOTE[t] ?? '' : costHtml(d.cost, s.res)}</div>
           </div>`;
         })
         .join('');
+      if (!cards) cards = `<div class="cards-empty">Nothing here yet: more opens up as the town grows.</div>`;
     }
     this.el.buildbar.classList.toggle('open', !!this.category);
     this.el.buildbar.innerHTML = `${cards ? `<div class="cards">${cards}</div>` : ''}<div class="tabs">${tabs}${tools}</div>`;
@@ -349,6 +349,7 @@ export class Hud {
       t.kind,
       t.kind === 'build' || t.kind === 'zone' ? t.type : t.kind === 'road' && t.paved ? 'paved' : '',
       s.tier,
+      s.charters?.length ?? 0,
       ...BUILD_ORDER.map((b) => (canAfford(s, BUILDINGS[b].cost) ? 1 : 0)),
     ].join('|');
   }

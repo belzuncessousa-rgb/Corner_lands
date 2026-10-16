@@ -308,8 +308,8 @@ export function isBridge(s: GameState, x: number, y: number): boolean {
 
 /** Stone for each tile of paved road. */
 export const PAVING_COST: Cost = { stone: 2 };
-/** Settlement rank needed to pave roads (Village). */
-export const PAVING_TIER = 1;
+/** Settlement rank needed to pave roads (none: stone is its own price). */
+export const PAVING_TIER = 0;
 
 export function roadError(s: GameState, x: number, y: number, paved = false): string | null {
   if (!inBounds(s, x, y)) return 'Outside the map';
