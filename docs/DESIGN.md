@@ -273,3 +273,8 @@ Note from the morning run: the 30-year soak's famine on seed 3 comes from its ra
 - [x] Export a town to a file and import one, so friends can swap towns and continue each other's games
 - [x] The map seed shown in the menu with a copy button: play the same land as a friend and compare
 - [x] "Save a picture" in the menu: a screenshot of the town with its name, rank and year, to share
+
+### Phase 23 — Ideas for the next runs
+- [ ] Name your town when founding it; the name heads the save list, the picture and the chronicle
+- [ ] A "seed of the week" on the New Settlement screen, the same for everyone, so friends can race the same land
+- [ ] A town score (villagers, prestige, great works, years without hunger) on the picture and the load card, for friendly comparison
