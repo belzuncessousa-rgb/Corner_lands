@@ -37,6 +37,7 @@ import {
   zoneArea,
   zoneError,
   zonesOf,
+  isUnlocked,
 } from './sim';
 import type { BuildingType, Cost, GameState, ResourceId } from './types';
 import { idx, inBounds } from './world';
@@ -299,6 +300,9 @@ export function playBot(s: GameState, years: number, seed = 1): BotReport {
 /** Buys what is short at the market, as a sensible player would. */
 function shop(s: GameState): void {
   if (!hasBuilt(s, 'market')) return;
+  // Let the merchants take what is above the stock targets.
+  s.sell ??= {};
+  for (const r of ['leather', 'cloth', 'hides', 'wool'] as ResourceId[]) s.sell[r] = true;
   const buy = (id: ResourceId, n: number, keep: number) => {
     if (s.res.gold > keep) trade(s, id, n);
   };
@@ -518,6 +522,25 @@ export function act(s: GameState, rand: () => number): void {
     if (count(s, 'claypit') > 0 && count(s, 'kiln') < 1) wants.push('kiln');
   }
   if (s.tier >= 1 && count(s, 'tavern') < 1 + Math.floor(pop / 70)) wants.push('tavern');
+  // Many idle hands: more workshops wherever their inputs are to hand; the
+  // market sells what they make.
+  if (s.tier >= 4 && idle > Math.max(10, pop * 0.15)) {
+    const has = (r: ResourceId, n: number) => s.res[r] >= n;
+    const extra: [BuildingType, boolean][] = [
+      ['farm', true],
+      ['sawmill', has('wood', 30)],
+      ['carpenter', has('planks', 20)],
+      ['stonemason', has('stone', 20)],
+      ['tanner', has('hides', 20)],
+      ['weaver', has('wool', 20) || has('flax', 20)],
+      ['tailor', has('cloth', 10)],
+      ['smithy', has('iron', 10)],
+      ['kiln', has('clay', 10)],
+      ['woodcutter', true],
+      ['quarry', true],
+    ];
+    for (const [t, ok] of extra) if (ok && isUnlocked(s, t) && count(s, t) < 2 + Math.floor(pop / 20)) (idle > pop * 0.25 ? wants.unshift(t) : wants.push(t));
+  }
   for (const t of wants) {
     if (BUILDINGS[t].tier > s.tier) continue;
     if (tryPlace(s, t)) return;
