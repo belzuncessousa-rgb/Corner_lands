@@ -2433,6 +2433,37 @@ export function settlerBlocker(s: GameState): string | null {
   return null;
 }
 
+/** Firsts and round numbers worth a line in the chronicle, checked daily until reached. */
+const MILESTONES: { id: string; text: string; reached: (s: GameState) => boolean; quiet?: boolean }[] = [
+  { id: 'harvest', text: 'The first harvest was brought in', reached: (s) => (s.year?.harvest ?? 0) > 0 },
+  { id: 'bread', text: 'The first loaves came out of the oven', reached: (s) => s.res.bread > 0 },
+  { id: 'market', text: 'The first market opened its stalls', reached: (s) => s.buildings.some((b) => b.type === 'market' && b.build >= 1) },
+  { id: 'timber', text: 'The first Timber House was raised', reached: (s) => s.buildings.some((b) => b.type === 'house' && b.level >= 2 && b.build >= 1) },
+  { id: 'church', text: 'The church bell rang for the first time', reached: (s) => s.buildings.some((b) => b.type === 'church' && b.build >= 1) },
+  { id: 'townhouse', text: 'The first Townhouse was raised', reached: (s) => s.buildings.some((b) => b.type === 'house' && b.level >= 3 && b.build >= 1) },
+  { id: 'pop50', text: 'Fifty souls now call these lands home', reached: (s) => s.population >= 50 },
+  { id: 'pop100', text: 'A hundred villagers now call these lands home', reached: (s) => s.population >= 100 },
+  { id: 'pop200', text: 'Two hundred souls live under your banner', reached: (s) => s.population >= 200 },
+  { id: 'pop300', text: 'Three hundred souls live under your banner', reached: (s) => s.population >= 300 },
+  ...TIERS.slice(1).map((t, i) => ({ id: `tier${i + 1}`, text: `The settlement became a ${t.name}`, reached: (s: GameState) => s.tier >= i + 1, quiet: true })),
+  { id: 'fair', text: 'The first fair was held', reached: (s) => (s.fairs ?? 0) > 0, quiet: true },
+  { id: 'walls', text: 'The town walls were closed', reached: (s) => wallSections(s) >= WALL_SAFE },
+  { id: 'cathedral', text: 'The cathedral was consecrated', reached: (s) => s.buildings.some((b) => b.type === 'cathedral' && b.build >= 1) },
+];
+
+/** Records milestones newly reached; those not announced elsewhere get a toast. */
+export function checkMilestones(s: GameState): void {
+  // A game saved before milestones were kept: what it had already reached has no date.
+  const before = !s.milestones && s.day > 1;
+  s.milestones ??= [];
+  const got = s.milestones;
+  for (const m of MILESTONES) {
+    if (got.some((x) => x.id === m.id) || !m.reached(s)) continue;
+    got.push({ id: m.id, day: before ? -1 : s.day, text: m.text });
+    if (!m.quiet && !before) log(s, `${m.text}.`, 'good');
+  }
+}
+
 /** The settlement's rank follows the manor's level. */
 export function updateTier(s: GameState): void {
   const hall = s.buildings.find((b) => b.type === 'townhall');
@@ -2459,6 +2490,7 @@ export function stepDay(s: GameState): void {
   dailyProduction(s, rng);
   reportHarvest(s);
   noteSeen(s);
+  checkMilestones(s);
   s.day++;
   if (s.day % DAYS_PER_MONTH === 0) monthly(s, rng);
   if (s.dirty) recompute(s);

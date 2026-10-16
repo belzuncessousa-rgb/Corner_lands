@@ -1107,3 +1107,28 @@ describe('seasonal festivals', () => {
     expect(s.festivalDay?.id).toBe('midsummer');
   });
 });
+
+describe('milestones', () => {
+  it('records firsts with their date once, and old saves get no burst of news', async () => {
+    const { checkMilestones } = await import('../src/game/sim');
+    const s = generateWorld(7);
+    s.population = 120;
+    const before = s.messages.length;
+    checkMilestones(s);
+    const ids = (s.milestones ?? []).map((m) => m.id);
+    expect(ids).toContain('pop50');
+    expect(ids).toContain('pop100');
+    expect(ids).not.toContain('pop200');
+    expect(s.messages.length).toBe(before + 2);
+    checkMilestones(s);
+    expect(s.milestones!.length).toBe(ids.length);
+    // A game from before milestones: reached ones are noted without a date or a toast.
+    const old = generateWorld(8);
+    old.day = 400;
+    old.population = 60;
+    const n = old.messages.length;
+    checkMilestones(old);
+    expect(old.milestones!.find((m) => m.id === 'pop50')?.day).toBe(-1);
+    expect(old.messages.length).toBe(n);
+  });
+});

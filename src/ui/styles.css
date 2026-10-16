@@ -1939,3 +1939,23 @@ table.prod td.num {
   cursor: pointer;
 }
 .msg.tip b { color: #4a6f90; }
+/* Milestones: a short timeline above the chronicle. */
+.milestones {
+  max-height: 22vh;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 12px;
+  margin-bottom: 6px;
+}
+.milestones + .sub + .chronicle,
+.milestones ~ .chronicle { max-height: 36vh; }
+.mile {
+  display: flex;
+  flex-direction: column;
+  padding: 3px 8px;
+  border-left: 3px solid #c89a38;
+  font-size: 14px;
+}
+.mile small { color: var(--ink-soft); font-size: 12px; }
+@media (max-width: 600px) { .milestones { grid-template-columns: 1fr; } }

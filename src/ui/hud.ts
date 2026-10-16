@@ -1150,7 +1150,11 @@ export class Hud {
       .reverse()
       .map((m) => `<div class="chron ${m.kind}"><small>${MONTH_NAMES[monthOf(m.day)]}, Y${yearOf(m.day)}</small> ${esc(m.text)}</div>`)
       .join('');
-    this.openModal(`<h2>Chronicle</h2><div class="chronicle">${rows || '<i>Nothing has happened yet.</i>'}</div>
+    const dated = (s.milestones ?? []).filter((m) => m.day >= 0);
+    const miles = dated
+      .map((m) => `<div class="mile"><small>${MONTH_NAMES[monthOf(m.day)]}, Year ${yearOf(m.day)}</small><span>${esc(m.text)}</span></div>`)
+      .join('');
+    this.openModal(`<h2>Chronicle</h2>${miles ? `<div class="sub">Milestones</div><div class="milestones">${miles}</div><div class="sub">Lately</div>` : ''}<div class="chronicle">${rows || '<i>Nothing has happened yet.</i>'}</div>
       <div class="row" style="justify-content:flex-end;margin-top:10px"><button class="primary" data-action="close-modal">Close</button></div>`);
   }
 
