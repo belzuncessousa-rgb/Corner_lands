@@ -342,6 +342,11 @@ export class Renderer {
         this.buckets[Math.max(d, this.boost[i])].push(i * 4);
       }
     }
+    this.festTile = this.light ? -1 : this.festivalTile(s);
+    if (this.festTile >= 0) {
+      const [wx, wy] = iso((this.festTile % W) + 0.5, ((this.festTile / W) | 0) + 0.5);
+      if (visible(wx, wy)) this.buckets[Math.max(((this.festTile % W) + ((this.festTile / W) | 0)), this.boost[this.festTile])].push(this.festTile * 4);
+    }
     agents.forEach((a, ai) => {
       if (!a.visible) return;
       const tx = Math.floor(a.x);
@@ -856,6 +861,10 @@ export class Renderer {
   private drawTileObjects(s: GameState, i: number, season: Season): void {
     const x = i % s.width;
     const y = (i - x) / s.width;
+    if (i === this.festTile) {
+      this.drawFestival(s, x + 0.5, y + 0.5);
+      if (!s.trees[i] && !s.rock[i] && !s.ore[i] && !s.berriesMax[i] && !s.stumps?.[i]) return;
+    }
     const v = s.variant[i];
     const orchard = this.orchardTiles.get(i);
     if (orchard) {
@@ -2404,6 +2413,142 @@ export class Renderer {
       c.drawImage(this.mistPuff, sx - w / 2, sy - w / 4 - 4, w, w / 2);
     }
     c.globalAlpha = 1;
+  }
+
+  /** The tile where this month's village festivity stands, or -1. */
+  private festTile = -1;
+  private festCache = { key: '', tile: -1 };
+
+  /**
+   * A maypole in late spring and a bonfire once the harvest is in, on open
+   * ground in front of the town hall, for a few days in the middle of the month.
+   */
+  private festivalTile(s: GameState): number {
+    const month = monthOf(s.day);
+    const d = s.day % DAYS_PER_MONTH;
+    if ((month !== 2 && month !== 8) || d < 2 || d > 7) return -1;
+    const hall = s.buildings.find((b) => b.type === 'townhall' && b.build >= 1);
+    if (!hall) return -1;
+    const key = `${hall.id}:${Math.floor(s.day / DAYS_PER_MONTH)}`;
+    if (this.festCache.key === key) return this.festCache.tile;
+    const W = s.width;
+    const free = (x: number, y: number) => {
+      if (!inBounds(s, x, y)) return false;
+      const i = y * W + x;
+      return s.occ[i] < 0 && !s.terrain[i] && !s.trees[i] && !s.rock[i] && !s.ore[i];
+    };
+    let best = -1;
+    let bd = 1e9;
+    const cx = hall.x + hall.w / 2;
+    const cy = hall.y + hall.h / 2;
+    for (let y = hall.y - 7; y < hall.y + hall.h + 7; y++) {
+      for (let x = hall.x - 7; x < hall.x + hall.w + 7; x++) {
+        let ok = true;
+        for (let dy = -1; dy <= 1 && ok; dy++) for (let dx = -1; dx <= 1; dx++) ok &&= free(x + dx, y + dy);
+        if (!ok) continue;
+        // Nearer is better, and in front of the hall (where it can be seen) better still.
+        const dist = Math.hypot(x + 0.5 - cx, y + 0.5 - cy) + (x < hall.x || y < hall.y ? 3 : 0);
+        if (dist < bd) {
+          bd = dist;
+          best = y * W + x;
+        }
+      }
+    }
+    this.festCache = { key, tile: best };
+    return best;
+  }
+
+  /** Dancers round a ribboned maypole, or villagers about a harvest bonfire. */
+  private drawFestival(s: GameState, x: number, y: number): void {
+    const c = this.ctx;
+    const t = this.time;
+    const may = monthOf(s.day) === 2;
+    const [px, py] = iso(x, y);
+    const tunics = ['#b85a48', '#5a7a9a', '#d8b048', '#6a9a5a', '#9a6aa0', '#c88a50', '#4a8a8a'];
+    const hairs = ['#e0c070', '#6a4428', '#3a2818', '#a05a30'];
+    const n = may ? 6 : 7;
+    const ring: [number, number, number][] = [];
+    for (let k = 0; k < n; k++) {
+      const a = (may ? t * 0.6 : t * 0.04) + (k / n) * Math.PI * 2;
+      const [sx, sy] = iso(x + Math.cos(a) * 0.95, y + Math.sin(a) * 0.95);
+      ring.push([sx, sy, k]);
+    }
+    const back = ring.filter((r) => r[1] <= py);
+    const front = ring.filter((r) => r[1] > py);
+    const folk = (list: [number, number, number][]) => {
+      for (const [sx, sy, k] of list.sort((a, b) => a[1] - b[1])) {
+        const face = sx < px ? 1 : -1;
+        this.drawFolk(sx, sy, 0.95, tunics[k % tunics.length], hairs[k % hairs.length], may ? t * 8 + k : 0, face, false);
+      }
+    };
+    if (may) {
+      const top = py - 52;
+      // Ribbons from the crown to the dancers' hands (those behind first).
+      const ribbons = (list: [number, number, number][]) => {
+        for (const [sx, sy, k] of list) {
+          c.strokeStyle = ['#d84a40', '#f2e8d0', '#4a7ac8', '#e8c040'][k % 4];
+          c.lineWidth = 1;
+          c.beginPath();
+          c.moveTo(px, top + 3);
+          c.quadraticCurveTo((px + sx) / 2, (top + sy) / 2 - 4, sx, sy - 9);
+          c.stroke();
+        }
+      };
+      ribbons(back);
+      folk(back);
+      c.fillStyle = 'rgba(20,20,10,0.25)';
+      c.beginPath();
+      c.ellipse(px, py, 5, 2, 0, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = '#e8dcc0';
+      c.fillRect(px - 1.3, top, 2.6, py - top);
+      c.fillStyle = '#c8b898';
+      c.fillRect(px + 0.3, top, 1, py - top);
+      // A crown of greenery and flowers.
+      c.fillStyle = '#4a7a3a';
+      c.beginPath();
+      c.ellipse(px, top + 2, 6, 2.6, 0, 0, Math.PI * 2);
+      c.fill();
+      for (let k = 0; k < 6; k++) {
+        c.fillStyle = ['#f0d040', '#e85a6a', '#f8f0e0'][k % 3];
+        c.beginPath();
+        c.arc(px + Math.cos(k * 1.05) * 5, top + 2 + Math.sin(k * 1.05) * 2, 1, 0, Math.PI * 2);
+        c.fill();
+      }
+      ribbons(front);
+      folk(front);
+      return;
+    }
+    // Harvest bonfire.
+    folk(back);
+    c.fillStyle = 'rgba(30,20,10,0.35)';
+    c.beginPath();
+    c.ellipse(px, py, 10, 4.5, 0, 0, Math.PI * 2);
+    c.fill();
+    c.strokeStyle = '#5a3e26';
+    c.lineWidth = 2.2;
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * Math.PI * 2;
+      c.beginPath();
+      c.moveTo(px + Math.cos(a) * 8, py + Math.sin(a) * 3.4);
+      c.lineTo(px + Math.cos(a) * 1.5, py - 14);
+      c.stroke();
+    }
+    for (let k = 0; k < 3; k++) {
+      const f = 0.85 + 0.15 * Math.sin(t * (8 + k * 3) + k);
+      c.fillStyle = ['rgba(240,90,30,0.9)', 'rgba(255,160,40,0.9)', 'rgba(255,230,120,0.95)'][k];
+      const w = (7 - k * 2) * f;
+      const h = (22 - k * 5) * f;
+      c.beginPath();
+      c.moveTo(px - w, py - 2);
+      c.quadraticCurveTo(px - w * 0.6, py - h * 0.6, px + Math.sin(t * 5 + k) * 1.5, py - 2 - h);
+      c.quadraticCurveTo(px + w * 0.6, py - h * 0.6, px + w, py - 2);
+      c.closePath();
+      c.fill();
+    }
+    if (Math.random() < 0.3) this.sparks.push({ x: px + (Math.random() - 0.5) * 6, y: py - 18, vx: (Math.random() - 0.5) * 14 + this.wind * 6, vy: -30 - Math.random() * 20, life: 0, max: 0.8 + Math.random() * 0.5 });
+    this.nightLights.push(px, py - 6, 1.6);
+    folk(front);
   }
 
   /** Lanterns seen this frame, as world x, y and strength triples. */
