@@ -321,7 +321,7 @@ The 3D view (built from the game's own drawings) and the first gridless steps (b
 
 ### Phase 31 — Water and weather in the flat look
 - [x] Ducks and their broods paddling near the banks, spring to autumn
-- [ ] A fishing boat out on the water near a working fishery
+- [x] A fishing boat out on the water near a working fishery
 - [ ] Puddles on dirt lanes after rain, drying out over the following days
 - [ ] Morning mist over water and low meadows in spring and autumn
 - [ ] Chimney smoke and washing lines leaning with a shared, slowly shifting wind

@@ -362,7 +362,10 @@ export class Renderer {
       const d = Math.max(tx + ty, this.boost[ty * W + tx]);
       this.buckets[Math.min(nb - 1, d)].push(ai * 4 + 3);
     });
-    if (!this.light && season !== 3) this.drawDucks(s, visible);
+    if (!this.light && season !== 3) {
+      this.drawDucks(s, visible);
+      this.drawBoats(s, visible);
+    }
     for (const bucket of this.buckets) {
       for (const code of bucket) {
         const kind = code & 3;
@@ -1399,6 +1402,88 @@ export class Renderer {
         c.fillStyle = '#e8a030';
         c.fillRect(face > 0 ? hx + 0.9 * r : hx - 2.1 * r, hy - 0.1, 1.2 * r, 0.6 * r);
       }
+    }
+  }
+
+  /** For each fishery, the open water tile its boat rows out to (or -1). */
+  private boatSpots = new Map<number, number>();
+
+  /** A rowing boat with a fisher casting a line, out from each working fishery. */
+  private drawBoats(s: GameState, visible: (x: number, y: number) => boolean): void {
+    if (this.duckMap !== s.terrain) this.boatSpots.clear();
+    const W = s.width;
+    const water = (x: number, y: number) => inBounds(s, x, y) && s.terrain[idx(s, x, y)] === 1;
+    const c = this.ctx;
+    for (const b of s.buildings) {
+      if (b.type !== 'fisher' || b.build < 1 || b.workers <= 0 || b.paused) continue;
+      let spot = this.boatSpots.get(b.id);
+      if (spot === undefined) {
+        // The nearest water with open water all round, within a short row.
+        spot = -1;
+        let bd = 1e9;
+        const cx = b.x + b.w / 2;
+        const cy = b.y + b.h / 2;
+        for (let y = b.y - 6; y < b.y + b.h + 6; y++) {
+          for (let x = b.x - 6; x < b.x + b.w + 6; x++) {
+            let open = true;
+            for (let dy = -1; dy <= 1 && open; dy++) for (let dx = -1; dx <= 1; dx++) open &&= water(x + dx, y + dy);
+            if (!open) continue;
+            const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy) + ((x * 7 + y * 13 + b.id) % 5) * 0.3;
+            if (d < bd) {
+              bd = d;
+              spot = y * W + x;
+            }
+          }
+        }
+        this.boatSpots.set(b.id, spot);
+      }
+      if (spot < 0) continue;
+      const t = this.time;
+      const x = (spot % W) + 0.5 + Math.sin(t * 0.07 + b.id) * 0.25;
+      const y = ((spot / W) | 0) + 0.5 + Math.cos(t * 0.05 + b.id) * 0.2;
+      const [sx, sy0] = iso(x, y);
+      if (!visible(sx, sy0)) continue;
+      const sy = sy0 + Math.sin(t * 1.6 + b.id) * 0.6;
+      const f = b.id % 2 ? 1 : -1;
+      // Ripples round the hull.
+      c.strokeStyle = 'rgba(230,242,248,0.45)';
+      c.lineWidth = 0.7;
+      c.beginPath();
+      c.ellipse(sx, sy0 + 1, 14 + Math.sin(t * 1.6) * 1, 4.5, 0, 0, Math.PI * 2);
+      c.stroke();
+      // Hull: a dark wooden boat seen from the side, bow up at one end.
+      c.fillStyle = '#5a3e26';
+      c.beginPath();
+      c.moveTo(sx - 11 * f, sy - 4);
+      c.lineTo(sx + 12 * f, sy - 5.5);
+      c.quadraticCurveTo(sx + 9 * f, sy + 1.5, sx + 4 * f, sy + 1.5);
+      c.lineTo(sx - 7 * f, sy + 1.5);
+      c.quadraticCurveTo(sx - 10 * f, sy + 0.5, sx - 11 * f, sy - 4);
+      c.fill();
+      c.fillStyle = '#7a5636';
+      c.fillRect(Math.min(sx - 10 * f, sx + 11 * f), sy - 5, 21, 1.4);
+      // The fisher, seated, rod out over the water.
+      this.drawFolk(sx - 3 * f, sy - 1.5, 0.85, '#6a7a5a', '#4a3020', 0, f, false);
+      const rx = sx + 1 * f;
+      const ry = sy - 9;
+      const tx = rx + 16 * f;
+      const ty = ry - 9 + Math.sin(t * 0.9 + b.id) * 1.2;
+      c.strokeStyle = '#6b4a2e';
+      c.lineWidth = 0.9;
+      c.beginPath();
+      c.moveTo(rx, ry);
+      c.lineTo(tx, ty);
+      c.stroke();
+      c.strokeStyle = 'rgba(240,240,230,0.7)';
+      c.lineWidth = 0.4;
+      c.beginPath();
+      c.moveTo(tx, ty);
+      c.lineTo(tx + 2 * f, sy + 3);
+      c.stroke();
+      c.fillStyle = '#d84a30';
+      c.beginPath();
+      c.arc(tx + 2 * f, sy + 3 + Math.sin(t * 2.3 + b.id) * 0.5, 0.9, 0, Math.PI * 2);
+      c.fill();
     }
   }
 
