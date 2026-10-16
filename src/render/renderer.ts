@@ -1584,7 +1584,7 @@ export class Renderer {
 
   /** Spring brings a passing shower about one day in three, chosen by the date. */
   private drawRain(s: GameState, season: Season, dt: number, wrap: (f: { x: number; y: number }) => void): void {
-    const showery = season === 0 && ((s.day * 2654435761) >>> 0) % 3 === 0;
+    const showery = season === 0 && s.day > 10 && ((s.day * 2654435761) >>> 0) % 3 === 0;
     const goal = showery ? 1 : 0;
     this.rainLevel += Math.max(-dt * 0.4, Math.min(dt * 0.4, goal - this.rainLevel));
     if (this.rainLevel <= 0.01) {

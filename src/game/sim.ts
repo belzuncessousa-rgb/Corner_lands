@@ -178,6 +178,8 @@ export function placementError(s: GameState, type: BuildingType, x: number, y: n
     return 'Must be next to water';
   }
   if (type === 'cathedral' && s.buildings.some((b) => b.type === 'cathedral')) return 'Your town has its cathedral';
+  if (type === 'guildhall' && s.buildings.some((b) => b.type === 'guildhall')) return 'Your town has its guildhall';
+  if (type === 'belltower' && s.buildings.some((b) => b.type === 'belltower')) return 'Your town has its bell tower';
   if ((d.cost.gold ?? 0) > s.res.gold) return 'Not enough coins';
   return null;
 }
@@ -546,11 +548,12 @@ export function noteSeen(s: GameState): void {
 export function exportGoods(s: GameState): number {
   const markets = s.buildings.filter((b) => b.type === 'market' && b.build >= 1 && b.workers > 0).length;
   let budget = markets * EXPORT_PER_MARKET * (hasCharter(s, 'trade2') ? 2 : 1);
+  const guild = s.buildings.some((b) => b.type === 'guildhall' && b.build >= 1 && b.workers > 0);
   let gold = 0;
   const sold: string[] = [];
   for (const k in s.sell ?? {}) {
     const id = k as ResourceId;
-    const price = priceOf(s, id) * (hasCharter(s, 'trade3a') ? 1.3 : 1);
+    const price = priceOf(s, id) * (hasCharter(s, 'trade3a') ? 1.3 : 1) * (guild ? 1.2 : 1);
     if (!price || budget <= 0) continue;
     const n = Math.min(budget, Math.floor(s.res[id] - keepOf(s, id)));
     if (n <= 0) continue;
@@ -1816,6 +1819,7 @@ function passiveStatus(s: GameState, b: Building): string {
     case 'garden':
     case 'maypole':
     case 'statue':
+    case 'belltower':
     case 'cathedral':
     case 'church': {
       let homes = 0;
@@ -2167,6 +2171,8 @@ export function prestigeIncome(s: GameState): number {
     else if (b.type === 'cathedral') n += 6;
     else if (b.type === 'wall') walls++;
     else if (b.type === 'statue') n += 1;
+    else if (b.type === 'belltower') n += 2;
+    else if (b.type === 'guildhall') n += 4;
     else if (b.type === 'maypole') n += 0.5;
     else if (b.type === 'house' && b.level >= 3) n += 0.2;
     else if (b.type === 'hunter' && hasCharter(s, 'nature3b')) n += 1;
@@ -2350,6 +2356,7 @@ export function updateHappiness(s: GameState): void {
   }
   for (const m of s.moods ?? []) if (m.until > s.day) factors.push({ label: m.label, value: m.value });
   if (s.buildings.some((b) => b.type === 'cathedral' && b.build >= 1)) factors.push({ label: 'The cathedral', value: 6 });
+  if (s.buildings.some((b) => b.type === 'guildhall' && b.build >= 1)) factors.push({ label: 'Pride in the guildhall', value: 3 });
   if (wallSections(s) >= WALL_SAFE) factors.push({ label: 'Safe behind the town walls', value: 4 });
   if (s.retinue) factors.push({ label: "The lord's guard", value: 2 });
   if (s.charters?.length) {
@@ -2448,6 +2455,8 @@ const MILESTONES: { id: string; text: string; reached: (s: GameState) => boolean
   ...TIERS.slice(1).map((t, i) => ({ id: `tier${i + 1}`, text: `The settlement became a ${t.name}`, reached: (s: GameState) => s.tier >= i + 1, quiet: true })),
   { id: 'fair', text: 'The first fair was held', reached: (s) => (s.fairs ?? 0) > 0, quiet: true },
   { id: 'walls', text: 'The town walls were closed', reached: (s) => wallSections(s) >= WALL_SAFE },
+  { id: 'belltower', text: 'The bells of the new tower rang out', reached: (s) => s.buildings.some((b) => b.type === 'belltower' && b.build >= 1) },
+  { id: 'guildhall', text: 'The guilds opened their hall', reached: (s) => s.buildings.some((b) => b.type === 'guildhall' && b.build >= 1) },
   { id: 'cathedral', text: 'The cathedral was consecrated', reached: (s) => s.buildings.some((b) => b.type === 'cathedral' && b.build >= 1) },
 ];
 

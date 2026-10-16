@@ -52,7 +52,7 @@ const HAIR = ['#3a2a1a', '#6a4a2a', '#c8a060', '#2a2420', '#8a5a2a', '#d8d0c0'];
 const ROAD_SPEED = ROAD_TILES_PER_DAY / DAY_SECONDS;
 const OFFROAD_SPEED = OFFROAD_TILES_PER_DAY / DAY_SECONDS;
 const PAVED_SPEED = STONE_ROAD_TILES_PER_DAY / DAY_SECONDS;
-const GATHERING = new Set(['market', 'well', 'church', 'cathedral', 'maypole', 'garden', 'statue']);
+const GATHERING = new Set(['market', 'well', 'church', 'cathedral', 'maypole', 'garden', 'statue', 'belltower', 'guildhall']);
 const MAX_AGENTS = 180;
 
 export class AgentSystem {

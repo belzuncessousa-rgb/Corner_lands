@@ -103,6 +103,8 @@ export type BuildingType =
   | 'market'
   | 'church'
   | 'cathedral'
+  | 'guildhall'
+  | 'belltower'
   | 'wall'
   | 'storehouse'
   | 'granary'

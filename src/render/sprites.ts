@@ -1871,6 +1871,77 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       p.ctx.fill();
       break;
     }
+    case 'belltower': {
+      const stone = '#c2b9a8';
+      const dark = '#a69d8c';
+      p.shadow(0.35, 0.35, 1.65, 1.65);
+      // A broad base, the shaft, and the open belfry under a slate spire.
+      p.box(0.4, 0.4, 1.6, 1.6, 0, 14, dark);
+      p.box(0.55, 0.55, 1.45, 1.45, 14, 70, stone);
+      p.wallL(1.452, 0.85, 1.15, 0, 18, '#4a2f1b');
+      for (const z of [30, 52]) {
+        p.wallL(1.452, 0.92, 1.08, z, z + 9, '#3a3a52');
+        p.wallR(1.452, 0.92, 1.08, z, z + 9, '#3a3a52');
+      }
+      p.box(0.5, 0.5, 1.5, 1.5, 84, 4, dark);
+      p.wallL(1.452, 0.68, 1.32, 90, 106, '#221e1b');
+      p.wallR(1.452, 0.68, 1.32, 90, 106, '#221e1b');
+      // The bell inside.
+      const [bx, by] = iso(1.0, 1.45, 94);
+      p.ctx.fillStyle = '#c89a38';
+      p.ctx.beginPath();
+      p.ctx.moveTo(bx - 4, by + 4);
+      p.ctx.quadraticCurveTo(bx - 3, by - 6, bx, by - 6);
+      p.ctx.quadraticCurveTo(bx + 3, by - 6, bx + 4, by + 4);
+      p.ctx.fill();
+      p.box(0.5, 0.5, 1.5, 1.5, 106, 4, dark);
+      p.roofPyramid(0.5, 0.5, 1.5, 1.5, 110, 52, 'slate', 0.04);
+      p.line([1.0, 1.0, 162], [1.0, 1.0, 172], '#d8b84a', 1.4);
+      break;
+    }
+    case 'guildhall': {
+      const stone = '#c2b9a8';
+      const WALL = '#efe3c8';
+      const BEAM = '#5a3a22';
+      p.shadow(0.2, 0.2, 3.85, 3.85);
+      // An arcaded stone ground floor where the merchants meet.
+      p.box(0.3, 0.3, 3.7, 3.7, 0, 20, stone);
+      for (const x of [0.6, 1.3, 2.0, 2.7]) {
+        p.wallL(3.702, x, x + 0.45, 0, 15, '#3a2a1e');
+        p.wallR(3.702, x, x + 0.45, 0, 15, '#3a2a1e');
+      }
+      // Two timbered floors above, jettied out a little.
+      p.box(0.22, 0.22, 3.78, 3.78, 20, 22, WALL);
+      p.timber(0.22, 0.22, 3.78, 3.78, 20, 22, BEAM);
+      for (const x of [0.5, 1.2, 1.9, 2.6, 3.2]) {
+        p.windowL(3.78, x, 27, 0.2, 8, season === 3);
+        p.windowR(3.78, x, 27, 0.2, 8);
+      }
+      p.roofX(0.22, 0.22, 3.78, 3.78, 42, 34, 'tile', WALL, 0.12);
+      // A clock gable over the door, and the guild banners.
+      p.box(1.6, 3.5, 2.4, 3.95, 20, 40, WALL);
+      p.timber(1.6, 3.5, 2.4, 3.95, 20, 40, BEAM);
+      const [cx, cy] = iso(2.0, 3.952, 48);
+      p.ctx.fillStyle = '#f4ecd8';
+      p.ctx.beginPath();
+      p.ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+      p.ctx.fill();
+      p.ctx.strokeStyle = '#3a2a1e';
+      p.ctx.lineWidth = 1;
+      p.ctx.stroke();
+      p.ctx.beginPath();
+      p.ctx.moveTo(cx, cy);
+      p.ctx.lineTo(cx, cy - 4);
+      p.ctx.moveTo(cx, cy);
+      p.ctx.lineTo(cx + 3, cy + 1);
+      p.ctx.stroke();
+      p.roofY(1.6, 3.5, 2.4, 3.95, 60, 18, 'tile', WALL, 0.08);
+      for (const [x, col] of [[0.7, '#9a2a2a'], [3.3, '#2a4a8a']] as [number, string][]) {
+        p.line([x, 3.8, 20], [x, 3.8, 92], '#4a3a2a', 1.2);
+        p.wallL(3.802, x, x + 0.25, 80, 92, col);
+      }
+      break;
+    }
     case 'garden': {
       const flowers = season === 3 ? ['#e8eef0'] : season === 2 ? ['#d8903a', '#b8503a', '#e0c040'] : ['#e84a6a', '#f2d34a', '#b97ae0', '#f4f0e0', '#e86a3a'];
       p.poly(

@@ -47,6 +47,7 @@ const TRADE_NAMES: Partial<Record<BuildingType, string>> = {
   scriptorium: 'Scrivener',
   church: 'Clerk',
   cathedral: 'Canon',
+  guildhall: 'Alderman',
 };
 
 function hash(s: string): number {

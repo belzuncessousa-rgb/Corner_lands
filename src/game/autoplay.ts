@@ -48,7 +48,8 @@ export function tryPlace(s: GameState, type: BuildingType, near?: { x: number; y
   const d = BUILDINGS[type];
   // Count materials already promised to unfinished sites. The cathedral, like a
   // player would, is begun with the coins alone; builders gather the rest over years.
-  if (type === 'cathedral' ? s.res.gold < (d.cost.gold ?? 0) + 500 : !affordsWithPromises(s, d.cost)) return false;
+  // So are the other great works.
+  if (type === 'cathedral' || type === 'guildhall' || type === 'belltower' ? s.res.gold < (d.cost.gold ?? 0) + 500 : !affordsWithPromises(s, d.cost)) return false;
   const reached = reachableRoads(s);
   let best: { x: number; y: number; score: number } | null = null;
   const hall = s.buildings.find((b) => b.type === 'townhall')!;
@@ -439,6 +440,13 @@ export function act(s: GameState, rand: () => number): void {
   }
   // Rich enough for the great work: begin the cathedral before anything else.
   if ((s.tier >= 4 || (s.tier >= 3 && s.res.gold > 4000)) && count(s, 'cathedral') < 1 && s.day % DAYS_PER_MONTH === 0 && tryPlace(s, 'cathedral')) return;
+  // Coins to spare: the other great works, a bell tower and the guildhall.
+  if (s.tier >= 3 && s.day % DAYS_PER_MONTH === 5) {
+    for (const t of ['belltower', 'guildhall'] as BuildingType[]) {
+      const d = BUILDINGS[t];
+      if (d.tier <= s.tier && count(s, t) < 1 && s.res.gold > (d.cost.gold ?? 0) * 2 && tryPlace(s, t)) return;
+    }
+  }
   // Jobs nobody fills: new workplaces would only spread the villagers thinner.
   const short = labourSummary(s).short.reduce((a, x) => a + x.want - x.have, 0);
   // Grain piling up: more mills and ovens before anything else.

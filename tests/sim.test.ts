@@ -1144,3 +1144,35 @@ describe('steward on idle hands and unused piles', () => {
     expect(said).toMatch(/150 hides lie unused.*Tannery/);
   });
 });
+
+describe('great works', () => {
+  it('one guildhall and one bell tower per town; the guildhall lifts prices and spirits', async () => {
+    const { exportGoods, prestigeIncome } = await import('../src/game/sim');
+    const s = generateWorld(21);
+    s.tier = 4;
+    s.res.gold = 50000;
+    const hall = s.buildings.find((b) => b.type === 'townhall')!;
+    const put = (t: BuildingType) => {
+      for (let r = 3; r < 25; r++)
+        for (let dy = -r; dy <= r; dy++)
+          for (let dx = -r; dx <= r; dx++) if (!placementError(s, t, hall.x + dx, hall.y + dy)) return placeOrder(s, t, hall.x + dx, hall.y + dy)!;
+      throw new Error(`no room for ${t}`);
+    };
+    const market = put('market');
+    market.build = 1;
+    market.workers = 1;
+    const guild = put('guildhall');
+    const tower = put('belltower');
+    expect(placementError(s, 'guildhall', 1, 1)).toMatch(/has its guildhall/);
+    expect(placementError(s, 'belltower', 1, 1)).toMatch(/has its bell tower/);
+    s.sell = { stone: true };
+    s.res.stone = 500;
+    const plain = exportGoods(structuredClone(s));
+    guild.build = 1;
+    guild.workers = 2;
+    tower.build = 1;
+    const richer = exportGoods(structuredClone(s));
+    expect(richer).toBeGreaterThan(plain * 1.15);
+    expect(prestigeIncome(s)).toBeGreaterThanOrEqual(6);
+  });
+});

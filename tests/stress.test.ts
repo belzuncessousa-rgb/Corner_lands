@@ -256,7 +256,7 @@ describe('stress', () => {
       const size = serialize(s).length;
       const walls = s.buildings.filter((b) => b.type === 'wall' && b.build >= 1).length;
       console.log(
-        `seed ${seed}: walls ${walls} festivals ${JSON.stringify(s.festivals ?? {})} cathedral ${s.buildings.some((b) => b.type === 'cathedral')} pop ${s.population} tier ${s.tier} gold ${Math.round(s.res.gold)} prestige ${Math.round(s.res.prestige)} messages ${s.messages.length} history ${s.history.length} buildings ${s.buildings.length} save ${Math.round(size / 1024)}KB ${ms.toFixed(2)}ms/day hungry ${hungry} ${bad ?? 'ok'}`,
+        `seed ${seed}: walls ${walls} festivals ${JSON.stringify(s.festivals ?? {})} great ${["cathedral", "belltower", "guildhall"].filter((t) => s.buildings.some((b) => b.type === t && b.build >= 1)).join("+")} pop ${s.population} tier ${s.tier} gold ${Math.round(s.res.gold)} prestige ${Math.round(s.res.prestige)} messages ${s.messages.length} history ${s.history.length} buildings ${s.buildings.length} save ${Math.round(size / 1024)}KB ${ms.toFixed(2)}ms/day hungry ${hungry} ${bad ?? 'ok'}`,
       );
       expect(bad).toBeNull();
       // Bounded lists: the log keeps the last forty messages.
