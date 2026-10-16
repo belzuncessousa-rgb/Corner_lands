@@ -913,6 +913,35 @@ export function employed(s: GameState): number {
   return n;
 }
 
+/** Fells up to n units of timber from the trees around a site; false if there are none. */
+function fellNear(s: GameState, b: Building, n: number): boolean {
+  let got = 0;
+  for (let r = 1; r <= 4 && got < n; r++) {
+    for (let y = b.y - r; y < b.y + b.h + r && got < n; y++) {
+      for (let x = b.x - r; x < b.x + b.w + r && got < n; x++) {
+        if (!inBounds(s, x, y)) continue;
+        const i = idx(s, x, y);
+        if (s.trees[i] <= 0 || s.groves?.some((g) => x >= g.x && x < g.x + g.w && y >= g.y && y < g.y + g.h)) continue;
+        s.trees[i]--;
+        got += 2;
+        if (!s.trees[i]) (s.stumps ??= {})[i] = s.day;
+      }
+    }
+  }
+  return got > 0;
+}
+
+/** True when a site still needs materials and none of them is in storage. */
+export function starvedSite(s: GameState, b: Building): boolean {
+  if (b.type === 'woodcutter' && b.build < 1) return false;
+  if (!needsMaterials(b)) return false;
+  for (const k in b.need) {
+    const id = k as ResourceId;
+    if ((b.need[id] ?? 0) > 0 && s.res[id] >= 1) return false;
+  }
+  return true;
+}
+
 /** Re-runs connectivity, distributes residents and assigns jobs. */
 export function recompute(s: GameState): void {
   if (s.dirty) {
@@ -949,7 +978,10 @@ export function recompute(s: GameState): void {
     // Pausing stops a workplace's production, not building work on it.
     // Town wall sections are a long project: after every workplace, so the
     // masons who make their stone keep working.
-    if (isProject(b)) jobs.push({ b, site: true, p: 100 + (b.type === 'wall' ? WALL_SITE_PRIORITY : SITE_PRIORITY) + b.id * 1e-6 });
+    // A site whose materials are all missing from storage holds no builders:
+    // they would only stand about, while the woodcutters who could end the
+    // wait went unstaffed.
+    if (isProject(b) && !starvedSite(s, b)) jobs.push({ b, site: true, p: 100 + (b.type === 'wall' ? WALL_SITE_PRIORITY : SITE_PRIORITY) + b.id * 1e-6 });
     if (b.paused) continue;
     if (b.build >= 1 && workDef(b).workers > 0 && (b.want ?? 1) > 0 && !restingNow(s, b)) {
       // Families working a craft from home always tend to it first.
@@ -1912,9 +1944,9 @@ function dailyOrchards(s: GameState): void {
 
 /** Backyard extensions a family can keep, what they cost and make. */
 export const YARDS: Record<string, { name: string; cost: Cost; desc: string; tier: number }> = {
-  veg: { name: 'Vegetable patch', cost: { wood: 4 }, desc: 'Cabbages, leeks and turnips: 3 vegetables a month from spring to autumn.', tier: 0 },
-  hens: { name: 'Hen coop', cost: { wood: 8 }, desc: 'A few hens: 3 eggs a month, 1 in winter.', tier: 0 },
-  bees: { name: 'Beehives', cost: { wood: 6, gold: 15 }, desc: 'Straw skeps: about 8 honey each late summer.', tier: 1 },
+  veg: { name: 'Vegetable patch', cost: { wood: 4, gold: 8 }, desc: 'Cabbages, leeks and turnips: 3 vegetables a month from spring to autumn.', tier: 0 },
+  hens: { name: 'Hen coop', cost: { wood: 8, gold: 15 }, desc: 'A few hens: 3 eggs a month, 1 in winter.', tier: 0 },
+  bees: { name: 'Beehives', cost: { wood: 6, gold: 25 }, desc: 'Straw skeps: about 8 honey each late summer.', tier: 1 },
 };
 
 export function setYard(s: GameState, b: Building, kind: string | undefined): string | null {
@@ -2114,6 +2146,13 @@ export function dailyConstruction(s: GameState): void {
       const carry = (n * CARRY_LOAD) / ((b.trip ?? 0) + 0.5);
       let pool = (renovating ? (b.carry ?? 0) : b.work) + carry;
       let missing = '';
+      // With no timber in store, a woodcutter's lodge is raised from trees
+      // felled on the spot, so a town can never be stuck without one.
+      if (b.type === 'woodcutter' && !renovating && (b.need!.wood ?? 0) > 0 && s.res.wood < 1 && fellNear(s, b, n * 2)) {
+        b.need!.wood = Math.max(0, (b.need!.wood ?? 0) - n * 2);
+        setStatus('Felling timber on the spot');
+        continue;
+      }
       for (const k in b.need) {
         const id = k as ResourceId;
         const want = b.need![id] ?? 0;

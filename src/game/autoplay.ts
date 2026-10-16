@@ -50,7 +50,8 @@ export function tryPlace(s: GameState, type: BuildingType, near?: { x: number; y
   // Count materials already promised to unfinished sites. The cathedral, like a
   // player would, is begun with the coins alone; builders gather the rest over years.
   // So are the other great works.
-  if (type === 'cathedral' || type === 'guildhall' || type === 'belltower' ? s.res.gold < (d.cost.gold ?? 0) + 500 : !affordsWithPromises(s, d.cost)) return false;
+  // A woodcutter's lodge can always be begun: without timber, its builders fell their own.
+  if (type === 'cathedral' || type === 'guildhall' || type === 'belltower' ? s.res.gold < (d.cost.gold ?? 0) + 500 : type !== 'woodcutter' && !affordsWithPromises(s, d.cost)) return false;
   const reached = reachableRoads(s);
   let best: { x: number; y: number; score: number } | null = null;
   const hall = s.buildings.find((b) => b.type === 'townhall')!;
@@ -472,6 +473,8 @@ export function act(s: GameState, rand: () => number): void {
     for (const t of wants) if (BUILDINGS[t].tier <= s.tier && tryPlace(s, t)) return;
     return;
   }
+  // Woods felled bare: plant before anything else, as a careful player would.
+  if (count(s, 'forester') < count(s, 'woodcutter') && s.buildings.some((b) => b.type === 'woodcutter' && b.status === 'No trees in range')) wants.push('forester');
   if (count(s, 'woodcutter') < 2 + Math.floor(pop / 15) || (s.res.wood < 25 && count(s, 'woodcutter') < 4 + Math.floor(pop / 10))) wants.push('woodcutter');
   if (totalHousing(s) - pop < 4 && idle >= 0) wants.push('house');
   if (count(s, 'quarry') < 1 + Math.floor(pop / 30)) {

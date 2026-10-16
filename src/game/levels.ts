@@ -29,8 +29,8 @@ export interface HouseLevel {
 export const HOUSE_LEVELS: HouseLevel[] = [
   { name: '', housing: 0, tax: 0 },
   { name: 'Cottage', housing: 5, tax: 1 },
-  { name: 'Timber House', housing: 7, tax: 1.5, cost: { planks: 10, stone: 5, gold: 20 }, tier: 1 },
-  { name: 'Townhouse', housing: 9, tax: 2, cost: { planks: 20, tiles: 15, stone: 10, tools: 3, gold: 50 }, tier: 2 },
+  { name: 'Timber House', housing: 7, tax: 1.5, cost: { planks: 12, wood: 6 }, tier: 1 },
+  { name: 'Townhouse', housing: 9, tax: 2, cost: { planks: 20, tiles: 15, stone: 10, tools: 3 }, tier: 2 },
 ];
 
 export const MANOR_LEVELS: { name: string; cost?: Cost; days?: number }[] = [
@@ -45,7 +45,7 @@ export const MANOR_LEVELS: { name: string; cost?: Cost; days?: number }[] = [
 /** Extra storage each manor level above the first provides. */
 export const MANOR_STORAGE_PER_LEVEL = { materials: 60, food: 50 };
 
-export const WORKPLACE_UPGRADE: Cost = { planks: 15, stone: 10, gold: 30 };
+export const WORKPLACE_UPGRADE: Cost = { planks: 15, wood: 10 };
 export const UPGRADABLE_WORK: BuildingType[] = [
   'woodcutter',
   'forester',

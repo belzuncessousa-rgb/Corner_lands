@@ -680,6 +680,7 @@ describe('review regressions', () => {
     s.tier = 1;
     s.res.wood = 150;
     s.res.gold = 200;
+    s.res.planks = 20;
     s.population = 12;
     const byre = placeNearRoad(s, 'byre');
     let z = null;

@@ -233,7 +233,7 @@ export function generateWorld(seed: number, opts: { relaxed?: boolean; hardy?: b
   s.res.planks = 0;
   s.res.berries = 40;
   s.res.meat = 20;
-  s.res.gold = 150;
+  s.res.gold = 100;
   if (opts.relaxed) {
     s.relaxed = true;
     for (const k of ['wood', 'stone', 'berries', 'meat', 'gold'] as const) s.res[k] *= 2;

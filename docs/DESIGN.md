@@ -355,8 +355,8 @@ art, the logic and balance get this pass. Grouped by how deep each change goes.
 - [x] Bug: the manor stopped improving in one playthrough (renovations never said what they were waiting for; now the upgrade box shows it, e.g. "Waiting for dressed stone in storage")
 - [ ] Haulers visibly carry what they move
 - [x] Fishers sit in their boats (no legs or shadow); fewer duck families, five to seven ducklings each
-- [ ] Less stone early: level 1 buildings are timber; stone is for better buildings
-- [ ] Coins only for what must be imported: woodcutter and forester cost timber only; orchards, decorations and backyard extensions cost coins (and some materials). Coins hard to come by and worth spending
+- [x] Less stone early: level 1 buildings are timber (wells, dairies, sawpits, tanneries, windmills, Timber Houses); stone is for better buildings
+- [x] Coins only for what must be imported: woodcutter and forester cost timber only, as do markets, taverns, smithies and upgrades; orchards, decorations and backyard extensions cost coins (and some materials); great works keep coins for their bells, glass and the like. Taxes halved and the start purse 100, so coins are hard to come by and worth spending. A woodcutter's lodge can always be built: with no timber in store its builders fell trees on the spot
 
 ### Phase 35 — How work and goods move
 - [ ] Yield is throughput: what a workplace makes depends on how much its workers get done in a day (walking included)
