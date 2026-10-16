@@ -11,17 +11,29 @@ let dir = '';
 
 beforeAll(async () => {
   dir = mkdtempSync(join(tmpdir(), 'cl-saves-'));
-  const port = 3900 + Math.floor(Math.random() * 500);
-  base = `http://localhost:${port}`;
-  proc = spawn('node', ['server/index.mjs'], { env: { ...process.env, PORT: String(port), SAVES_DIR: dir } });
-  await new Promise<void>((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error('server did not start')), 5000);
-    proc.stdout!.on('data', () => {
-      clearTimeout(t);
-      resolve();
-    });
-  });
-});
+  // Under load the server can be slow to start, or a random port may be taken:
+  // poll its health, and try another port if it exits.
+  for (let attempt = 0; attempt < 3 && !base; attempt++) {
+    const port = 3900 + Math.floor(Math.random() * 500);
+    const url = `http://localhost:${port}`;
+    proc = spawn('node', ['server/index.mjs'], { env: { ...process.env, PORT: String(port), SAVES_DIR: dir } });
+    let exited = false;
+    proc.on('exit', () => (exited = true));
+    for (let t = 0; t < 150 && !exited; t++) {
+      try {
+        if ((await fetch(`${url}/api/health`)).ok) {
+          base = url;
+          break;
+        }
+      } catch {
+        /* not listening yet */
+      }
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    if (!base) proc.kill();
+  }
+  if (!base) throw new Error('server did not start');
+}, 60000);
 
 afterAll(() => {
   proc?.kill();
