@@ -173,6 +173,9 @@ then fall back to the browser's localStorage.
   lived-in homes (off at faster speeds and in light mode).
 - **Weather** — snow drifts in winter, leaves fall in autumn and spring brings
   passing showers (all off in light mode).
+- **Music** — now and then a short recorder tune over a plucked drone, in a
+  different mode for each season, with long silences between; Music in the
+  game menu turns it off.
 - **Settings** — the game menu (Esc) scales every panel from 85% to 130% and
   can pause the game whenever bad news arrives.
 - **Relaxed and Hardy modes** — Relaxed doubles the starting supplies and nobody

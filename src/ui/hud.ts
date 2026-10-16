@@ -92,6 +92,7 @@ import type { Game } from '../main';
 import { CATEGORY_ICONS, ICONS, SEASON_ICONS } from './icons';
 import { Minimap } from './minimap';
 import { Ambient } from './ambient';
+import { Music } from './music';
 import { folkDoing, folkName, folkThought, WISHES, workplaceOf } from './folk';
 
 const ZONE_COST_NOTE: Partial<Record<BuildingType, string>> = {
@@ -180,6 +181,9 @@ export class Hud {
   private modal: HTMLElement | null = null;
   private audio: AudioContext | null = null;
   private ambient: Ambient | null = null;
+  private music: Music | null = null;
+  /** The seasonal tune, separately from the other sounds. */
+  private musicOn = true;
   muted = false;
   private objectivesMin = true;
   private lastInspectorKey = '';
@@ -196,6 +200,7 @@ export class Hud {
       this.uiScale = Number(localStorage.getItem('cornerlands.uiScale')) || 1;
       this.pauseOnBad = localStorage.getItem('cornerlands.pauseOnBad') === '1';
       this.tipsOn = localStorage.getItem('cornerlands.tipsOff') !== '1';
+      this.musicOn = localStorage.getItem('cornerlands.music') !== '0';
       this.tipsSeen = new Set(JSON.parse(localStorage.getItem('cornerlands.tips') ?? '[]') as string[]);
     } catch {
       /* ignore */
@@ -1992,6 +1997,7 @@ export class Hud {
         <button data-m="new">New Settlement</button>
         <button data-m="help">How to Play</button>
         <button data-m="sound">Sound: ${this.muted ? 'Off' : 'On'}</button>
+        <button data-m="music" ${this.muted ? 'disabled' : ''}>Music: ${this.musicOn ? 'On' : 'Off'}</button>
         <button data-m="scale">Text size: ${Math.round(this.uiScale * 100)}%</button>
         <button data-m="pausebad">Pause on bad news: ${this.pauseOnBad ? 'On' : 'Off'}</button>
         <button data-m="tips">Tips: ${this.tipsOn ? 'On' : 'Off'}</button>
@@ -2041,6 +2047,16 @@ export class Hud {
       } catch {
         btn.textContent = url;
       }
+    });
+    m.querySelector('[data-m="music"]')!.addEventListener('click', () => {
+      this.musicOn = !this.musicOn;
+      this.music?.setOn(this.musicOn);
+      try {
+        localStorage.setItem('cornerlands.music', this.musicOn ? '1' : '0');
+      } catch {
+        /* ignore */
+      }
+      this.showGameMenu();
     });
     m.querySelector('[data-m="tips"]')!.addEventListener('click', () => {
       this.tipsOn = !this.tipsOn;
@@ -2242,6 +2258,8 @@ export class Hud {
     try {
       this.audio = new AudioContext();
       this.ambient = new Ambient(this.audio);
+      this.music = new Music(this.audio);
+      this.music.setOn(this.musicOn);
     } catch {
       /* no audio */
     }
@@ -2251,6 +2269,7 @@ export class Hud {
   tickAudio(dt: number, running: boolean): void {
     if (!this.ambient || this.muted || this.audio?.state !== 'running') return;
     this.ambient.update(dt, seasonOf(this.game.state.day), running);
+    this.music?.update(dt, seasonOf(this.game.state.day), running);
   }
 
   sound(kind: 'place' | 'road' | 'demolish' | 'good' | 'bad' | 'coin' | 'jig' | 'fanfare' | 'march' | 'stone'): void {
