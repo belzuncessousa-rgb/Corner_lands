@@ -1322,3 +1322,23 @@ describe('names and the weekly seed', () => {
     expect(townName({ seed: 42, name: 'Our Town' })).toBe('Our Town');
   });
 });
+
+describe('town score', () => {
+  it('rises with people, rank and deeds, and counts years without hunger', async () => {
+    const { townScore } = await import('../src/game/sim');
+    const s = generateWorld(16);
+    const start = townScore(s);
+    s.population += 10;
+    expect(townScore(s)).toBe(start + 100);
+    s.tier = 2;
+    s.title = 1;
+    expect(townScore(s)).toBe(start + 100 + 1000 + 400);
+    // A year with no hunger counts once it ends.
+    stepDay(s);
+    s.day = DAYS_PER_YEAR - 1;
+    s.year!.hungry = 0;
+    s.res.bread = 1000;
+    stepDay(s);
+    expect(s.fedYears).toBe(1);
+  });
+});

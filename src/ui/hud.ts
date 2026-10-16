@@ -2139,6 +2139,7 @@ export class Hud {
         <p><b>Keys</b>: <kbd>Left-drag</kbd> / <kbd>WASD</kbd> / arrows pan · <kbd>Wheel</kbd> / <kbd>+</kbd><kbd>-</kbd> / pinch zoom · <kbd>R</kbd> road (click, click) · <kbd>T</kbd> paved road · <kbd>X</kbd> / <kbd>Del</kbd> demolish · <kbd>P</kbd> protect a wood · <kbd>V</kbd> reach of wells, markets, taverns, churches · <kbd>Ctrl+Z</kbd> undo the last placement or demolition · ${BUILD_ORDER.filter((b) => BUILDINGS[b].hotkey)
           .map((b) => `<kbd>${BUILDINGS[b].hotkey!.toUpperCase()}</kbd> ${BUILDINGS[b].name.toLowerCase()}`)
           .join(' · ')} · <kbd>Space</kbd> pause · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> speed</p>
+        <p><b>Playing with friends:</b> found the same land with the seed of the week, download your town from Save Game for a friend to open, and compare <b>scores</b> on the load cards: villagers and rank, the lord's title, great works, works of art, milestones and every year in which no one went hungry.</p>
         <p><kbd>Esc</kbd>, <kbd>Right-click</kbd> or a long press on touch screens backs out one step at a time: a dialog, a pinned panel, a half-drawn road or field, the tool, the selection, then opens the menu.</p>
       </div>
       <div class="row" style="justify-content:flex-end"><button class="primary" data-m="back">Back</button></div>`,

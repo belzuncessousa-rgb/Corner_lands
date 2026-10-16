@@ -37,6 +37,7 @@ import {
   updateHappiness,
   yearOf,
   keepOf,
+  townScore,
   GROVE_MAX,
   groveAt,
   protectGrove,
@@ -239,6 +240,7 @@ export class Game {
     }
     const miles = (s.milestones ?? []).length;
     if (miles) deeds.push(`${miles} milestone${miles > 1 ? 's' : ''}`);
+    deeds.push(`Score ${townScore(s)}`);
     return deeds.length ? `${base} — ${deeds.join(' · ')}` : base;
   }
 

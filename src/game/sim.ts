@@ -1466,7 +1466,19 @@ export function yearGoalMet(s: GameState, g: (typeof YEAR_GOALS)[number]): boole
   return g.done ? g.done(s) : g.have(s) >= g.goal;
 }
 
+/**
+ * A friendly score to compare towns: people and rank first, then the lord's
+ * deeds, and every year in which no one went hungry.
+ */
+export function townScore(s: GameState): number {
+  const great = ['cathedral', 'guildhall', 'belltower'].filter((t) => s.buildings.some((b) => b.type === t && b.build >= 1)).length;
+  return Math.round(
+    s.population * 10 + s.tier * 500 + (s.title ?? 0) * 400 + great * 300 + (s.commissions?.length ?? 0) * 200 + (s.milestones?.length ?? 0) * 50 + (s.fedYears ?? 0) * 100,
+  );
+}
+
 function yearInReview(s: GameState): void {
+  if (s.year && s.day > 1 && !(s.year.hungry ?? 0)) s.fedYears = (s.fedYears ?? 0) + 1;
   // Judge the year's goal before the tally starts afresh (the day has just turned).
   const last = s.day - 1;
   const g = s.tier >= TIERS.length - 1 && s.year ? YEAR_GOALS[Math.floor(last / DAYS_PER_YEAR) % YEAR_GOALS.length] : null;
