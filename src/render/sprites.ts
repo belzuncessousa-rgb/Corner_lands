@@ -659,7 +659,7 @@ const HOUSE_VARIANTS: { wall: string; tint: { color: string; t: number } | null;
   { wall: '#dcb6a4', tint: { color: '#6a665e', t: 0.42 }, roof2: 'shingle', prop: 'logs' },
 ];
 
-function drawBuilding(p: Pen, type: BuildingType, level: number, season: Season, variant = 0): V3[] {
+export function drawBuilding(p: Pen, type: BuildingType, level: number, season: Season, variant = 0): V3[] {
   const smoke: V3[] = [];
   // Expanded workshops get fired-clay roofs and a guild banner.
   const expanded = level >= 2 && type !== 'house' && type !== 'townhall';
