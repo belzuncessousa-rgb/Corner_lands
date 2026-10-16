@@ -2024,3 +2024,12 @@ table.prod td.num {
   font-style: italic;
   opacity: 0.75;
 }
+
+.trade-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 6px 0 8px;
+}
+.trade-tabs button.active {
+  background: linear-gradient(180deg, #e8c860, #c89a38);
+}

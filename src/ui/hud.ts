@@ -1575,6 +1575,10 @@ export class Hud {
         this.lastInspectorKey = '';
         break;
       }
+      case 'trade-tab':
+        this.tradeTab = t.dataset.tab as 'food' | 'materials' | 'goods';
+        this.showTrade();
+        break;
       case 'trade-do': {
         const err = trade(s, t.dataset.res as ResourceId, Number(t.dataset.n));
         if (err) this.flash(err);
@@ -2213,12 +2217,19 @@ export class Hud {
     m.querySelectorAll<SVGSVGElement>('svg.chart').forEach(bindChartHover);
   }
 
+  /** Which kind of goods the trade window shows. */
+  private tradeTab: 'food' | 'materials' | 'goods' = 'materials';
+
   private showTrade(): void {
     const s = this.game.state;
     const staffed = s.buildings.some((b) => b.type === 'market' && b.build >= 1 && b.workers > 0);
-    const basic: ResourceId[] = ['wood', 'stone', 'planks', 'tools', 'bread', 'meat', 'fish', 'grain'];
+    // Every tradeable good, in tabs by kind.
+    const tab = this.tradeTab;
+    const tabs = (['food', 'materials', 'goods'] as const)
+      .map((g) => `<button data-action="trade-tab" data-tab="${g}" class="${g === tab ? 'active' : ''}">${GROUP_NAMES[g]}</button>`)
+      .join('');
     const rows = (Object.keys(TRADE_PRICES) as ResourceId[])
-      .filter((r) => basic.includes(r) || s.seen?.includes(r))
+      .filter((r) => GOODS[r].group === tab)
       .map((r) => {
         const buy = buyPrice(s, r, 10);
         const sell = sellPrice(s, r, 10);
@@ -2237,6 +2248,7 @@ export class Hud {
     const last = s.report.trade ?? 0;
     const html = `<h2>Marketplace Trade</h2>
       <p>Gold: <b>${Math.floor(s.res.gold)}</b> ${ICONS.gold} · ${staffed ? `Merchants visit every month and buy up to ${EXPORT_PER_MARKET} goods per market${last ? ` (last month: +${last} gold)` : ''}.` : '<span class="neg">Staff the marketplace so merchants will visit.</span>'}</p>
+      <div class="trade-tabs">${tabs}</div>
       <table class="trade">${rows}</table>
       <div class="row" style="justify-content:flex-end;margin-top:10px"><button class="primary" data-action="close-modal">Done</button></div>`;
     if (wasOpen && this.modal) {

@@ -351,7 +351,7 @@ art, the logic and balance get this pass. Grouped by how deep each change goes.
 - [x] A fertility heatmap on the ground while placing a farm or field
 - [x] Buildings whose requirements are not met yet (charters and the like) are hidden from the menus, not shown locked
 - [x] Stone roads easy to find: the button is "Stone road" and is there from the start (it used to appear only at Village rank)
-- [ ] Trading post lists every good, in tabs by kind
+- [x] Trading post lists every good, in tabs by kind (Food, Materials, Goods); it used to show only basics and goods already seen
 - [x] Bug: the manor stopped improving in one playthrough (renovations never said what they were waiting for; now the upgrade box shows it, e.g. "Waiting for dressed stone in storage")
 - [~] Haulers visibly carry what they move (loads now drawn 1.7x larger; real haulers come with Phase 35)
 - [x] Fishers sit in their boats (no legs or shadow); fewer duck families, five to seven ducklings each
