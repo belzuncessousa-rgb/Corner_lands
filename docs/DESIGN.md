@@ -325,3 +325,10 @@ The 3D view (built from the game's own drawings) and the first gridless steps (b
 - [x] Puddles on dirt lanes after rain, drying out over the following days
 - [x] Morning mist over water and low meadows in spring and autumn
 - [x] Chimney smoke, brewhouse steam and cloud shadows drifting with one shared wind that slowly veers and gusts
+
+### Phase 32 — Evenings and festivals in the flat look
+- [x] Villagers out after dark carry lanterns, with a warm pool of light at their feet
+- [ ] A maypole with dancers by the town hall in late spring
+- [ ] A harvest bonfire with villagers gathered round when the harvest is in
+- [ ] Wreaths on doors and candles in the windows in midwinter
+- [ ] Dogs trotting after some villagers, and cats sunning on walls and log piles

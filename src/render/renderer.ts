@@ -397,6 +397,7 @@ export class Renderer {
     if (!this.light) this.drawWeather(s, season, dt);
     else this.snow = [];
     this.drawAtmosphere(season, s.day);
+    this.drawNightLights();
     this.mark('effects');
   }
 
@@ -1890,6 +1891,23 @@ export class Renderer {
     c.beginPath();
     c.ellipse(wx, wy, 4, 1.8, 0, 0, Math.PI * 2);
     c.fill();
+    if (this.dusk > 0.35 && !this.light && a.key.charCodeAt(a.key.length - 1) % 3 !== 0) {
+      // A lantern after dark, and the warm light it throws on the ground.
+      const glow = Math.min(1, (this.dusk - 0.35) / 0.3) * (0.9 + 0.1 * Math.sin(this.time * 9 + a.step));
+      const lx = wx + 4 * a.dir;
+      const ly = wy - 6 - bob + Math.sin(a.step) * 0.6;
+      this.nightLights.push(lx, wy - 3, glow);
+      c.strokeStyle = '#3a2c20';
+      c.lineWidth = 0.6;
+      c.beginPath();
+      c.moveTo(lx, ly - 2);
+      c.lineTo(wx + 2 * a.dir, wy - 7 - bob);
+      c.stroke();
+      c.fillStyle = `rgba(255,214,120,${glow})`;
+      c.fillRect(lx - 1.1, ly - 1.8, 2.2, 2.8);
+      c.fillStyle = '#3a2c20';
+      c.fillRect(lx - 1.4, ly - 2.4, 2.8, 0.7);
+    }
     // Legs.
     c.strokeStyle = '#3a2c20';
     c.lineWidth = 1.4;
@@ -2386,6 +2404,33 @@ export class Renderer {
       c.drawImage(this.mistPuff, sx - w / 2, sy - w / 4 - 4, w, w / 2);
     }
     c.globalAlpha = 1;
+  }
+
+  /** Lanterns seen this frame, as world x, y and strength triples. */
+  private nightLights: number[] = [];
+
+  /** Warm light added back over the evening tint, so lanterns light the lanes. */
+  private drawNightLights(): void {
+    const L = this.nightLights;
+    if (!L.length) return;
+    const c = this.ctx;
+    const z = this.cam.zoom;
+    c.save();
+    c.globalCompositeOperation = 'lighter';
+    for (let k = 0; k < L.length; k += 3) {
+      const x = this.width / 2 + (L[k] - this.cam.x) * z;
+      const y = this.height / 2 + (L[k + 1] - this.cam.y) * z;
+      const r = 22 * z;
+      const g = c.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, `rgba(255,170,70,${0.32 * L[k + 2]})`);
+      g.addColorStop(1, 'rgba(255,170,70,0)');
+      c.fillStyle = g;
+      c.beginPath();
+      c.ellipse(x, y, r, r * 0.6, 0, 0, Math.PI * 2);
+      c.fill();
+    }
+    c.restore();
+    L.length = 0;
   }
 
   private drawAtmosphere(season: Season, day: number): void {
