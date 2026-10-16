@@ -1,8 +1,8 @@
-import { DAYS_PER_MONTH, FOOD_IDS, GOODS, RESOURCE_STORAGE } from './data';
+import { BUILDINGS, DAYS_PER_MONTH, FOOD_IDS, GOODS, RESOURCE_STORAGE } from './data';
 import type { StorageKind } from './data';
-import { harvestForecast, labourSummary, log, winterBundles, storageCap, stored, totalHousing } from './sim';
+import { harvestForecast, isUnlocked, labourSummary, log, winterBundles, storageCap, stored, totalHousing } from './sim';
 import { RESOURCE_IDS } from './types';
-import type { GameState } from './types';
+import type { BuildingType, GameState, ResourceId } from './types';
 
 /** Minimum days between repeats of the same piece of advice. */
 const COOLDOWN = DAYS_PER_MONTH * 6;
@@ -23,6 +23,36 @@ function piles(s: GameState, kind: StorageKind): string {
     .slice(0, 2)
     .map((r) => `${GOODS[r].name.toLowerCase()} (${Math.floor(s.res[r])})`);
   return top.length ? `, mostly ${top.join(' and ')}` : '';
+}
+
+/** Raw goods that pile up unused, and the workshop that would use them. */
+const USERS: { good: ResourceId; by: BuildingType; makes: string }[] = [
+  { good: 'hides', by: 'tanner', makes: 'leather for boots' },
+  { good: 'wool', by: 'weaver', makes: 'cloth for clothes' },
+  { good: 'flax', by: 'weaver', makes: 'linen for clothes' },
+  { good: 'barley', by: 'brewhouse', makes: 'ale for the taverns' },
+  { good: 'grain', by: 'windmill', makes: 'flour for the bakers' },
+  { good: 'milk', by: 'dairy', makes: 'cheese' },
+];
+const built = (s: GameState, t: BuildingType) => s.buildings.some((b) => b.type === t && b.build >= 1);
+
+/** The largest unused pile, if any is worth a word. */
+function unusedPile(s: GameState): (typeof USERS)[number] | undefined {
+  return USERS.filter((u) => s.res[u.good] >= 80 && !built(s, u.by) && !s.buildings.some((b) => b.type === u.by) && isUnlocked(s, u.by))
+    .sort((a, b) => s.res[b.good] - s.res[a.good])[0];
+}
+
+/** Workplaces a town with spare hands would most likely use. */
+function usefulJobs(s: GameState): string {
+  const ideas: string[] = [];
+  const u = unusedPile(s);
+  if (u) ideas.push(`a ${BUILDINGS[u.by].name} for the ${GOODS[u.good].name.toLowerCase()} in store`);
+  if (food(s) < s.population * 3) ideas.push('another farm, fisher or hunter');
+  if (s.res.planks < 30 && isUnlocked(s, 'sawmill')) ideas.push(`a ${BUILDINGS.sawmill.name}`);
+  if (s.res.stone < 30) ideas.push('a quarry');
+  if (built(s, 'market')) ideas.push('a workshop whose wares the market can sell');
+  else ideas.push('woodcutters and quarries, whose surplus a market can sell');
+  return ideas.slice(0, 3).join(', or ');
 }
 
 /** Wheat each staffed-up windmill grinds in a month, roughly (walking included). */
@@ -134,6 +164,23 @@ const ADVICE: Advice[] = [
     id: 'charter',
     when: (s) => s.tier >= 2 && !(s.charters?.length) && s.res.prestige >= 40,
     text: () => 'Steward: the crown would grant us a charter for our prestige. Open the charters (crown button) and choose what our town should become.',
+  },
+  {
+    id: 'idle-hands',
+    when: (s) => {
+      const l = labourSummary(s);
+      return s.population >= 20 && l.idle >= Math.max(8, s.population * 0.15) && l.builders < l.idle;
+    },
+    text: (s) =>
+      `Steward: ${labourSummary(s).idle} villagers have no work. They could serve in ${usefulJobs(s)}.`,
+  },
+  {
+    id: 'unused-pile',
+    when: (s) => !!unusedPile(s),
+    text: (s) => {
+      const u = unusedPile(s)!;
+      return `Steward: ${Math.floor(s.res[u.good])} ${GOODS[u.good].name.toLowerCase()} lie unused in our stores. A ${BUILDINGS[u.by].name} would turn them into ${u.makes}, or sell them at the market.`;
+    },
   },
 ];
 

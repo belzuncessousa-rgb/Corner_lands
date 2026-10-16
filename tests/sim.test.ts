@@ -1132,3 +1132,15 @@ describe('milestones', () => {
     expect(old.messages.length).toBe(n);
   });
 });
+
+describe('steward on idle hands and unused piles', () => {
+  it('names the workshop that would use a pile nobody touches', async () => {
+    const { advise } = await import('../src/game/advisor');
+    const s = generateWorld(11);
+    s.tier = 1;
+    s.res.hides = 150;
+    for (let i = 0; i < 20; i++) advise(s, 3);
+    const said = s.messages.map((m) => m.text).join(' | ');
+    expect(said).toMatch(/150 hides lie unused.*Tannery/);
+  });
+});
