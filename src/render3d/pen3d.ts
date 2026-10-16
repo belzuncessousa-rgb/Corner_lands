@@ -142,8 +142,41 @@ export class Pen3D extends Pen {
   // Real shadows replace the painted ones.
   override shadow(): void {}
 
+  /** Boxes built so far, so wall details can be mirrored to their far sides. */
+  private boxes: { x0: number; y0: number; x1: number; y1: number; z0: number; z1: number }[] = [];
+  private mirroring = false;
+
+  override wallL(y: number, xa: number, xb: number, za: number, zb: number, fill: string): void {
+    super.wallL(y, xa, xb, za, zb, fill);
+    if (this.mirroring) return;
+    // The same window or door on the back wall of the box it sits on.
+    const b = this.boxes.find((o) => Math.abs(o.y1 - y) < 0.012 && xa >= o.x0 - 0.05 && xb <= o.x1 + 0.05 && za >= o.z0 - 2 && zb <= o.z1 + 2);
+    if (!b) return;
+    this.mirroring = true;
+    super.wallL(b.y0 - (y - b.y1), xa, xb, za, zb, fill);
+    this.mirroring = false;
+  }
+
+  override wallR(x: number, ya: number, yb: number, za: number, zb: number, fill: string): void {
+    super.wallR(x, ya, yb, za, zb, fill);
+    if (this.mirroring) return;
+    const b = this.boxes.find((o) => Math.abs(o.x1 - x) < 0.012 && ya >= o.y0 - 0.05 && yb <= o.y1 + 0.05 && za >= o.z0 - 2 && zb <= o.z1 + 2);
+    if (!b) return;
+    this.mirroring = true;
+    super.wallR(b.x0 - (x - b.x1), ya, yb, za, zb, fill);
+    this.mirroring = false;
+  }
+
+  /** Timber framing on all four walls (the flat view only ever needed two). */
+  override timber(x0: number, y0: number, x1: number, y1: number, z0: number, h: number, color = '#4a3020'): void {
+    super.timber(x0, y0, x1, y1, z0, h, color);
+    super.timber(x0, y1, x1, y0, z0, h, color);
+    super.timber(x1, y0, x0, y1, z0, h, color);
+  }
+
   override box(x0: number, y0: number, x1: number, y1: number, z0: number, h: number, color: string, top?: string, mat?: Material): void {
     const z1 = z0 + h;
+    if (h >= 5) this.boxes.push({ x0, y0, x1, y1, z0, z1 });
     const P = (x: number, y: number, z: number) => toWorld(x, y, z);
     const [a, b, c, d] = [P(x0, y0, z0), P(x1, y0, z0), P(x1, y1, z0), P(x0, y1, z0)];
     const [e, f, g, k] = [P(x0, y0, z1), P(x1, y0, z1), P(x1, y1, z1), P(x0, y1, z1)];
