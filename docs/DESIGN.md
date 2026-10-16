@@ -290,3 +290,8 @@ Note for later runs: when a feature players would notice goes in, add a line to 
 - [x] A link to share the land: the menu copies the game's address with `?seed=…`, and opening it goes straight to New Settlement with that seed
 - [x] Evening light: the day ends in a warm dusk with lit windows before the next morning (off in light mode)
 - [x] A quiet tune for each season from the existing sound engine, with its own volume switch
+
+### Phase 26 — Ideas for the next runs
+- [ ] A second map type: a river valley with islands and fords, or a hilly land with more rock and less soil, chosen on New Settlement
+- [ ] Villagers react to evening: they walk home at dusk and the lanes are quieter until morning
+- [ ] The uitest covers the new menus (photo mode, town files, seed link, music switch) so later changes cannot break them unnoticed
