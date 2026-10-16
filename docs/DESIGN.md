@@ -353,7 +353,7 @@ art, the logic and balance get this pass. Grouped by how deep each change goes.
 - [x] Stone roads easy to find: the button is "Stone road" and is there from the start (it used to appear only at Village rank)
 - [ ] Trading post lists every good, in tabs by kind
 - [x] Bug: the manor stopped improving in one playthrough (renovations never said what they were waiting for; now the upgrade box shows it, e.g. "Waiting for dressed stone in storage")
-- [ ] Haulers visibly carry what they move
+- [~] Haulers visibly carry what they move (loads now drawn 1.7x larger; real haulers come with Phase 35)
 - [x] Fishers sit in their boats (no legs or shadow); fewer duck families, five to seven ducklings each
 - [x] Less stone early: level 1 buildings are timber (wells, dairies, sawpits, tanneries, windmills, Timber Houses); stone is for better buildings
 - [x] Coins only for what must be imported: woodcutter and forester cost timber only, as do markets, taverns, smithies and upgrades; orchards, decorations and backyard extensions cost coins (and some materials); great works keep coins for their bells, glass and the like. Taxes halved and the start purse 100, so coins are hard to come by and worth spending. A woodcutter's lodge can always be built: with no timber in store its builders fell trees on the spot

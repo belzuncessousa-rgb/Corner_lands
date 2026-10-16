@@ -2150,7 +2150,15 @@ export class Renderer {
       }
     }
     // Carried goods.
-    if (a.carry) drawCarried(c, a.carry, wx, wy - 17 - bob);
+    if (a.carry) {
+      // Loads are drawn large, so who carries what reads at a glance.
+      const ly = wy - 17 - bob;
+      c.save();
+      c.translate(wx, ly);
+      c.scale(1.7, 1.7);
+      drawCarried(c, a.carry, 0, 0);
+      c.restore();
+    }
     c.globalAlpha = 1;
   }
 
