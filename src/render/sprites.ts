@@ -189,6 +189,42 @@ export function waterTile(season: Season, mask: number): Sprite {
 }
 
 /** Dirt road; mask bits mark road neighbours like waterTile. */
+/**
+ * A road tile that only turns a corner (two neighbours at right angles) is
+ * drawn as a curve between the two edge midpoints, so roads bend instead of
+ * meeting in a sharp elbow. Returns the two midpoints, or null.
+ */
+function cornerEnds(mask: number, mids: [number, number, number][]): [[number, number], [number, number]] | null {
+  if (mask !== 3 && mask !== 6 && mask !== 12 && mask !== 9) return null;
+  const ends = mids.filter(([bit]) => mask & bit).map(([, x, y]) => [x, y] as [number, number]);
+  return [ends[0], ends[1]];
+}
+
+/** Points along a road tile's centre line: a curve for corners, spokes otherwise. */
+function roadPoints(cx: number, cy: number, segs: [number, number, number][], corner: [[number, number], [number, number]] | null, step: number): [number, number, number, number][] {
+  // Each point carries the direction of travel there (ux, uy).
+  const out: [number, number, number, number][] = [];
+  if (corner) {
+    const [[ax, ay], [bx, by]] = corner;
+    const n = Math.max(4, Math.round((Math.hypot(ax - cx, ay - cy) + Math.hypot(bx - cx, by - cy)) / step));
+    for (let i = 0; i <= n; i++) {
+      const t = i / n;
+      const x = (1 - t) * (1 - t) * ax + 2 * (1 - t) * t * cx + t * t * bx;
+      const y = (1 - t) * (1 - t) * ay + 2 * (1 - t) * t * cy + t * t * by;
+      const dx = 2 * (1 - t) * (cx - ax) + 2 * t * (bx - cx);
+      const dy = 2 * (1 - t) * (cy - ay) + 2 * t * (by - cy);
+      const l = Math.hypot(dx, dy) || 1;
+      out.push([x, y, dx / l, dy / l]);
+    }
+    return out;
+  }
+  for (const [, mx, my] of segs) {
+    const len = Math.hypot(mx - cx, my - cy);
+    for (let t = 0; t <= len + 0.5; t += step) out.push([cx + ((mx - cx) * t) / len, cy + ((my - cy) * t) / len, (mx - cx) / len, (my - cy) / len]);
+  }
+  return out;
+}
+
 export function roadTile(season: Season, mask: number, layer: 'edge' | 'fill'): Sprite {
   return makeSprite(TW + 4, TH + 4, TW / 2 + 2, 2, (ctx) => {
     const cx = 0;
@@ -201,11 +237,18 @@ export function roadTile(season: Season, mask: number, layer: 'edge' | 'fill'): 
     ];
     const dirt = season === 3 ? '#cfc6b8' : '#a88a5c';
     const edge = season === 3 ? '#b9ad9c' : '#8d7149';
+    const corner = cornerEnds(mask, mids);
     const draw = (color: string, width: number) => {
       ctx.strokeStyle = color;
       ctx.lineWidth = width;
       ctx.lineCap = 'round';
       ctx.beginPath();
+      if (corner) {
+        ctx.moveTo(corner[0][0], corner[0][1]);
+        ctx.quadraticCurveTo(cx, cy, corner[1][0], corner[1][1]);
+        ctx.stroke();
+        return;
+      }
       let any = false;
       for (const [bit, mx, my] of mids) {
         if (!(mask & bit)) continue;
@@ -253,14 +296,20 @@ export function pavedTile(season: Season, mask: number, layer: 'edge' | 'fill'):
     ];
     let segs = mids.filter(([bit]) => mask & bit);
     if (!segs.length) segs = [mids[0], mids[2]];
+    const corner = cornerEnds(mask, mids);
     const draw = (color: string, width: number) => {
       ctx.strokeStyle = color;
       ctx.lineWidth = width;
       ctx.lineCap = 'round';
       ctx.beginPath();
-      for (const [, mx, my] of segs) {
-        ctx.moveTo(cx, cy);
-        ctx.lineTo(mx, my);
+      if (corner) {
+        ctx.moveTo(corner[0][0], corner[0][1]);
+        ctx.quadraticCurveTo(cx, cy, corner[1][0], corner[1][1]);
+      } else {
+        for (const [, mx, my] of segs) {
+          ctx.moveTo(cx, cy);
+          ctx.lineTo(mx, my);
+        }
       }
       ctx.stroke();
     };
@@ -274,26 +323,22 @@ export function pavedTile(season: Season, mask: number, layer: 'edge' | 'fill'):
     // Cobbles laid in courses across the road.
     const rand = mulberry32(mask * 17 + 3);
     const stones = ['#b4ada0', '#a39b8c', '#c2bbad', '#998f80', '#aca594'];
-    for (const [, mx, my] of segs) {
-      const len = Math.hypot(mx - cx, my - cy);
-      const ux = (mx - cx) / len;
-      const uy = (my - cy) / len;
+    let row = 0;
+    for (const [bx, by, ux, uy] of roadPoints(cx, cy, segs, corner, 3.2)) {
       // Perpendicular in iso screen space (across the road).
       const px = -uy * 2;
       const py = ux * 0.5;
-      for (let t = 0; t <= len + 0.5; t += 3.2) {
-        const row = Math.round(t / 3.2);
-        for (let k = -2; k <= 2; k++) {
-          const off = k + (row % 2 ? 0.5 : 0);
-          if (Math.abs(off) > 2.2) continue;
-          const x = cx + ux * t + px * off * 1.35;
-          const y = cy + uy * t + py * off * 1.35;
-          ctx.fillStyle = season === 3 && rand() < 0.4 ? '#e8ecf0' : stones[Math.floor(rand() * stones.length)];
-          ctx.beginPath();
-          ctx.ellipse(x, y, 1.9, 1.15, 0, 0, Math.PI * 2);
-          ctx.fill();
-        }
+      for (let k = -2; k <= 2; k++) {
+        const off = k + (row % 2 ? 0.5 : 0);
+        if (Math.abs(off) > 2.2) continue;
+        const x = bx + px * off * 1.35;
+        const y = by + py * off * 1.35;
+        ctx.fillStyle = season === 3 && rand() < 0.4 ? '#e8ecf0' : stones[Math.floor(rand() * stones.length)];
+        ctx.beginPath();
+        ctx.ellipse(x, y, 1.9, 1.15, 0, 0, Math.PI * 2);
+        ctx.fill();
       }
+      row++;
     }
     // A worn centre line where cartwheels run.
     ctx.globalAlpha = 0.18;
