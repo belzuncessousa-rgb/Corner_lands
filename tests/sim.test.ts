@@ -1305,3 +1305,20 @@ describe('commissions', () => {
     expect(s.happinessFactors.some((f) => f.label === 'The great tapestry' && f.value === 2)).toBe(true);
   });
 });
+
+describe('names and the weekly seed', () => {
+  it('gives each seed a stable place name and everyone the same seed all week', async () => {
+    const { placeName, townName, weeklySeed, weekNumber } = await import('../src/game/names');
+    expect(placeName(42)).toBe(placeName(42));
+    expect(placeName(42)).toMatch(/^[A-Z][a-z]+$/);
+    const names = new Set(Array.from({ length: 200 }, (_, i) => placeName(i)));
+    expect(names.size).toBeGreaterThan(100);
+    // Monday 00:00 UTC to Sunday 23:59 is one week.
+    const monday = Date.UTC(2026, 9, 12);
+    expect(weekNumber(monday)).toBe(weekNumber(monday + 6.99 * 86400000));
+    expect(weekNumber(monday + 7 * 86400000)).toBe(weekNumber(monday) + 1);
+    expect(weeklySeed(weekNumber(monday))).not.toBe(weeklySeed(weekNumber(monday) + 1));
+    expect(townName({ seed: 42 })).toBe(placeName(42));
+    expect(townName({ seed: 42, name: 'Our Town' })).toBe('Our Town');
+  });
+});

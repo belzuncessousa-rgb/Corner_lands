@@ -158,7 +158,9 @@ then fall back to the browser's localStorage.
 - **Protected woods** — the Protect tool (P) marks a wood the woodcutters
   leave standing: click one corner, then the other; click twice inside one to
   lift it.
-- **Playing with friends** — download your town as a file (Save Game) and a
+- **Playing with friends** — name your town when you found it, or take the
+  seed of the week (the same land for everyone until Monday) and race your
+  friends; download your town as a file (Save Game) and a
   friend opens it from Load Game to carry on; the game menu shows the map seed
   to copy, so friends can found the same land, and "Save a picture" downloads
   a captioned view of your town.

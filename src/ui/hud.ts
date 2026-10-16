@@ -1,3 +1,4 @@
+import { placeName, townName, weeklySeed } from '../game/names';
 import { deleteSave, listSaves, type SaveInfo } from '../api';
 import {
   BUILDINGS,
@@ -1207,7 +1208,7 @@ export class Hud {
     const miles = dated
       .map((m) => `<div class="mile"><small>${MONTH_NAMES[monthOf(m.day)]}, Year ${yearOf(m.day)}</small><span>${esc(m.text)}</span></div>`)
       .join('');
-    this.openModal(`<h2>Chronicle</h2>${miles ? `<div class="sub">Milestones</div><div class="milestones">${miles}</div><div class="sub">Lately</div>` : ''}<div class="chronicle">${rows || '<i>Nothing has happened yet.</i>'}</div>
+    this.openModal(`<h2>Chronicle of ${esc(townName(s))}</h2>${miles ? `<div class="sub">Milestones</div><div class="milestones">${miles}</div><div class="sub">Lately</div>` : ''}<div class="chronicle">${rows || '<i>Nothing has happened yet.</i>'}</div>
       <div class="row" style="justify-content:flex-end;margin-top:10px"><button class="primary" data-action="close-modal">Close</button></div>`);
   }
 
@@ -1827,8 +1828,9 @@ export class Hud {
     const seed = Math.floor(Math.random() * 999999);
     const m = this.openModal(
       `<h2>New Settlement</h2>
-      <p>Every map is generated from a seed. Share a seed to play the same land.</p>
-      <div class="row"><label>Seed</label><input id="seed" value="${seed}" inputmode="numeric"><button data-m="dice">🎲</button></div>
+      <div class="row"><label>Name</label><input id="town" value="${esc(placeName(seed))}" maxlength="40"><button data-m="rename" data-tip="Another name">🎲</button></div>
+      <p>Every map is generated from a seed. Share a seed to play the same land, or take this week's seed, the same for everyone.</p>
+      <div class="row"><label>Seed</label><input id="seed" value="${seed}" inputmode="numeric"><button data-m="dice" data-tip="Another land">🎲</button><button data-m="weekly" data-tip="The same land for everyone until Monday">Seed of the week</button></div>
       <div class="map-preview"><canvas width="300" height="160" aria-label="The land from above"></canvas><div class="map-facts"></div></div>
       <div class="modes">
         <label class="mode"><input type="radio" name="mode" value="normal" checked><span><b>Normal</b><br><small>Hungry or unhappy villagers will leave.</small></span></label>
@@ -1858,14 +1860,25 @@ export class Hud {
       typing = window.setTimeout(preview, 250);
     });
     preview();
-    m.querySelector('[data-m="dice"]')!.addEventListener('click', () => {
-      input.value = String(Math.floor(Math.random() * 999999));
+    const town = m.querySelector('#town') as HTMLInputElement;
+    // The name follows the seed until the player types their own.
+    let named = false;
+    town.addEventListener('input', () => (named = true));
+    const reseed = (n: number) => {
+      input.value = String(n);
+      if (!named) town.value = placeName(n);
       preview();
+    };
+    m.querySelector('[data-m="dice"]')!.addEventListener('click', () => reseed(Math.floor(Math.random() * 999999)));
+    m.querySelector('[data-m="weekly"]')!.addEventListener('click', () => reseed(weeklySeed()));
+    m.querySelector('[data-m="rename"]')!.addEventListener('click', () => {
+      town.value = placeName(Math.floor(Math.random() * 999999));
+      named = true;
     });
     m.querySelector('[data-m="back"]')!.addEventListener('click', () => (fromMain ? this.showMainMenu() : this.showGameMenu()));
     m.querySelector('[data-m="go"]')!.addEventListener('click', () => {
       const mode = ((m.querySelector('input[name="mode"]:checked') as HTMLInputElement | null)?.value ?? 'normal') as 'normal' | 'relaxed' | 'hardy';
-      this.game.newGame(seedOf(input.value.trim()), mode);
+      this.game.newGame(seedOf(input.value.trim()), mode, town.value);
       this.closeModal(true);
       this.game.setSpeed(1);
     });
@@ -2036,7 +2049,7 @@ export class Hud {
   private showSave(): void {
     const m = this.openModal(
       `<h2>Save Game</h2>
-      <div class="row"><input id="slot" value="my-village" maxlength="40"><button class="primary" data-m="save">Save</button></div>
+      <div class="row"><input id="slot" value="${esc(townName(this.game.state).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'my-village')}" maxlength="40"><button class="primary" data-m="save">Save</button></div>
       <p id="save-msg" style="min-height:1.2em"></p>
       <p class="note">To share this town with a friend, download it as a file; they open it from Load Game.</p>
       <div class="row" style="justify-content:space-between"><button data-m="file">⬇ Download as a file</button><button data-m="back">Back</button></div>`,

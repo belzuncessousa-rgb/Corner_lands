@@ -275,6 +275,6 @@ Note from the morning run: the 30-year soak's famine on seed 3 comes from its ra
 - [x] "Save a picture" in the menu: a screenshot of the town with its name, rank and year, to share
 
 ### Phase 23 — Ideas for the next runs
-- [ ] Name your town when founding it; the name heads the save list, the picture and the chronicle
-- [ ] A "seed of the week" on the New Settlement screen, the same for everyone, so friends can race the same land
+- [x] Name your town when founding it; the name heads the save list, the picture and the chronicle
+- [x] A "seed of the week" on the New Settlement screen, the same for everyone, so friends can race the same land
 - [ ] A town score (villagers, prestige, great works, years without hunger) on the picture and the load card, for friendly comparison

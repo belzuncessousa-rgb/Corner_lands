@@ -302,6 +302,8 @@ export interface GameState {
   festivalDay?: { id: string; day: number };
   /** This year's tally for the year-end page of the chronicle. */
   year?: { pop: number; gold: number; prestige: number; arrived: number; left: number; built: number; harvest: number; stock?: Partial<Record<ResourceId, number>>; hungry?: number };
+  /** The settlement's name, chosen when founding it. */
+  name?: string;
   /** Works of art commissioned with prestige (see COMMISSIONS). */
   commissions?: string[];
   /** The lord's rank: 0 Lord, 1 Baron, 2 Earl, 3 Duke (see TITLES). */

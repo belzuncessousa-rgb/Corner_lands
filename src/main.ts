@@ -3,6 +3,7 @@ import { deleteSave, listSaves, loadGame, saveGame } from './api';
 import { BUILDINGS, BUILD_ORDER, DAY_SECONDS, MONTH_NAMES, TIERS } from './game/data';
 import { playBot } from './game/autoplay';
 import { autoResolve, TITLES } from './game/events';
+import { placeName, townName } from './game/names';
 import { StateRng } from './game/rng';
 import { deserialize, serialize } from './game/save';
 import {
@@ -188,9 +189,10 @@ export class Game {
     this.setSpeed(this.speedIndex === 0 ? this.lastSpeed : 0);
   }
 
-  newGame(seed: number, mode: 'normal' | 'relaxed' | 'hardy' = 'normal'): void {
+  newGame(seed: number, mode: 'normal' | 'relaxed' | 'hardy' = 'normal', name?: string): void {
     this.state = generateWorld(seed, { relaxed: mode === 'relaxed', hardy: mode === 'hardy' });
     this.state.founded = Date.now();
+    this.state.name = name?.trim().slice(0, 40) || placeName(seed);
     recompute(this.state);
     // Show a meaningful happiness breakdown from the very first day.
     this.state.report.variety = FOOD_IDS.filter((f) => this.state.res[f] > 0).length;
@@ -227,7 +229,7 @@ export class Game {
 
   summary(): string {
     const s = this.state;
-    const base = `${TIERS[s.tier].name} · ${s.population} villagers · Year ${yearOf(s.day)}, ${MONTH_NAMES[monthOf(s.day)]}${s.relaxed ? ' · Relaxed' : s.hardy ? ' · Hardy' : ''}`;
+    const base = `${townName(s)} · ${TIERS[s.tier].name} · ${s.population} villagers · Year ${yearOf(s.day)}, ${MONTH_NAMES[monthOf(s.day)]}${s.relaxed ? ' · Relaxed' : s.hardy ? ' · Hardy' : ''}`;
     // Deeds for the load cards: the lord's title, great works and milestones.
     const deeds: string[] = [];
     if (s.title) deeds.push(TITLES[s.title].name);
@@ -254,7 +256,8 @@ export class Game {
   /** A file name for this town: rank, year and map seed. */
   private fileStem(): string {
     const s = this.state;
-    return `corner-lands-${TIERS[s.tier].name.toLowerCase()}-year${yearOf(s.day)}-seed${s.seed}`;
+    const slug = townName(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'town';
+    return `corner-lands-${slug}-year${yearOf(s.day)}-seed${s.seed}`;
   }
 
   /** Downloads the town as a file a friend can open. */
