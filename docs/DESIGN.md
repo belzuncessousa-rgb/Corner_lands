@@ -324,4 +324,4 @@ The 3D view (built from the game's own drawings) and the first gridless steps (b
 - [x] A fishing boat out on the water near a working fishery
 - [x] Puddles on dirt lanes after rain, drying out over the following days
 - [x] Morning mist over water and low meadows in spring and autumn
-- [ ] Chimney smoke and washing lines leaning with a shared, slowly shifting wind
+- [x] Chimney smoke, brewhouse steam and cloud shadows drifting with one shared wind that slowly veers and gusts

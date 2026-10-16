@@ -2103,7 +2103,7 @@ export class Renderer {
         // Steam rising from the brewhouse coppers while the brewer works.
         if (!this.light && b.type === 'brewhouse' && b.workers > 0 && !b.paused && (b.output > 0 || b.lastOutput > 0)) {
           const [vx, vy] = iso(b.x + 0.95, b.y + 0.85, 40);
-          for (let k = 0; k < 2; k++) this.particles.push({ x: vx + (Math.random() - 0.5) * 6, y: vy, vx: 2 + Math.random() * 3, vy: -16 - Math.random() * 8, life: 0, max: 1.2 + Math.random() * 0.6, size: 2.4 + Math.random(), steam: true });
+          for (let k = 0; k < 2; k++) this.particles.push({ x: vx + (Math.random() - 0.5) * 6, y: vy, vx: this.wind * 4 + Math.random() * 2, vy: -16 - Math.random() * 8, life: 0, max: 1.2 + Math.random() * 0.6, size: 2.4 + Math.random(), steam: true });
         }
         // Forges at work throw sparks from the anvil.
         if (!this.light && (b.type === 'smithy' || b.type === 'armoury' || b.type === 'bloomery') && b.workers > 0 && !b.paused && (b.output > 0 || b.lastOutput > 0)) {
@@ -2116,7 +2116,7 @@ export class Renderer {
           this.particles.push({
             x: wx + (Math.random() - 0.5) * 2,
             y: wy,
-            vx: 4 + Math.random() * 3,
+            vx: this.wind * 5 + Math.random() * 2 - 1,
             vy: -10 - Math.random() * 6,
             life: 0,
             max: 2.5 + Math.random() * 1.5,
@@ -2125,8 +2125,11 @@ export class Renderer {
         }
       }
     }
+    // One wind for the whole land, slowly veering and gusting.
+    this.wind = 0.9 * Math.sin(this.time * 0.006 + 0.6) + 0.35 * Math.sin(this.time * 0.017 + 1);
     for (const p of this.particles) {
       p.life += dt;
+      p.vx += this.wind * 3 * dt;
       p.x += p.vx * dt;
       p.y += p.vy * dt;
     }
@@ -2143,6 +2146,8 @@ export class Renderer {
   }
 
   private sparks: { x: number; y: number; vx: number; vy: number; life: number; max: number }[] = [];
+  /** The wind across the land: negative blows left, positive right, near 0 is still. */
+  private wind = 0.5;
 
   private drawSparks(): void {
     const c = this.ctx;
@@ -2170,12 +2175,13 @@ export class Renderer {
     }
     c.fillStyle = 'rgba(20,30,40,0.075)';
     for (const cl of this.clouds) {
-      cl.x += 9 * dt;
+      cl.x += 12 * this.wind * dt;
       cl.y += 2 * dt;
-      if (cl.x - cl.rx > maxX) {
-        cl.x = minX - cl.rx;
+      if (cl.x - cl.rx > maxX || cl.x + cl.rx < minX) {
+        cl.x = cl.x > maxX ? minX - cl.rx : maxX + cl.rx;
         cl.y = Math.random() * maxY;
       }
+      if (cl.y - cl.ry > maxY) cl.y = -cl.ry;
       c.beginPath();
       c.ellipse(cl.x, cl.y, cl.rx, cl.ry, 0.15, 0, Math.PI * 2);
       c.fill();
