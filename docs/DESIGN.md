@@ -288,5 +288,5 @@ Note for later runs: when a feature players would notice goes in, add a line to 
 
 ### Phase 25 — Ideas for the next runs
 - [x] A link to share the land: the menu copies the game's address with `?seed=…`, and opening it goes straight to New Settlement with that seed
-- [ ] Evening light: the day ends in a warm dusk with lit windows before the next morning (off in light mode)
+- [x] Evening light: the day ends in a warm dusk with lit windows before the next morning (off in light mode)
 - [ ] A quiet tune for each season from the existing sound engine, with its own volume switch

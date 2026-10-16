@@ -371,6 +371,8 @@ export class Game {
     }
     this.agents.update(this.state, gameDt);
     this.wildlife.update(this.state, gameDt);
+    // Dusk only at normal speed: faster, the days would flicker.
+    this.renderer.setDayTime(this.simAcc / DAY_SECONDS, !this.demo && this.speed <= 1, dt);
     this.renderer.render(this.state, this.agents.agents, this.overlay(), running ? dt : 0, this.wildlife.animals);
     this.hud.minimap.update(dt);
     this.hud.tickAudio(dt, running);

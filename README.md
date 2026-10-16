@@ -169,6 +169,8 @@ then fall back to the browser's localStorage.
   says what it does; switch them off (or back on) in the game menu.
 - **Market days** — on the fifth day of each month (outside winter) every
   staffed market fills with townsfolk, a farmer's cart and bunting.
+- **Evening** — at normal speed each day ends in a warm dusk with lamplight in
+  lived-in homes (off at faster speeds and in light mode).
 - **Weather** — snow drifts in winter, leaves fall in autumn and spring brings
   passing showers (all off in light mode).
 - **Settings** — the game menu (Esc) scales every panel from 85% to 130% and

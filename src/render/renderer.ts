@@ -897,6 +897,8 @@ export class Renderer {
     if (fest === 'midsummer' && b.type === 'townhall') this.drawBonfire(b);
     if (b.type === 'market' && !this.light && isMarketDay(s, b)) this.drawMarketDay(b);
     if (b.type === 'townhall' && s.commissions?.includes('tapestry')) this.drawHeraldry(b);
+    // Lamplight in lived-in homes and the tavern as evening falls.
+    if (this.dusk > 0.25 && b.build >= 1 && (b.residents > 0 || (b.type === 'tavern' && b.workers > 0))) this.drawLamplight(b);
     if (b.upgrading) this.drawScaffold(b);
     if (selected) {
       c.save();
@@ -1063,6 +1065,28 @@ export class Renderer {
   }
 
   /** Trestle tables and bunting in the manor's yard for a month after a feast. */
+  /** A soft window glow on the front of a building. */
+  private drawLamplight(b: Building): void {
+    const c = this.ctx;
+    const [x, y] = iso(b.x + b.w * 0.75, b.y + b.h, 9);
+    // One glow drawn once and stamped on every lit window: cheap in big towns.
+    if (!this.glow) {
+      const g = document.createElement('canvas');
+      g.width = g.height = 36;
+      const gc = g.getContext('2d')!;
+      const grad = gc.createRadialGradient(18, 18, 0, 18, 18, 18);
+      grad.addColorStop(0, 'rgba(255,214,120,0.95)');
+      grad.addColorStop(1, 'rgba(255,190,90,0)');
+      gc.fillStyle = grad;
+      gc.fillRect(0, 0, 36, 36);
+      this.glow = g;
+    }
+    c.globalAlpha = Math.min(1, (this.dusk - 0.25) / 0.5);
+    c.drawImage(this.glow, x - 18, y - 18);
+    c.globalAlpha = 1;
+  }
+  private glow: HTMLCanvasElement | null = null;
+
   /** The great tapestry's design flies on a tall banner beside the manor. */
   private drawHeraldry(b: Building): void {
     const p = new Pen(this.ctx);
@@ -1739,6 +1763,16 @@ export class Renderer {
     this.birds = this.birds.filter((f) => f.x > vx0 - margin && f.x < vx1 + margin && f.y > vy0 - margin && f.y < vy1 + margin);
   }
 
+  /** How deep into dusk the day is (0 by day, 1 at its deepest), eased so it never jumps. */
+  private dusk = 0;
+
+  setDayTime(frac: number, allowed: boolean, dt: number): void {
+    // Evening falls over the last quarter of the day and lifts at the turn.
+    const target = !allowed || this.light ? 0 : frac < 0.72 ? 0 : frac < 0.92 ? (frac - 0.72) / 0.2 : Math.max(0, (1 - frac) / 0.08);
+    const step = Math.min(1, dt * 2.5);
+    this.dusk += (target - this.dusk) * step;
+  }
+
   private drawAtmosphere(season: Season, day: number): void {
     const c = this.ctx;
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
@@ -1757,6 +1791,13 @@ export class Renderer {
     g.addColorStop(1, 'rgba(20,15,5,0.35)');
     c.fillStyle = g;
     c.fillRect(0, 0, this.width, this.height);
+    if (this.dusk > 0.01) {
+      // A warm low sun, then a little blue as the light goes.
+      c.fillStyle = `rgba(255,140,60,${0.13 * this.dusk})`;
+      c.fillRect(0, 0, this.width, this.height);
+      c.fillStyle = `rgba(30,35,80,${0.22 * this.dusk})`;
+      c.fillRect(0, 0, this.width, this.height);
+    }
     void day;
   }
 
