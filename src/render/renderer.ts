@@ -366,6 +366,7 @@ export class Renderer {
     if (!this.light && season !== 3) {
       this.drawDucks(s, visible);
       this.drawBoats(s, visible);
+      this.drawMist(s, season, visible);
     }
     for (const bucket of this.buckets) {
       for (const code of bucket) {
@@ -2319,6 +2320,66 @@ export class Renderer {
     const target = !allowed || this.light ? 0 : frac < 0.72 ? 0 : frac < 0.92 ? (frac - 0.72) / 0.2 : Math.max(0, (1 - frac) / 0.08);
     const step = Math.min(1, dt * 2.5);
     this.dusk += (target - this.dusk) * step;
+    // Early morning, when mist lies on the water.
+    const dawn = !allowed || this.light ? 0 : frac < 0.1 ? 1 : frac < 0.32 ? 1 - (frac - 0.1) / 0.22 : 0;
+    this.dawn += (dawn - this.dawn) * step;
+  }
+
+  /** How early in the morning it is (1 at first light, 0 by mid-morning). */
+  private dawn = 0;
+  /** Water and the meadows along it, where morning mist gathers. */
+  private mistSpots: number[] = [];
+  private mistMap: Uint8Array | null = null;
+  private mistPuff: HTMLCanvasElement | null = null;
+
+  /** Soft banks of mist over water and the low ground beside it on spring and autumn mornings. */
+  private drawMist(s: GameState, season: Season, visible: (x: number, y: number) => boolean): void {
+    const misty = (season === 0 || season === 2) && ((s.day * 40503) >>> 0) % 5 < 3;
+    if (!misty || this.dawn < 0.02) return;
+    const W = s.width;
+    if (this.mistMap !== s.terrain) {
+      this.mistMap = s.terrain;
+      this.mistSpots = [];
+      for (let i = 0; i < s.terrain.length; i++) {
+        const h = (Math.imul(i, 2246822519) >>> 0) % 6;
+        const x = i % W;
+        const y = (i / W) | 0;
+        if (s.terrain[i] === 1) {
+          if (h < 2) this.mistSpots.push(i);
+        } else if (h === 0) {
+          for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            if (inBounds(s, x + dx, y + dy) && s.terrain[idx(s, x + dx, y + dy)] === 1) {
+              this.mistSpots.push(i);
+              break;
+            }
+          }
+        }
+      }
+    }
+    if (!this.mistPuff) {
+      const cv = document.createElement('canvas');
+      cv.width = 128;
+      cv.height = 64;
+      const g = cv.getContext('2d')!;
+      const grad = g.createRadialGradient(64, 32, 0, 64, 32, 64);
+      grad.addColorStop(0, 'rgba(240,244,246,0.55)');
+      grad.addColorStop(0.5, 'rgba(240,244,246,0.25)');
+      grad.addColorStop(1, 'rgba(240,244,246,0)');
+      g.setTransform(1, 0, 0, 0.5, 0, 16);
+      g.fillStyle = grad;
+      g.fillRect(0, 0, 128, 128);
+      this.mistPuff = cv;
+    }
+    const c = this.ctx;
+    c.globalAlpha = Math.min(1, this.dawn * 1.2);
+    for (const i of this.mistSpots) {
+      const drift = this.time * 0.04 + (i % 17);
+      const [sx, sy] = iso((i % W) + 0.5 + Math.sin(drift) * 0.4, ((i / W) | 0) + 0.5 + Math.cos(drift * 0.7) * 0.25);
+      if (!visible(sx, sy)) continue;
+      const w = 110 + (i % 5) * 14;
+      c.drawImage(this.mistPuff, sx - w / 2, sy - w / 4 - 4, w, w / 2);
+    }
+    c.globalAlpha = 1;
   }
 
   private drawAtmosphere(season: Season, day: number): void {

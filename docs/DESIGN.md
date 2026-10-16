@@ -323,5 +323,5 @@ The 3D view (built from the game's own drawings) and the first gridless steps (b
 - [x] Ducks and their broods paddling near the banks, spring to autumn
 - [x] A fishing boat out on the water near a working fishery
 - [x] Puddles on dirt lanes after rain, drying out over the following days
-- [ ] Morning mist over water and low meadows in spring and autumn
+- [x] Morning mist over water and low meadows in spring and autumn
 - [ ] Chimney smoke and washing lines leaning with a shared, slowly shifting wind
