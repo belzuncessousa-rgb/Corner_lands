@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { BUILDINGS } from '../game/data';
 import { seasonOf } from '../game/sim';
 import type { GameState, Season } from '../game/types';
-import { drawBuilding, treeSprite } from '../render/sprites';
+import { drawBuilding, treeSprite, wallMaterial } from '../render/sprites';
 import type { TreeKind } from '../render/sprites';
 import { Pen3D } from './pen3d';
 
@@ -20,6 +20,7 @@ export function buildingModel(type: GameState['buildings'][number]['type'], leve
   if (!m) {
     const p = new Pen3D();
     p.snow = season === 3;
+    p.matFor = wallMaterial;
     drawBuilding(p, type, level, season, variant);
     m = p.build();
     models.set(key, m);

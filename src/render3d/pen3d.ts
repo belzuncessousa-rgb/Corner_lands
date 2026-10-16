@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { Pen, TW } from '../render/pen';
-import type { V3 } from '../render/pen';
+import type { Material, RoofKind, V3 } from '../render/pen';
+import { patternTexture, WORLD } from './patterns';
+import type { Pattern } from './patterns';
 
 /**
  * Scale between the flat drawing and 3D: the isometric pen measures height
@@ -11,8 +13,19 @@ export const PX_PER_UNIT = (TW / Math.SQRT2) * Math.cos(Math.PI / 6);
 /** Pen coordinates (x, y in tiles, z in pixels) to world space (y up). */
 export const toWorld = (x: number, y: number, z: number): THREE.Vector3 => new THREE.Vector3(x, z / PX_PER_UNIT, y);
 
-/** One shared material for every solid face: colours come from the vertices. */
-const SOLID = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
+/** Shared materials: colours come from the vertices, patterns from the swatches. */
+const materials = new Map<Pattern | null, THREE.Material>();
+function materialFor(p: Pattern | null): THREE.Material {
+  let m = materials.get(p);
+  if (!m) {
+    m = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, map: p ? patternTexture(p) : null });
+    materials.set(p, m);
+  }
+  return m;
+}
+
+const ROOF_PATTERN: Record<RoofKind, Pattern> = { thatch: 'thatch', shingle: 'shingle', slate: 'slate', tile: 'tile', plank: 'plank' };
+const roofPattern = (k: RoofKind): Pattern => ROOF_PATTERN[k];
 
 /** A throwaway canvas for the few things the building code paints directly. */
 let scratch: CanvasRenderingContext2D | null = null;
@@ -42,25 +55,46 @@ function parse(style: string): { color: THREE.Color; alpha: number } {
  * faces, so a building can be seen from any side.
  */
 export class Pen3D extends Pen {
-  private batches = new Map<string, { color: THREE.Color; alpha: number; pos: number[] }>();
+  private batches = new Map<string, { color: THREE.Color; alpha: number; pattern: Pattern | null; pos: number[]; uv: number[] }>();
 
   constructor() {
     super(scratchCtx());
   }
 
-  private tri(a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, style: string): void {
-    let batch = this.batches.get(style);
+  private tri(a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, style: string, pattern: Pattern | null = null, uv?: number[]): void {
+    const key = `${pattern ?? ''}|${style}`;
+    let batch = this.batches.get(key);
     if (!batch) {
       const { color, alpha } = parse(style);
-      batch = { color, alpha, pos: [] };
-      this.batches.set(style, batch);
+      batch = { color, alpha, pattern, pos: [], uv: [] };
+      this.batches.set(key, batch);
     }
     batch.pos.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+    batch.uv.push(...(uv ?? [0, 0, 0, 0, 0, 0]));
   }
 
-  private quadW(a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, d: THREE.Vector3, style: string): void {
-    this.tri(a, b, c, style);
-    this.tri(a, c, d, style);
+  /**
+   * A quad a-b-c-d (a to b along the bottom edge, a to d upwards). With a
+   * pattern, texture coordinates run along a-b and up a-d in world units.
+   */
+  private quadW(a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, d: THREE.Vector3, style: string, pattern: Pattern | null = null): void {
+    if (!pattern) {
+      this.tri(a, b, c, style);
+      this.tri(a, c, d, style);
+      return;
+    }
+    const u = b.clone().sub(a).normalize();
+    const v = d.clone().sub(a);
+    v.sub(u.clone().multiplyScalar(v.dot(u))).normalize();
+    // Offsets from the face's corner keep neighbouring faces from matching seams exactly.
+    const o = (a.x * 0.37 + a.z * 0.61) % 1;
+    const uvOf = (p: THREE.Vector3) => {
+      const r = p.clone().sub(a);
+      return [r.dot(u) / WORLD + o, r.dot(v) / WORLD];
+    };
+    const [ua, ub, uc, ud] = [uvOf(a), uvOf(b), uvOf(c), uvOf(d)];
+    this.tri(a, b, c, style, pattern, [...ua, ...ub, ...uc]);
+    this.tri(a, c, d, style, pattern, [...ua, ...uc, ...ud]);
   }
 
   override poly(pts: V3[], fill: string | null): void {
@@ -108,15 +142,17 @@ export class Pen3D extends Pen {
   // Real shadows replace the painted ones.
   override shadow(): void {}
 
-  override box(x0: number, y0: number, x1: number, y1: number, z0: number, h: number, color: string, top?: string): void {
+  override box(x0: number, y0: number, x1: number, y1: number, z0: number, h: number, color: string, top?: string, mat?: Material): void {
     const z1 = z0 + h;
     const P = (x: number, y: number, z: number) => toWorld(x, y, z);
     const [a, b, c, d] = [P(x0, y0, z0), P(x1, y0, z0), P(x1, y1, z0), P(x0, y1, z0)];
     const [e, f, g, k] = [P(x0, y0, z1), P(x1, y0, z1), P(x1, y1, z1), P(x0, y1, z1)];
-    this.quadW(d, c, g, k, color); // front (y1)
-    this.quadW(b, a, e, f, color); // back (y0)
-    this.quadW(c, b, f, g, color); // right (x1)
-    this.quadW(a, d, k, e, color); // left (x0)
+    const m = mat ?? this.matFor?.(color);
+    const wall: Pattern | null = h < 5 || !m ? null : m === 'plank' ? 'boards' : m;
+    this.quadW(d, c, g, k, color, wall); // front (y1)
+    this.quadW(b, a, e, f, color, wall); // back (y0)
+    this.quadW(c, b, f, g, color, wall); // right (x1)
+    this.quadW(a, d, k, e, color, wall); // left (x0)
     this.quadW(k, g, f, e, top ?? color); // top
   }
 
@@ -124,8 +160,8 @@ export class Pen3D extends Pen {
     const ym = (y0 + y1) / 2;
     const col = this.roofColor(kind);
     const P = (x: number, y: number, z: number) => toWorld(x, y, z);
-    this.quadW(P(x0 - o, y0 - o, h - 2), P(x1 + o, y0 - o, h - 2), P(x1 + o, ym, h + rh), P(x0 - o, ym, h + rh), col);
-    this.quadW(P(x0 - o, y1 + o, h - 2), P(x1 + o, y1 + o, h - 2), P(x1 + o, ym, h + rh), P(x0 - o, ym, h + rh), col);
+    this.quadW(P(x0 - o, y0 - o, h - 2), P(x1 + o, y0 - o, h - 2), P(x1 + o, ym, h + rh), P(x0 - o, ym, h + rh), col, roofPattern(kind));
+    this.quadW(P(x0 - o, y1 + o, h - 2), P(x1 + o, y1 + o, h - 2), P(x1 + o, ym, h + rh), P(x0 - o, ym, h + rh), col, roofPattern(kind));
     this.tri(P(x1, y0, h), P(x1, y1, h), P(x1, ym, h + rh), wall);
     this.tri(P(x0, y0, h), P(x0, y1, h), P(x0, ym, h + rh), wall);
     if (this.snow) this.snowCap([P(x0 - o, y1 + o, h - 2), P(x1 + o, y1 + o, h - 2), P(x1 + o, ym, h + rh), P(x0 - o, ym, h + rh)]);
@@ -135,8 +171,8 @@ export class Pen3D extends Pen {
     const xm = (x0 + x1) / 2;
     const col = this.roofColor(kind);
     const P = (x: number, y: number, z: number) => toWorld(x, y, z);
-    this.quadW(P(x0 - o, y0 - o, h - 2), P(x0 - o, y1 + o, h - 2), P(xm, y1 + o, h + rh), P(xm, y0 - o, h + rh), col);
-    this.quadW(P(x1 + o, y0 - o, h - 2), P(x1 + o, y1 + o, h - 2), P(xm, y1 + o, h + rh), P(xm, y0 - o, h + rh), col);
+    this.quadW(P(x0 - o, y0 - o, h - 2), P(x0 - o, y1 + o, h - 2), P(xm, y1 + o, h + rh), P(xm, y0 - o, h + rh), col, roofPattern(kind));
+    this.quadW(P(x1 + o, y0 - o, h - 2), P(x1 + o, y1 + o, h - 2), P(xm, y1 + o, h + rh), P(xm, y0 - o, h + rh), col, roofPattern(kind));
     this.tri(P(x0, y1, h), P(x1, y1, h), P(xm, y1, h + rh), wall);
     this.tri(P(x0, y0, h), P(x1, y0, h), P(xm, y0, h + rh), wall);
     if (this.snow) this.snowCap([P(x1 + o, y0 - o, h - 2), P(x1 + o, y1 + o, h - 2), P(xm, y1 + o, h + rh), P(xm, y0 - o, h + rh)]);
@@ -183,16 +219,20 @@ export class Pen3D extends Pen {
   }
 
   /**
-   * The finished model: all solid faces in one mesh with a colour per
-   * vertex (one draw call per building), and see-through faces in another.
+   * The finished model: every solid face in one mesh (one object per
+   * building) with a colour per vertex and a group per surface pattern, and
+   * see-through faces in another.
    */
   build(): THREE.Group {
     const group = new THREE.Group();
-    const solid: { pos: number[]; col: number[] } = { pos: [], col: [] };
-    for (const { color, alpha, pos } of this.batches.values()) {
+    const byPattern = new Map<Pattern | null, { pos: number[]; col: number[]; uv: number[] }>();
+    for (const { color, alpha, pattern, pos, uv } of this.batches.values()) {
       if (alpha >= 1) {
-        solid.pos.push(...pos);
-        for (let i = 0; i < pos.length / 3; i++) solid.col.push(color.r, color.g, color.b);
+        let t = byPattern.get(pattern);
+        if (!t) byPattern.set(pattern, (t = { pos: [], col: [], uv: [] }));
+        t.pos.push(...pos);
+        t.uv.push(...uv);
+        for (let i = 0; i < pos.length / 3; i++) t.col.push(color.r, color.g, color.b);
         continue;
       }
       const geo = new THREE.BufferGeometry();
@@ -202,12 +242,24 @@ export class Pen3D extends Pen {
       mesh.receiveShadow = true;
       group.add(mesh);
     }
-    if (solid.pos.length) {
+    if (byPattern.size) {
+      const pos: number[] = [];
+      const col: number[] = [];
+      const uv: number[] = [];
       const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.Float32BufferAttribute(solid.pos, 3));
-      geo.setAttribute('color', new THREE.Float32BufferAttribute(solid.col, 3));
+      const mats: THREE.Material[] = [];
+      for (const [pattern, t] of byPattern) {
+        geo.addGroup(pos.length / 3, t.pos.length / 3, mats.length);
+        mats.push(materialFor(pattern));
+        pos.push(...t.pos);
+        col.push(...t.col);
+        uv.push(...t.uv);
+      }
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+      geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
       geo.computeVertexNormals();
-      const mesh = new THREE.Mesh(geo, SOLID);
+      const mesh = new THREE.Mesh(geo, mats);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       group.add(mesh);

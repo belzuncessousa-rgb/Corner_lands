@@ -644,7 +644,7 @@ export function buildingSprite(type: BuildingType, w: number, h: number, level: 
 const STONE_COLORS = new Set([STONE, '#c8c0b0', '#9d9488', '#b0a898', '#b6ae9f', '#9d978c', '#a49c8e', '#c8c2b6', '#9b9284']);
 
 /** Wall material for a box colour: stone greys, timber browns, plastered infill. */
-function wallMaterial(color: string): Material | undefined {
+export function wallMaterial(color: string): Material | undefined {
   if (STONE_COLORS.has(color)) return 'stone';
   if (color === WOOD) return 'plank';
   if (color === PLASTER || color === '#e8d4b0' || HOUSE_VARIANTS.some((v) => v.wall === color)) return 'plaster';
