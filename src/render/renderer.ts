@@ -1253,25 +1253,30 @@ export class Renderer {
   }
 
   /** A small standing or running figure, used for the lane folk by homes. */
-  private drawFolk(sx: number, sy: number, scale: number, tunic: string, hair: string, run: number, face: number, winter: boolean): void {
+  private drawFolk(sx: number, sy: number, scale: number, tunic: string, hair: string, run: number, face: number, winter: boolean, seated = false): void {
     const c = this.ctx;
     c.save();
     c.translate(sx, sy);
     c.scale(scale, scale);
     const bob = Math.abs(Math.sin(run)) * 1.2 * (run ? 1 : 0);
     const leg = run ? Math.sin(run) * 2 : 0;
-    c.fillStyle = 'rgba(20,20,10,0.28)';
-    c.beginPath();
-    c.ellipse(0, 0, 4, 1.8, 0, 0, Math.PI * 2);
-    c.fill();
+    if (seated) c.translate(0, 4);
+    else {
+      c.fillStyle = 'rgba(20,20,10,0.28)';
+      c.beginPath();
+      c.ellipse(0, 0, 4, 1.8, 0, 0, Math.PI * 2);
+      c.fill();
+    }
     c.strokeStyle = '#3a2c20';
     c.lineWidth = 1.4;
-    c.beginPath();
-    c.moveTo(-1, -4 - bob);
-    c.lineTo(-1 + leg, 0);
-    c.moveTo(1, -4 - bob);
-    c.lineTo(1 - leg, 0);
-    c.stroke();
+    if (!seated) {
+      c.beginPath();
+      c.moveTo(-1, -4 - bob);
+      c.lineTo(-1 + leg, 0);
+      c.moveTo(1, -4 - bob);
+      c.lineTo(1 - leg, 0);
+      c.stroke();
+    }
     c.fillStyle = tunic;
     c.beginPath();
     c.moveTo(-3, -4 - bob);
@@ -1454,7 +1459,7 @@ export class Renderer {
       this.duckSpots = [];
       const water = (x: number, y: number) => inBounds(s, x, y) && s.terrain[idx(s, x, y)] === 1;
       for (let i = 0; i < s.terrain.length; i++) {
-        if (s.terrain[i] !== 1 || (Math.imul(i, 2654435761) >>> 0) % 13 !== 0) continue;
+        if (s.terrain[i] !== 1 || (Math.imul(i, 2654435761) >>> 0) % 31 !== 0) continue;
         const x = i % W;
         const y = (i / W) | 0;
         // Open water a tile from the bank: room to swim, close to the reeds.
@@ -1471,13 +1476,13 @@ export class Renderer {
       const y0 = ((i / W) | 0) + 0.5;
       const [vx, vy] = iso(x0, y0);
       if (!visible(vx, vy)) continue;
-      const n = 2 + (i % 3);
+      const n = 5 + (i % 3);
       const t = this.time * 0.12 + i;
       const at = (a: number) => iso(x0 + Math.cos(a) * 0.7, y0 + Math.sin(a) * 0.7);
       const brood: [number, number, number, number][] = [];
       for (let k = 0; k < n; k++) {
         // The brood follows in a line behind the mother.
-        const a = t - k * 0.42;
+        const a = t - k * 0.3;
         const [sx, sy] = at(a);
         const [nx] = at(a + 0.05);
         brood.push([sx, sy, nx > sx ? 1 : -1, k]);
@@ -1658,7 +1663,7 @@ export class Renderer {
       c.fillStyle = '#7a5636';
       c.fillRect(Math.min(sx - 10 * f, sx + 11 * f), sy - 5, 21, 1.4);
       // The fisher, seated, rod out over the water.
-      this.drawFolk(sx - 3 * f, sy - 1.5, 0.85 * FOLK_SCALE, '#6a7a5a', '#4a3020', 0, f, false);
+      this.drawFolk(sx - 3 * f, sy - 1.5, 0.85 * FOLK_SCALE, '#6a7a5a', '#4a3020', 0, f, false, true);
       const rx = sx + 1 * f;
       const ry = sy - 9;
       const tx = rx + 16 * f;

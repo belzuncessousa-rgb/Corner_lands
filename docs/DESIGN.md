@@ -354,7 +354,7 @@ art, the logic and balance get this pass. Grouped by how deep each change goes.
 - [ ] Trading post lists every good, in tabs by kind
 - [x] Bug: the manor stopped improving in one playthrough (renovations never said what they were waiting for; now the upgrade box shows it, e.g. "Waiting for dressed stone in storage")
 - [ ] Haulers visibly carry what they move
-- [ ] Fishers sit in their boats (no legs or shadow); fewer duck families, more ducklings each
+- [x] Fishers sit in their boats (no legs or shadow); fewer duck families, five to seven ducklings each
 - [ ] Less stone early: level 1 buildings are timber; stone is for better buildings
 - [ ] Coins only for what must be imported: woodcutter and forester cost timber only; orchards, decorations and backyard extensions cost coins (and some materials). Coins hard to come by and worth spending
 
