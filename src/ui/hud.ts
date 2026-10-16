@@ -14,6 +14,7 @@ import {
   GROUP_NAMES,
   RESOURCE_STORAGE,
   STORAGE_CAPACITY,
+  DAYS_PER_MONTH,
 } from '../game/data';
 import { nextTitle, takeTitle, titleError, TITLES, fairCost, fairError, fairPrestige, FAIR_TIER, feastCost, feastError, FESTIVALS, festivalError, getEvent, holdFair, holdFeast, holdFestival, resolveEvent } from '../game/events';
 import { CHARTERS, CHARTER_TIER, PATHS, charterCost, charterError, grantCharter, hasCharter } from '../game/charters';
@@ -76,6 +77,8 @@ import {
   dismissRetinue,
   raiseRetinue,
   retinueError,
+  isMarketDay,
+  MARKET_DAY,
 } from '../game/sim';
 import type { Building, BuildingType, Category, Cost, GoodsGroup, ResourceId } from '../game/types';
 import type { StorageKind } from '../game/data';
@@ -753,7 +756,7 @@ export class Hud {
     const key = JSON.stringify([
       b.id, b.status, b.workers, b.builders, b.residents, b.build.toFixed(2), b.paused, b.level, b.lastOutput, b.growth.toFixed(2), b.want, b.priority, b.recipe, b.yard, b.trade, b.herd, b.owner, Math.floor(b.growth),
       s.tier, blocker, b.need, (b.upProgress ?? 0).toFixed(2), b.unmet, Math.floor(s.res.gold / 10), s.population,
-      s.lastFeast, s.festivals, monthOf(s.day), s.retinue, Math.floor(s.res.wood), Math.floor(totalFood(s)), b.barn, Math.floor(s.res.prestige), Math.floor(s.res.weapons),
+      s.lastFeast, s.festivals, monthOf(s.day), b.type === 'market' ? s.day : 0, s.retinue, Math.floor(s.res.wood), Math.floor(totalFood(s)), b.barn, Math.floor(s.res.prestige), Math.floor(s.res.weapons),
       STORAGE_CAPACITY[b.type] ? RESOURCE_IDS.map((r) => (RESOURCE_STORAGE[r] ? Math.floor(s.res[r]) : 0)).join() : '',
     ]);
     if (key === this.lastInspectorKey) return;
@@ -809,6 +812,11 @@ export class Hud {
           .join('')}</span></div>`);
       }
       rows.push(...this.zoneRows(b));
+      if (b.type === 'market' && b.build >= 1) {
+        const left = (MARKET_DAY - (s.day % DAYS_PER_MONTH) + DAYS_PER_MONTH) % DAYS_PER_MONTH;
+        const when = isMarketDay(s, b) ? '<span class="pos">Today!</span>' : !b.workers ? '<span class="neg">Needs a stallholder</span>' : left === 0 ? 'Not in winter' : `In ${left} day${left > 1 ? 's' : ''}`;
+        rows.push(`<div class="kv" data-tip="Once a month the square fills with townsfolk and the merchants' cart comes for the goods you sell."><span>Market day</span><span>${when}</span></div>`);
+      }
       rows.push(...this.storeRows(b));
       if (b.type === 'townhall') {
         const c = feastCost(s);

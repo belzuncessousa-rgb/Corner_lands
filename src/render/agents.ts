@@ -1,6 +1,6 @@
 import { BUILDINGS, DAY_SECONDS, OFFROAD_TILES_PER_DAY, ROAD_TILES_PER_DAY, STONE_ROAD_TILES_PER_DAY, STORAGE_CAPACITY } from '../game/data';
 import { findPath } from '../game/path';
-import { chooseRecipe, doorTile, forTilesInRadius, bCenter, isMarketDay, isWinter, needsMaterials } from '../game/sim';
+import { chooseRecipe, doorTile, forTilesInRadius, bCenter, isMarketDay, isWinter, MARKET_DAY, needsMaterials } from '../game/sim';
 import type { Building, GameState, ResourceId } from '../game/types';
 import { getBuilding, idx, inBounds } from '../game/world';
 
@@ -67,17 +67,18 @@ export class AgentSystem {
     this.syncTimer = 0;
   }
 
-  private lastMonth = -1;
+  private lastCartDay: number | null = null;
 
   update(s: GameState, dt: number): void {
-    // Each month a merchant cart visits markets that export goods.
-    const month = Math.floor(s.day / 10);
-    if (this.lastMonth >= 0 && month !== this.lastMonth && dt > 0) {
+    // Each month, on market day, a merchant cart visits markets that export goods.
+    // The first market day seen after a load sends no cart; later ones do.
+    const marketDay = s.day % 10 === MARKET_DAY ? s.day : null;
+    if (marketDay !== null && this.lastCartDay !== null && marketDay !== this.lastCartDay && dt > 0) {
       for (const m of s.buildings) {
         if (m.type === 'market' && m.build >= 1 && Object.keys(s.sell ?? {}).length) this.sendCart(s, m);
       }
     }
-    this.lastMonth = month;
+    if (marketDay !== null || this.lastCartDay === null) this.lastCartDay = marketDay ?? -1;
     this.syncTimer -= dt;
     if (this.syncTimer <= 0) {
       this.sync(s);
