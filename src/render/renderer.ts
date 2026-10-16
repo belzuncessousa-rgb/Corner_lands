@@ -66,6 +66,8 @@ interface Particle {
   life: number;
   max: number;
   size: number;
+  /** Steam (whiter, quicker to vanish) rather than smoke. */
+  steam?: boolean;
 }
 
 const GRASS_VARIANTS = 8;
@@ -378,7 +380,7 @@ export class Renderer {
     this.updateSmoke(s, dt, season);
     for (const p of this.particles) {
       const t = p.life / p.max;
-      c.fillStyle = `rgba(225,225,225,${0.35 * (1 - t)})`;
+      c.fillStyle = p.steam ? `rgba(250,250,250,${0.5 * (1 - t)})` : `rgba(225,225,225,${0.35 * (1 - t)})`;
       c.beginPath();
       c.arc(p.x, p.y, p.size * (1 + t * 1.6), 0, Math.PI * 2);
       c.fill();
@@ -612,6 +614,33 @@ export class Renderer {
       if (color) {
         p.line([a, y - 0.05, height * 0.5], [z, y - 0.05, height * 0.5], color, height + 1.5);
         p.line([a, y - 0.08, height], [z, y - 0.08, height], shadeCrop(color), 1.2);
+      }
+    }
+    if (month === 7 && season !== 3) {
+      // Sheaves stooked to dry in rows after the harvest.
+      for (let yy = y0 + 0.6; yy < y0 + b.h - 0.3; yy += 1.2) {
+        for (let xx = x0 + 0.6; xx < x0 + b.w - 0.3; xx += 1.1) {
+          const [sx, sy] = iso(xx + ((b.id + Math.floor(yy)) % 2) * 0.3, yy);
+          const c = p.ctx;
+          c.fillStyle = 'rgba(30,20,10,0.2)';
+          c.beginPath();
+          c.ellipse(sx, sy, 4, 1.6, 0, 0, Math.PI * 2);
+          c.fill();
+          c.fillStyle = '#c8a040';
+          c.beginPath();
+          c.moveTo(sx - 3.5, sy);
+          c.lineTo(sx, sy - 9);
+          c.lineTo(sx + 3.5, sy);
+          c.closePath();
+          c.fill();
+          c.fillStyle = '#e0c060';
+          c.beginPath();
+          c.moveTo(sx - 1, sy);
+          c.lineTo(sx, sy - 9);
+          c.lineTo(sx + 2.5, sy);
+          c.closePath();
+          c.fill();
+        }
       }
     }
   }
@@ -933,6 +962,18 @@ export class Renderer {
       drawSails(c, hx, hy, this.time * 0.9 + b.id, season);
     }
     if (b.type === 'house' && b.residents > 0 && season !== 3 && !this.light && (b.id * 2654435761) % 3 === 0) this.drawChickens(b);
+    if (b.type === 'farm' && b.build >= 1 && monthOf(s.day) >= 7) this.drawHayRick(b, season);
+    if (b.type === 'bakery' && b.build >= 1 && b.workers > 0 && !b.paused && (b.output > 0 || b.lastOutput > 0)) {
+      // The oven mouth glows and flickers while the baker bakes.
+      const [ox, oy] = iso(b.x + 1.6, b.y + 0.85, 0);
+      const f = 0.35 + 0.2 * Math.sin(this.time * 7 + b.id) + 0.1 * Math.sin(this.time * 13);
+      c.fillStyle = `rgba(255,150,50,${f})`;
+      c.beginPath();
+      c.ellipse(ox + 2, oy - 2, 7, 5, 0, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = `rgba(255,220,120,${f + 0.2})`;
+      c.fillRect(ox - 1, oy - 2.5, 5, 2.2);
+    }
     if (STORAGE_CAPACITY[b.type]) this.drawStock(s, b, season);
     if (b.type === 'townhall' && s.feastDay !== undefined && s.day - s.feastDay < DAYS_PER_MONTH) this.drawFeast(b);
     const fest = s.festivalDay && s.day - s.festivalDay.day < DAYS_PER_MONTH ? s.festivalDay.id : null;
@@ -1108,6 +1149,33 @@ export class Renderer {
   }
 
   /** Trestle tables and bunting in the manor's yard for a month after a feast. */
+  /** A thatched hay rick by the farmstead from the harvest to the spring. */
+  private drawHayRick(b: Building, season: Season): void {
+    const c = this.ctx;
+    const [sx, sy] = iso(b.x + b.w - 0.35, b.y + b.h + 0.35);
+    c.fillStyle = 'rgba(30,20,10,0.25)';
+    c.beginPath();
+    c.ellipse(sx + 2, sy, 11, 4.5, 0, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = '#c8a24a';
+    c.beginPath();
+    c.moveTo(sx - 10, sy);
+    c.lineTo(sx - 9, sy - 10);
+    c.quadraticCurveTo(sx, sy - 24, sx + 9, sy - 10);
+    c.lineTo(sx + 10, sy);
+    c.closePath();
+    c.fill();
+    c.fillStyle = '#b08a38';
+    c.fillRect(sx + 1, sy - 12, 9, 12);
+    // A thatched cap, snowy in winter.
+    c.fillStyle = season === 3 ? '#eef2f4' : '#8a6a3a';
+    c.beginPath();
+    c.moveTo(sx - 9.5, sy - 11);
+    c.quadraticCurveTo(sx, sy - 26, sx + 9.5, sy - 11);
+    c.quadraticCurveTo(sx, sy - 17, sx - 9.5, sy - 11);
+    c.fill();
+  }
+
   /** Two or three hens pecking about a home's front yard. */
   private drawChickens(b: Building): void {
     const c = this.ctx;
@@ -1671,6 +1739,11 @@ export class Renderer {
         if (b.build < 1) continue;
         const active = b.residents > 0 || b.workers > 0;
         if (!active || Math.random() > 0.35) continue;
+        // Steam rising from the brewhouse coppers while the brewer works.
+        if (!this.light && b.type === 'brewhouse' && b.workers > 0 && !b.paused && (b.output > 0 || b.lastOutput > 0)) {
+          const [vx, vy] = iso(b.x + 0.95, b.y + 0.85, 40);
+          for (let k = 0; k < 2; k++) this.particles.push({ x: vx + (Math.random() - 0.5) * 6, y: vy, vx: 2 + Math.random() * 3, vy: -16 - Math.random() * 8, life: 0, max: 1.2 + Math.random() * 0.6, size: 2.4 + Math.random(), steam: true });
+        }
         // Forges at work throw sparks from the anvil.
         if (!this.light && (b.type === 'smithy' || b.type === 'armoury' || b.type === 'bloomery') && b.workers > 0 && !b.paused && (b.output > 0 || b.lastOutput > 0)) {
           const [ax, ay] = iso(b.x + b.w * 0.8, b.y + b.h - 0.05, 6);
