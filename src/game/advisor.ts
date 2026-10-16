@@ -166,6 +166,12 @@ const ADVICE: Advice[] = [
     text: () => 'Steward: the crown would grant us a charter for our prestige. Open the charters (crown button) and choose what our town should become.',
   },
   {
+    id: 'pottage',
+    when: (s) => s.population >= 20 && (s.report.pottage ?? 0) >= s.population * 0.3 && s.report.shortage === 0,
+    text: (s) =>
+      `Steward: ${s.report.pottage} villagers lived on pottage last month, grain boiled whole for want of better food. Bread from a Windmill and a Bakery feeds three times as many from the same wheat; hunters and fishers add variety.`,
+  },
+  {
     id: 'idle-hands',
     when: (s) => {
       const l = labourSummary(s);

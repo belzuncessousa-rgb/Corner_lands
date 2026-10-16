@@ -213,6 +213,8 @@ export interface MonthReport {
   left: number;
   /** Gold earned from merchants last month. */
   trade?: number;
+  /** Villagers fed on pottage (grain or oats boiled whole) last month. */
+  pottage?: number;
 }
 
 /** One month's snapshot for the ledger charts. */

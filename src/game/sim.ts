@@ -2059,7 +2059,7 @@ const VARIETY_BONUS = [0, 0, 6, 12, 18];
 const POTTAGE: ResourceId[] = ['grain', 'oats'];
 export const POTTAGE_FOOD = 0.5;
 
-export function eatFood(s: GameState, mouths: number): { hungry: number; groups: number } {
+export function eatFood(s: GameState, mouths: number): { hungry: number; groups: number; pottage: number } {
   let need = mouths;
   const groups = new Set<string>();
   while (need > 0.001) {
@@ -2076,13 +2076,14 @@ export function eatFood(s: GameState, mouths: number): { hungry: number; groups:
     if (!ate) break;
   }
   // With nothing else left, families boil grain or oats into pottage.
+  const before = need;
   for (const f of POTTAGE) {
     const n = Math.min(Math.floor(s.res[f]), Math.ceil((need - 0.001) / POTTAGE_FOOD));
     if (n <= 0) continue;
     s.res[f] -= n;
     need -= n * POTTAGE_FOOD;
   }
-  return { hungry: Math.max(0, Math.ceil(need - 0.001)), groups: groups.size };
+  return { hungry: Math.max(0, Math.ceil(need - 0.001)), groups: groups.size, pottage: Math.round(before - Math.max(0, need)) };
 }
 
 export function monthly(s: GameState, rng: StateRng): void {
@@ -2109,6 +2110,7 @@ export function monthly(s: GameState, rng: StateRng): void {
   report.eaten = s.population - eaten.hungry;
   report.shortage = eaten.hungry;
   report.variety = eaten.groups;
+  report.pottage = eaten.pottage;
   const need = eaten.hungry;
   if (need > 0) log(s, `Food shortage! ${need} villagers went hungry.`, 'bad');
 

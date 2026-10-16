@@ -1236,3 +1236,21 @@ describe('year in review', () => {
     expect(review.some((t) => /Stocked up: [a-z ]+ \(\+\d+\)/.test(t))).toBe(true);
   });
 });
+
+describe('pottage', () => {
+  it('counts villagers fed on pottage and the steward speaks up', async () => {
+    const { eatFood } = await import('../src/game/sim');
+    const { advise } = await import('../src/game/advisor');
+    const s = generateWorld(13);
+    for (const k of Object.keys(s.res)) if (k !== 'gold') (s.res as Record<string, number>)[k] = 0;
+    s.res.grain = 200;
+    s.population = 40;
+    const r = eatFood(s, 40);
+    expect(r.hungry).toBe(0);
+    expect(r.pottage).toBe(40);
+    s.report.pottage = r.pottage;
+    s.report.shortage = 0;
+    for (let i = 0; i < 25; i++) advise(s, 3);
+    expect(s.messages.some((m) => /40 villagers lived on pottage/.test(m.text))).toBe(true);
+  });
+});
