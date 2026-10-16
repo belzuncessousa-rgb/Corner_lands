@@ -15,6 +15,7 @@ import {
   bridgeTile,
   bushSprite,
   makeSprite,
+  drawSails,
   buildingSprite,
   grassTile,
   roadTile,
@@ -383,6 +384,7 @@ export class Renderer {
       c.fill();
     }
 
+    this.drawSparks();
     this.drawSky(s, season, dt);
     if (!this.light) this.drawWeather(s, season, dt);
     else this.snow = [];
@@ -912,7 +914,9 @@ export class Renderer {
   }
 
   private drawBuilding(s: GameState, b: Building, season: Season, selected: boolean): void {
-    const sp = this.buildingSprite(b.type, b.level, season, variantOf(s, b));
+    // A mill that ground grain lately turns its sails (drawn live, not in the picture).
+    const turning = b.type === 'windmill' && b.build >= 1 && !this.light && b.workers > 0 && !b.paused && (b.output > 0 || b.lastOutput > 0);
+    const sp = this.buildingSprite(b.type, b.level, season, turning ? 1 : variantOf(s, b));
     const [wx, wy] = iso(b.x, b.y);
     const c = this.ctx;
     if (b.build < 1) {
@@ -924,6 +928,10 @@ export class Renderer {
       return;
     }
     this.blit(sp, wx, wy);
+    if (turning) {
+      const [hx, hy] = iso(b.x + 1.0, b.y + 1.42, 34);
+      drawSails(c, hx, hy, this.time * 0.9 + b.id, season);
+    }
     if (STORAGE_CAPACITY[b.type]) this.drawStock(s, b, season);
     if (b.type === 'townhall' && s.feastDay !== undefined && s.day - s.feastDay < DAYS_PER_MONTH) this.drawFeast(b);
     const fest = s.festivalDay && s.day - s.festivalDay.day < DAYS_PER_MONTH ? s.festivalDay.id : null;
@@ -1615,6 +1623,11 @@ export class Renderer {
         if (b.build < 1) continue;
         const active = b.residents > 0 || b.workers > 0;
         if (!active || Math.random() > 0.35) continue;
+        // Forges at work throw sparks from the anvil.
+        if (!this.light && (b.type === 'smithy' || b.type === 'armoury' || b.type === 'bloomery') && b.workers > 0 && !b.paused && (b.output > 0 || b.lastOutput > 0)) {
+          const [ax, ay] = iso(b.x + b.w * 0.8, b.y + b.h - 0.05, 6);
+          for (let k = 0; k < 4; k++) this.sparks.push({ x: ax, y: ay, vx: (Math.random() - 0.5) * 30, vy: -18 - Math.random() * 22, life: 0, max: 0.5 + Math.random() * 0.4 });
+        }
         const sp = this.buildingSprite(b.type, b.level, season, variantOf(s, b));
         for (const [x, y, z] of sp.smoke) {
           const [wx, wy] = iso(b.x + x, b.y + y, z);
@@ -1637,6 +1650,25 @@ export class Renderer {
     }
     this.particles = this.particles.filter((p) => p.life < p.max);
     if (this.particles.length > 1500) this.particles.splice(0, this.particles.length - 1500);
+    for (const p of this.sparks) {
+      p.life += dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy += 70 * dt;
+    }
+    this.sparks = this.sparks.filter((p) => p.life < p.max);
+    if (this.sparks.length > 400) this.sparks.splice(0, this.sparks.length - 400);
+  }
+
+  private sparks: { x: number; y: number; vx: number; vy: number; life: number; max: number }[] = [];
+
+  private drawSparks(): void {
+    const c = this.ctx;
+    for (const p of this.sparks) {
+      const t = p.life / p.max;
+      c.fillStyle = `rgba(255,${Math.round(200 - t * 120)},60,${1 - t})`;
+      c.fillRect(p.x - 0.8, p.y - 0.8, 1.6, 1.6);
+    }
   }
 
   private snow: { x: number; y: number; s: number }[] = [];

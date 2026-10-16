@@ -281,6 +281,44 @@ export function waterTile(season: Season, mask: number, deco = 0): Sprite {
   });
 }
 
+/** A post mill's four lattice sails around a hub at (hx, hy), turned by `turn` radians. */
+export function drawSails(c: CanvasRenderingContext2D, hx: number, hy: number, turn: number, season: Season): void {
+  for (let k = 0; k < 4; k++) {
+    const a = Math.PI / 4 + (k * Math.PI) / 2 + turn;
+    const ex = hx + Math.cos(a) * 30;
+    const ey = hy + Math.sin(a) * 30;
+    c.strokeStyle = '#5e4129';
+    c.lineWidth = 1.6;
+    c.beginPath();
+    c.moveTo(hx, hy);
+    c.lineTo(ex, ey);
+    c.stroke();
+    // Lattice sail cloth along one side of each arm.
+    const nx = -Math.sin(a) * 6;
+    const ny = Math.cos(a) * 6;
+    c.fillStyle = season === 3 ? 'rgba(230,236,240,0.85)' : 'rgba(240,232,214,0.9)';
+    c.beginPath();
+    c.moveTo(hx + Math.cos(a) * 8, hy + Math.sin(a) * 8);
+    c.lineTo(ex, ey);
+    c.lineTo(ex + nx, ey + ny);
+    c.lineTo(hx + Math.cos(a) * 8 + nx, hy + Math.sin(a) * 8 + ny);
+    c.closePath();
+    c.fill();
+    c.strokeStyle = 'rgba(94,65,41,0.6)';
+    c.lineWidth = 0.5;
+    for (let t = 0.35; t < 1; t += 0.16) {
+      c.beginPath();
+      c.moveTo(hx + Math.cos(a) * 30 * t, hy + Math.sin(a) * 30 * t);
+      c.lineTo(hx + Math.cos(a) * 30 * t + nx, hy + Math.sin(a) * 30 * t + ny);
+      c.stroke();
+    }
+  }
+  c.fillStyle = '#3b2a1a';
+  c.beginPath();
+  c.arc(hx, hy, 2.4, 0, Math.PI * 2);
+  c.fill();
+}
+
 /** Dirt road; mask bits mark road neighbours like waterTile. */
 /**
  * A road tile that only turns a corner (two neighbours at right angles) is
@@ -1199,43 +1237,11 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       p.doorL(1.38, 0.9, 0.18, 9);
       p.windowL(1.38, 0.8, 26, 0.12, 5);
       p.roofX(0.62, 0.62, 1.38, 1.38, 40, 14, 'shingle', WOOD, 0.06);
-      // Sails turn on a hub at the front face.
-      const [hx, hy] = iso(1.0, 1.42, 34);
-      const c = p.ctx;
-      for (let k = 0; k < 4; k++) {
-        const a = Math.PI / 4 + (k * Math.PI) / 2;
-        const ex = hx + Math.cos(a) * 30;
-        const ey = hy + Math.sin(a) * 30;
-        c.strokeStyle = '#5e4129';
-        c.lineWidth = 1.6;
-        c.beginPath();
-        c.moveTo(hx, hy);
-        c.lineTo(ex, ey);
-        c.stroke();
-        // Lattice sail cloth along one side of each arm.
-        const nx = -Math.sin(a) * 6;
-        const ny = Math.cos(a) * 6;
-        c.fillStyle = season === 3 ? 'rgba(230,236,240,0.85)' : 'rgba(240,232,214,0.9)';
-        c.beginPath();
-        c.moveTo(hx + Math.cos(a) * 8, hy + Math.sin(a) * 8);
-        c.lineTo(ex, ey);
-        c.lineTo(ex + nx, ey + ny);
-        c.lineTo(hx + Math.cos(a) * 8 + nx, hy + Math.sin(a) * 8 + ny);
-        c.closePath();
-        c.fill();
-        c.strokeStyle = 'rgba(94,65,41,0.6)';
-        c.lineWidth = 0.5;
-        for (let t = 0.35; t < 1; t += 0.16) {
-          c.beginPath();
-          c.moveTo(hx + Math.cos(a) * 30 * t, hy + Math.sin(a) * 30 * t);
-          c.lineTo(hx + Math.cos(a) * 30 * t + nx, hy + Math.sin(a) * 30 * t + ny);
-          c.stroke();
-        }
+      // Sails turn on a hub at the front face; a working mill gets them drawn turning, frame by frame.
+      if (variant !== 1) {
+        const [hx, hy] = iso(1.0, 1.42, 34);
+        drawSails(p.ctx, hx, hy, 0, season);
       }
-      c.fillStyle = '#3b2a1a';
-      c.beginPath();
-      c.arc(hx, hy, 2.4, 0, Math.PI * 2);
-      c.fill();
       p.sack(1.65, 1.3, '#efe6d4');
       p.sack(1.75, 1.5, '#e8dcc4');
       break;

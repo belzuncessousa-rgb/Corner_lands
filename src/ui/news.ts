@@ -3,6 +3,7 @@
  * something worth telling returning players goes in; the number only grows.
  */
 export const NEWS: { n: number; text: string }[] = [
+  { n: 16, text: 'A livelier land: turning windmills, forge sparks, wildflower meadows, reeds and lilies, stumps where the woodcutters were, and homes with flower boxes and washing lines' },
   { n: 15, text: 'A quiet tune now and then, in a different mode for each season (Music in the menu)' },
   { n: 14, text: 'Evening falls at the end of each day, with lamplight in the windows' },
   { n: 13, text: 'Copy a link to your land from the menu: friends who open it start on the same map' },
