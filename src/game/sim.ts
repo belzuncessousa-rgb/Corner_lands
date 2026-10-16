@@ -2006,7 +2006,7 @@ export function dailyProduction(s: GameState, rng: StateRng): void {
 /** Most builders that work one site at once. */
 export const MAX_BUILDERS = 4;
 /** Share of a building-day of work one builder does per day. */
-export const LABOUR_PER_BUILDER = 0.7;
+export const LABOUR_PER_BUILDER = 2;
 
 /** Construction sites in the order builders attend to them. */
 export function constructionSites(s: GameState): Building[] {
@@ -2028,8 +2028,10 @@ export function dailyConstruction(s: GameState): void {
     const n = b.builders ?? 0;
     const d = BUILDINGS[b.type];
     const renovating = b.build >= 1;
+    // A renovation keeps its own note, so the workplace's status stays about its work.
     const setStatus = (text: string) => {
-      if (!renovating) b.status = text;
+      if (renovating) b.upNote = text;
+      else b.status = text;
     };
     if (needsMaterials(b)) {
       if (n === 0) {
@@ -2066,6 +2068,7 @@ export function dailyConstruction(s: GameState): void {
       continue;
     }
     if (renovating) {
+      b.upNote = `Building (${n} builder${n > 1 ? 's' : ''})`;
       b.upProgress = Math.min(1, (b.upProgress ?? 0) + (n * LABOUR_PER_BUILDER) / upgradeDays(b));
       if (b.upProgress >= 1) {
         b.carry = 0;

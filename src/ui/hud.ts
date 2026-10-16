@@ -898,7 +898,9 @@ export class Hud {
         rows.push(`<div class="needs"><div class="needs-h">Needs</div>${needs.map((n) => `<span class="${n.met ? 'met' : 'unmet'}">${n.met ? '✓' : '✗'} ${n.label}</span>`).join('')}</div>`);
       }
       if (b.upgrading) {
+        const note = b.upNote ?? 'Waiting for builders';
         rows.push(`<div class="upgrade-box"><b>Upgrading to ${esc(upgradeName(b))}</b>${needLine()}
+          <div class="kv"><span>Now</span><span class="${/^Waiting/.test(note) ? 'neg' : ''}">${esc(note)}</span></div>
           <div class="kv"><span>Work</span><span>${Math.floor((b.upProgress ?? 0) * 100)}% · ${b.builders ?? 0} builders</span></div>
           <div class="progress"><i style="width:${(b.upProgress ?? 0) * 100}%"></i></div></div>`);
       } else if (plan) {

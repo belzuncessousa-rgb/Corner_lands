@@ -342,7 +342,7 @@ The look is right ("loving the cute forms and the overall aesthetics"). Before m
 art, the logic and balance get this pass. Grouped by how deep each change goes.
 
 ### Phase 34 — Quick fixes from the playtest
-- [ ] Construction is much faster: building is not where the time should go
+- [x] Construction is much faster: building is not where the time should go
 - [ ] Dirt and stone roads take a little time to build (laid tile by tile)
 - [ ] Objectives and rewards only in Easy (the tutorial-like mode), not in the regular game
 - [ ] The build bar keeps a fixed size however many buildings a category holds
@@ -352,7 +352,7 @@ art, the logic and balance get this pass. Grouped by how deep each change goes.
 - [ ] Buildings whose requirements are not met yet (charters and the like) are hidden from the menus, not shown locked
 - [ ] Stone roads easy to find (they are under Paving; make that obvious)
 - [ ] Trading post lists every good, in tabs by kind
-- [ ] Bug: the manor stopped improving in one playthrough
+- [x] Bug: the manor stopped improving in one playthrough (renovations never said what they were waiting for; now the upgrade box shows it, e.g. "Waiting for dressed stone in storage")
 - [ ] Haulers visibly carry what they move
 - [ ] Fishers sit in their boats (no legs or shadow); fewer duck families, more ducklings each
 - [ ] Less stone early: level 1 buildings are timber; stone is for better buildings

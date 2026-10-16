@@ -204,6 +204,7 @@ export function finishUpgrade(s: GameState, b: Building): void {
   b.level = b.upgrading ?? b.level;
   b.upgrading = undefined;
   b.upProgress = undefined;
+  b.upNote = undefined;
   b.need = undefined;
   if (b.type === 'townhall') {
     s.tier = b.level - 1;

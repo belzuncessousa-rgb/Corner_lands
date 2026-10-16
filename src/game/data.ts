@@ -8,8 +8,8 @@ export const DAY_SECONDS = 22.5;
 export const STONE_ROAD_TILES_PER_DAY = 30;
 export const ROAD_TILES_PER_DAY = 22;
 export const OFFROAD_TILES_PER_DAY = 12;
-/** Units of goods a villager carries in one trip. */
-export const CARRY_LOAD = 5;
+/** Units of materials a builder carries to a site in one trip (a barrow load). */
+export const CARRY_LOAD = 12;
 /** How strongly walking time slows production (0 = ignored). */
 export const TRAVEL_WEIGHT = 2;
 

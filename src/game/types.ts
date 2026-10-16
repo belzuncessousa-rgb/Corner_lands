@@ -145,6 +145,8 @@ export interface Building {
   carry?: number;
   /** Renovation progress 0..1 once materials are delivered. */
   upProgress?: number;
+  /** What a renovation in progress is doing or waiting for. */
+  upNote?: string;
   /** House needs that are not met (for the inspector). */
   unmet?: string[];
   /** Construction materials still to be carried to the site. */
