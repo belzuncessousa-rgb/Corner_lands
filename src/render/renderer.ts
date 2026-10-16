@@ -932,6 +932,7 @@ export class Renderer {
       const [hx, hy] = iso(b.x + 1.0, b.y + 1.42, 34);
       drawSails(c, hx, hy, this.time * 0.9 + b.id, season);
     }
+    if (b.type === 'house' && b.residents > 0 && season !== 3 && !this.light && (b.id * 2654435761) % 3 === 0) this.drawChickens(b);
     if (STORAGE_CAPACITY[b.type]) this.drawStock(s, b, season);
     if (b.type === 'townhall' && s.feastDay !== undefined && s.day - s.feastDay < DAYS_PER_MONTH) this.drawFeast(b);
     const fest = s.festivalDay && s.day - s.festivalDay.day < DAYS_PER_MONTH ? s.festivalDay.id : null;
@@ -1107,6 +1108,53 @@ export class Renderer {
   }
 
   /** Trestle tables and bunting in the manor's yard for a month after a feast. */
+  /** Two or three hens pecking about a home's front yard. */
+  private drawChickens(b: Building): void {
+    const c = this.ctx;
+    const n = 2 + (b.id % 2);
+    for (let k = 0; k < n; k++) {
+      const seed = b.id * 13 + k * 7;
+      const t = this.time * 0.35 + seed;
+      const x = b.x + 0.35 + ((seed % 5) / 5) * (b.w - 0.5) + Math.sin(t) * 0.15;
+      const y = b.y + b.h + 0.18 + ((seed % 3) / 3) * 0.25 + Math.cos(t * 0.8) * 0.08;
+      const [sx, sy] = iso(x, y);
+      c.save();
+      c.translate(sx, sy);
+      c.scale(1.5, 1.5);
+      c.translate(-sx, -sy);
+      const face = Math.cos(t) > 0 ? 1 : -1;
+      const peck = Math.sin(this.time * 3 + seed) > 0.6;
+      const body = k === 1 ? '#b8743a' : '#f2ece0';
+      c.fillStyle = 'rgba(20,20,10,0.22)';
+      c.beginPath();
+      c.ellipse(sx, sy, 2.4, 0.9, 0, 0, Math.PI * 2);
+      c.fill();
+      c.strokeStyle = '#c89a38';
+      c.lineWidth = 0.5;
+      c.beginPath();
+      c.moveTo(sx - 0.5, sy - 1.5);
+      c.lineTo(sx - 0.5, sy);
+      c.moveTo(sx + 0.5, sy - 1.5);
+      c.lineTo(sx + 0.5, sy);
+      c.stroke();
+      c.fillStyle = body;
+      c.beginPath();
+      c.ellipse(sx, sy - 2.6, 2.3, 1.6, 0, 0, Math.PI * 2);
+      c.fill();
+      // The head, down to the ground when pecking.
+      const hx = sx + face * 2;
+      const hy = sy - (peck ? 1 : 4);
+      c.beginPath();
+      c.arc(hx, hy, 1.1, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = '#d8352a';
+      c.fillRect(hx - 0.4, hy - 1.6, 0.9, 0.7);
+      c.fillStyle = '#e8b030';
+      c.fillRect(hx + face * 0.9 - (face < 0 ? 0.7 : 0), hy - 0.2, 0.7, 0.5);
+      c.restore();
+    }
+  }
+
   /** A soft window glow on the front of a building. */
   private drawLamplight(b: Building): void {
     const c = this.ctx;
