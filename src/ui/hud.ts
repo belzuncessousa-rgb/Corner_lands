@@ -1117,19 +1117,6 @@ export class Hud {
     this.renderBuildBar();
   }
 
-  /** A small button to take back the last placement or demolition, for a few seconds. */
-  showUndo(label: string | null, ms: number): void {
-    this.root.querySelector('.undo-btn')?.remove();
-    clearTimeout(this.undoTimer);
-    if (!label || this.game.demo) return;
-    const btn = document.createElement('button');
-    btn.className = 'undo-btn panel';
-    btn.innerHTML = `↶ ${esc(label)} <small>Ctrl+Z</small>`;
-    btn.addEventListener('click', () => this.game.undo());
-    this.root.appendChild(btn);
-    this.undoTimer = window.setTimeout(() => btn.remove(), ms);
-  }
-  private undoTimer = 0;
 
   /** Says which reach the map shows, and how many homes it misses. */
   showCoverage(type: BuildingType | null): void {
@@ -2187,7 +2174,7 @@ export class Hud {
         <p><b>Prestige</b> comes from a fine manor, a church and monuments. From Town on, spend it on <b>charters</b> (crown button) to specialise your town.</p>
         <p>Your <b>steward</b> warns you when things go wrong; the <b>Chronicle</b> (scroll button) keeps the full story.</p>
         <div class="ornament">❦</div>
-        <p><b>Keys</b>: <kbd>Left-drag</kbd> / <kbd>WASD</kbd> / arrows pan · <kbd>Wheel</kbd> / <kbd>+</kbd><kbd>-</kbd> / pinch zoom · <kbd>R</kbd> road (click, click) · <kbd>T</kbd> paved road · <kbd>X</kbd> / <kbd>Del</kbd> demolish · <kbd>P</kbd> protect a wood · <kbd>U</kbd> photo mode (hide the interface) · <kbd>V</kbd> reach of wells, markets, taverns, churches · <kbd>Ctrl+Z</kbd> undo the last placement or demolition · ${BUILD_ORDER.filter((b) => BUILDINGS[b].hotkey)
+        <p><b>Keys</b>: <kbd>Left-drag</kbd> / <kbd>WASD</kbd> / arrows pan · <kbd>Wheel</kbd> / <kbd>+</kbd><kbd>-</kbd> / pinch zoom · <kbd>R</kbd> road (click, click) · <kbd>T</kbd> paved road · <kbd>X</kbd> / <kbd>Del</kbd> demolish · <kbd>P</kbd> protect a wood · <kbd>U</kbd> photo mode (hide the interface) · <kbd>V</kbd> reach of wells, markets, taverns, churches · ${BUILD_ORDER.filter((b) => BUILDINGS[b].hotkey)
           .map((b) => `<kbd>${BUILDINGS[b].hotkey!.toUpperCase()}</kbd> ${BUILDINGS[b].name.toLowerCase()}`)
           .join(' · ')} · <kbd>Space</kbd> pause · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> speed</p>
         <p><b>Playing with friends:</b> found the same land with the seed of the week, download your town from Save Game for a friend to open, and compare <b>scores</b> on the load cards: villagers and rank, the lord's title, great works, works of art, milestones and every year in which no one went hungry.</p>

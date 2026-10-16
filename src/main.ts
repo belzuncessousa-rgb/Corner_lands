@@ -48,7 +48,7 @@ import {
 import type { Building, BuildingType, GameState } from './game/types';
 import { FOOD_IDS } from './game/data';
 import { generateWorld, idx, inBounds } from './game/world';
-import { demolishWithUndo, undoMany, undoPlacement, type UndoStep } from './game/undo';
+import { demolishWithUndo } from './game/undo';
 import type { Agent } from './render/agents';
 import { AgentSystem } from './render/agents';
 import { Wildlife } from './render/wildlife';
@@ -68,8 +68,6 @@ const SPEEDS = [0, 1, 3, 8];
 /** Autosaves of different settlements kept before the oldest is removed. */
 const AUTOSAVES_KEPT = 3;
 
-/** Seconds' grace to take back a placement or demolition. */
-const UNDO_MS = 10000;
 
 /** Services whose reach the V overlay can show. */
 const COVERAGE_TYPES: BuildingType[] = ['well', 'market', 'tavern', 'church'];
@@ -109,36 +107,13 @@ export class Game {
   /** Which service's reach the map is showing (V cycles), if any. */
   coverage: BuildingType | null = null;
 
-  /** The last placement or demolition, which may be taken back for a few seconds. */
-  private undoStep: { step: UndoStep; until: number; state: GameState } | null = null;
-
-  offerUndo(step: UndoStep): void {
-    this.undoStep = { step, until: performance.now() + UNDO_MS, state: this.state };
-    this.hud.showUndo(step.label, UNDO_MS);
-  }
-
-  /** Demolishes a building (from the tool or the inspector) and offers to undo it. */
-  demolishBuilding(b: Building): UndoStep | null {
-    const step = demolishWithUndo(this.state, b);
-    if (!step) return null;
+  /** Demolishes a building (from the tool or the inspector). There is no taking it back. */
+  demolishBuilding(b: Building): boolean {
+    if (!demolishWithUndo(this.state, b)) return false;
     log(this.state, `${BUILDINGS[b.type].name} demolished.`, 'info');
-    this.offerUndo(step);
-    return step;
+    return true;
   }
 
-  undo(): void {
-    const u = this.undoStep;
-    this.undoStep = null;
-    this.hud.showUndo(null, 0);
-    if (!u || performance.now() > u.until || u.state !== this.state) return;
-    const err = u.step.revert(this.state);
-    if (err) this.hud.flash(err);
-    else {
-      this.select(null);
-      this.hud.sound('place');
-      this.hud.update();
-    }
-  }
 
   /** Cycles the reach overlay: wells, markets, taverns, churches, off. */
   cycleCoverage(): void {
@@ -209,9 +184,6 @@ export class Game {
   }
 
   private afterLoad(): void {
-    // Undo belongs to the game it was made in.
-    this.undoStep = null;
-    this.hud.showUndo(null, 0);
     this.selectedAgent = null;
     this.demo = false;
     this.renderer.showMarkers = true;
@@ -684,7 +656,6 @@ export class Game {
     const z = placeZone(s, type, a.x, a.y, tx, ty);
     this.zoneAnchor = null;
     if (z) {
-      this.offerUndo(undoPlacement(z));
       this.hud.sound('place');
       this.setTool({ kind: 'select' });
       this.hud.closeCategory();
@@ -746,7 +717,6 @@ export class Game {
       }
       const b = placeOrder(s, tool.type, p.x, p.y);
       if (b) {
-        this.offerUndo(undoPlacement(b));
         this.hud.sound('place');
         if (!canAfford(s, materialsOf(BUILDINGS[tool.type].cost))) this.hud.flash('Builders will start once the materials are in storage.');
         if (tool.type !== 'house' && tool.type !== 'well' && tool.type !== 'garden') {
@@ -830,16 +800,12 @@ export class Game {
     const s = this.state;
     let n = 0;
     if (this.tool.kind === 'road' && this.tool.wall) {
-      const placed: UndoStep[] = [];
+      let placed = 0;
       for (const t of this.roadTiles(tx, ty)) {
         if (s.road[idx(s, t.x, t.y)] > 0 || placementError(s, 'wall', t.x, t.y)) continue;
-        const w = placeOrder(s, 'wall', t.x, t.y);
-        if (w) placed.push(undoPlacement(w));
+        if (placeOrder(s, 'wall', t.x, t.y)) placed++;
       }
-      if (placed.length) {
-        this.offerUndo(undoMany(placed, `Undo ${placed.length} wall section${placed.length > 1 ? 's' : ''}`));
-        this.hud.sound('stone');
-      }
+      if (placed) this.hud.sound('stone');
       return;
     }
     const paved = this.tool.kind === 'road' && !!this.tool.paved;
@@ -1008,11 +974,6 @@ export class Game {
         return;
       }
       if (this.modalOpen) return;
-      if (k === 'z' && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault();
-        this.undo();
-        return;
-      }
       if (k === ' ') {
         e.preventDefault();
         this.togglePause();

@@ -38,7 +38,7 @@ await page.keyboard.press('Escape');
 await page.waitForTimeout(200);
 if (process.env.DEBUG) console.log('pinned before Esc', pinned, 'menu', !!(await page.$('.modal-back')));
 check('Esc closes a pinned panel', pinned && (await page.$eval('#chip-panel', (e) => getComputedStyle(e).display)) === 'none' && !(await page.$('.modal-back')));
-// Undo: place a house, then take it back with Ctrl+Z.
+// No undo: a placed house stays, Ctrl+Z or not.
 {
   const before = await page.evaluate(() => ({ n: window.game.state.buildings.length, gold: window.game.state.res.gold }));
   await page.keyboard.press('h');
@@ -50,7 +50,7 @@ check('Esc closes a pinned panel', pinned && (await page.$eval('#chip-panel', (e
   await page.keyboard.press('Control+z');
   await page.waitForTimeout(200);
   const after = await page.evaluate(() => ({ n: window.game.state.buildings.length, gold: window.game.state.res.gold }));
-  check('undo a placement with Ctrl+Z', placed && shown && after.n === before.n && after.gold === before.gold, JSON.stringify({ placed, shown, before, after }));
+  check('no undo: Ctrl+Z leaves a placement standing', placed && !shown && after.n === before.n + 1, JSON.stringify({ placed, shown, before, after }));
 }
 // Farmstead from the menu (search a free spot near the hall).
 await pick('farming', 'farm');
@@ -192,7 +192,7 @@ check('reach overlay toggles', reach === 'well' && (await page.evaluate(() => wi
   check('lay a town wall with two clicks', walls >= 5, `${walls} sections`);
   await page.keyboard.press('Control+z');
   await page.waitForTimeout(150);
-  check('undo a whole stretch of wall', (await page.evaluate(() => window.game.state.buildings.filter((b) => b.type === 'wall').length)) === 0);
+  check('no undo for walls either', (await page.evaluate(() => window.game.state.buildings.filter((b) => b.type === 'wall').length)) === walls);
   await page.evaluate(() => { window.game.setTool({ kind: 'select' }); window.game.hud.closeCategory(); });
   await page.evaluate(() => { window.game.state.tier = 1; });
 }

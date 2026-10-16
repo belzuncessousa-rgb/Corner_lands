@@ -1891,17 +1891,6 @@ table.prod td.num {
 #log .msg.bad::before { content: '⚠ '; font-weight: bold; color: var(--bad); }
 #log .msg.good::before { content: '✓ '; font-weight: bold; color: var(--good); }
 
-/* Undo for a few seconds after placing or demolishing. */
-.undo-btn {
-  position: absolute;
-  left: 50%;
-  top: 62px;
-  transform: translateX(-50%);
-  padding: 5px 12px;
-  font-size: 14px;
-  z-index: 25;
-}
-.undo-btn small { opacity: 0.6; margin-left: 6px; }
 
 /* Production chains in the Production Book. */
 .prod.chains td:first-child { width: 90px; }

@@ -346,7 +346,7 @@ art, the logic and balance get this pass. Grouped by how deep each change goes.
 - [x] Dirt and stone roads take a little time to build: drawn roads are pegged out (dashed) and laid in order, 16 dirt or 6 paved tiles a day, paid up front and refunded if struck off
 - [ ] Objectives and rewards only in Easy (the tutorial-like mode), not in the regular game
 - [x] The build bar keeps a fixed size however many buildings a category holds
-- [ ] No undo (Ctrl+Z): no room for regrets
+- [x] No undo (Ctrl+Z): no room for regrets
 - [ ] The game pauses when the town grows a size
 - [ ] A fertility heatmap on the ground while placing a farm
 - [x] Buildings whose requirements are not met yet (charters and the like) are hidden from the menus, not shown locked
