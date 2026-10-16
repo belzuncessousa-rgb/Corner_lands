@@ -4,6 +4,7 @@ import { seasonOf } from '../game/sim';
 import type { GameState, Season } from '../game/types';
 import { drawBuilding, treeSprite, wallMaterial } from '../render/sprites';
 import type { TreeKind } from '../render/sprites';
+import { mulberry32 } from '../game/rng';
 import { Pen3D } from './pen3d';
 
 /**
@@ -42,55 +43,146 @@ function treeTexture(kind: TreeKind, season: Season, v: number) {
   return t;
 }
 
-/** The ground as one texture, a few pixels per tile, painted from the map. */
+/** The ground as one texture, painted from the map in the style of the flat tiles. */
 function groundTexture(s: GameState, season: Season): THREE.CanvasTexture {
-  const P = 8;
+  const P = 24;
+  const W = s.width * P;
+  const H = s.height * P;
   const c = document.createElement('canvas');
-  c.width = s.width * P;
-  c.height = s.height * P;
+  c.width = W;
+  c.height = H;
   const g = c.getContext('2d')!;
-  const grass = season === 3 ? ['#dfe5e3', '#d6dcda', '#e8ecea'] : season === 2 ? ['#a8a24a', '#9b9845', '#b3ab55'] : ['#7fae4a', '#73a444', '#8ab955'];
+  const rand = mulberry32(s.seed);
+  // Soil richness as a soft wash: one pixel per tile, smoothed as it is enlarged.
+  const small = document.createElement('canvas');
+  small.width = s.width;
+  small.height = s.height;
+  const sg = small.getContext('2d')!;
+  const lush = season === 3 ? ['#d9dfdd', '#e6ebe9'] : season === 2 ? ['#9a9440', '#b4ac58'] : ['#6a9a3c', '#8cba56'];
   for (let y = 0; y < s.height; y++) {
     for (let x = 0; x < s.width; x++) {
       const i = y * s.width + x;
-      if (s.terrain[i] === 1) g.fillStyle = season === 3 ? '#9fb6c8' : '#4d86b0';
-      else g.fillStyle = grass[Math.min(2, Math.floor(s.fertility[i] * 3))];
-      g.fillRect(x * P, y * P, P, P);
-      if (s.terrain[i] !== 1) {
-        // A few darker and lighter flecks so the grass is not flat.
-        g.fillStyle = 'rgba(40,60,20,0.12)';
-        g.fillRect(x * P + (s.variant[i] % 6), y * P + ((s.variant[i] >> 3) % 6), 2, 2);
-      }
-      if (s.road[i]) {
-        g.fillStyle = s.road[i] === 2 ? '#a39b8c' : season === 3 ? '#cfc6b8' : '#a88a5c';
-        g.fillRect(x * P + 1, y * P + 1, P - 2, P - 2);
-        // Join to road neighbours so roads read as bands.
-        if (x + 1 < s.width && s.road[i + 1]) g.fillRect(x * P + P - 1, y * P + 1, 2, P - 2);
-        if (y + 1 < s.height && s.road[i + s.width]) g.fillRect(x * P + 1, y * P + P - 1, P - 2, 2);
+      sg.fillStyle = s.terrain[i] === 1 ? (season === 3 ? '#a3b9ca' : '#4a83ad') : mixHex(lush[0], lush[1], 1 - s.fertility[i]);
+      sg.fillRect(x, y, 1, 1);
+    }
+  }
+  g.imageSmoothingEnabled = true;
+  g.drawImage(small, 0, 0, W, H);
+  // Tufts and flecks, as on the flat grass tiles.
+  const tuft = season === 3 ? ['rgba(255,255,255,0.35)', 'rgba(160,170,170,0.25)'] : ['rgba(40,70,20,0.22)', 'rgba(200,230,120,0.22)'];
+  for (let k = 0; k < s.width * s.height * 6; k++) {
+    const x = rand() * W;
+    const y = rand() * H;
+    if (s.terrain[Math.floor(y / P) * s.width + Math.floor(x / P)] === 1) continue;
+    g.strokeStyle = tuft[k % 2];
+    g.lineWidth = 1;
+    g.beginPath();
+    g.moveTo(x, y);
+    g.lineTo(x + (rand() - 0.5) * 2, y - 2 - rand() * 3);
+    g.stroke();
+  }
+  // Sandy shores where land meets water, and ripples on the water.
+  g.lineCap = 'round';
+  for (let y = 0; y < s.height; y++) {
+    for (let x = 0; x < s.width; x++) {
+      const i = y * s.width + x;
+      if (s.terrain[i] !== 1) continue;
+      const land = (xx: number, yy: number) => xx >= 0 && yy >= 0 && xx < s.width && yy < s.height && s.terrain[yy * s.width + xx] !== 1;
+      g.strokeStyle = season === 3 ? '#e8ece8' : '#d8c890';
+      g.lineWidth = P * 0.28;
+      const edge = (ax: number, ay: number, bx: number, by: number) => {
+        g.beginPath();
+        g.moveTo(ax, ay);
+        g.lineTo(bx, by);
+        g.stroke();
+      };
+      if (land(x - 1, y)) edge(x * P, y * P, x * P, (y + 1) * P);
+      if (land(x + 1, y)) edge((x + 1) * P, y * P, (x + 1) * P, (y + 1) * P);
+      if (land(x, y - 1)) edge(x * P, y * P, (x + 1) * P, y * P);
+      if (land(x, y + 1)) edge(x * P, (y + 1) * P, (x + 1) * P, (y + 1) * P);
+      if (season !== 3 && rand() < 0.3) {
+        g.strokeStyle = 'rgba(255,255,255,0.25)';
+        g.lineWidth = 1;
+        edge(x * P + rand() * P * 0.6, y * P + rand() * P, x * P + P * 0.4 + rand() * P * 0.6, y * P + rand() * P);
       }
     }
   }
-  // Fields and pastures as coloured plots.
+  // Fields: ploughed plots with crop rows.
   for (const b of s.buildings) {
-    if (b.type === 'field') {
-      g.fillStyle = season === 3 ? '#cfd4d4' : b.growth > 0.3 ? '#6e9a3a' : '#7a5a3a';
-      g.fillRect(b.x * P + 1, b.y * P + 1, b.w * P - 2, b.h * P - 2);
-      g.strokeStyle = 'rgba(60,40,20,0.35)';
-      for (let r = 0; r < b.h * 4; r++) {
+    if (b.type !== 'field') continue;
+    g.fillStyle = season === 3 ? '#cfd4d4' : '#7a5a3a';
+    roundRect(g, b.x * P + P * 0.12, b.y * P + P * 0.12, b.w * P - P * 0.24, b.h * P - P * 0.24, P * 0.5);
+    g.fill();
+    const crop = season === 3 ? '#b8bebe' : b.growth > 0.05 ? (b.growth > 0.8 ? '#c8a848' : '#6a9a38') : '#5e4129';
+    g.strokeStyle = crop;
+    g.lineWidth = b.growth > 0.05 && season !== 3 ? P / 6 : 1.5;
+    for (let r = 0; r < b.h * 4; r++) {
+      const y = b.y * P + (r + 0.5) * (P / 4);
+      const edgeR = Math.min(r + 0.5, b.h * 4 - r - 0.5) / 4;
+      const cut = edgeR < 0.45 ? (0.45 - edgeR) * P : 0;
+      g.beginPath();
+      g.moveTo(b.x * P + P * 0.3 + cut, y);
+      g.lineTo((b.x + b.w) * P - P * 0.3 - cut, y);
+      g.stroke();
+    }
+  }
+  // Roads: continuous bands with a darker verge, bending at corners.
+  const road = (x: number, y: number) => x >= 0 && y >= 0 && x < s.width && y < s.height && s.road[y * s.width + x] > 0;
+  for (const layer of ['edge', 'fill'] as const) {
+    for (let y = 0; y < s.height; y++) {
+      for (let x = 0; x < s.width; x++) {
+        const i = y * s.width + x;
+        if (!s.road[i]) continue;
+        const paved = s.road[i] === 2;
+        g.strokeStyle = layer === 'edge' ? (season === 3 ? '#b9ad9c' : paved ? '#6e6658' : '#8d7149') : paved ? '#a8a092' : season === 3 ? '#cfc6b8' : '#a88a5c';
+        g.lineWidth = P * (layer === 'edge' ? 0.62 : 0.48);
+        g.lineCap = 'round';
+        const cx = (x + 0.5) * P;
+        const cy = (y + 0.5) * P;
+        const ends: [number, number][] = [];
+        if (road(x + 1, y)) ends.push([(x + 1) * P, cy]);
+        if (road(x - 1, y)) ends.push([x * P, cy]);
+        if (road(x, y + 1)) ends.push([cx, (y + 1) * P]);
+        if (road(x, y - 1)) ends.push([cx, y * P]);
         g.beginPath();
-        g.moveTo(b.x * P + 2, b.y * P + (r + 0.5) * (P / 4));
-        g.lineTo((b.x + b.w) * P - 2, b.y * P + (r + 0.5) * (P / 4));
+        const corner = ends.length === 2 && ends[0][0] !== ends[1][0] && ends[0][1] !== ends[1][1];
+        if (corner) {
+          g.moveTo(ends[0][0], ends[0][1]);
+          g.quadraticCurveTo(cx, cy, ends[1][0], ends[1][1]);
+        } else if (ends.length) {
+          for (const [ex, ey] of ends) {
+            g.moveTo(cx, cy);
+            g.lineTo(ex, ey);
+          }
+        } else {
+          g.moveTo(cx - 2, cy);
+          g.lineTo(cx + 2, cy);
+        }
         g.stroke();
       }
-    } else if (b.type === 'pasture') {
-      g.fillStyle = 'rgba(150,180,70,0.35)';
-      g.fillRect(b.x * P, b.y * P, b.w * P, b.h * P);
     }
   }
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.magFilter = THREE.NearestFilter;
+  tex.anisotropy = 8;
   return tex;
+}
+
+function roundRect(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
+  g.beginPath();
+  g.moveTo(x + r, y);
+  g.arcTo(x + w, y, x + w, y + h, r);
+  g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r);
+  g.arcTo(x, y, x + w, y, r);
+  g.closePath();
+}
+
+function mixHex(a: string, b: string, t: number): string {
+  const pa = parseInt(a.slice(1), 16);
+  const pb = parseInt(b.slice(1), 16);
+  const ch = (sh: number) => Math.round(((pa >> sh) & 255) * (1 - t) + ((pb >> sh) & 255) * t);
+  return `rgb(${ch(16)},${ch(8)},${ch(0)})`;
 }
 
 export interface Town3D {
