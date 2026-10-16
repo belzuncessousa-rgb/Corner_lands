@@ -94,7 +94,14 @@ const ADVICE: Advice[] = [
   {
     id: 'tavern-dry',
     when: (s) => s.buildings.some((b) => b.type === 'tavern' && b.build >= 1 && b.blocked === 1),
-    text: () => 'Steward: the tavern casks are dry. A Brewhouse brews ale from barley (sow a barley field) or presses cider from apples.',
+    text: (s) => {
+      const brewers = s.buildings.filter((b) => b.type === 'brewhouse' && b.build >= 1).length;
+      if (s.res.barley >= 20)
+        return brewers
+          ? `Steward: the tavern casks are dry, yet ${Math.floor(s.res.barley)} barley waits in the granaries. Build another Brewhouse, or give the one we have more hands.`
+          : `Steward: the tavern casks are dry, yet ${Math.floor(s.res.barley)} barley waits in the granaries. Build a Brewhouse to brew it into ale.`;
+      return 'Steward: the tavern casks are dry. A Brewhouse brews ale from barley (sow a barley field) or presses cider from apples.';
+    },
   },
   {
     id: 'clothes',
@@ -108,7 +115,7 @@ const ADVICE: Advice[] = [
       const h = harvestForecast(s).find((x) => x.expected > x.room + 10)!;
       const store = h.kind === 'food' ? 'granaries' : 'storehouses';
       const build = h.kind === 'food' ? 'a Granary' : 'a Storehouse';
-      return `Steward: the harvest is near. The fields should bring in about ${h.expected}, but the ${store} and the farm barns have room for only ${h.room}; the rest will spoil. Build ${build} or sell some stock before autumn.`;
+      return `Steward: the harvest is near. The fields should bring in about ${h.expected}, but the ${store} and the farm barns have room for only ${h.room}${h.room < h.expected / 4 ? `; they are full${piles(s, h.kind)}` : ''}; the rest will spoil. Build ${build} or sell some stock before autumn.`;
     },
   },
   {

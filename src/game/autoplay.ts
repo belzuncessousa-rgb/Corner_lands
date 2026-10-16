@@ -46,14 +46,17 @@ const count = (s: GameState, t: BuildingType) => s.buildings.filter((b) => b.typ
 /** Places a building near the manor, or near `near` (a home that lacks it). */
 export function tryPlace(s: GameState, type: BuildingType, near?: { x: number; y: number }): boolean {
   const d = BUILDINGS[type];
-  // Count materials already promised to unfinished sites.
-  if (!affordsWithPromises(s, d.cost)) return false;
+  // Count materials already promised to unfinished sites. The cathedral, like a
+  // player would, is begun with the coins alone; builders gather the rest over years.
+  if (type === 'cathedral' ? s.res.gold < (d.cost.gold ?? 0) + 500 : !affordsWithPromises(s, d.cost)) return false;
   const reached = reachableRoads(s);
   let best: { x: number; y: number; score: number } | null = null;
   const hall = s.buildings.find((b) => b.type === 'townhall')!;
+  // A bigger town spreads further from the manor.
+  const reach = 26 + 5 * Math.max(0, s.tier - 2);
   for (let y = 0; y < s.height; y++) {
     for (let x = 0; x < s.width; x++) {
-      if (Math.abs(x - hall.x) > 26 || Math.abs(y - hall.y) > 26) continue;
+      if (Math.abs(x - hall.x) > reach || Math.abs(y - hall.y) > reach) continue;
       if (placementError(s, type, x, y)) continue;
       // Keep the planned streets free.
       let blocksStreet = false;
@@ -142,6 +145,12 @@ function drawFields(s: GameState): void {
       const farms = s.buildings.filter((b) => b.type === 'farm').indexOf(farm);
       f.recipe = crops[(fields.length + farms) % crops.length];
     }
+  }
+  // Sow wheat again where barley or flax piles up unused.
+  for (const f of s.buildings) {
+    if (f.type !== 'field' || f.growth > 0.01) continue;
+    if ((f.recipe === 'barley' && s.res.barley > 200) || (f.recipe === 'flax' && s.res.flax > 200)) f.recipe = 'wheat';
+    else if (f.recipe === 'wheat' && s.res.barley < 20 && count(s, 'brewhouse') > 0 && s.res.grain > 100) f.recipe = 'barley';
   }
   for (const byre of s.buildings) {
     if (byre.type !== 'byre' || byre.build < 1 || zonesOf(s, byre).length) continue;
@@ -294,10 +303,12 @@ function shop(s: GameState): void {
   };
   // Stores clogged with wares: sell some of the largest pile.
   if (stored(s, 'materials') > storageCap(s, 'materials') * 0.9) {
-    const piles: ResourceId[] = ['planks', 'dressedstone', 'woodparts', 'tiles', 'iron', 'clay'];
+    const piles: ResourceId[] = ['planks', 'dressedstone', 'woodparts', 'tiles', 'iron', 'clay', 'flax', 'hides', 'wool'];
     const top = piles.reduce((a, c) => (s.res[c] > s.res[a] ? c : a));
     if (s.res[top] >= 30) trade(s, top, -Math.floor(s.res[top] / 3));
   }
+  // Granaries full of what no one eats (barley waiting for the brewer).
+  if (stored(s, 'food') > storageCap(s, 'food') * 0.8 && s.res.barley >= 60) trade(s, 'barley', -Math.floor(s.res.barley / 2));
   if (s.res.wood < 30) buy('wood', 20, 80);
   if (s.res.tools < 6 && s.tier >= 2) buy('tools', 5, 150);
   if (totalFood(s) < s.population * 2) buy('bread', 20, 80);
@@ -426,13 +437,15 @@ export function act(s: GameState, rand: () => number): void {
   if (s.tier >= 2) {
     for (const t of ['smithy', 'church'] as BuildingType[]) if (count(s, t) === 0) wants.push(t);
   }
+  // Rich enough for the great work: begin the cathedral before anything else.
+  if ((s.tier >= 4 || (s.tier >= 3 && s.res.gold > 4000)) && count(s, 'cathedral') < 1 && s.day % DAYS_PER_MONTH === 0 && tryPlace(s, 'cathedral')) return;
   // Jobs nobody fills: new workplaces would only spread the villagers thinner.
   const short = labourSummary(s).short.reduce((a, x) => a + x.want - x.have, 0);
   // Grain piling up: more mills and ovens before anything else.
   if (s.tier >= 1 && s.res.grain > 60 && count(s, 'windmill') < 1 + Math.floor(s.res.grain / 60)) wants.push('windmill');
   if (s.tier >= 1 && s.res.flour > 20 && count(s, 'bakery') < 1 + count(s, 'windmill')) wants.push('bakery');
   if (food < pop * 4 && foodMakers < 1 + pop / 6) {
-    if (s.tier >= 1 && count(s, 'farm') < 1 + Math.floor(pop / 40)) wants.push('farm');
+    if (s.tier >= 1 && count(s, 'farm') < 1 + Math.floor(pop / (idle > pop / 10 ? 25 : 40))) wants.push('farm');
     if (count(s, 'forager') < 2) wants.push('forager');
     if (count(s, 'fisher') < 2 + Math.floor(pop / 30)) wants.push('fisher');
     if (count(s, 'hunter') < 2 + Math.floor(pop / 30)) wants.push('hunter');
@@ -476,9 +489,9 @@ export function act(s: GameState, rand: () => number): void {
     if (count(s, 'farm') < 1 + Math.floor(pop / 50)) wants.push('farm');
     if (count(s, 'windmill') < count(s, 'farm')) wants.push('windmill');
     if (count(s, 'bakery') < count(s, 'windmill')) wants.push('bakery');
-    if (count(s, 'tavern') > 0 && count(s, 'brewhouse') < 1) wants.push('brewhouse');
+    if (count(s, 'tavern') > 0 && count(s, 'brewhouse') < Math.max(1, Math.ceil(count(s, 'tavern') / 2))) wants.push('brewhouse');
     if (pop >= 30 && count(s, 'byre') < 1) wants.push('byre');
-    if (count(s, 'byre') > 0 && count(s, 'weaver') < 1) wants.push('weaver');
+    if ((count(s, 'byre') > 0 || s.res.flax >= 40) && count(s, 'weaver') < 1) wants.push('weaver');
     if (count(s, 'weaver') > 0 && count(s, 'tailor') < 1) wants.push('tailor');
     if (count(s, 'sawmill') < 1 + Math.floor(pop / 35)) wants.push('sawmill');
     if (count(s, 'market') < 1) wants.push('market');
@@ -489,7 +502,6 @@ export function act(s: GameState, rand: () => number): void {
     }
     if (count(s, 'smithy') < 1) wants.push('smithy');
     if (count(s, 'church') < 1) wants.push('church');
-    if (s.tier >= 3 && count(s, 'cathedral') < 1 && s.res.gold > 3000) wants.push('cathedral');
     if (pop >= 60 && count(s, 'tanner') < 1) wants.push('tanner');
     if (count(s, 'mine') > 0 && count(s, 'bloomery') < 1) wants.push('bloomery');
     if (count(s, 'claypit') < 1) wants.push('claypit');
