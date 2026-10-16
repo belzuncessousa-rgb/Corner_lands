@@ -95,7 +95,7 @@ export const GOODS: Record<ResourceId, GoodDef> = {
   weapons: good('Arms', 'goods', 20, "Bows, pikes and armour. The castle's garrison needs them; merchants pay well.", { keep: 30 }),
 
   gold: good('Coins', 'currency', 0, 'Collected from taxes and trade.'),
-  prestige: good('Prestige', 'currency', 0, 'The renown of your house. Earned from a fine manor and a thriving town; spent on charters and on titles (Baron, Earl, Duke).'),
+  prestige: good('Prestige', 'currency', 0, 'The renown of your house. Earned from a fine manor and a thriving town; spent on charters, titles (Baron, Earl, Duke) and works of art.'),
 };
 
 /** Edible goods, in the order villagers reach for them. */

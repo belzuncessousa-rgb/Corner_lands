@@ -260,6 +260,6 @@ Note from the morning run: the 30-year soak's famine on seed 3 comes from its ra
 - [x] A seasonal goal on the objectives panel for players past City: "this year: raise prestige by 200", "this year: no one goes hungry"
 
 ### Phase 20 — Ideas for the next runs
-- [ ] Prestige still piles up past Duke (2,000–2,600 at year 30): a few repeatable prestige uses, e.g. commission a tapestry or a stained-glass window for the cathedral (+happiness, one each)
+- [x] Prestige still piles up past Duke (2,000–2,600 at year 30): a few repeatable prestige uses, e.g. commission a tapestry or a stained-glass window for the cathedral (+happiness, one each)
 - [x] The save server test failed once under load, right after a typecheck; give its server start a readiness wait so it cannot race
 - [x] Look again at mobile layout with the new build-bar tab (Protect) and the longer objectives panel at 360 px wide

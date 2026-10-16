@@ -3,7 +3,7 @@
  * tune balance; the title screen uses it to grow a demo village.
  */
 import { BUILDINGS, DAYS_PER_MONTH } from './data';
-import { autoResolve, nextTitle, takeTitle, titleError, fairCost, fairError, feastError, FESTIVALS, festivalError, holdFair, holdFeast, holdFestival } from './events';
+import { autoResolve, commission, commissionError, COMMISSIONS, nextTitle, takeTitle, titleError, fairCost, fairError, feastError, FESTIVALS, festivalError, holdFair, holdFeast, holdFestival } from './events';
 import { grantCharter } from './charters';
 import { startUpgrade, upgradeBlocker, upgradePlan } from './levels';
 import { StateRng } from './rng';
@@ -419,6 +419,8 @@ export function act(s: GameState, rand: () => number): void {
   if (!fairError(s) && s.res.gold > fairCost(s) * 3) holdFair(s);
   // Prestige to spare after the charters: rise in rank.
   if (!titleError(s) && s.res.prestige > (nextTitle(s)?.prestige ?? 0) + 150) takeTitle(s);
+  // Past Duke, or between titles with prestige to spare: works of art.
+  for (const c of COMMISSIONS) if (!commissionError(s, c.id) && s.res.prestige > c.prestige + 300 && (!nextTitle(s) || s.res.prestige > (nextTitle(s)?.prestige ?? 0) + c.prestige)) commission(s, c.id);
   for (const f of FESTIVALS) if (!festivalError(s, f.id) && food > pop * 4) holdFestival(s, f.id);
   if (s.tier >= 4 && s.res.dressedstone > 60 && s.res.gold > 500) layWall(s);
   renovate(s);

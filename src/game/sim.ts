@@ -2414,6 +2414,8 @@ export function updateHappiness(s: GameState): void {
   }
   for (const m of s.moods ?? []) if (m.until > s.day) factors.push({ label: m.label, value: m.value });
   if (s.buildings.some((b) => b.type === 'cathedral' && b.build >= 1)) factors.push({ label: 'The cathedral', value: 6 });
+  if (s.commissions?.includes('tapestry')) factors.push({ label: 'The great tapestry', value: 2 });
+  if (s.commissions?.includes('glass')) factors.push({ label: 'The cathedral glass', value: 3 });
   if ((s.title ?? 0) >= 2) factors.push({ label: `Proud to serve ${(s.title ?? 0) >= 3 ? 'a Duke' : 'an Earl'}`, value: 3 });
   if (s.buildings.some((b) => b.type === 'guildhall' && b.build >= 1)) factors.push({ label: 'Pride in the guildhall', value: 3 });
   if (wallSections(s) >= WALL_SAFE) factors.push({ label: 'Safe behind the town walls', value: 4 });

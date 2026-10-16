@@ -199,6 +199,34 @@ export function takeTitle(s: GameState): string | null {
   return null;
 }
 
+/** Works of art bought with prestige once the great buildings stand: each lifts spirits for good. */
+export const COMMISSIONS = [
+  { id: 'tapestry', name: 'Great tapestry', desc: 'A tapestry of your house\'s deeds for the manor hall', prestige: 300, happiness: 2, needs: 'townhall' as const },
+  { id: 'glass', name: 'Stained-glass windows', desc: 'Windows of coloured glass for the cathedral', prestige: 600, happiness: 3, needs: 'cathedral' as const },
+];
+
+/** Why a commission cannot be made, or null. */
+export function commissionError(s: GameState, id: string): string | null {
+  const c = COMMISSIONS.find((x) => x.id === id);
+  if (!c) return 'Unknown commission';
+  if (s.commissions?.includes(id)) return 'Already made';
+  if (!s.buildings.some((b) => b.type === c.needs && b.build >= 1)) return c.needs === 'cathedral' ? 'Needs a cathedral' : 'Needs the manor';
+  if (s.tier < 3) return 'Needs a Borough';
+  if (s.res.prestige < c.prestige) return `Needs ${c.prestige} prestige`;
+  return null;
+}
+
+/** Pays for a commission; returns why not, or null. */
+export function commission(s: GameState, id: string): string | null {
+  const err = commissionError(s, id);
+  if (err) return err;
+  const c = COMMISSIONS.find((x) => x.id === id)!;
+  s.res.prestige -= c.prestige;
+  (s.commissions ??= []).push(id);
+  log(s, `${c.desc} is finished, and the whole town comes to see it.`, 'good');
+  return null;
+}
+
 /** Why the lord cannot call a feast now, or null. */
 export function feastError(s: GameState): string | null {
   if (!FEAST_MONTHS.includes(Math.floor(s.day / DAYS_PER_MONTH) % 12)) return 'In autumn, after the harvest';

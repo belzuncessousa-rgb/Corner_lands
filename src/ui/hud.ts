@@ -16,7 +16,7 @@ import {
   STORAGE_CAPACITY,
   DAYS_PER_MONTH,
 } from '../game/data';
-import { nextTitle, takeTitle, titleError, TITLES, fairCost, fairError, fairPrestige, FAIR_TIER, feastCost, feastError, FESTIVALS, festivalError, getEvent, holdFair, holdFeast, holdFestival, resolveEvent } from '../game/events';
+import { commission, commissionError, COMMISSIONS, nextTitle, takeTitle, titleError, TITLES, fairCost, fairError, fairPrestige, FAIR_TIER, feastCost, feastError, FESTIVALS, festivalError, getEvent, holdFair, holdFeast, holdFestival, resolveEvent } from '../game/events';
 import { CHARTERS, CHARTER_TIER, PATHS, charterCost, charterError, grantCharter, hasCharter } from '../game/charters';
 import { HOUSE_LEVELS, MANOR_LEVELS, buildingName, houseNeeds, startUpgrade, upgradeBlocker, upgradePlan, workersOf } from '../game/levels';
 import { activeQuests } from '../game/quests';
@@ -515,6 +515,20 @@ export class Hud {
       <p class="note">Select a workplace to set its workers and priority. Idle villagers help on building sites.</p>`;
   }
 
+  /** Works of art prestige can buy once the great buildings stand. */
+  private commissionRows(): string {
+    const s = this.game.state;
+    if (s.tier < 3) return '';
+    return COMMISSIONS.map((c) => {
+      const done = s.commissions?.includes(c.id);
+      const err = commissionError(s, c.id);
+      const tip = `<b>${c.name}</b><br>${esc(c.desc)}. +${c.happiness} happiness for good.<br>Costs ${c.prestige} prestige`;
+      return `<div class="kv feast" data-tip="${esc(tip)}"><span>${c.name}</span><span>${
+        done ? '<span class="pos">Made ✓</span>' : `<button data-action="commission" data-id="${c.id}" ${err ? `disabled title="${esc(err)}"` : ''}>Commission <small>${c.prestige} ${ICONS.prestige}</small></button>`
+      }</span></div>`;
+    }).join('');
+  }
+
   /** The lord's title, and the next one prestige can buy. */
   private titleRow(): string {
     const s = this.game.state;
@@ -551,6 +565,7 @@ export class Hud {
           : ''
       }
       ${this.titleRow()}
+      ${this.commissionRows()}
       <div class="row">${hasBuilt(s, 'market') ? '<button data-action="trade">⚖ Trade</button>' : ''}<button data-action="ledger">Ledger</button><button data-action="charters">${ICONS.prestige} Charters</button></div>`;
   }
 
@@ -1515,6 +1530,13 @@ export class Hud {
           this.sound('jig');
         }
         this.lastInspectorKey = '';
+        break;
+      }
+      case 'commission': {
+        const err = commission(s, t.dataset.id ?? '');
+        if (err) this.flash(err);
+        else this.sound('fanfare');
+        this.renderChipPanel();
         break;
       }
       case 'title': {

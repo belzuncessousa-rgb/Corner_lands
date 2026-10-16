@@ -1289,3 +1289,19 @@ describe('year goals', () => {
     expect(s.moods?.some((m) => m.label === 'A year well kept')).toBe(true);
   });
 });
+
+describe('commissions', () => {
+  it('prestige buys each work of art once, for lasting cheer', async () => {
+    const { commission, commissionError } = await import('../src/game/events');
+    const { updateHappiness } = await import('../src/game/sim');
+    const s = generateWorld(15);
+    s.tier = 3;
+    s.res.prestige = 1000;
+    expect(commissionError(s, 'glass')).toMatch(/cathedral/);
+    expect(commission(s, 'tapestry')).toBeNull();
+    expect(s.res.prestige).toBe(700);
+    expect(commissionError(s, 'tapestry')).toMatch(/Already/);
+    updateHappiness(s);
+    expect(s.happinessFactors.some((f) => f.label === 'The great tapestry' && f.value === 2)).toBe(true);
+  });
+});
