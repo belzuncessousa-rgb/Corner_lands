@@ -307,7 +307,7 @@ The 3D view (built from the game's own drawings) and the first gridless steps (b
 
 ### Phase 29 — More art for the flat look (the chosen direction)
 - [x] Stumps where trees were felled, slowly grassing over; reeds and water lilies along quiet shores
-- [ ] Wildflowers and stones scattered in meadows, thicker on rich soil, changing with the seasons
+- [x] Wildflowers and stones scattered in meadows, thicker on rich soil, changing with the seasons
 - [ ] More house looks: flower boxes, laundry lines, a bench by the door, varied chimneys and roof patches
 - [ ] Workshop signs and small working details (a cart at the sawpit, hides on frames at the tannery, cloth drying at the weaver)
 - [ ] Contact shadows: a soft darkening where walls meet the ground, so buildings sit in the land

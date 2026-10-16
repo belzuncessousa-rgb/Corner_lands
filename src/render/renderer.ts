@@ -67,7 +67,7 @@ interface Particle {
   size: number;
 }
 
-const GRASS_VARIANTS = 6;
+const GRASS_VARIANTS = 8;
 const CHUNK = 16;
 const TREE_VARIANTS = 6;
 

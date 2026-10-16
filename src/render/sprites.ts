@@ -111,18 +111,59 @@ export function grassTile(month: number, fert: number, variant: number): Sprite 
         ctx.stroke();
       }
     }
-    if (season === 0 && rand() < 0.5) {
-      const flowers = ['#f4f0d8', '#f2d34a', '#e48ab0', '#b9a3e6'];
-      const col = flowers[Math.floor(rand() * flowers.length)];
-      for (let i = 0; i < 5; i++) {
-        ctx.fillStyle = col;
-        ctx.fillRect((rand() - 0.5) * TW * 0.7, rand() * TH * 0.7 + 4, 1.6, 1.6);
+    if ((season === 0 || season === 1) && rand() < 0.35 + fert * 0.18) {
+      // Wildflowers in a patch or two, thicker on rich soil: daisies and
+      // primroses in spring; poppies, cornflowers, buttercups and clover in summer.
+      const flowers = season === 0 ? ['#f4f0d8', '#f2d34a', '#e48ab0', '#b9a3e6'] : ['#d8352a', '#4a78d0', '#f2d34a', '#f4f0e4', '#c46aa8'];
+      const patches = 1 + (fert >= 2 && rand() < 0.6 ? 1 : 0);
+      for (let p = 0; p < patches; p++) {
+        const col = flowers[Math.floor(rand() * flowers.length)];
+        const px = (rand() - 0.5) * TW * 0.55;
+        const py = TH * 0.25 + rand() * TH * 0.5;
+        for (let i = 0; i < 3 + fert * 2; i++) {
+          const fx = px + (rand() - 0.5) * 12;
+          const fy = py + (rand() - 0.5) * 6;
+          ctx.fillStyle = col;
+          ctx.fillRect(fx - 0.9, fy - 0.9, 1.8, 1.8);
+          ctx.fillStyle = col === '#f4f0d8' || col === '#f4f0e4' ? '#e8c840' : shade(col, 0.6);
+          ctx.fillRect(fx - 0.3, fy - 0.3, 0.7, 0.7);
+        }
+      }
+    }
+    if (variant % 5 === 0 && season !== 3) {
+      // A field stone or two half sunk in the grass.
+      for (let i = 0; i < 1 + (variant % 2); i++) {
+        const x = (rand() - 0.5) * TW * 0.5;
+        const y = TH * 0.35 + rand() * TH * 0.4;
+        ctx.fillStyle = '#9d988c';
+        ctx.beginPath();
+        ctx.ellipse(x, y, 2.4, 1.4, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#c4beb2';
+        ctx.beginPath();
+        ctx.ellipse(x - 0.5, y - 0.5, 1.3, 0.7, 0, 0, Math.PI * 2);
+        ctx.fill();
       }
     }
     if (season === 2 && rand() < 0.4) {
       for (let i = 0; i < 4; i++) {
         ctx.fillStyle = ['#c8752e', '#d9a43c', '#a8482a'][i % 3];
         ctx.fillRect((rand() - 0.5) * TW * 0.7, rand() * TH * 0.7 + 4, 2, 1.4);
+      }
+    }
+    if (season === 2 && fert >= 2 && rand() < 0.5) {
+      // Seed heads standing in the autumn grass.
+      ctx.strokeStyle = '#b89a5a';
+      ctx.lineWidth = 0.7;
+      for (let i = 0; i < 5; i++) {
+        const x = (rand() - 0.5) * TW * 0.6;
+        const y = TH * 0.3 + rand() * TH * 0.5;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + 0.6, y - 4);
+        ctx.stroke();
+        ctx.fillStyle = '#d8c48a';
+        ctx.fillRect(x, y - 5, 1.4, 1.6);
       }
     }
     if (season === 3) {
