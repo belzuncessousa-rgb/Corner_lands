@@ -1934,3 +1934,8 @@ table.prod td.num {
 
 /* Save list thumbnails. */
 .save .thumb { width: 84px; height: auto; flex: none; margin-right: 10px; border-radius: 4px; background: rgba(60, 90, 110, 0.15); }
+.msg.tip {
+  border-left-color: #6a8fb0;
+  cursor: pointer;
+}
+.msg.tip b { color: #4a6f90; }

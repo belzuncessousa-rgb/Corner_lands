@@ -144,6 +144,23 @@ function setHTML(el: HTMLElement, html: string): void {
 /** Goods listed in the top bar panels even before the first one is made. */
 const ALWAYS_SHOWN: ResourceId[] = ['wood', 'stone', 'bread', 'berries', 'meat', 'fish'];
 
+/** Just-in-time help: one short line, shown the first time each thing is used. */
+const TIPS: Record<string, string> = {
+  category: 'Pick a building card, then click the map. Builders fetch the materials from storage, so you can place it before you can afford it.',
+  build: 'Green means a good spot. Right-click or Esc puts the tool down; Ctrl+Z takes a placement back for a few seconds.',
+  zone: 'Fields, pastures and orchards are drawn: click one corner, then the opposite one. Bigger fields need more hands.',
+  road: 'Click to start a road, click again to end it. Roads are optional, but villagers walk faster on them.',
+  wall: 'Wall sections keep wolves and bandits out once there are enough of them. Small gates are left so villagers can pass.',
+  demolish: 'Demolishing returns part of the cost. Changed your mind? Ctrl+Z puts it back for a few seconds.',
+  'chip-happy': 'Happiness brings settlers. Town talk tells you what villagers wish for; click a line to see one of their homes.',
+  'chip-pop': 'Who works where, and who is short of hands. Click a workplace in the list to go there and raise its priority.',
+  'chip-food': 'Hover a good to see who makes it and who uses it. Set a stock target so workshops stop when you have enough.',
+  'chip-treasury': 'Coins come from taxes, markets and trade. Prestige, from feasts, fairs and fine buildings, buys charters.',
+  inspect: 'Pause a building to free its workers, or raise its priority. X or Delete demolishes the selected building.',
+  villager: 'Every villager has a name and a thought. Their wishes tell you what the town lacks.',
+  speed: 'Space pauses; 1, 2 and 3 set the speed. Press V to see which homes a well, market or church reaches.',
+};
+
 export class Hud {
   private el: Record<string, HTMLElement> = {};
   /** Open build category, or null when the build menu is folded away. */
@@ -170,6 +187,8 @@ export class Hud {
       this.muted = localStorage.getItem('cornerlands.muted') === '1';
       this.uiScale = Number(localStorage.getItem('cornerlands.uiScale')) || 1;
       this.pauseOnBad = localStorage.getItem('cornerlands.pauseOnBad') === '1';
+      this.tipsOn = localStorage.getItem('cornerlands.tipsOff') !== '1';
+      this.tipsSeen = new Set(JSON.parse(localStorage.getItem('cornerlands.tips') ?? '[]') as string[]);
     } catch {
       /* ignore */
     }
@@ -343,6 +362,9 @@ export class Hud {
   private uiScale = 1;
   /** Stop the clock when bad news arrives (famine, departures, fire). */
   private pauseOnBad = false;
+  /** Short help shown the first time a panel or tool is opened. */
+  private tipsOn = true;
+  private tipsSeen = new Set<string>();
 
   private applyScale(): void {
     this.root.style.setProperty('zoom', this.uiScale === 1 ? '' : String(this.uiScale));
@@ -624,6 +646,47 @@ export class Hud {
     this.updateLog();
     this.updateSeason();
     this.updateHint();
+    this.updateTips();
+  }
+
+  /** One line of help the first time each panel or tool is used, then never again. */
+  private updateTips(): void {
+    const g = this.game;
+    if (g.demo || !this.tipsOn || this.modal) return;
+    const t = g.tool;
+    const key =
+      t.kind === 'road' ? (t.wall ? 'wall' : 'road')
+      : t.kind === 'demolish' ? 'demolish'
+      : t.kind === 'zone' ? 'zone'
+      : t.kind === 'build' ? 'build'
+      : this.category ? 'category'
+      : this.openChip ? `chip-${this.openChip === 'materials' || this.openChip === 'goods' ? 'food' : this.openChip}`
+      : g.selectedAgent ? 'villager'
+      : g.selected !== null ? 'inspect'
+      : g.state.day >= 2 ? 'speed'
+      : '';
+    if (!key || this.tipsSeen.has(key) || !TIPS[key]) return;
+    this.tipsSeen.add(key);
+    try {
+      localStorage.setItem('cornerlands.tips', JSON.stringify([...this.tipsSeen]));
+    } catch {
+      /* ignore */
+    }
+    const div = document.createElement('div');
+    div.className = 'msg panel tip';
+    div.dataset.kind = 'advice';
+    div.innerHTML = `<b>Tip:</b> ${TIPS[key]}`;
+    div.title = 'Click to dismiss. Tips can be turned off in the menu.';
+    div.addEventListener('click', () => div.remove());
+    div.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      div.remove();
+    });
+    // A newer tip replaces an older one still showing.
+    this.el.log.querySelectorAll('.tip').forEach((o) => o.remove());
+    this.el.log.appendChild(div);
+    this.expire(div, 'advice');
+    while (this.el.log.children.length > 3) this.el.log.firstElementChild!.remove();
   }
 
   private updateObjectives(): void {
@@ -1819,6 +1882,7 @@ export class Hud {
         <button data-m="sound">Sound: ${this.muted ? 'Off' : 'On'}</button>
         <button data-m="scale">Text size: ${Math.round(this.uiScale * 100)}%</button>
         <button data-m="pausebad">Pause on bad news: ${this.pauseOnBad ? 'On' : 'Off'}</button>
+        <button data-m="tips">Tips: ${this.tipsOn ? 'On' : 'Off'}</button>
       </div>`,
     );
     m.querySelector('[data-m="resume"]')!.addEventListener('click', () => this.closeModal());
@@ -1830,6 +1894,18 @@ export class Hud {
       this.pauseOnBad = !this.pauseOnBad;
       try {
         localStorage.setItem('cornerlands.pauseOnBad', this.pauseOnBad ? '1' : '0');
+      } catch {
+        /* ignore */
+      }
+      this.showGameMenu();
+    });
+    m.querySelector('[data-m="tips"]')!.addEventListener('click', () => {
+      this.tipsOn = !this.tipsOn;
+      // Turning tips back on shows them all again from the start.
+      if (this.tipsOn) this.tipsSeen.clear();
+      try {
+        localStorage.setItem('cornerlands.tipsOff', this.tipsOn ? '0' : '1');
+        if (this.tipsOn) localStorage.removeItem('cornerlands.tips');
       } catch {
         /* ignore */
       }
