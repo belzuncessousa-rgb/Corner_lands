@@ -126,6 +126,20 @@ export class Pen {
     this.plainBox(x0, y0, x1, y1, z0, h, color, top);
     const m = mat ?? this.matFor?.(color);
     if (m && h >= 5) this.textureBox(x0, y0, x1, y1, z0, h, color, m);
+    if (z0 === 0 && h >= 8 && x1 - x0 > 0.3 && y1 - y0 > 0.3) this.contactShadow(x0, y0, x1, y1);
+  }
+
+  /** Where a wall meets the ground: a soft darkening at its foot and a thin shade on the ground. */
+  private contactShadow(x0: number, y0: number, x1: number, y1: number): void {
+    this.poly([[x0, y1, 0], [x1, y1, 0], [x1 + 0.07, y1 + 0.07, 0], [x0 + 0.03, y1 + 0.07, 0]], 'rgba(30,24,12,0.16)');
+    this.poly([[x1, y0, 0], [x1, y1, 0], [x1 + 0.07, y1 + 0.07, 0], [x1 + 0.07, y0 + 0.03, 0]], 'rgba(30,24,12,0.16)');
+    for (const [za, zb, a] of [
+      [0, 1.4, 0.16],
+      [1.4, 3, 0.08],
+    ] as const) {
+      this.wallL(y1 + 0.003, x0, x1, za, zb, `rgba(30,22,10,${a})`);
+      this.wallR(x1 + 0.003, y0, y1, za, zb, `rgba(30,22,10,${a + 0.04})`);
+    }
   }
 
   private plainBox(x0: number, y0: number, x1: number, y1: number, z0: number, h: number, color: string, top?: string): void {
