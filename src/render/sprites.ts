@@ -796,7 +796,23 @@ const HOUSE_VARIANTS: { wall: string; tint: { color: string; t: number } | null;
  * line, a bench by the door. `front` is the y of the front wall, `wins` the
  * x of the ground-floor windows and `wz` their sill height.
  */
-function drawHouseExtra(p: Pen, extra: HouseExtra, season: Season, front: number, wins: number[], wz: number): void {
+function drawHouseExtra(p: Pen, extra: HouseExtra, season: Season, front: number, wins: number[], wz: number, door?: [number, number]): void {
+  if (season === 3) {
+    // Midwinter: an evergreen wreath on the door and a candle in each window.
+    if (door) {
+      const dx = door[0] + door[1] / 2;
+      p.circle(dx, front + 0.01, 8, 2.4, '#3f6a3a');
+      p.circle(dx, front + 0.012, 8, 1.2, '#5b3a22');
+      p.circle(dx - 0.02, front + 0.014, 9.6, 0.6, '#c83a2a');
+      p.circle(dx + 0.03, front + 0.014, 6.6, 0.5, '#c83a2a');
+      p.line([dx, front + 0.014, 5.8], [dx, front + 0.014, 4.8], '#c83a2a', 0.8);
+    }
+    for (const x of wins) {
+      p.line([x + 0.075, front + 0.01, wz + 0.4], [x + 0.075, front + 0.01, wz + 2.2], '#f2ece0', 1);
+      p.circle(x + 0.075, front + 0.01, wz + 3, 1.6, 'rgba(255,200,90,0.45)');
+      p.circle(x + 0.075, front + 0.01, wz + 2.8, 0.6, '#ffd860');
+    }
+  }
   if ((extra === 'flowers' || extra === 'both') && season !== 3) {
     const colors = season === 2 ? ['#d88a3a', '#b8482a'] : ['#e84a6a', '#f2d34a', '#f4f0e0', '#b97ae0'];
     for (const x of wins) {
@@ -860,7 +876,7 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
         p.doorL(1.62, 0.85, 0.22, 11);
         p.windowL(1.62, 0.38, 4, 0.16, 5, season === 3);
         p.windowL(1.62, 1.4, 4, 0.16, 5);
-        drawHouseExtra(p, hv.extra, season, 1.62, [0.38, 1.4], 4);
+        drawHouseExtra(p, hv.extra, season, 1.62, [0.38, 1.4], 4, [0.85, 0.22]);
         for (const x of [0.35, 0.85, 1.4]) {
           p.windowL(1.67, x, 15, 0.14, 6, season === 3 && x > 1);
           p.windowL(1.72, x, 28, 0.14, 6);
@@ -893,7 +909,7 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
         p.doorL(1.6, 0.9, 0.2, 11);
         p.windowL(1.6, 0.42, 4, 0.14, 5);
         p.windowL(1.6, 1.4, 4, 0.14, 5);
-        drawHouseExtra(p, hv.extra, season, 1.6, [0.42, 1.4], 4);
+        drawHouseExtra(p, hv.extra, season, 1.6, [0.42, 1.4], 4, [0.9, 0.2]);
         p.windowL(1.65, 0.45, 17, 0.14, 6, season === 3);
         p.windowL(1.65, 1.35, 17, 0.14, 6);
         p.windowR(1.8, 0.6, 17, 0.14, 6);
@@ -927,7 +943,7 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
         p.windowL(1.45, 1.32, 7, 0.14, 5);
         p.doorL(1.45, 0.9, 0.18, 11);
         p.windowR(1.65, 0.8, 7, 0.14, 5);
-        drawHouseExtra(p, hv.extra, season, 1.45, [0.52, 1.32], 7);
+        drawHouseExtra(p, hv.extra, season, 1.45, [0.52, 1.32], 7, [0.9, 0.18]);
         p.roofX(0.35, 0.45, 1.65, 1.45, 17, 15, 'thatch', WALL, 0.13);
         smoke.push(p.chimney(1.3, 1.08, 24, 14, '#8a7d70'));
         if (!yard) drawHouseProp(p, hv.prop === 'hive' ? 'logs' : hv.prop, season);
