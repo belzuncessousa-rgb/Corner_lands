@@ -44,8 +44,7 @@ import { checkQuests } from './quests';
 import { StateRng } from './rng';
 import type { Building, BuildingType, Category, Cost, GameState, MessageKind, ResourceId, Season } from './types';
 import { RESOURCE_IDS } from './types';
-import { curveTiles } from './curves';
-import { cellsOf, footprintCells, getBuilding, idx, inBounds, makeBuilding, placeBuilding, removeBuilding, setRoad } from './world';
+import { getBuilding, idx, inBounds, makeBuilding, placeBuilding, removeBuilding, setRoad } from './world';
 
 // ---------------------------------------------------------------- time helpers
 
@@ -184,47 +183,6 @@ export function placementError(s: GameState, type: BuildingType, x: number, y: n
   if (type === 'belltower' && s.buildings.some((b) => b.type === 'belltower')) return 'Your town has its bell tower';
   if ((d.cost.gold ?? 0) > s.res.gold) return 'Not enough coins';
   return null;
-}
-
-/** Whether a list of tiles is free to build on. */
-function cellsClear(s: GameState, cells: number[]): string | null {
-  for (const i of cells) {
-    if (i < 0) return 'Outside the map';
-    if (s.terrain[i] === 1) return 'Cannot build on water';
-    if (s.occ[i] >= 0) return 'Space is occupied';
-    if (s.road[i]) return 'A road is in the way';
-    if (s.rock[i] || s.ore[i]) return 'Rocky ground';
-  }
-  return null;
-}
-
-/** Why a building cannot stand at (cx, cy) turned by rot, or null: free placement. */
-export function freePlacementError(s: GameState, type: BuildingType, cx: number, cy: number, rot: number): string | null {
-  const d = BUILDINGS[type];
-  if (d.zone || type === 'wall') return 'Cannot be built';
-  // The same rules as on the grid, then the turned footprint itself.
-  const rule = placementError(s, type, Math.round(cx - d.w / 2), Math.round(cy - d.h / 2));
-  if (rule && rule !== 'Space is occupied' && rule !== 'A road is in the way' && rule !== 'Rocky ground' && rule !== 'Cannot build on water' && rule !== 'Outside the map') return rule;
-  if ((type === 'fisher' || type === 'claypit') && countInRadius(s, { x: cx, y: cy }, 2.5, (i) => s.terrain[i] === 1) < 2) return 'Must be next to water';
-  return cellsClear(s, footprintCells(s, d.w, d.h, cx, cy, rot));
-}
-
-/** Places a construction site at any position and angle. */
-export function placeFree(s: GameState, type: BuildingType, cx: number, cy: number, rot: number): Building | null {
-  if (freePlacementError(s, type, cx, cy, rot)) return null;
-  const d = BUILDINGS[type];
-  s.res.gold -= d.cost.gold ?? 0;
-  // The nearest grid rectangle stands in for the footprint where only an
-  // outline matters (the flat view, rough distances).
-  const b = makeBuilding(s.nextId++, type, Math.round(cx - d.w / 2), Math.round(cy - d.h / 2));
-  b.cx = cx;
-  b.cy = cy;
-  b.rot = rot;
-  b.cells = footprintCells(s, d.w, d.h, cx, cy, rot);
-  b.need = materialsOf(d.cost);
-  placeBuilding(s, b);
-  recompute(s);
-  return b;
 }
 
 /** Materials of a cost that builders must carry (gold is paid up front). */
@@ -382,39 +340,7 @@ export function buildRoad(s: GameState, x: number, y: number, paved = false): bo
 export function removeRoad(s: GameState, x: number, y: number): boolean {
   if (!inBounds(s, x, y) || !s.road[idx(s, x, y)]) return false;
   setRoad(s, x, y, false);
-  // A curve broken here is drawn tile by tile from now on.
-  const i = idx(s, x, y);
-  if (s.curves?.some((c) => c.tiles.includes(i))) s.curves = s.curves.filter((c) => !c.tiles.includes(i));
   return true;
-}
-
-/** Why a road cannot follow this curve (bends in tiles), or null. */
-export function curveError(s: GameState, pts: [number, number][], paved = false): string | null {
-  if (pts.length < 2) return 'Click where the road should bend, then where it ends';
-  const tiles = curveTiles(s, pts);
-  let fresh = 0;
-  for (const i of tiles) {
-    const x = i % s.width;
-    const y = (i - x) / s.width;
-    const err = roadError(s, x, y, paved);
-    if (!err) fresh++;
-    else if (err !== 'Already a road' && err !== 'Already paved') return err;
-  }
-  return fresh ? null : 'The road is already there';
-}
-
-/** Lays a road along a free curve; returns the tiles newly laid. */
-export function layCurve(s: GameState, pts: [number, number][], paved = false): number {
-  if (curveError(s, pts, paved)) return 0;
-  const tiles = curveTiles(s, pts);
-  let n = 0;
-  for (const i of tiles) {
-    const x = i % s.width;
-    if (buildRoad(s, x, (i - x) / s.width, paved)) n++;
-  }
-  (s.curves ??= []).push({ pts: pts.map(([x, y]) => [x, y] as [number, number]), paved, tiles });
-  s.dirty = true;
-  return n;
 }
 
 export function demolish(s: GameState, b: Building): boolean {
@@ -654,7 +580,6 @@ export function centerOf(x: number, y: number, w: number, h: number): { x: numbe
 }
 
 export function bCenter(b: Building): { x: number; y: number } {
-  if (b.cx !== undefined && b.cy !== undefined) return { x: b.cx, y: b.cy };
   return centerOf(b.x, b.y, b.w, b.h);
 }
 
@@ -785,9 +710,12 @@ export function travelField(s: GameState, rebuild = false): Float64Array {
   const zones = new Set(s.buildings.filter((b) => BUILDINGS[b.type].zone || isPostern(b)).map((b) => b.id));
   for (const b of s.buildings) {
     if (b.build < 1 || !STORAGE_CAPACITY[b.type]) continue;
-    for (const i of cellsOf(s, b)) {
-      field[i] = 0;
-      heap.push(i, 0);
+    for (let y = b.y; y < b.y + b.h; y++) {
+      for (let x = b.x; x < b.x + b.w; x++) {
+        const i = idx(s, x, y);
+        field[i] = 0;
+        heap.push(i, 0);
+      }
     }
   }
   while (heap.size) {
@@ -825,34 +753,12 @@ export function tripDays(s: GameState, b: Building): number {
   forPerimeter(s, b, (i) => {
     if (field[i] < best) best = field[i];
   });
-  for (const i of cellsOf(s, b)) best = Math.min(best, field[i]);
+  for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) best = Math.min(best, field[idx(s, x, y)]);
   if (!Number.isFinite(best)) return 20;
   return (2 * best) / ROAD_TILES_PER_DAY;
 }
 
 export function forPerimeter(s: GameState, b: Building, fn: (i: number, x: number, y: number) => void): void {
-  if (b.cells) {
-    // A turned building: every tile beside its footprint, once each.
-    const own = new Set(b.cells);
-    const seen = new Set<number>();
-    for (const c of b.cells) {
-      const cx = c % s.width;
-      const cy = (c - cx) / s.width;
-      for (const [x, y] of [
-        [cx + 1, cy],
-        [cx - 1, cy],
-        [cx, cy + 1],
-        [cx, cy - 1],
-      ]) {
-        if (!inBounds(s, x, y)) continue;
-        const i = idx(s, x, y);
-        if (own.has(i) || seen.has(i)) continue;
-        seen.add(i);
-        fn(i, x, y);
-      }
-    }
-    return;
-  }
   for (let x = b.x; x < b.x + b.w; x++) {
     if (inBounds(s, x, b.y - 1)) fn(idx(s, x, b.y - 1), x, b.y - 1);
     if (inBounds(s, x, b.y + b.h)) fn(idx(s, x, b.y + b.h), x, b.y + b.h);
@@ -863,21 +769,14 @@ export function forPerimeter(s: GameState, b: Building, fn: (i: number, x: numbe
   }
 }
 
-/** How much a tile beside a building lies in front of it (its door side). */
-function frontScore(b: Building, x: number, y: number): number {
-  if (b.rot === undefined || b.cx === undefined || b.cy === undefined) return (y >= b.y + b.h ? 2 : 0) + (x >= b.x + b.w ? 1 : 0);
-  // The front faces +y, turned by rot.
-  return (x + 0.5 - b.cx) * -Math.sin(b.rot) + (y + 0.5 - b.cy) * Math.cos(b.rot);
-}
-
 /** A road tile next to the building, used as its entrance. */
 export function doorTile(s: GameState, b: Building): { x: number; y: number } {
   let best: { x: number; y: number } | null = null;
   let bestScore = -Infinity;
   forPerimeter(s, b, (i, x, y) => {
     if (!s.road[i]) return;
-    // Prefer front-facing sides (south / east, or the way a turned building faces).
-    const score = frontScore(b, x, y);
+    // Prefer front-facing sides (south / east), which read better visually.
+    const score = (y >= b.y + b.h ? 2 : 0) + (x >= b.x + b.w ? 1 : 0);
     if (score > bestScore) {
       bestScore = score;
       best = { x, y };
@@ -889,7 +788,7 @@ export function doorTile(s: GameState, b: Building): { x: number; y: number } {
   let fbScore = -Infinity;
   forPerimeter(s, b, (i, x, y) => {
     if (s.terrain[i] === 1 || s.occ[i] >= 0) return;
-    const score = frontScore(b, x, y);
+    const score = (y >= b.y + b.h ? 2 : 0) + (x >= b.x + b.w ? 1 : 0);
     if (score > fbScore) {
       fbScore = score;
       fallback = { x, y };

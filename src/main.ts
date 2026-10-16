@@ -4,7 +4,6 @@ import { BUILDINGS, BUILD_ORDER, DAY_SECONDS, MONTH_NAMES, TIERS } from './game/
 import { playBot } from './game/autoplay';
 import { autoResolve, TITLES } from './game/events';
 import { placeName, townName } from './game/names';
-import { curveSamples, curveTiles } from './game/curves';
 import { StateRng } from './game/rng';
 import { deserialize, serialize } from './game/save';
 import {
@@ -36,14 +35,9 @@ import {
   PAVING_TIER,
   stepDay,
   updateHappiness,
-  seasonOf,
   yearOf,
   keepOf,
   townScore,
-  freePlacementError,
-  placeFree,
-  curveError,
-  layCurve,
   GROVE_MAX,
   groveAt,
   protectGrove,
@@ -153,10 +147,6 @@ export class Game {
 
   /** Right-click (or a long press): drop the half-drawn road or zone, then the tool, then the selection. */
   private cancelOrDeselect(): void {
-    if (this.curvePts.length) {
-      this.finishCurve();
-      return;
-    }
     if (this.tool.kind === 'road' && this.roadAnchor) this.roadAnchor = null;
     else if ((this.tool.kind === 'zone' || this.tool.kind === 'grove') && this.zoneAnchor) this.zoneAnchor = null;
     else if (this.tool.kind !== 'select') this.setTool({ kind: 'select' });
@@ -181,12 +171,6 @@ export class Game {
     this.bindInput();
     window.addEventListener('resize', () => this.renderer.resize());
     requestAnimationFrame((t) => this.frame(t));
-    // The 3D view, if the player turned it on last time.
-    try {
-      if (localStorage.getItem('cornerlands.3d') === '1') void this.set3D(true);
-    } catch {
-      /* ignore */
-    }
     // A shared link (…?seed=123) goes straight to founding a town on that land.
     const shared = new URLSearchParams(location.search).get('seed');
     if (shared) history.replaceState(null, '', location.pathname);
@@ -302,18 +286,6 @@ export class Game {
     this.afterLoad();
   }
 
-  /** The 3D view (a test): loaded on demand so the flat game stays light. */
-  private view3d: import('./render3d/view3d').View3D | null = null;
-
-  async set3D(on: boolean): Promise<void> {
-    if (on && !this.view3d) {
-      const { View3D } = await import('./render3d/view3d');
-      this.view3d = new View3D(this.canvas);
-    }
-    if (this.view3d) this.view3d.visible = on;
-    this.renderer.threeD = on;
-  }
-
   /** Photo mode: the interface, markers and selection are hidden for a clean view. */
   photo = false;
 
@@ -401,15 +373,6 @@ export class Game {
     this.wildlife.update(this.state, gameDt);
     // Dusk only at normal speed: faster, the days would flicker.
     this.renderer.setDayTime(this.simAcc / DAY_SECONDS, !this.demo && this.speed <= 1, dt);
-    if (this.view3d && this.renderer.threeD) {
-      // Villagers, carts and deer stand in the 3D world, so buildings hide them.
-      const season = seasonOf(this.state.day);
-      const figures = this.agents.agents
-        .filter((a) => a.visible)
-        .map((a) => ({ sprite: this.renderer.figureSprite(a), x: a.x + (a.role.kind === 'cart' ? 0 : a.ox * 0.25), y: a.y + (a.role.kind === 'cart' ? 0 : a.oy * 0.25) }));
-      for (const an of this.wildlife.animals) figures.push({ sprite: this.renderer.animalSprite(an, season), x: an.x, y: an.y });
-      this.view3d.render(this.state, this.renderer.cam, this.renderer.width, this.renderer.height, this.renderer.dpr, figures);
-    }
     this.renderer.render(this.state, this.agents.agents, this.overlay(), running ? dt : 0, this.wildlife.animals);
     this.hud.minimap.update(dt);
     this.hud.tickAudio(dt, running);
@@ -474,15 +437,7 @@ export class Game {
     const ty = Math.floor(fty);
     if (inBounds(s, tx, ty)) ov.hover = { x: tx, y: ty };
     const tool = this.tool;
-    if (tool.kind === 'build' && this.renderer.threeD && this.view3d && !BUILDINGS[tool.type].zone) {
-      // Free placement in 3D: anywhere, turned to face the nearest road.
-      const f = this.freeSpot(tool.type, ftx, fty);
-      const err = freePlacementError(s, tool.type, f.cx, f.cy, f.rot);
-      this.view3d.setGhost({ type: tool.type, cx: f.cx, cy: f.cy, rot: f.rot, ok: !err }, seasonOf(s.day));
-      const d = BUILDINGS[tool.type];
-      if (d.radius) ov.range = { cx: f.cx, cy: f.cy, r: d.radius, highlight: rangeHighlighter(s, tool.type) };
-      this.hud.setHint(err ? `${d.name}: ${err}` : `${d.name}: click to place · it turns to face the nearest road · , and . turn it by hand`, !!err);
-    } else if (tool.kind === 'build') {
+    if (tool.kind === 'build') {
       const p = this.ghostPos(tool.type, ftx, fty);
       const err = placementError(s, tool.type, p.x, p.y);
       ov.ghost = { type: tool.type, x: p.x, y: p.y, ok: !err };
@@ -574,22 +529,6 @@ export class Game {
             : 'Click where the wall starts, then where it ends · roads it crosses get gate towers',
         !!err,
       );
-    } else if (tool.kind === 'road' && this.curving()) {
-      const pts = [...this.curvePts, this.snapToRoad(ftx, fty)];
-      if (pts.length >= 2) {
-        ov.curve = curveSamples(pts, 0.25);
-        ov.tiles = curveTiles(s, pts).map((i) => {
-          const x = i % s.width;
-          const y = (i - x) / s.width;
-          const e = roadError(s, x, y, !!tool.paved);
-          return { x, y, ok: !e || e === 'Already a road' || e === 'Already paved' };
-        });
-        ov.tileColor = 'road';
-        const err = curveError(s, pts, !!tool.paved);
-        this.hud.setHint(err ? `Road: ${err}` : `Road: ${ov.tiles.filter((t) => !s.road[idx(s, t.x, t.y)]).length} new tiles · click to add a bend · click the last bend again, Enter or right-click to finish`, !!err);
-      } else {
-        this.hud.setHint('Road: click where it starts, then click each bend; it follows a smooth curve', false);
-      }
     } else if (tool.kind === 'road') {
       const paved = !!tool.paved;
       const tiles = this.roadTiles(tx, ty);
@@ -634,31 +573,6 @@ export class Game {
       this.hud.setHint('', false);
     }
     return ov;
-  }
-
-  /** A hand-chosen turn for free placement (, and .), or null to face the nearest road. */
-  private freeTurn: number | null = null;
-
-  /** Where a freely placed building would stand under the pointer, and its angle. */
-  private freeSpot(type: BuildingType, fx: number, fy: number): { cx: number; cy: number; rot: number } {
-    const s = this.state;
-    if (this.freeTurn !== null) return { cx: fx, cy: fy, rot: this.freeTurn };
-    // Face the nearest road tile within a few tiles: the front (+y) turned towards it.
-    const d = BUILDINGS[type];
-    const reach = Math.max(d.w, d.h) / 2 + 3;
-    let best: { x: number; y: number; d: number } | null = null;
-    for (let y = Math.floor(fy - reach); y <= Math.ceil(fy + reach); y++) {
-      for (let x = Math.floor(fx - reach); x <= Math.ceil(fx + reach); x++) {
-        if (!inBounds(s, x, y) || !s.road[idx(s, x, y)]) continue;
-        const dist = Math.hypot(x + 0.5 - fx, y + 0.5 - fy);
-        if (!best || dist < best.d) best = { x: x + 0.5, y: y + 0.5, d: dist };
-      }
-    }
-    if (!best) return { cx: fx, cy: fy, rot: 0 };
-    // Snap the turn to 5° steps so rows of houses line up.
-    const raw = Math.atan2(-(best.x - fx), best.y - fy);
-    const rot = Math.round(raw / (Math.PI / 36)) * (Math.PI / 36);
-    return { cx: fx, cy: fy, rot };
   }
 
   private buildHint(type: BuildingType, x: number, y: number, err: string | null): string {
@@ -776,64 +690,6 @@ export class Game {
   }
 
   /** Road tool click: start a road, or lay the segment and continue from its end. */
-  /** Bends of the curved road being drawn (3D view), in tiles. */
-  private curvePts: [number, number][] = [];
-
-  /** Roads are drawn as free curves in the 3D view (walls stay on the grid). */
-  private curving(): boolean {
-    return this.tool.kind === 'road' && !this.tool.wall && this.renderer.threeD && !!this.view3d;
-  }
-
-  /** Starts and ends snap to a road close by, so curves join the network. */
-  private snapToRoad(fx: number, fy: number): [number, number] {
-    const s = this.state;
-    const tx = Math.floor(fx);
-    const ty = Math.floor(fy);
-    let best: [number, number] | null = null;
-    let bd = 0.8;
-    for (let y = ty - 1; y <= ty + 1; y++) {
-      for (let x = tx - 1; x <= tx + 1; x++) {
-        if (!inBounds(s, x, y) || !s.road[idx(s, x, y)]) continue;
-        const d = Math.hypot(x + 0.5 - fx, y + 0.5 - fy);
-        if (d < bd) {
-          bd = d;
-          best = [x + 0.5, y + 0.5];
-        }
-      }
-    }
-    return best ?? [fx, fy];
-  }
-
-  private clickCurve(fx: number, fy: number): void {
-    if (!inBounds(this.state, Math.floor(fx), Math.floor(fy))) return;
-    const p = this.snapToRoad(fx, fy);
-    const last = this.curvePts[this.curvePts.length - 1];
-    // Clicking the last bend again finishes the road.
-    if (last && Math.hypot(last[0] - p[0], last[1] - p[1]) < 0.5) {
-      this.finishCurve();
-      return;
-    }
-    this.curvePts.push(p);
-  }
-
-  private finishCurve(): void {
-    const s = this.state;
-    const pts = this.curvePts;
-    this.curvePts = [];
-    if (pts.length < 2) return;
-    const paved = this.tool.kind === 'road' && !!this.tool.paved;
-    const err = curveError(s, pts, paved);
-    if (err) {
-      this.hud.flash(err);
-      return;
-    }
-    const n = layCurve(s, pts, paved);
-    if (n) {
-      recompute(s);
-      this.hud.sound('road');
-    }
-  }
-
   private clickRoad(tx: number, ty: number): void {
     if (!inBounds(this.state, tx, ty)) return;
     if (!this.roadAnchor) {
@@ -854,9 +710,6 @@ export class Game {
 
   setTool(t: Tool): void {
     this.tool = t;
-    this.freeTurn = null;
-    this.curvePts = [];
-    if (t.kind !== 'build') this.view3d?.setGhost(null, 0);
     this.dragTile = null;
     this.roadAnchor = null;
     this.zoneAnchor = null;
@@ -882,24 +735,13 @@ export class Game {
     const ty = Math.floor(fty);
     const tool = this.tool;
     if (tool.kind === 'build') {
-      let b: Building | null;
-      if (this.renderer.threeD && this.view3d && !BUILDINGS[tool.type].zone) {
-        const f = this.freeSpot(tool.type, ftx, fty);
-        const err = freePlacementError(s, tool.type, f.cx, f.cy, f.rot);
-        if (err) {
-          this.hud.flash(err);
-          return;
-        }
-        b = placeFree(s, tool.type, f.cx, f.cy, f.rot);
-      } else {
-        const p = this.ghostPos(tool.type, ftx, fty);
-        const err = placementError(s, tool.type, p.x, p.y);
-        if (err) {
-          this.hud.flash(err);
-          return;
-        }
-        b = placeOrder(s, tool.type, p.x, p.y);
+      const p = this.ghostPos(tool.type, ftx, fty);
+      const err = placementError(s, tool.type, p.x, p.y);
+      if (err) {
+        this.hud.flash(err);
+        return;
       }
+      const b = placeOrder(s, tool.type, p.x, p.y);
       if (b) {
         this.offerUndo(undoPlacement(b));
         this.hud.sound('place');
@@ -1098,10 +940,7 @@ export class Game {
       }
       if (df.button !== 0) return;
       if (this.tool.kind === 'road') {
-        if (!this.moved) {
-          if (this.curving()) this.clickCurve(ftx, fty);
-          else this.clickRoad(tx, ty);
-        }
+        if (!this.moved) this.clickRoad(tx, ty);
         return;
       }
       if (this.tool.kind === 'zone') {
@@ -1157,10 +996,6 @@ export class Game {
           this.hud.showCoverage(null);
           return;
         }
-        if (this.curvePts.length) {
-          this.curvePts = [];
-          return;
-        }
         if (this.tool.kind === 'road' && this.roadAnchor) this.roadAnchor = null;
         else if ((this.tool.kind === 'zone' || this.tool.kind === 'grove') && this.zoneAnchor) this.zoneAnchor = null;
         else if (this.tool.kind !== 'select') this.setTool({ kind: 'select' });
@@ -1186,16 +1021,8 @@ export class Game {
         this.setTool({ kind: 'road', paved: true });
       } else if (k === 'v') {
         this.cycleCoverage();
-      } else if (k === 'enter' && this.curvePts.length) {
-        this.finishCurve();
       } else if (k === 'u') {
         this.setPhoto(!this.photo);
-      } else if ((k === ',' || k === '.') && this.tool.kind === 'build' && this.renderer.threeD) {
-        // Turn the building being placed by 15°, from where it currently faces.
-        const lp = this.lastPointer;
-        const [fx, fy] = lp ? this.renderer.screenToTile(lp.x, lp.y) : [0, 0];
-        const cur = this.freeSpot(this.tool.type, fx, fy).rot;
-        this.freeTurn = cur + (k === ',' ? -1 : 1) * (Math.PI / 12);
       } else if (k === 'x' || k === 'delete') {
         this.setTool({ kind: 'demolish' });
       } else if (k === 'p') {

@@ -51,8 +51,6 @@ export interface Overlay {
   hover?: { x: number; y: number };
   /** Range circle in tile coordinates. */
   range?: { cx: number; cy: number; r: number; highlight?: (i: number) => boolean };
-  /** A curved road being drawn: points along it, in tiles. */
-  curve?: [number, number][];
   /** The villager selected on the map (their key). */
   agent?: string;
   /** Reach of every well (or market, tavern, church) and which homes it covers. */
@@ -231,9 +229,6 @@ export class Renderer {
   /** Buildings by id, rebuilt each frame (walls look up their neighbours). */
   private byId = new Map<number, Building>();
 
-  /** A 3D view draws the land, trees and buildings underneath; this canvas adds the rest. */
-  threeD = false;
-
   private renderFrame(s: GameState, agents: Agent[], ov: Overlay, dt: number, animals: Animal[]): void {
     this.time += dt;
     this.coverageHomes = ov.coverage?.homes ?? null;
@@ -244,11 +239,8 @@ export class Renderer {
     const season = seasonOf(s.day);
     const z = this.cam.zoom;
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    if (this.threeD) c.clearRect(0, 0, this.width, this.height);
-    else {
-      c.fillStyle = season === 3 ? '#9fb0b8' : '#5f7d4a';
-      c.fillRect(0, 0, this.width, this.height);
-    }
+    c.fillStyle = season === 3 ? '#9fb0b8' : '#5f7d4a';
+    c.fillRect(0, 0, this.width, this.height);
     c.setTransform(
       this.dpr * z,
       0,
@@ -272,7 +264,7 @@ export class Renderer {
     const gs = z * this.dpr > 1.25 ? 2 : z * this.dpr > 0.6 ? 1 : 0.5;
     const cw = Math.ceil(W / CHUNK);
     const ch = Math.ceil(H / CHUNK);
-    for (let cy = 0; cy < (this.threeD ? 0 : ch); cy++) {
+    for (let cy = 0; cy < ch; cy++) {
       for (let cx = 0; cx < cw; cx++) {
         const x0 = cx * CHUNK;
         const y0 = cy * CHUNK;
@@ -286,13 +278,11 @@ export class Renderer {
       }
     }
     this.mark('ground');
-    if (!this.threeD) {
-      this.drawWaterShimmer(s, visible);
-      this.drawFields(s, season, ov.selected);
-      this.drawFootpaths(s, agents, season, dt, visible);
-    }
+    this.drawWaterShimmer(s, visible);
+    this.drawFields(s, season, ov.selected);
+    this.drawFootpaths(s, agents, season, dt, visible);
     // Roads on top of ground: all edges first so joints blend.
-    for (const layer of this.threeD ? [] : (['edge', 'fill'] as const)) {
+    for (const layer of ['edge', 'fill'] as const) {
       for (let y = 0; y < H; y++) {
         for (let x = 0; x < W; x++) {
           const i = y * W + x;
@@ -373,12 +363,8 @@ export class Renderer {
       for (const code of bucket) {
         const kind = code & 3;
         const n = code >> 2;
-        if (kind === 0) {
-          if (!this.threeD) this.drawTileObjects(s, n, season);
-        } else if (kind === 1) {
-          if (!this.threeD) this.drawBuilding(s, s.buildings[n], season, ov.selected === s.buildings[n].id);
-        }
-        else if (this.threeD) continue;
+        if (kind === 0) this.drawTileObjects(s, n, season);
+        else if (kind === 1) this.drawBuilding(s, s.buildings[n], season, ov.selected === s.buildings[n].id);
         else if (kind === 2) this.drawAgent(agents[n]);
         else this.drawAnimal(animals[n], season);
       }
@@ -758,21 +744,6 @@ export class Renderer {
         c.strokeStyle = ov.groves ? 'rgba(240,250,210,0.95)' : 'rgba(235,240,200,0.8)';
         c.stroke();
       }
-      c.restore();
-    }
-    if (ov.curve && ov.curve.length > 1) {
-      c.save();
-      c.strokeStyle = 'rgba(250,236,180,0.9)';
-      c.lineWidth = 3;
-      c.lineCap = 'round';
-      c.lineJoin = 'round';
-      c.beginPath();
-      ov.curve.forEach(([x, y], k) => {
-        const [a, b] = iso(x, y);
-        if (k) c.lineTo(a, b);
-        else c.moveTo(a, b);
-      });
-      c.stroke();
       c.restore();
     }
     if (ov.hover && !ov.ghost && !ov.tiles) {
@@ -1372,36 +1343,6 @@ export class Renderer {
     void s;
   }
 
-  /**
-   * A villager (or cart) in its current pose as a small image, for the 3D
-   * view to stand in the world: the same drawing, cached per look and frame.
-   */
-  figureSprite(a: Agent): Sprite {
-    const frame = a.phase === 'walk' || a.phase === 'act' ? Math.round((((a.step % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) / (Math.PI / 3)) % 6 : 0;
-    const key = `ag:${a.role.kind}:${a.tunic}:${a.hair}:${a.phase}:${a.dir}:${a.carry ?? ''}:${a.act ?? ''}:${frame}:${a.key === this.selectedAgent}`;
-    return this.sprite(key, () =>
-      makeSprite(70, 64, 35, 50, (ctx) => {
-        const old = this.ctx;
-        this.ctx = ctx;
-        this.drawAgent({ ...a, x: 0, y: 0, ox: 0, oy: 0, fadeIn: 1, step: (frame * Math.PI) / 3 });
-        this.ctx = old;
-      }),
-    );
-  }
-
-  /** A deer in its current pose as a small image, for the 3D view. */
-  animalSprite(a: Animal, season: Season): Sprite {
-    const frame = a.grazing ? 0 : Math.round((((a.step % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) / (Math.PI / 3)) % 6;
-    return this.sprite(`an:${a.kind}:${a.dir}:${a.grazing}:${frame}:${season}`, () =>
-      makeSprite(40, 36, 20, 28, (ctx) => {
-        const old = this.ctx;
-        this.ctx = ctx;
-        this.drawAnimal({ ...a, x: 0, y: 0, alpha: 1, step: (frame * Math.PI) / 3 }, season);
-        this.ctx = old;
-      }),
-    );
-  }
-
   private drawAgent(a: Agent): void {
     if (a.role.kind === 'cart') {
       this.drawCart(a);
@@ -1938,7 +1879,7 @@ function drawBeast(c: CanvasRenderingContext2D, x: number, y: number, f: number,
   }
 }
 
-export function variantOf(s: GameState, b: Building): number {
+function variantOf(s: GameState, b: Building): number {
   // The cathedral shows its stained glass once commissioned.
   if (b.type === 'cathedral') return s.commissions?.includes('glass') ? 1 : 0;
   if (b.type !== 'house') return 0;
@@ -2068,7 +2009,7 @@ function shadeHex(hex: string, f: number): string {
   return f >= 1 ? hex : mix(hex, '#000000', 1 - f);
 }
 
-export const TREE_SLOTS: [number, number][][] = [
+const TREE_SLOTS: [number, number][][] = [
   [[0.5, 0.5]],
   [
     [0.3, 0.35],

@@ -644,7 +644,7 @@ export function buildingSprite(type: BuildingType, w: number, h: number, level: 
 const STONE_COLORS = new Set([STONE, '#c8c0b0', '#9d9488', '#b0a898', '#b6ae9f', '#9d978c', '#a49c8e', '#c8c2b6', '#9b9284']);
 
 /** Wall material for a box colour: stone greys, timber browns, plastered infill. */
-export function wallMaterial(color: string): Material | undefined {
+function wallMaterial(color: string): Material | undefined {
   if (STONE_COLORS.has(color)) return 'stone';
   if (color === WOOD) return 'plank';
   if (color === PLASTER || color === '#e8d4b0' || HOUSE_VARIANTS.some((v) => v.wall === color)) return 'plaster';
@@ -659,7 +659,7 @@ const HOUSE_VARIANTS: { wall: string; tint: { color: string; t: number } | null;
   { wall: '#dcb6a4', tint: { color: '#6a665e', t: 0.42 }, roof2: 'shingle', prop: 'logs' },
 ];
 
-export function drawBuilding(p: Pen, type: BuildingType, level: number, season: Season, variant = 0): V3[] {
+function drawBuilding(p: Pen, type: BuildingType, level: number, season: Season, variant = 0): V3[] {
   const smoke: V3[] = [];
   // Expanded workshops get fired-clay roofs and a guild banner.
   const expanded = level >= 2 && type !== 'house' && type !== 'townhall';

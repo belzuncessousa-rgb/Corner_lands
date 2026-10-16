@@ -1,7 +1,7 @@
 import { BUILDINGS } from './data';
 import { deliveredTo, demolish, log, recompute, store, zoneCost } from './sim';
 import type { Building, Cost, GameState, ResourceId } from './types';
-import { cellsOf, placeBuilding } from './world';
+import { idx, placeBuilding } from './world';
 
 /**
  * A short grace period after placing or demolishing: the last action can be
@@ -65,7 +65,12 @@ export function demolishWithUndo(s: GameState, b: Building): UndoStep | null {
   return {
     label: `Undo demolishing ${BUILDINGS[copy.type].name}`,
     revert: (st) => {
-      for (const i of cellsOf(st, copy)) if (st.occ[i] >= 0 || st.road[i]) return 'Something stands there now';
+      for (let y = copy.y; y < copy.y + copy.h; y++) {
+        for (let x = copy.x; x < copy.x + copy.w; x++) {
+          const i = idx(st, x, y);
+          if (st.occ[i] >= 0 || st.road[i]) return 'Something stands there now';
+        }
+      }
       for (const k in refund) if (st.res[k as ResourceId] < (refund[k as ResourceId] ?? 0) - 1e-6) return 'The refund has already been spent';
       for (const k in refund) st.res[k as ResourceId] -= refund[k as ResourceId] ?? 0;
       placeBuilding(st, copy);
@@ -76,7 +81,7 @@ export function demolishWithUndo(s: GameState, b: Building): UndoStep | null {
 }
 
 function removeQuietly(s: GameState, b: Building): void {
-  for (const i of cellsOf(s, b)) if (s.occ[i] === b.id) s.occ[i] = -1;
+  for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) s.occ[idx(s, x, y)] = -1;
   s.buildings = s.buildings.filter((o) => o !== b);
   recompute(s);
 }

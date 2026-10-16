@@ -6,9 +6,5 @@ export default defineConfig({
   server: {
     proxy: { '/api': 'http://localhost:3001' },
   },
-  build: {
-    outDir: 'dist',
-    // The 3D test page ships alongside the game.
-    rollupOptions: { input: { main: 'index.html', proto3d: 'proto3d.html' } },
-  },
+  build: { outDir: 'dist' },
 });

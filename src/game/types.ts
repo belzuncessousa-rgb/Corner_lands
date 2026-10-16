@@ -125,15 +125,6 @@ export interface Building {
   w: number;
   h: number;
   level: number;
-  /**
-   * Free placement: the exact centre in tiles, the angle (radians, turning
-   * the front from +y towards -x) and the tiles the turned footprint covers.
-   * Absent for buildings laid square on the grid, which cover x, y, w, h.
-   */
-  cx?: number;
-  cy?: number;
-  rot?: number;
-  cells?: number[];
   /** Construction progress 0..1; building is complete at 1. */
   build: number;
   workers: number;
@@ -311,8 +302,6 @@ export interface GameState {
   festivalDay?: { id: string; day: number };
   /** This year's tally for the year-end page of the chronicle. */
   year?: { pop: number; gold: number; prestige: number; arrived: number; left: number; built: number; harvest: number; stock?: Partial<Record<ResourceId, number>>; hungry?: number };
-  /** Roads laid as free curves: the clicked bends, dirt or paved, and the tiles under them. */
-  curves?: { pts: [number, number][]; paved: boolean; tiles: number[] }[];
   /** Years that ended with no one having gone hungry. */
   fedYears?: number;
   /** The cathedral holds a relic (bought from a travelling friar). */
