@@ -1107,13 +1107,18 @@ export class Hud {
     const div = document.createElement('div');
     div.className = 'banner panel';
     div.innerHTML = `<div class="ornament">❦ ❦ ❦</div><h1>${t.name}</h1><p>${esc(t.desc)}</p>
-      ${unlocked.length ? `<div class="unlocks">${unlocked.map((b) => `<div><img src="${this.cardImage(b)}" alt=""><span>${BUILDINGS[b].name}</span></div>`).join('')}</div>` : ''}`;
+      ${unlocked.length ? `<div class="unlocks">${unlocked.map((b) => `<div><img src="${this.cardImage(b)}" alt=""><span>${BUILDINGS[b].name}</span></div>`).join('')}</div>` : ''}
+      <button class="primary carry-on">Carry on ▶</button>`;
     this.root.appendChild(div);
     this.sound('good');
     setTimeout(() => this.sound('good'), 350);
-    setTimeout(() => div.classList.add('out'), 6000);
-    setTimeout(() => div.remove(), 7000);
-    div.addEventListener('click', () => div.remove());
+    // A new size is a moment to take stock: the game waits until the player carries on.
+    const wasRunning = this.game.speed > 0;
+    if (wasRunning) this.game.setSpeed(0);
+    div.querySelector('.carry-on')!.addEventListener('click', () => {
+      div.remove();
+      if (wasRunning && this.game.speed === 0) this.game.togglePause();
+    });
     this.renderBuildBar();
   }
 

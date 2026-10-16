@@ -347,7 +347,7 @@ art, the logic and balance get this pass. Grouped by how deep each change goes.
 - [x] Objectives and rewards (and a City's yearly goals) only in Easy (renamed from Relaxed), not in the regular game
 - [x] The build bar keeps a fixed size however many buildings a category holds
 - [x] No undo (Ctrl+Z): no room for regrets
-- [ ] The game pauses when the town grows a size
+- [x] The game pauses when the town grows a size (the banner waits for "Carry on")
 - [ ] A fertility heatmap on the ground while placing a farm
 - [x] Buildings whose requirements are not met yet (charters and the like) are hidden from the menus, not shown locked
 - [x] Stone roads easy to find: the button is "Stone road" and is there from the start (it used to appear only at Village rank)
