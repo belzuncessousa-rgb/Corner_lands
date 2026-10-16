@@ -499,12 +499,62 @@ export class Pen {
     }
   }
 
+  /**
+   * Heavy winter snow on a roof slope: a thick blanket with a lumpy edge that
+   * curls over the eave, and icicles hanging beneath it.
+   */
   private snowOn(plane: V3[]): void {
     const [e0, e1, r1, r0] = plane;
-    const t = 0.25;
-    const a: V3 = [e0[0] + (r0[0] - e0[0]) * t, e0[1] + (r0[1] - e0[1]) * t, e0[2] + (r0[2] - e0[2]) * t];
-    const b: V3 = [e1[0] + (r1[0] - e1[0]) * t, e1[1] + (r1[1] - e1[1]) * t, e1[2] + (r1[2] - e1[2]) * t];
-    this.poly([a, b, r1, r0], 'rgba(244,248,250,0.92)');
+    const lerp = (a: V3, b: V3, t: number): V3 => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+    const t = 0.04;
+    const a = lerp(e0, r0, t);
+    const b = lerp(e1, r1, t);
+    const [ax, ay] = iso(a[0], a[1], a[2]);
+    const [bx, by] = iso(b[0], b[1], b[2]);
+    const [cx, cy] = iso(r1[0], r1[1], r1[2]);
+    const [dx, dy] = iso(r0[0], r0[1], r0[2]);
+    const ctx = this.ctx;
+    const rand = mulberry32(hash(e0[0], e0[1], e0[2], e1[0], e1[1], 7));
+    const len = Math.hypot(bx - ax, by - ay);
+    const n = Math.max(3, Math.round(len / 5));
+    // Blanket with a scalloped, overhanging lower edge.
+    ctx.beginPath();
+    ctx.moveTo(dx, dy);
+    ctx.lineTo(ax, ay);
+    for (let i = 0; i < n; i++) {
+      const u0 = i / n;
+      const u1 = (i + 1) / n;
+      const mx = ax + (bx - ax) * ((u0 + u1) / 2);
+      const my = ay + (by - ay) * ((u0 + u1) / 2) + 1.6 + rand() * 1.6;
+      ctx.quadraticCurveTo(mx, my, ax + (bx - ax) * u1, ay + (by - ay) * u1);
+    }
+    ctx.lineTo(cx, cy);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(246,249,251,0.96)';
+    ctx.fill();
+    // Blue shadow under the lip so the snow reads as thick.
+    ctx.strokeStyle = 'rgba(150,170,190,0.55)';
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(ax, ay + 1.2);
+    ctx.lineTo(bx, by + 1.2);
+    ctx.stroke();
+    // Icicles hanging from the eave.
+    const m = Math.max(2, Math.round(len / 4));
+    ctx.fillStyle = 'rgba(214,232,244,0.9)';
+    for (let i = 0; i < m; i++) {
+      if (rand() < 0.35) continue;
+      const u = (i + 0.3 + rand() * 0.4) / m;
+      const x = ax + (bx - ax) * u;
+      const y = ay + (by - ay) * u + 1.5;
+      const l = 2 + rand() * 4.5;
+      ctx.beginPath();
+      ctx.moveTo(x - 0.7, y);
+      ctx.lineTo(x + 0.7, y);
+      ctx.lineTo(x + (rand() - 0.5) * 0.4, y + l);
+      ctx.closePath();
+      ctx.fill();
+    }
   }
 
   /** Quad on the front-left wall (plane y = y). */

@@ -317,4 +317,4 @@ The 3D view (built from the game's own drawings) and the first gridless steps (b
 - [ ] Children playing in the lanes near homes, and neighbours stopping to chat
 - [x] Bakery ovens glowing at the mouth, and steam from the brewhouse
 - [x] Harvest sheaves stooked in the fields after the harvest, and hay ricks by the farmsteads in autumn
-- [ ] Icicles and snow-heavy roofs in deep winter
+- [x] Icicles and snow-heavy roofs in deep winter
