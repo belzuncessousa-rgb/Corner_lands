@@ -513,9 +513,10 @@ export function act(s: GameState, rand: () => number): void {
     const lone = s.buildings.find((h) => h.residents > 0 && !coveredBy(s, h, 'market'));
     if (lone && drawMarket(s, bCenter(lone))) return;
   }
-  // A harvest that will not fit spoils in the fields: a granary comes first,
-  // short of hands or not.
-  if (monthOf(s.day) <= 6 && count(s, 'granary') < 2 + Math.floor(pop / 30) && harvestForecast(s).some((h) => h.kind === 'food' && h.expected > h.room + 40)) wants.unshift('granary');
+  // A harvest that will not fit spoils in the fields: a silo (needing no
+  // keepers) or a granary comes first, short of hands or not.
+  if (s.tier >= 1 && monthOf(s.day) <= 6 && count(s, 'silo') < count(s, 'farm') && harvestForecast(s).some((h) => h.kind === 'food' && h.expected > h.room + 40)) wants.unshift('silo');
+  else if (monthOf(s.day) <= 6 && count(s, 'granary') < 2 + Math.floor(pop / 30) && harvestForecast(s).some((h) => h.kind === 'food' && h.expected > h.room + 40)) wants.unshift('granary');
   if (short >= 8) {
     // Fill the existing jobs first; homes still bring more hands.
     if (totalHousing(s) - pop < 4) wants.push('house');

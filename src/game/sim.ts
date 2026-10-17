@@ -11,6 +11,8 @@ import {
   STONE_ROAD_TILES_PER_DAY,
   YARD_STORE,
   STORAGE_CAPACITY,
+  SILO_CAPACITY,
+  SILO_GOODS,
   type StorageKind,
   TRAVEL_WEIGHT,
   MAX_BEAUTY,
@@ -87,17 +89,35 @@ export function storageCap(s: GameState, kind: StorageKind): number {
   return n;
 }
 
+/** What the stores of a kind hold (for food: not counting the grain kept in silos). */
 export function stored(s: GameState, kind: StorageKind): number {
   let n = 0;
   for (const k in RESOURCE_STORAGE) if (RESOURCE_STORAGE[k as ResourceId] === kind) n += s.res[k as ResourceId];
+  return kind === 'food' ? n - siloHeld(s) : n;
+}
+
+/** Wheat and barley all finished silos hold. */
+export function siloCap(s: GameState): number {
+  let n = 0;
+  for (const b of s.buildings) if (b.type === 'silo' && b.build >= 1) n += SILO_CAPACITY;
   return n;
+}
+
+/** Grain now kept in silos: they fill first, the granaries take the rest. */
+export function siloHeld(s: GameState): number {
+  const cap = siloCap(s);
+  if (!cap) return 0;
+  let n = 0;
+  for (const r of SILO_GOODS) n += s.res[r];
+  return Math.min(cap, n);
 }
 
 /** Free space left for a resource's storage pool (Infinity for gold). */
 export function roomFor(s: GameState, id: ResourceId): number {
   const kind = RESOURCE_STORAGE[id];
   if (!kind) return Infinity;
-  return Math.max(0, storageCap(s, kind) - stored(s, kind));
+  const room = Math.max(0, storageCap(s, kind) - stored(s, kind));
+  return SILO_GOODS.includes(id) ? room + siloCap(s) - siloHeld(s) : room;
 }
 
 /** Adds goods up to the free space; returns how many fit. */
@@ -1723,14 +1743,17 @@ export function fieldForecast(s: GameState, f: Building): { good: ResourceId; no
 export function harvestForecast(s: GameState): { kind: StorageKind; expected: number; room: number }[] {
   const expected: Partial<Record<StorageKind, number>> = {};
   const farms = new Set<Building>();
+  let siloCrop = 0;
   for (const f of s.buildings) {
     if (f.type !== 'field' || f.growth <= 0) continue;
     // Fields without a farmstead rot unharvested.
     const owner = s.buildings.find((o) => o.id === f.owner && o.build >= 1);
     if (!owner) continue;
     farms.add(owner);
-    const kind = RESOURCE_STORAGE[CROP_GOOD[cropOf(f)]];
+    const good = CROP_GOOD[cropOf(f)];
+    const kind = RESOURCE_STORAGE[good];
     if (kind) expected[kind] = (expected[kind] ?? 0) + fieldYield(s, f, 1);
+    if (SILO_GOODS.includes(good)) siloCrop += fieldYield(s, f, 1);
   }
   // Each farm's barn takes only its own harvest; share the space across stores by size.
   let barns = 0;
@@ -1739,7 +1762,8 @@ export function harvestForecast(s: GameState): { kind: StorageKind; expected: nu
   return (Object.keys(expected) as StorageKind[]).map((kind) => ({
     kind,
     expected: expected[kind]!,
-    room: Math.max(0, storageCap(s, kind) - stored(s, kind)) + Math.floor((barns * expected[kind]!) / all),
+    // Silos take the wheat and barley, as far as their room goes.
+    room: Math.max(0, storageCap(s, kind) - stored(s, kind)) + Math.floor((barns * expected[kind]!) / all) + (kind === 'food' ? Math.min(siloCrop, siloCap(s) - siloHeld(s)) : 0),
   }));
 }
 
@@ -2303,6 +2327,8 @@ function passiveStatus(s: GameState, b: Building): string {
       return `Materials in store: ${Math.floor(stored(s, 'materials'))} / ${storageCap(s, 'materials')}`;
     case 'granary':
       return `Food in store: ${Math.floor(stored(s, 'food'))} / ${storageCap(s, 'food')}`;
+    case 'silo':
+      return `Grain in the silos: ${Math.floor(siloHeld(s))} / ${siloCap(s)}`;
     default:
       return 'Operating';
   }

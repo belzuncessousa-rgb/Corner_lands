@@ -388,6 +388,8 @@ art, the logic and balance get this pass. Grouped by how deep each change goes.
 - [x] Hardy mode is hard but fair: every test map reaches Town (in 3 to 6 years, against about 3 on Normal)
 - [x] The autoplayer builds a granary before a harvest spoils, serves homes out of a market's reach even when hands are short, keeps its streets around the camp once a manor is built, and no longer builds a mill for every sack of wheat
 
+- [x] Silo (Farming, Village): a round tower that keeps 500 wheat and barley for years, needs no keepers, and fills before the granaries, so a big harvest no longer crowds out other food
+
 ### For the visual refinement phase (later)
 
 On hold until the player has played the October changes (Phases 34–38) and given feedback on logic and balance: the player asked not to commit to more art before that.

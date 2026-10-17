@@ -32,6 +32,8 @@ import {
   log,
   monthOf,
   nextTierRequirements,
+  siloCap,
+  siloHeld,
   recompute,
   seasonOf,
   setKeep,
@@ -655,6 +657,7 @@ export class Hud {
       const cap = storageCap(s, kind);
       storage = `<div class="kv"><span>${kind === 'food' ? `${ICONS.granary} Granaries` : `${ICONS.storage} Storehouses`}</span><span class="${used >= cap ? 'neg' : ''}">${used} / ${cap}</span></div>
         <div class="progress"><i style="width:${Math.min(100, (100 * used) / Math.max(1, cap))}%"></i></div>`;
+      if (kind === 'food' && siloCap(s)) storage += `<div class="kv" data-tip="Silos keep wheat and barley; the granaries take what they cannot hold."><span>${ICONS.grain} Silos</span><span>${Math.floor(siloHeld(s))} / ${siloCap(s)}</span></div>`;
     }
     const extra =
       group === 'food'
@@ -2240,7 +2243,7 @@ export class Hud {
         <p><b>Building:</b> pick a category at the bottom, then a building, then click the map. Builders carry the materials over from storage, one load per trip, and then raise the walls. Plans can wait for materials. Buildings you cannot build yet stay hidden.</p>
         <p><b>Markets</b> (Civic) are free and drawn like fields. Families fetch their food and goods from a staffed market within reach; homes out of reach go hungry, however full the stores.</p>
         <p><b>Gatherers</b> walk to the nearest trees, rocks, berries, game or fish, so place them close. Goods pile up in each workplace's yard until haulers from a Storehouse or Granary fetch them.</p>
-        <p><b>Fields, pastures and orchards</b> (Farming) are drawn: click one corner, then the opposite one, near a Farmstead, Animal Farm or Orchard Keeper's Lodge. Choose each field's crop in the panel; animals are bought at the Animal Farm once you have a Trading Post, and share its pasture room.</p>
+        <p><b>Fields, pastures and orchards</b> (Farming) are drawn: click one corner, then the opposite one, near a Farmstead, Animal Farm or Orchard Keeper's Lodge. Choose each field's crop in the panel, and build a Silo to keep the grain; animals are bought at the Animal Farm once you have a Trading Post, and share its pasture room.</p>
         <p><b>Trading Post:</b> merchants come here to buy your surplus, and coins buy what you lack.</p>
         <p><b>Roads</b> are optional but villagers walk faster on them, faster still on paved stone (T). Click to start, click again to plan it, keep clicking to continue; the road is laid a few tiles each day.</p>
         <p><b>The top bar</b> shows happiness, villagers, food, materials, goods and the treasury. Hover a chip for the details, click to pin it: set how much of each good to keep and whether merchants may buy the surplus. Workers rest when their goods reach the target.</p>

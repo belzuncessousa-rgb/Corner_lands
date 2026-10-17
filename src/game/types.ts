@@ -110,6 +110,7 @@ export type BuildingType =
   | 'wall'
   | 'storehouse'
   | 'granary'
+  | 'silo'
   | 'tavern'
   | 'garden'
   | 'maypole'

@@ -1,7 +1,7 @@
 import { mulberry32 } from '../game/rng';
 import { HOME_TRADES } from '../game/sim';
 import type { BuildingType, Season } from '../game/types';
-import { type Material, Pen, TH, TW, iso, mix, shade, type V3 } from './pen';
+import { type Material, Pen, ROOF_COLORS, TH, TW, iso, mix, shade, type V3 } from './pen';
 
 /** Supersampling factor so sprites stay crisp when zoomed in. */
 export const SS = 2;
@@ -2048,6 +2048,66 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       p.wallL(1.352, 1.3, 1.7, 6, 19, '#5b3a22');
       p.box(1.35, 1.35, 1.65, 1.6, 0, 6, '#7b5a36');
       p.roofX(0.4, 0.3, 2.6, 1.35, 24, 20, 'thatch', '#b88a52', 0.16);
+      break;
+    }
+    case 'silo': {
+      // A round tower of stone and boards under a conical cap, a ladder up its side.
+      p.shadow(0.3, 0.3, 1.7, 1.7);
+      const ctx = p.ctx;
+      const cyl = (r: number, z0: number, z1: number, col: string) => {
+        const rx = r * (TW / 2) * Math.SQRT2;
+        const ry = r * (TH / 2) * Math.SQRT2;
+        const [cx, cb] = iso(1, 1, z0);
+        const [, ct] = iso(1, 1, z1);
+        const g = ctx.createLinearGradient(cx - rx, 0, cx + rx, 0);
+        g.addColorStop(0, shade(col, 1.05));
+        g.addColorStop(0.45, shade(col, 0.95));
+        g.addColorStop(1, shade(col, 0.62));
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.ellipse(cx, cb, rx, ry, 0, 0, Math.PI);
+        ctx.lineTo(cx - rx, ct);
+        ctx.ellipse(cx, ct, rx, ry, 0, Math.PI, 0, true);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = shade(col, 0.5);
+        ctx.lineWidth = 0.6;
+        ctx.stroke();
+        return { cx, ct, rx, ry };
+      };
+      cyl(0.62, 0, 8, STONE);
+      const body = cyl(0.56, 8, 52, '#b8925c');
+      // Hoops and boards.
+      ctx.strokeStyle = 'rgba(70,45,25,0.55)';
+      ctx.lineWidth = 0.7;
+      for (const z of [18, 30, 42]) {
+        const [, hy] = iso(1, 1, z);
+        ctx.beginPath();
+        ctx.ellipse(body.cx, hy, body.rx, body.ry, 0, 0, Math.PI);
+        ctx.stroke();
+      }
+      // A conical thatched cap.
+      const [, apex] = iso(1, 1, 76);
+      const cap = ctx.createLinearGradient(body.cx - body.rx, 0, body.cx + body.rx, 0);
+      const roof = p.snow ? '#eef2f4' : ROOF_COLORS.thatch;
+      cap.addColorStop(0, shade(roof, 1.08));
+      cap.addColorStop(1, shade(roof, 0.65));
+      ctx.fillStyle = cap;
+      ctx.beginPath();
+      ctx.moveTo(body.cx - body.rx * 1.18, body.ct);
+      ctx.ellipse(body.cx, body.ct, body.rx * 1.18, body.ry * 1.18, 0, Math.PI, 0, true);
+      ctx.lineTo(body.cx, apex);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = shade(ROOF_COLORS.thatch, 0.45);
+      ctx.stroke();
+      // Ladder and hatch on the near side.
+      p.line([1.42, 1.42, 4], [1.42, 1.42, 50], '#5b3a22', 1);
+      p.line([1.5, 1.34, 4], [1.5, 1.34, 50], '#5b3a22', 1);
+      for (let z = 8; z < 50; z += 6) p.line([1.42, 1.42, z], [1.5, 1.34, z], '#5b3a22', 0.8);
+      p.wallL(1.56, 0.85, 1.1, 40, 48, '#5b3a22');
+      p.sack(1.75, 0.55, '#e8dcc4');
+      p.sack(1.8, 0.35, '#d8c79c');
       break;
     }
     case 'market': {

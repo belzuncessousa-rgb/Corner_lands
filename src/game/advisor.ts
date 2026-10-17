@@ -174,7 +174,7 @@ const ADVICE: Advice[] = [
     text: (s) => {
       const h = harvestForecast(s).find((x) => x.expected > x.room + 10)!;
       const store = h.kind === 'food' ? 'granaries' : 'storehouses';
-      const build = h.kind === 'food' ? 'a Granary' : 'a Storehouse';
+      const build = h.kind === 'food' ? 'a Silo for the grain, a Granary' : 'a Storehouse';
       return `Steward: the harvest is near. The fields should bring in about ${h.expected}, but the ${store} and the farm barns have room for only ${h.room}${h.room < h.expected / 4 ? `; they are full${piles(s, h.kind)}` : ''}; the rest will spoil. Build ${build} or sell some stock before autumn.`;
     },
   },

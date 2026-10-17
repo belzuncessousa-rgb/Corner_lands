@@ -135,6 +135,11 @@ export const STORAGE_CAPACITY: Partial<Record<BuildingType, Partial<Record<Stora
   granary: { food: 300 },
 };
 
+/** Grains a silo keeps: they go there first, before the granaries. */
+export const SILO_GOODS: ResourceId[] = ['grain', 'barley'];
+/** Wheat and barley each silo holds. */
+export const SILO_CAPACITY = 500;
+
 export const DAYS_PER_MONTH = 10;
 export const MONTHS_PER_YEAR = 12;
 export const DAYS_PER_YEAR = DAYS_PER_MONTH * MONTHS_PER_YEAR;
@@ -729,6 +734,18 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     buildDays: 12,
     workers: 2,
   }),
+  silo: def({
+    type: 'silo',
+    name: 'Silo',
+    desc: `A tall round store that keeps 500 wheat and barley dry for years. Harvested grain goes here first and the granaries stay free for other food. It needs no keepers.`,
+    category: 'farming',
+    w: 2,
+    h: 2,
+    cost: { wood: 20, stone: 15 },
+    buildDays: 12,
+    workers: 0,
+    tier: 1,
+  }),
   tavern: def({
     type: 'tavern',
     name: 'Tavern',
@@ -920,6 +937,7 @@ export const BUILD_ORDER: BuildingType[] = [
   'well',
   'storehouse',
   'granary',
+  'silo',
   'market',
   'tradingpost',
   'townhall',
