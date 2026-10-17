@@ -94,10 +94,10 @@ import {
   seatOf,
   yardTotal,
 } from '../game/sim';
-import type { Building, BuildingType, Category, Cost, GoodsGroup, ResourceId } from '../game/types';
+import type { Building, BuildingType, Category, Cost, GoodsGroup, Land, ResourceId } from '../game/types';
 import type { StorageKind } from '../game/data';
 import { RESOURCE_IDS } from '../game/types';
-import { generateWorld, idx, inBounds } from '../game/world';
+import { LANDS, generateWorld, idx, inBounds } from '../game/world';
 import type { Game } from '../main';
 import { CATEGORY_ICONS, ICONS, SEASON_ICONS } from './icons';
 import { Minimap } from './minimap';
@@ -1902,13 +1902,16 @@ export class Hud {
     m.querySelector('[data-m="help"]')!.addEventListener('click', () => this.showHelp(true));
   }
 
-  showNewGame(fromMain: boolean, presetSeed?: number): void {
+  showNewGame(fromMain: boolean, presetSeed?: number, presetLand?: Land): void {
     const seed = presetSeed ?? Math.floor(Math.random() * 999999);
     const m = this.openModal(
       `<h2>New Settlement</h2>
       <div class="row"><label>Name</label><input id="town" value="${esc(placeName(seed))}" maxlength="40"><button data-m="rename" data-tip="Another name">🎲</button></div>
       <p>Every map is generated from a seed. Share a seed to play the same land, or take this week's seed, the same for everyone.</p>
       <div class="row"><label>Seed</label><input id="seed" value="${seed}" inputmode="numeric"><button data-m="dice" data-tip="Another land">🎲</button><button data-m="weekly" data-tip="The same land for everyone until Monday">Seed of the week</button></div>
+      <div class="lands">${(Object.keys(LANDS) as Land[])
+        .map((l) => `<label class="mode"><input type="radio" name="land" value="${l}" ${(presetLand ?? 'meadow') === l ? 'checked' : ''}><span><b>${LANDS[l].name}</b><br><small>${esc(LANDS[l].desc)}</small></span></label>`)
+        .join('')}</div>
       <div class="map-preview"><canvas width="300" height="160" aria-label="The land from above"></canvas><div class="map-facts"></div></div>
       <div class="modes">
         <label class="mode"><input type="radio" name="mode" value="normal" checked><span><b>Normal</b><br><small>Hungry or unhappy villagers will leave.</small></span></label>
@@ -1931,7 +1934,9 @@ export class Hud {
       }
       return Math.floor(Math.abs(n)) % 2147483647;
     };
-    const preview = () => this.drawMapPreview(m.querySelector('.map-preview')!, seedOf(input.value.trim()));
+    const landOf = () => ((m.querySelector('input[name="land"]:checked') as HTMLInputElement | null)?.value ?? 'meadow') as Land;
+    const preview = () => this.drawMapPreview(m.querySelector('.map-preview')!, seedOf(input.value.trim()), landOf());
+    m.querySelectorAll('input[name="land"]').forEach((r) => r.addEventListener('change', preview));
     let typing = 0;
     input.addEventListener('input', () => {
       clearTimeout(typing);
@@ -1956,7 +1961,7 @@ export class Hud {
     m.querySelector('[data-m="back"]')!.addEventListener('click', () => (fromMain ? this.showMainMenu() : this.showGameMenu()));
     m.querySelector('[data-m="go"]')!.addEventListener('click', () => {
       const mode = ((m.querySelector('input[name="mode"]:checked') as HTMLInputElement | null)?.value ?? 'normal') as 'normal' | 'relaxed' | 'hardy';
-      this.game.newGame(seedOf(input.value.trim()), mode, town.value);
+      this.game.newGame(seedOf(input.value.trim()), mode, town.value, landOf());
       this.closeModal(true);
       this.game.setSpeed(1);
     });
@@ -1987,8 +1992,8 @@ export class Hud {
   }
 
   /** The land a seed makes, from above, with what lies near the starting manor. */
-  private drawMapPreview(box: HTMLElement, seed: number): void {
-    const s = generateWorld(seed);
+  private drawMapPreview(box: HTMLElement, seed: number, land: Land = 'meadow'): void {
+    const s = generateWorld(seed, { land });
     const cv = box.querySelector('canvas')!;
     const c = cv.getContext('2d')!;
     const W = s.width;
@@ -2096,7 +2101,7 @@ export class Hud {
     });
     m.querySelector('[data-m="seed-link"]')!.addEventListener('click', async (e) => {
       const btn = e.currentTarget as HTMLButtonElement;
-      const url = `${location.origin}${location.pathname}?seed=${this.game.state.seed}`;
+      const url = `${location.origin}${location.pathname}?seed=${this.game.state.seed}${this.game.state.land ? `&land=${this.game.state.land}` : ''}`;
       try {
         await navigator.clipboard.writeText(url);
         btn.textContent = 'Link copied';

@@ -261,6 +261,9 @@ export interface Shoal {
   max: number;
 }
 
+/** Kinds of land a new settlement may be founded on. */
+export type Land = 'meadow' | 'valley' | 'hills';
+
 export interface GameState {
   version: number;
   seed: number;
@@ -295,6 +298,8 @@ export interface GameState {
   incoming: number;
   /** Relaxed mode: generous start and villagers never leave in anger. */
   relaxed?: boolean;
+  /** The kind of land: rolling meadows (the default), a river valley, or hills. */
+  land?: Land;
   /** Hardy mode: a scarcer start, colder winters, choosier settlers. */
   hardy?: boolean;
   /** Identifies this settlement among saves (its autosave slot). */

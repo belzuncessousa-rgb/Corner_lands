@@ -294,6 +294,28 @@ describe('yards and haulers', () => {
   });
 });
 
+describe('kinds of land', () => {
+  it('valleys run wetter and richer, hills stonier and poorer; saves remember which', () => {
+    const stats = (land: 'meadow' | 'valley' | 'hills') => {
+      const s = generateWorld(4242, { land });
+      return {
+        s,
+        rock: s.rock.filter((v) => v > 0).length,
+        fert: s.fertility.reduce((a, v) => a + v, 0) / s.fertility.length,
+      };
+    };
+    const meadow = stats('meadow');
+    const valley = stats('valley');
+    const hills = stats('hills');
+    expect(hills.rock).toBeGreaterThan(meadow.rock);
+    expect(hills.fert).toBeLessThan(meadow.fert);
+    expect(valley.fert).toBeGreaterThan(meadow.fert);
+    expect(valley.rock).toBeLessThan(meadow.rock);
+    expect(deserialize(serialize(hills.s)).land).toBe('hills');
+    expect(meadow.s.land).toBeUndefined();
+  });
+});
+
 describe('planned roads', () => {
   it('are paid at once and laid over the following moments, in order', () => {
     const s = generateWorld(777);

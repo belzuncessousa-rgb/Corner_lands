@@ -1,6 +1,6 @@
 import { BUILDINGS } from './data';
 import { fbm, mulberry32 } from './rng';
-import type { Building, BuildingType, GameState, Resources } from './types';
+import type { Building, BuildingType, GameState, Land, Resources } from './types';
 import { RESOURCE_IDS } from './types';
 
 export const MAP_SIZE = 80;
@@ -43,7 +43,15 @@ export function makeBuilding(id: number, type: BuildingType, x: number, y: numbe
 }
 
 /** Generates a fresh map and initial settlement. */
-export function generateWorld(seed: number, opts: { relaxed?: boolean; hardy?: boolean } = {}): GameState {
+/** How each kind of land is described when choosing where to found a town. */
+export const LANDS: Record<Land, { name: string; desc: string }> = {
+  meadow: { name: 'Meadows', desc: 'Rolling land with woods, lakes and a river: a little of everything.' },
+  valley: { name: 'River valley', desc: 'A broad river with islands and shallow fords; rich soil along the banks, little stone.' },
+  hills: { name: 'Hills', desc: 'Stony upland with more rock and ore, thin soil and only a stream.' },
+};
+
+export function generateWorld(seed: number, opts: { relaxed?: boolean; hardy?: boolean; land?: Land } = {}): GameState {
+  const land: Land = opts.land ?? 'meadow';
   const W = MAP_SIZE;
   const H = MAP_SIZE;
   const n = W * H;
@@ -89,7 +97,8 @@ export function generateWorld(seed: number, opts: { relaxed?: boolean; hardy?: b
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
       const h = fbm(x / 16, y / 16, lakeSeed, 4);
-      if (h < 0.3) s.terrain[idx(s, x, y)] = 1;
+      // Hills hold few lakes; a valley's water is all in its river.
+      if (h < (land === 'hills' ? 0.22 : land === 'valley' ? 0.18 : 0.3)) s.terrain[idx(s, x, y)] = 1;
     }
   }
   const vertical = rand() < 0.5;
@@ -100,7 +109,22 @@ export function generateWorld(seed: number, opts: { relaxed?: boolean; hardy?: b
     dir = Math.max(-0.9, Math.min(0.9, dir * 0.96));
     rx += dir;
     rx = Math.max(4, Math.min((vertical ? W : H) - 5, rx));
-    const width = 1.2 + fbm(t / 9, 3, seed + 5, 2) * 1.6;
+    const width = land === 'valley' ? 3.5 + fbm(t / 9, 3, seed + 5, 2) * 2.5 : land === 'hills' ? 0.7 + fbm(t / 9, 3, seed + 5, 2) * 0.6 : 1.2 + fbm(t / 9, 3, seed + 5, 2) * 1.6;
+    if (land === 'valley') {
+      // Islands in mid-stream, and every so often a ford: shallows to walk across.
+      const island = fbm(t / 6, 9, seed + 13, 2) > 0.68;
+      const ford = t % 23 === 11 || t % 23 === 12;
+      for (let o = -6; o <= 6; o++) {
+        const along = Math.round(rx + o);
+        const off = Math.abs(o + (rx - Math.round(rx)));
+        if (off > width) continue;
+        const x = vertical ? along : t;
+        const y = vertical ? t : along;
+        if (!inBounds(s, x, y)) continue;
+        s.terrain[idx(s, x, y)] = ford || (island && off < width - 2.2) ? 0 : 1;
+      }
+      continue;
+    }
     for (let o = -3; o <= 3; o++) {
       const along = Math.round(rx + o);
       if (Math.abs(o + (rx - Math.round(rx))) > width) continue;
@@ -114,7 +138,9 @@ export function generateWorld(seed: number, opts: { relaxed?: boolean; hardy?: b
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
       const f = fbm(x / 12, y / 12, seed + 31, 3);
-      s.fertility[idx(s, x, y)] = Math.max(0.15, Math.min(1, (f - 0.25) * 1.8));
+      let fert = (f - 0.25) * 1.8;
+      if (land === 'hills') fert *= 0.7;
+      s.fertility[idx(s, x, y)] = Math.max(0.15, Math.min(1, fert));
     }
   }
 
@@ -190,9 +216,10 @@ export function generateWorld(seed: number, opts: { relaxed?: boolean; hardy?: b
   };
   // Few outcrops, but deep: stone is found in places, not everywhere.
   depositNear(s.rock, 8, 13, 2, 40, true);
-  for (let k = 0; k < 4; k++) depositNear(s.rock, 16, 40, 1 + Math.floor(rand() * 2), 45);
+  const outcrops = land === 'hills' ? 9 : land === 'valley' ? 2 : 4;
+  for (let k = 0; k < outcrops; k++) depositNear(s.rock, 16, 40, 1 + Math.floor(rand() * 2), 45);
   depositNear(s.ore, 14, 22, 1, 30);
-  for (let k = 0; k < 2; k++) depositNear(s.ore, 20, 40, 1, 35);
+  for (let k = 0; k < (land === 'hills' ? 4 : 2); k++) depositNear(s.ore, 20, 40, 1, 35);
 
   seedNature(s, site, rand);
 
@@ -206,6 +233,18 @@ export function generateWorld(seed: number, opts: { relaxed?: boolean; hardy?: b
     if (inBounds(s, x, roadY) && s.terrain[idx(s, x, roadY)] === 0) setRoad(s, x, roadY, true);
   }
 
+  // Valley soil is richest along the banks.
+  if (land === 'valley') {
+    for (let y = 0; y < H; y++)
+      for (let x = 0; x < W; x++) {
+        const i = idx(s, x, y);
+        if (s.terrain[i]) continue;
+        let near = false;
+        for (let dy = -4; dy <= 4 && !near; dy++) for (let dx = -4; dx <= 4 && !near; dx++) near = inBounds(s, x + dx, y + dy) && s.terrain[idx(s, x + dx, y + dy)] === 1;
+        if (near) s.fertility[i] = Math.min(1, s.fertility[i] + 0.3);
+      }
+  }
+  if (land !== 'meadow') s.land = land;
   s.res.wood = 70;
   s.res.stone = 20;
   s.res.planks = 0;

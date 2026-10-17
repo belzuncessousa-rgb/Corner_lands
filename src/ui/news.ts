@@ -3,6 +3,7 @@
  * something worth telling returning players goes in; the number only grows.
  */
 export const NEWS: { n: number; text: string }[] = [
+  { n: 24, text: 'Choose your land on New Settlement: meadows, a river valley with fords and islands, or stony hills. Villagers go home at dusk' },
   { n: 23, text: 'Herds: buy each sheep, cow or pig at the trading post; kinds share the pastures; no oats, no breeding, slaughter when you choose' },
   { n: 22, text: "A new start: the settlers' camp. Towns grow by themselves when they have the people and places for it; the manor is built by choice and grows into a castle" },
   { n: 21, text: 'Free marketplaces you draw, where households fetch their food; a Trading Post for the outside world; errands take working time' },

@@ -292,7 +292,7 @@ Note for later runs: when a feature players would notice goes in, add a line to 
 - [x] A quiet tune for each season from the existing sound engine, with its own volume switch
 
 ### Phase 26 — Ideas for the next runs
-- [ ] A second map type: a river valley with islands and fords, or a hilly land with more rock and less soil, chosen on New Settlement
+- [x] More map types, chosen on New Settlement (with the preview): Meadows (as before), River valley (a broad river with islands and fords, rich banks, little stone) and Hills (more rock and ore, thin soil, only a stream). Shared seed links carry the land
 - [x] Villagers react to evening: they walk home at dusk (lanterns lit) and stay in until morning; only newcomers on the road are out
 - [x] The uitest covers the new menus (photo mode, town files, seed link, music switch) so later changes cannot break them unnoticed
 

@@ -1047,10 +1047,14 @@ button.active {
   stroke-width: 1;
 }
 
-.modes {
+.modes,
+.lands {
   display: flex;
   gap: 8px;
   margin-top: 10px;
+}
+.lands {
+  margin: 8px 0;
 }
 .mode {
   flex: 1;

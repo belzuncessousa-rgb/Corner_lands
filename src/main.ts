@@ -48,9 +48,9 @@ import {
   protectGrove,
   unprotectGrove,
 } from './game/sim';
-import type { Building, BuildingType, GameState } from './game/types';
+import type { Building, BuildingType, GameState, Land } from './game/types';
 import { FOOD_IDS } from './game/data';
-import { generateWorld, idx, inBounds } from './game/world';
+import { LANDS, generateWorld, idx, inBounds } from './game/world';
 import { demolishWithUndo } from './game/undo';
 import type { Agent } from './render/agents';
 import { AgentSystem } from './render/agents';
@@ -152,9 +152,12 @@ export class Game {
     window.addEventListener('resize', () => this.renderer.resize());
     requestAnimationFrame((t) => this.frame(t));
     // A shared link (…?seed=123) goes straight to founding a town on that land.
-    const shared = new URLSearchParams(location.search).get('seed');
+    const params = new URLSearchParams(location.search);
+    const shared = params.get('seed');
+    const sharedLand = params.get('land');
+    const land = sharedLand && sharedLand in LANDS ? (sharedLand as Land) : undefined;
     if (shared) history.replaceState(null, '', location.pathname);
-    if (shared && /^\d{1,9}$/.test(shared)) void this.hud.showMainMenu().then(() => this.hud.showNewGame(true, Number(shared)));
+    if (shared && /^\d{1,9}$/.test(shared)) void this.hud.showMainMenu().then(() => this.hud.showNewGame(true, Number(shared), land));
     else this.hud.showMainMenu();
   }
 
@@ -174,8 +177,8 @@ export class Game {
     this.setSpeed(this.speedIndex === 0 ? this.lastSpeed : 0);
   }
 
-  newGame(seed: number, mode: 'normal' | 'relaxed' | 'hardy' = 'normal', name?: string): void {
-    this.state = generateWorld(seed, { relaxed: mode === 'relaxed', hardy: mode === 'hardy' });
+  newGame(seed: number, mode: 'normal' | 'relaxed' | 'hardy' = 'normal', name?: string, land: Land = 'meadow'): void {
+    this.state = generateWorld(seed, { relaxed: mode === 'relaxed', hardy: mode === 'hardy', land });
     this.state.founded = Date.now();
     this.state.name = name?.trim().slice(0, 40) || placeName(seed);
     recompute(this.state);
