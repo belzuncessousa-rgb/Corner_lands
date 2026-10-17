@@ -7,7 +7,7 @@ import { idx, inBounds } from '../game/world';
 import type { Agent } from './agents';
 import { ICONS } from '../ui/icons';
 import type { Animal } from './wildlife';
-import { Pen, TH, TW, VIEW, iso, mix, turnPoint, type V3 } from './pen';
+import { PLAN, Pen, TH, TW, VIEW, iso, mix, turnPoint, type V3 } from './pen';
 import { mulberry32 } from '../game/rng';
 import {
   type Sprite,
@@ -319,7 +319,8 @@ export class Renderer {
     }
 
     this.mark('shimmer+fields+roads');
-    this.drawGroundOverlays(s, ov);
+    // In 3D the ground overlays lie on the 3D ground instead (see paintDecal).
+    if (!this.threeD) this.drawGroundOverlays(s, ov);
     this.mark('overlays');
 
     // ---- objects, back to front
@@ -791,7 +792,7 @@ export class Renderer {
         const x = i % s.width;
         const y = (i / s.width) | 0;
         const [wx, wy] = iso(x + 0.5, y + 0.5);
-        if (Math.abs(wx - this.cam.x) > hw || Math.abs(wy - this.cam.y) > hh) continue;
+        if (!PLAN.on && (Math.abs(wx - this.cam.x) > hw || Math.abs(wy - this.cam.y) > hh)) continue;
         buckets[Math.min(4, Math.floor(s.fertility[i] * 5))].push(i);
       }
       buckets.forEach((list, k) => {
@@ -902,18 +903,19 @@ export class Renderer {
     }
     const sel = ov.selected !== undefined ? s.buildings.find((b) => b.id === ov.selected) : undefined;
     if (sel) {
-      const p = new Pen(c);
-      p.poly(
-        [
-          [sel.x, sel.y, 0],
-          [sel.x + sel.w, sel.y, 0],
-          [sel.x + sel.w, sel.y + sel.h, 0],
-          [sel.x, sel.y + sel.h, 0],
-        ],
-        'rgba(255,230,120,0.18)',
-        'rgba(255,220,90,0.95)',
-        2,
-      );
+      // Round its footprint: a drawn shape, or the building turned as it stands.
+      const d = BUILDINGS[sel.type];
+      const w = d.zone ? sel.w : d.w;
+      const h = d.zone ? sel.h : d.h;
+      const pts: V3[] = sel.shape
+        ? sel.shape.map(([x, y]) => [x, y, 0] as V3)
+        : ([
+            [0, 0],
+            [w, 0],
+            [w, h],
+            [0, h],
+          ] as [number, number][]).map(([lx, ly]) => [...onBuilding(sel, lx, ly), 0] as V3);
+      new Pen(c).poly(pts, 'rgba(255,230,120,0.18)', 'rgba(255,220,90,0.95)', 2);
     }
   }
 
@@ -1884,6 +1886,27 @@ export class Renderer {
   }
 
   /** A soft window glow on the front of a building. */
+  /**
+   * The ground overlays (plans, reaches, previews, the selection) painted onto
+   * a map-aligned canvas covering tiles x0..x0+w, y0..y0+h, for the 3D view to
+   * lay on its ground, where buildings in front hide them.
+   */
+  paintDecal(canvas: HTMLCanvasElement, s: GameState, ov: Overlay, x0: number, y0: number, w: number, h: number, p: number): void {
+    canvas.width = Math.ceil(w * p);
+    canvas.height = Math.ceil(h * p);
+    const ctx = canvas.getContext('2d')!;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const old = this.ctx;
+    this.ctx = ctx;
+    Object.assign(PLAN, { on: true, x0, y0, p });
+    try {
+      this.drawGroundOverlays(s, ov);
+    } finally {
+      PLAN.on = false;
+      this.ctx = old;
+    }
+  }
+
   /**
    * What happens at a building beyond its drawing: festivals, market days,
    * the manor's banner, lamplight at dusk and scaffolding (in 3D drawn over

@@ -413,6 +413,38 @@ export class View3D {
   }
 
   private camera: THREE.OrthographicCamera | null = null;
+  private decal: THREE.Mesh | null = null;
+
+  /**
+   * Lays the ground overlays (a canvas covering tiles x0..x0+w, y0..y0+h)
+   * just above the ground, where buildings in front hide them; null clears it.
+   */
+  setDecal(canvas: HTMLCanvasElement | null, x0 = 0, y0 = 0, w = 1, h = 1): void {
+    if (!canvas) {
+      if (this.decal) this.decal.visible = false;
+      return;
+    }
+    if (!this.decal) {
+      const mat = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+      this.decal = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat);
+      this.decal.rotation.x = -Math.PI / 2;
+      this.decal.renderOrder = 1;
+      this.scene.add(this.decal);
+    }
+    const mat = this.decal.material as THREE.MeshBasicMaterial;
+    // A new texture when the canvas changed size: the old one cannot grow.
+    const size = `${canvas.width}x${canvas.height}`;
+    if (!mat.map || mat.map.userData.size !== size) {
+      mat.map?.dispose();
+      mat.map = new THREE.CanvasTexture(canvas);
+      mat.map.colorSpace = THREE.SRGBColorSpace;
+      mat.map.userData.size = size;
+    } else mat.map.needsUpdate = true;
+    mat.needsUpdate = true;
+    this.decal.visible = true;
+    this.decal.scale.set(w, h, 1);
+    this.decal.position.set(x0 + w / 2, 0.02, y0 + h / 2);
+  }
   private ray = new THREE.Raycaster();
 
   /**

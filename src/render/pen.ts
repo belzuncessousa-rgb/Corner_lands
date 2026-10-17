@@ -62,7 +62,14 @@ export function turnPoint(x: number, y: number, sign = 1): [number, number] {
   return [VIEW.cx + dx * VIEW.c - dy * s, VIEW.cy + dx * s + dy * VIEW.c];
 }
 
+/**
+ * Plan mode: drawing straight onto a map-aligned canvas (the 3D view's ground
+ * decal), `p` pixels a tile from tile (x0, y0); heights are ignored.
+ */
+export const PLAN = { on: false, x0: 0, y0: 0, p: 16 };
+
 export function iso(x: number, y: number, z = 0): [number, number] {
+  if (PLAN.on) return [(x - PLAN.x0) * PLAN.p, (y - PLAN.y0) * PLAN.p];
   if (VIEW.rot) [x, y] = turnPoint(x, y);
   return [(x - y) * (TW / 2), (x + y) * VIEW.ty - z * ZS * VIEW.hz];
 }

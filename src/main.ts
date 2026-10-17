@@ -305,6 +305,7 @@ export class Game {
       this.turnTo = 0;
       this.applyTurn(0);
       this.applyTilt(BASE_PITCH);
+      this.setZoom(this.renderer.cam.zoom);
     }
   }
 
@@ -330,6 +331,52 @@ export class Game {
   /** How steeply the 3D view looks down now (radians). */
   tiltNow(): number {
     return VIEW.pitch;
+  }
+
+  private decalCanvas = document.createElement('canvas');
+  private decalKey = '';
+
+  /**
+   * In 3D, the ground overlays are painted onto a canvas covering the tiles on
+   * screen and laid on the 3D ground; repainted only when something changes.
+   */
+  private syncDecal(ov: Overlay): void {
+    const s = this.state;
+    const r = this.renderer;
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (const [sx, sy] of [
+      [0, 0],
+      [r.width, 0],
+      [0, r.height],
+      [r.width, r.height],
+    ]) {
+      const [tx, ty] = r.screenToTile(sx, sy);
+      x0 = Math.min(x0, tx);
+      y0 = Math.min(y0, ty);
+      x1 = Math.max(x1, tx);
+      y1 = Math.max(y1, ty);
+    }
+    // A margin for tall buildings at the edges, snapped to whole tiles.
+    x0 = Math.max(0, Math.floor(x0) - 3);
+    y0 = Math.max(0, Math.floor(y0) - 3);
+    x1 = Math.min(s.width, Math.ceil(x1) + 3);
+    y1 = Math.min(s.height, Math.ceil(y1) + 3);
+    if (x1 <= x0 || y1 <= y0) return;
+    const empty = !ov.tiles && !ov.range && !ov.coverage && !ov.curve && !ov.fertility && ov.selected === undefined && !ov.hover && !s.groves?.length;
+    const key = empty ? 'empty' : `${x0},${y0},${x1},${y1}:${s.buildings.length}:${s.groves?.length ?? 0}:${JSON.stringify(ov, (_k, v) => (typeof v === 'function' ? undefined : v))}`;
+    if (key === this.decalKey) return;
+    this.decalKey = key;
+    if (empty) {
+      this.view3d!.setDecal(null);
+      return;
+    }
+    // Finer when zoomed in, never more than about two million pixels.
+    const p = Math.min(32, Math.max(8, Math.floor(Math.sqrt(2e6 / ((x1 - x0) * (y1 - y0))))));
+    r.paintDecal(this.decalCanvas, s, ov, x0, y0, x1 - x0, y1 - y0, p);
+    this.view3d!.setDecal(this.decalCanvas, x0, y0, x1 - x0, y1 - y0);
   }
 
   /** Lowest and steepest the 3D camera may look down. */
@@ -437,6 +484,8 @@ export class Game {
       const d = this.turnTo - this.turn;
       this.applyTurn(Math.abs(d) <= step ? this.turnTo : this.turn + Math.sign(d) * step);
     }
+    const ov = this.overlay();
+    if (this.view3d && this.renderer.threeD) this.syncDecal(ov);
     if (this.view3d && this.renderer.threeD) {
       // Villagers, carts and deer stand in the 3D world, so buildings hide them.
       const season = seasonOf(this.state.day);
@@ -458,7 +507,7 @@ export class Game {
       }
       this.view3d.render(this.state, this.renderer.cam, this.renderer.width, this.renderer.height, this.renderer.dpr, figures);
     }
-    this.renderer.render(this.state, this.agents.agents, this.overlay(), running ? dt : 0, this.wildlife.animals);
+    this.renderer.render(this.state, this.agents.agents, ov, running ? dt : 0, this.wildlife.animals);
     this.hud.minimap.update(dt);
     this.hud.tickAudio(dt, running);
     this.hudTimer -= dt;
@@ -1446,7 +1495,8 @@ export class Game {
   }
 
   setZoom(z: number): void {
-    this.renderer.cam.zoom = Math.max(0.4, Math.min(2.5, z));
+    // The 3D models stay sharp close up, so the 3D view zooms in further.
+    this.renderer.cam.zoom = Math.max(0.4, Math.min(this.renderer.threeD ? 4 : 2.5, z));
   }
 
   private panByKeys(dt: number): void {

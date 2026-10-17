@@ -1,7 +1,7 @@
 import { mulberry32 } from '../game/rng';
 import { HOME_TRADES } from '../game/sim';
 import type { BuildingType, Season } from '../game/types';
-import { type Material, Pen, ROOF_COLORS, TH, TW, VIEW, iso, mix, shade, type V3 } from './pen';
+import { type Material, PLAN, Pen, ROOF_COLORS, TH, TW, VIEW, iso, mix, shade, type V3 } from './pen';
 
 /** Supersampling factor so sprites stay crisp when zoomed in. */
 export const SS = 2;
@@ -28,6 +28,8 @@ export function makeSprite(w: number, h: number, ax: number, ay: number, draw: (
   ctx.lineCap = 'round';
   // Sprites are drawn in their own frame, whichever way the view is turned.
   const { rot, ty, hz } = VIEW;
+  const plan = PLAN.on;
+  PLAN.on = false;
   VIEW.rot = 0;
   VIEW.ty = TH / 2;
   VIEW.hz = 1;
@@ -38,6 +40,7 @@ export function makeSprite(w: number, h: number, ax: number, ay: number, draw: (
     VIEW.rot = rot;
     VIEW.ty = ty;
     VIEW.hz = hz;
+    PLAN.on = plan;
   }
 }
 
