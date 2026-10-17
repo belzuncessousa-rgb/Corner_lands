@@ -7,7 +7,7 @@ import { idx, inBounds } from '../game/world';
 import type { Agent } from './agents';
 import { ICONS } from '../ui/icons';
 import type { Animal } from './wildlife';
-import { Pen, TH, TW, iso, mix, type V3 } from './pen';
+import { Pen, TH, TW, iso, mix, turnPoint, type V3 } from './pen';
 import { mulberry32 } from '../game/rng';
 import {
   type Sprite,
@@ -133,7 +133,7 @@ export class Renderer {
     const [wx, wy] = this.screenToWorld(sx, sy);
     const a = wx / (TW / 2);
     const b = wy / (TH / 2);
-    return [(a + b) / 2, (b - a) / 2];
+    return turnPoint((a + b) / 2, (b - a) / 2, -1);
   }
 
   tileToScreen(tx: number, ty: number, z = 0): [number, number] {
@@ -145,8 +145,9 @@ export class Renderer {
     // Keep the centre of the view over the map's diamond, not its empty corners.
     const u = this.cam.x / (TW / 2);
     const v = this.cam.y / (TH / 2);
-    const tx = Math.max(0, Math.min(s.width, (u + v) / 2));
-    const ty = Math.max(0, Math.min(s.height, (v - u) / 2));
+    const [fx, fy] = turnPoint((u + v) / 2, (v - u) / 2, -1);
+    const tx = Math.max(0, Math.min(s.width, fx));
+    const ty = Math.max(0, Math.min(s.height, fy));
     [this.cam.x, this.cam.y] = iso(tx, ty);
   }
 

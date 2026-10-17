@@ -1,7 +1,7 @@
 import { mulberry32 } from '../game/rng';
 import { HOME_TRADES } from '../game/sim';
 import type { BuildingType, Season } from '../game/types';
-import { type Material, Pen, ROOF_COLORS, TH, TW, iso, mix, shade, type V3 } from './pen';
+import { type Material, Pen, ROOF_COLORS, TH, TW, VIEW, iso, mix, shade, type V3 } from './pen';
 
 /** Supersampling factor so sprites stay crisp when zoomed in. */
 export const SS = 2;
@@ -26,8 +26,15 @@ export function makeSprite(w: number, h: number, ax: number, ay: number, draw: (
   ctx.translate(ax, ay);
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
-  const smoke = draw(ctx) || [];
-  return { canvas, ax, ay, w, h, smoke };
+  // Sprites are drawn in their own frame, whichever way the view is turned.
+  const turn = VIEW.rot;
+  VIEW.rot = 0;
+  try {
+    const smoke = draw(ctx) || [];
+    return { canvas, ax, ay, w, h, smoke };
+  } finally {
+    VIEW.rot = turn;
+  }
 }
 
 // ------------------------------------------------------------------ palettes

@@ -2070,7 +2070,7 @@ export class Hud {
         <button data-m="pausebad">Pause on bad news: ${this.pauseOnBad ? 'On' : 'Off'}</button>
         <button data-m="tips">Tips: ${this.tipsOn ? 'On' : 'Off'}</button>
         <button data-m="photo">Photo mode (U)</button>
-        <button data-m="3d" data-tip="A first look at the town in 3D, built from the same drawings. Still a test: villagers draw on top of buildings.">3D view (test): ${this.game.renderer.threeD ? 'On' : 'Off'}</button>
+        <button data-m="3d" data-tip="The town in 3D, built from the same drawings. [ and ] turn the view; buildings can stand at any angle, and roads, fields and pastures are drawn freely.">3D view (test): ${this.game.renderer.threeD ? 'On' : 'Off'}</button>
         <button data-m="picture">📷 Save a picture</button>
       </div>
       <div class="seed-line" data-tip="Start a New Settlement with this seed to play the same land.">Map seed <b>${this.game.state.seed}</b> <button data-m="seed">Copy</button> <button data-m="seed-link" data-tip="A link that opens New Settlement on this land">Copy a link to this land</button></div>`,

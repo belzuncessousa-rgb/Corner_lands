@@ -7,6 +7,7 @@ import { TREE_SLOTS, variantOf } from '../render/renderer';
 import { bushSprite, fruitTreeSprite, rockSprite, treeSprite } from '../render/sprites';
 import type { Sprite, TreeKind } from '../render/sprites';
 import { buildingModel, groundTexture } from './scene3d';
+import { VIEW, turnPoint } from '../render/pen';
 
 /**
  * A building's model where it stands: on its grid rectangle, or for a freely
@@ -252,20 +253,29 @@ export class View3D {
     this.moving.begin();
     for (const f of figures) this.moving.add(f.sprite, f.x, f.y);
     this.moving.end();
-    // The camera centre, from iso pixels back to the tile plane.
+    // The camera centre, from iso pixels back to the tile plane (and, for a
+    // turned view, back from the turned plane to the map).
     const a = cam.x / 32;
     const b = cam.y / 16;
-    const tx = (a + b) / 2;
-    const ty = (b - a) / 2;
+    const [tx, ty] = turnPoint((a + b) / 2, (b - a) / 2, -1);
+    // Offsets from the target, turned the other way: the camera circles the
+    // map's centre as the flat projection turns the map.
+    const off = (x: number, z: number): [number, number] => {
+      const c = Math.cos(-VIEW.rot);
+      const sn = Math.sin(-VIEW.rot);
+      return [x * c - z * sn, x * sn + z * c];
+    };
     const ppu = PPU * cam.zoom;
     const camera = new THREE.OrthographicCamera(-width / 2 / ppu, width / 2 / ppu, height / 2 / ppu, -height / 2 / ppu, 0.1, 600);
     const el = Math.PI / 6;
     const dist = 200;
-    camera.position.set(tx + dist * Math.cos(el) * Math.SQRT1_2, dist * Math.sin(el), ty + dist * Math.cos(el) * Math.SQRT1_2);
+    const [cx, cz] = off(dist * Math.cos(el) * Math.SQRT1_2, dist * Math.cos(el) * Math.SQRT1_2);
+    camera.position.set(tx + cx, dist * Math.sin(el), ty + cz);
     camera.lookAt(tx, 0, ty);
     // The sun follows the view, with its shadows covering what is on screen.
     const reach = Math.min(70, Math.max(width, height) / ppu);
-    this.sun.position.set(tx - 18, 34, ty + 30);
+    const [sx, sz] = off(-18, 30);
+    this.sun.position.set(tx + sx, 34, ty + sz);
     this.sun.target.position.set(tx, 0, ty);
     const sc = this.sun.shadow.camera;
     sc.left = -reach;

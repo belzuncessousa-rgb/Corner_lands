@@ -11,7 +11,33 @@ export type V3 = [number, number, number];
  */
 export const ZS = 1.3;
 
+/**
+ * The 3D view can be turned: world tiles are turned about the map centre by
+ * this angle before they are projected, so the flat overlays drawn over the
+ * 3D view (ghosts, ranges, plans) stay on their tiles. Always 0 in the flat
+ * view, and while sprites are drawn (they keep their own local frame).
+ */
+export const VIEW = { rot: 0, cx: 0, cy: 0, c: 1, s: 0 };
+
+export function setViewTurn(rot: number, cx: number, cy: number): void {
+  VIEW.rot = rot;
+  VIEW.cx = cx;
+  VIEW.cy = cy;
+  VIEW.c = Math.cos(rot);
+  VIEW.s = Math.sin(rot);
+}
+
+/** A tile point turned by the view (or back again, with sign -1). */
+export function turnPoint(x: number, y: number, sign = 1): [number, number] {
+  if (!VIEW.rot) return [x, y];
+  const dx = x - VIEW.cx;
+  const dy = y - VIEW.cy;
+  const s = VIEW.s * sign;
+  return [VIEW.cx + dx * VIEW.c - dy * s, VIEW.cy + dx * s + dy * VIEW.c];
+}
+
 export function iso(x: number, y: number, z = 0): [number, number] {
+  if (VIEW.rot) [x, y] = turnPoint(x, y);
   return [(x - y) * (TW / 2), (x + y) * (TH / 2) - z * ZS];
 }
 

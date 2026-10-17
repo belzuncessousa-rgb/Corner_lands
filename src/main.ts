@@ -64,6 +64,7 @@ import type { Agent } from './render/agents';
 import { AgentSystem } from './render/agents';
 import { Wildlife } from './render/wildlife';
 import { type Overlay, Renderer, stallSpots } from './render/renderer';
+import { setViewTurn } from './render/pen';
 import { Hud } from './ui/hud';
 
 export type Tool =
@@ -294,6 +295,30 @@ export class Game {
     }
     if (this.view3d) this.view3d.visible = on;
     this.renderer.threeD = on;
+    // The flat view is never turned.
+    if (!on) {
+      this.turnTo = 0;
+      this.applyTurn(0);
+    }
+  }
+
+  /** How far the 3D view is turned (radians), and where it is turning to. */
+  private turn = 0;
+  private turnTo = 0;
+
+  /** Turns the 3D view a quarter round (dir 1 or -1). */
+  turnView(dir: number): void {
+    if (!this.renderer.threeD) return;
+    this.turnTo += (dir * Math.PI) / 2;
+  }
+
+  /** Sets the view's turn, keeping the tile at the middle of the screen where it is. */
+  private applyTurn(rot: number): void {
+    const s = this.state;
+    const [cx, cy] = this.renderer.screenToTile(this.renderer.width / 2, this.renderer.height / 2);
+    this.turn = rot;
+    setViewTurn(rot, s.width / 2, s.height / 2);
+    this.renderer.centerOn(cx, cy);
   }
 
   /** Photo mode: the interface, markers and selection are hidden for a clean view. */
@@ -384,6 +409,12 @@ export class Game {
     this.wildlife.update(this.state, gameDt);
     // Dusk only at normal speed: faster, the days would flicker.
     this.renderer.setDayTime(this.simAcc / DAY_SECONDS, !this.demo && this.speed <= 1, dt);
+    if (this.turn !== this.turnTo) {
+      // Swing round smoothly, a quarter turn in about a third of a second.
+      const step = dt * 5;
+      const d = this.turnTo - this.turn;
+      this.applyTurn(Math.abs(d) <= step ? this.turnTo : this.turn + Math.sign(d) * step);
+    }
     if (this.view3d && this.renderer.threeD) {
       // Villagers, carts and deer stand in the 3D world, so buildings hide them.
       const season = seasonOf(this.state.day);
@@ -1258,6 +1289,8 @@ export class Game {
         this.setTool({ kind: 'road', paved: true });
       } else if (k === 'v') {
         this.cycleCoverage();
+      } else if ((k === '[' || k === ']') && this.renderer.threeD) {
+        this.turnView(k === '[' ? -1 : 1);
       } else if (k === 'enter' && this.curvePts.length) {
         this.finishCurve();
       } else if (k === 'u') {
