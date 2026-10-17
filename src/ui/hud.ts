@@ -2069,6 +2069,7 @@ export class Hud {
         <button data-m="pausebad">Pause on bad news: ${this.pauseOnBad ? 'On' : 'Off'}</button>
         <button data-m="tips">Tips: ${this.tipsOn ? 'On' : 'Off'}</button>
         <button data-m="photo">Photo mode (U)</button>
+        <button data-m="3d" data-tip="A first look at the town in 3D, built from the same drawings. Still a test: villagers draw on top of buildings.">3D view (test): ${this.game.renderer.threeD ? 'On' : 'Off'}</button>
         <button data-m="picture">📷 Save a picture</button>
       </div>
       <div class="seed-line" data-tip="Start a New Settlement with this seed to play the same land.">Map seed <b>${this.game.state.seed}</b> <button data-m="seed">Copy</button> <button data-m="seed-link" data-tip="A link that opens New Settlement on this land">Copy a link to this land</button></div>`,
@@ -2085,6 +2086,16 @@ export class Hud {
       } catch {
         /* ignore */
       }
+      this.showGameMenu();
+    });
+    m.querySelector('[data-m="3d"]')!.addEventListener('click', async () => {
+      const on = !this.game.renderer.threeD;
+      try {
+        localStorage.setItem('cornerlands.3d', on ? '1' : '0');
+      } catch {
+        /* ignore */
+      }
+      await this.game.set3D(on);
       this.showGameMenu();
     });
     m.querySelector('[data-m="photo"]')!.addEventListener('click', () => {
