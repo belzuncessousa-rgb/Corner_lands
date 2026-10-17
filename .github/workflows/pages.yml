@@ -1,10 +1,13 @@
-# Builds the game and publishes it to the gh-pages branch on every push to main.
-# GitHub Pages serves that branch at https://<owner>.github.io/<repo>/.
+# Builds the game and publishes it to the gh-pages branch.
+# GitHub Pages serves that branch at https://<owner>.github.io/<repo>/:
+# the game from main at the root, and the 3D preview (branch claude/3d-gridless)
+# under /3d/. A push to either branch rebuilds both, so neither goes missing.
+# The same file lives on both branches (GitHub runs the copy on the pushed branch).
 name: Publish to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches: [main, claude/3d-gridless]
   workflow_dispatch:
 
 permissions:
@@ -19,19 +22,35 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/3d-gridless
+          path: preview3d
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
+      - name: Build the game (main)
+        working-directory: main
+        run: npm ci && npm run build
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
-      - run: npm run build
-      - name: Publish dist to gh-pages
+      - name: Build the 3D preview
+        working-directory: preview3d
+        run: npm ci && npm run build
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      - name: Publish to gh-pages
         run: |
-          cd dist
+          mkdir site
+          cp -r main/dist/. site/
+          mkdir site/3d
+          cp -r preview3d/dist/. site/3d/
+          cd site
           touch .nojekyll
           git init -q -b gh-pages
           git add -A
-          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -q -m "Publish ${GITHUB_SHA::7}"
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -q -m "Publish main $(cd ../main && git rev-parse --short HEAD), 3D $(cd ../preview3d && git rev-parse --short HEAD)"
           git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" gh-pages
