@@ -1,5 +1,5 @@
 import { BUILDINGS } from './data';
-import { deliveredTo, demolish, log, recompute, store, zoneCost } from './sim';
+import { deliveredTo, demolish, log, recompute, store, zoneCostOf } from './sim';
 import type { Building, Cost, GameState, ResourceId } from './types';
 import { cellsOf, placeBuilding } from './world';
 
@@ -17,7 +17,7 @@ export interface UndoStep {
 /** Records a placement (a building site or a drawn field, pasture or orchard). */
 export function undoPlacement(b: Building): UndoStep {
   const d = BUILDINGS[b.type];
-  const paid: Cost = d.zone ? zoneCost(b.type, b.w, b.h) : { gold: d.cost.gold ?? 0 };
+  const paid: Cost = d.zone ? zoneCostOf(b) : { gold: d.cost.gold ?? 0 };
   return {
     label: `Undo placing ${d.name}`,
     revert: (s) => {

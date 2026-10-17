@@ -137,6 +137,8 @@ export interface Building {
   cy?: number;
   rot?: number;
   cells?: number[];
+  /** Zones drawn as free shapes: the clicked corners of the outline, in tiles. */
+  shape?: [number, number][];
   /** Construction progress 0..1; building is complete at 1. */
   build: number;
   workers: number;

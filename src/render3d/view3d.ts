@@ -293,8 +293,8 @@ export class View3D {
     let roads = 0;
     for (let i = 0; i < s.road.length; i++) if (s.road[i]) roads = (roads * 31 + i * s.road[i]) >>> 0;
     const fields = s.buildings
-      .filter((b) => b.type === 'field' || b.type === 'pasture')
-      .map((b) => `${b.id}:${b.x}:${b.y}:${b.w}:${b.h}:${Math.round(b.growth * 5)}`)
+      .filter((b) => BUILDINGS[b.type].zone)
+      .map((b) => `${b.id}:${b.x}:${b.y}:${b.w}:${b.h}:${b.shape?.length ?? 0}:${Math.round(b.growth * 5)}`)
       .join();
     const key = `${season}:${roads}:${fields}:${(s.curves ?? []).length}:${(s.curves ?? []).map((c) => c.pts.length).join()}`;
     if (key === this.groundKey) return;

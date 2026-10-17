@@ -32,6 +32,7 @@ import {
   log,
   monthOf,
   nextTierRequirements,
+  zoneTiles,
   siloCap,
   siloHeld,
   recompute,
@@ -1004,7 +1005,7 @@ export class Hud {
     const zd = BUILDINGS[b.type].zone;
     if (zd) {
       const owner = s.buildings.find((o) => o.id === b.owner);
-      rows.push(`<div class="kv"><span>Size</span><span>${b.w} × ${b.h} (${b.w * b.h} tiles)</span></div>`);
+      rows.push(`<div class="kv"><span>Size</span><span>${b.shape ? `${zoneTiles(b)} tiles` : `${b.w} × ${b.h} (${b.w * b.h} tiles)`}</span></div>`);
       rows.push(
         owner
           ? `<div class="kv link" data-action="goto-b" data-id="${owner.id}"><span>Tended from</span><span>${esc(buildingName(owner))}</span></div>`

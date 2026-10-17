@@ -55,3 +55,61 @@ export function curveTiles(s: GameState, pts: Pt[]): number[] {
   }
   return out;
 }
+
+/**
+ * Fields, pastures, orchards and markets drawn as free shapes: the player
+ * clicks the corners of a polygon and the tiles whose centres lie inside
+ * it are the zone's ground (for area, yields and what stands where).
+ */
+export function insidePolygon(pts: Pt[], x: number, y: number): boolean {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const [xi, yi] = pts[i];
+    const [xj, yj] = pts[j];
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+/** The tiles inside a polygon (tiles off the map are -1). */
+export function polygonCells(s: GameState, pts: Pt[]): number[] {
+  const out: number[] = [];
+  if (pts.length < 3) return out;
+  const xs = pts.map((p) => p[0]);
+  const ys = pts.map((p) => p[1]);
+  for (let y = Math.floor(Math.min(...ys)); y <= Math.ceil(Math.max(...ys)); y++) {
+    for (let x = Math.floor(Math.min(...xs)); x <= Math.ceil(Math.max(...xs)); x++) {
+      if (!insidePolygon(pts, x + 0.5, y + 0.5)) continue;
+      out.push(x >= 0 && y >= 0 && x < s.width && y < s.height ? y * s.width + x : -1);
+    }
+  }
+  return out;
+}
+
+/** Length of a closed outline, in tiles. */
+export function perimeter(pts: Pt[]): number {
+  let n = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i];
+    const b = pts[(i + 1) % pts.length];
+    n += Math.hypot(b[0] - a[0], b[1] - a[1]);
+  }
+  return n;
+}
+
+/** The bounding rectangle of a set of tiles. */
+export function cellsRect(s: GameState, cells: number[]): { x: number; y: number; w: number; h: number } {
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  for (const i of cells) {
+    const x = i % s.width;
+    const y = (i - x) / s.width;
+    x0 = Math.min(x0, x);
+    y0 = Math.min(y0, y);
+    x1 = Math.max(x1, x);
+    y1 = Math.max(y1, y);
+  }
+  return { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+}

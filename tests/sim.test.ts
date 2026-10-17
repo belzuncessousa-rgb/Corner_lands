@@ -1598,6 +1598,58 @@ describe('free placement', () => {
   });
 });
 
+describe('free-shape zones', () => {
+  it('a field drawn as a free shape covers the tiles inside it, and its yield and costs follow its area', async () => {
+    const { placeShape, shapeError, zoneTiles, zoneCostOf, demolish } = await import('../src/game/sim');
+    const s = generateWorld(18);
+    s.res.wood = 999;
+    s.res.gold = 999;
+    s.tier = 1;
+    const hall = seatOf(s)!;
+    const ox = hall.x + 8;
+    const oy = hall.y - 8;
+    for (let y = oy - 2; y < oy + 14; y++)
+      for (let x = ox - 2; x < ox + 14; x++) {
+        const i = y * s.width + x;
+        if (s.occ[i] >= 0) continue;
+        s.terrain[i] = 0;
+        s.trees[i] = 0;
+        s.rock[i] = 0;
+        s.ore[i] = 0;
+        s.road[i] = 0;
+      }
+    // A triangle: about half of its bounding square.
+    const tri: [number, number][] = [
+      [ox, oy],
+      [ox + 8, oy],
+      [ox, oy + 8],
+    ];
+    expect(shapeError(s, 'pasture', [tri[0], tri[1]])).toBe('Click at least three corners');
+    expect(shapeError(s, 'pasture', tri)).toBeNull();
+    const wood = s.res.wood;
+    const z = placeShape(s, 'pasture', tri)!;
+    expect(z).toBeTruthy();
+    const n = zoneTiles(z);
+    expect(n).toBeGreaterThan(25);
+    expect(n).toBeLessThan(40);
+    expect(z.w * z.h).toBe(49);
+    // Fences round the outline: a timber for every two tiles of it.
+    expect(wood - s.res.wood).toBe(zoneCostOf(z).wood);
+    expect(zoneCostOf(z).wood).toBe(Math.round((8 + 8 + 8 * Math.SQRT2) / 2));
+    // It stands on exactly its own tiles.
+    for (const i of z.cells!) expect(s.occ[i]).toBe(z.id);
+    expect(s.occ[(oy + 7) * s.width + ox + 7]).not.toBe(z.id);
+    // Too small, or over something, is refused.
+    expect(shapeError(s, 'pasture', [[ox + 9, oy], [ox + 10, oy], [ox + 9, oy + 1]])).toMatch(/At least/);
+    expect(shapeError(s, 'pasture', [[ox + 1, oy + 1], [ox + 6, oy + 1], [ox + 1, oy + 6]])).toBe('Space is occupied');
+    // Saved and loaded with its outline.
+    const back = deserialize(serialize(s));
+    expect(back.buildings.find((b) => b.id === z.id)!.shape).toEqual(z.shape);
+    demolish(s, z);
+    for (const i of z.cells!) expect(s.occ[i]).toBe(-1);
+  });
+});
+
 describe('curved roads', () => {
   it('lays a joined chain of road tiles under a smooth curve and forgets it when cut', async () => {
     const { layCurve, curveError, removeRoad, layRoads } = await import('../src/game/sim');

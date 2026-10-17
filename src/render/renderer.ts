@@ -7,7 +7,7 @@ import { idx, inBounds } from '../game/world';
 import type { Agent } from './agents';
 import { ICONS } from '../ui/icons';
 import type { Animal } from './wildlife';
-import { Pen, TH, TW, iso, mix } from './pen';
+import { Pen, TH, TW, iso, mix, type V3 } from './pen';
 import { mulberry32 } from '../game/rng';
 import {
   type Sprite,
@@ -333,7 +333,8 @@ export class Renderer {
         // Stalls on every other tile, spread evenly over the square.
         const slots = marketStalls(b);
         const cands: number[] = [];
-        for (let y = b.y; y < b.y + b.h; y += 2) for (let x = b.x; x < b.x + b.w; x += 2) cands.push(y * W + x);
+        const own = b.cells && new Set(b.cells);
+        for (let y = b.y; y < b.y + b.h; y += 2) for (let x = b.x; x < b.x + b.w; x += 2) if (!own || own.has(y * W + x)) cands.push(y * W + x);
         for (let k = 0; k < Math.min(slots, cands.length); k++) {
           const i = cands[Math.floor(((k + 0.5) * cands.length) / slots)];
           const x = i % W;
@@ -346,8 +347,10 @@ export class Renderer {
       }
       if (BUILDINGS[b.type].zone) {
         if (b.type === 'orchard') {
+          const own = b.cells && new Set(b.cells);
           for (let y = b.y; y < b.y + b.h; y++) {
             for (let x = b.x; x < b.x + b.w; x++) {
+              if (own && !own.has(y * W + x)) continue;
               const [wx, wy] = iso(x, y);
               if (!visible(wx, wy)) continue;
               this.orchardTiles.set(y * W + x, b);
@@ -581,6 +584,13 @@ export class Renderer {
     const month = monthOf(s.day);
     const herds = new Map<number, number>();
     for (const b of s.buildings) {
+      // A zone drawn as a free shape: its square drawing, cut to the outline.
+      const shape = b.shape?.map(([x, y]) => [x, y, 0] as V3);
+      if (shape) {
+        p.ctx.save();
+        p.path(shape);
+        p.ctx.clip();
+      }
       if (b.type === 'farm') {
         // Farmyard.
         p.poly(
@@ -624,9 +634,13 @@ export class Renderer {
         );
         for (let x = b.x + 0.5; x < b.x + b.w; x += 1) p.line([x, b.y + 0.2, 0], [x, b.y + b.h - 0.2, 0], season === 3 ? 'rgba(200,206,208,0.6)' : 'rgba(150,170,80,0.35)', 3);
       }
+      if (shape) {
+        p.ctx.restore();
+        p.poly(shape, null, b.type === 'pasture' ? '#5e4129' : 'rgba(94,65,41,0.6)', b.type === 'pasture' ? 2 : 1);
+      }
       if (selected === b.id && BUILDINGS[b.type].zone) {
         p.poly(
-          [
+          shape ?? [
             [b.x, b.y, 0],
             [b.x + b.w, b.y, 0],
             [b.x + b.w, b.y + b.h, 0],

@@ -4,7 +4,7 @@ import { BUILDINGS, BUILD_ORDER, DAY_SECONDS, GATHERERS, MONTH_NAMES, TIERS } fr
 import { playBot } from './game/autoplay';
 import { autoResolve, TITLES } from './game/events';
 import { placeName, townName } from './game/names';
-import { curveSamples, curveTiles } from './game/curves';
+import { curveSamples, curveTiles, perimeter, polygonCells } from './game/curves';
 import { StateRng } from './game/rng';
 import { deserialize, serialize } from './game/save';
 import {
@@ -48,6 +48,8 @@ import {
   freePlacementError,
   placeFree,
   curveError,
+  placeShape,
+  shapeError,
   layCurve,
   GROVE_MAX,
   groveAt,
@@ -474,6 +476,35 @@ export class Game {
         ov.range = { cx: c.x, cy: c.y, r: d.radius, highlight: rangeHighlighter(s, tool.type) };
       }
       this.hud.setHint(this.buildHint(tool.type, p.x, p.y, err), !!err);
+    } else if (tool.kind === 'zone' && this.shaping()) {
+      // A free shape: the corners clicked so far and the pointer.
+      const d = BUILDINGS[tool.type];
+      const pts: [number, number][] = [...this.curvePts, [ftx, fty]];
+      const closing = this.curvePts.length >= 3 && Math.hypot(this.curvePts[0][0] - ftx, this.curvePts[0][1] - fty) < 0.6;
+      const shape = closing ? this.curvePts : pts;
+      ov.curve = shape.length >= 3 ? [...shape, shape[0]] : shape;
+      ov.tiles = polygonCells(s, shape)
+        .filter((i) => i >= 0)
+        .map((i) => {
+          const x = i % s.width;
+          const y = (i - x) / s.width;
+          return { x, y, ok: !footprintClear(s, x, y, 1, 1) };
+        });
+      ov.tileColor = 'road';
+      if (this.curvePts.length < 2) {
+        this.hud.setHint(`${d.name}: click each corner of its outline, any shape · ${d.zone!.min * d.zone!.min}–${d.zone!.max * d.zone!.max} tiles${d.zone!.owner === tool.type ? ' · free' : ''}`, false);
+      } else {
+        const err = shapeError(s, tool.type, shape);
+        const cost = zoneCost(tool.type, 0, 0, ov.tiles.length, perimeter(shape));
+        const costText = cost.wood ? ` · ${cost.wood} timber for fences` : cost.gold ? ` · ${cost.gold} coins for saplings` : '';
+        const stalls = tool.type === 'market' ? ` · room for ${Math.max(1, Math.min(6, Math.floor(ov.tiles.length / 6)))} stalls` : '';
+        this.hud.setHint(
+          err && shape.length >= 3
+            ? `${d.name}: ${err}`
+            : `${d.name} (${ov.tiles.length} tiles)${costText}${stalls} · click to add a corner · click the first corner, Enter or right-click to finish`,
+          !!err && shape.length >= 3,
+        );
+      }
     } else if (tool.kind === 'zone') {
       const a = this.zoneAnchor ?? { x: tx, y: ty };
       const err = zoneError(s, tool.type, a.x, a.y, tx, ty);
@@ -811,7 +842,48 @@ export class Game {
     this.curvePts.push(p);
   }
 
+  /** Zones are drawn as free shapes in the 3D view. */
+  private shaping(): boolean {
+    return this.tool.kind === 'zone' && this.renderer.threeD && !!this.view3d;
+  }
+
+  /** Adds a corner to the shape being drawn; clicking the first corner closes it. */
+  private clickShape(fx: number, fy: number): void {
+    if (!inBounds(this.state, Math.floor(fx), Math.floor(fy))) return;
+    const first = this.curvePts[0];
+    if (first && this.curvePts.length >= 3 && Math.hypot(first[0] - fx, first[1] - fy) < 0.6) {
+      this.finishCurve();
+      return;
+    }
+    const last = this.curvePts[this.curvePts.length - 1];
+    if (last && Math.hypot(last[0] - fx, last[1] - fy) < 0.3) return;
+    this.curvePts.push([fx, fy]);
+  }
+
+  private finishShape(): void {
+    const s = this.state;
+    const pts = this.curvePts;
+    this.curvePts = [];
+    if (this.tool.kind !== 'zone' || pts.length < 3) return;
+    const err = shapeError(s, this.tool.type, pts);
+    if (err) {
+      this.hud.flash(err);
+      return;
+    }
+    const b = placeShape(s, this.tool.type, pts);
+    if (b) {
+      this.hud.sound('place');
+      this.setTool({ kind: 'select' });
+      this.hud.closeCategory();
+      this.select(b.id);
+    }
+  }
+
   private finishCurve(): void {
+    if (this.tool.kind === 'zone') {
+      this.finishShape();
+      return;
+    }
     const s = this.state;
     const pts = this.curvePts;
     this.curvePts = [];
@@ -1095,7 +1167,10 @@ export class Game {
         return;
       }
       if (this.tool.kind === 'zone') {
-        if (!this.moved) this.clickZone(this.tool.type, tx, ty);
+        if (!this.moved) {
+          if (this.shaping()) this.clickShape(ftx, fty);
+          else this.clickZone(this.tool.type, tx, ty);
+        }
         return;
       }
       if (this.tool.kind === 'grove') {
@@ -1275,7 +1350,7 @@ function rangeHighlighter(s: GameState, type: BuildingType): ((i: number) => boo
 const game = new Game();
 // Handy hooks for debugging and automated screenshots.
 (window as unknown as Record<string, unknown>).game = game;
-(window as unknown as Record<string, unknown>).cl = { placeOrder, buildRoad, planRoad, buyAnimal, stepDay, recompute, placementError, playBot, placeZone, setYard, keepOf, log };
+(window as unknown as Record<string, unknown>).cl = { placeShape, placeOrder, buildRoad, planRoad, buyAnimal, stepDay, recompute, placementError, playBot, placeZone, setYard, keepOf, log };
 
 /** Hands the player a file to save. */
 function download(blob: Blob, name: string): void {

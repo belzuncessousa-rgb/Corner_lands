@@ -108,25 +108,8 @@ export function groundTexture(s: GameState, season: Season): THREE.CanvasTexture
       }
     }
   }
-  // Fields: ploughed plots with crop rows.
-  for (const b of s.buildings) {
-    if (b.type !== 'field') continue;
-    g.fillStyle = season === 3 ? '#cfd4d4' : '#7a5a3a';
-    roundRect(g, b.x * P + P * 0.12, b.y * P + P * 0.12, b.w * P - P * 0.24, b.h * P - P * 0.24, P * 0.5);
-    g.fill();
-    const crop = season === 3 ? '#b8bebe' : b.growth > 0.05 ? (b.growth > 0.8 ? '#c8a848' : '#6a9a38') : '#5e4129';
-    g.strokeStyle = crop;
-    g.lineWidth = b.growth > 0.05 && season !== 3 ? P / 6 : 1.5;
-    for (let r = 0; r < b.h * 4; r++) {
-      const y = b.y * P + (r + 0.5) * (P / 4);
-      const edgeR = Math.min(r + 0.5, b.h * 4 - r - 0.5) / 4;
-      const cut = edgeR < 0.45 ? (0.45 - edgeR) * P : 0;
-      g.beginPath();
-      g.moveTo(b.x * P + P * 0.3 + cut, y);
-      g.lineTo((b.x + b.w) * P - P * 0.3 - cut, y);
-      g.stroke();
-    }
-  }
+  // Zones: fields, pastures, orchards and market squares, laid square or drawn as free shapes.
+  for (const b of s.buildings) if (BUILDINGS[b.type].zone) paintZone(g, b, P, season);
   // Roads: continuous bands with a darker verge, bending at corners. Roads
   // laid as free curves are drawn along their curve instead of tile by tile.
   const road = (x: number, y: number) => x >= 0 && y >= 0 && x < s.width && y < s.height && s.road[y * s.width + x] > 0;
@@ -192,6 +175,117 @@ export function groundTexture(s: GameState, season: Season): THREE.CanvasTexture
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 8;
   return tex;
+}
+
+/** Traces a zone's outline: its drawn shape, or its rectangle with round corners. */
+function zonePath(g: CanvasRenderingContext2D, b: GameState['buildings'][number], P: number, inset: number): void {
+  if (!b.shape) {
+    roundRect(g, b.x * P + inset, b.y * P + inset, b.w * P - inset * 2, b.h * P - inset * 2, P * 0.5);
+    return;
+  }
+  // Corners rounded a little, like a ploughman turning his team.
+  const pts = b.shape.map(([x, y]) => [x * P, y * P] as [number, number]);
+  const n = pts.length;
+  const mid = (a: [number, number], c: [number, number]) => [(a[0] + c[0]) / 2, (a[1] + c[1]) / 2] as [number, number];
+  g.beginPath();
+  const m0 = mid(pts[n - 1], pts[0]);
+  g.moveTo(m0[0], m0[1]);
+  for (let i = 0; i < n; i++) {
+    const m = mid(pts[i], pts[(i + 1) % n]);
+    g.arcTo(pts[i][0], pts[i][1], m[0], m[1], P * 0.6);
+  }
+  g.closePath();
+}
+
+/** Paints a zone on the ground: ploughed rows, grazing with a fence, orchard rows or a market square. */
+function paintZone(g: CanvasRenderingContext2D, b: GameState['buildings'][number], P: number, season: Season): void {
+  const snow = season === 3;
+  const x0 = b.x * P;
+  const y0 = b.y * P;
+  const x1 = (b.x + b.w) * P;
+  const y1 = (b.y + b.h) * P;
+  g.save();
+  zonePath(g, b, P, b.shape ? 0 : P * 0.12);
+  if (b.type === 'field') {
+    // A grassy headland, then the ploughed plot with its crop rows.
+    g.fillStyle = snow ? '#cfd4d4' : '#7a5a3a';
+    g.fill();
+    g.clip();
+    const crop = snow ? '#b8bebe' : b.growth > 0.05 ? (b.growth > 0.8 ? '#c8a848' : '#6a9a38') : '#5e4129';
+    g.strokeStyle = crop;
+    g.lineWidth = b.growth > 0.05 && !snow ? P / 6 : 1.5;
+    for (let y = y0 + P / 8; y < y1; y += P / 4) {
+      g.beginPath();
+      g.moveTo(x0, y);
+      g.lineTo(x1, y);
+      g.stroke();
+    }
+    g.restore();
+    g.save();
+    zonePath(g, b, P, b.shape ? 0 : P * 0.12);
+    g.strokeStyle = snow ? 'rgba(200,206,208,0.8)' : 'rgba(110,140,60,0.7)';
+    g.lineWidth = P * 0.18;
+    g.stroke();
+  } else if (b.type === 'pasture') {
+    g.fillStyle = snow ? '#e4e8e8' : '#8cad4e';
+    g.fill();
+    g.clip();
+    // Tufts and bare patches where the herd stands.
+    const rand = mulberry32(b.id * 7919);
+    for (let k = 0; k < (x1 - x0) * (y1 - y0) / (P * 2); k++) {
+      g.fillStyle = rand() < 0.7 ? (snow ? 'rgba(255,255,255,0.5)' : 'rgba(70,110,40,0.35)') : 'rgba(150,120,80,0.25)';
+      g.fillRect(x0 + rand() * (x1 - x0), y0 + rand() * (y1 - y0), P * 0.18, P * 0.1);
+    }
+    g.restore();
+    g.save();
+    zonePath(g, b, P, b.shape ? 0 : P * 0.12);
+    // Post-and-rail fence round it.
+    g.strokeStyle = '#7b5a36';
+    g.lineWidth = P * 0.07;
+    g.stroke();
+    g.setLineDash([P * 0.08, P * 0.6]);
+    g.lineWidth = P * 0.16;
+    g.strokeStyle = '#5e4129';
+    g.stroke();
+  } else if (b.type === 'orchard') {
+    g.fillStyle = snow ? 'rgba(230,236,238,0.6)' : 'rgba(80,110,40,0.3)';
+    g.fill();
+    g.clip();
+    g.strokeStyle = snow ? 'rgba(200,206,208,0.6)' : 'rgba(150,170,80,0.45)';
+    g.lineWidth = P * 0.3;
+    for (let x = x0 + P / 2; x < x1; x += P) {
+      g.beginPath();
+      g.moveTo(x, y0);
+      g.lineTo(x, y1);
+      g.stroke();
+    }
+  } else if (b.type === 'market') {
+    // Packed earth with a cobbled edge.
+    g.fillStyle = snow ? '#d6dadb' : '#b5a88e';
+    g.fill();
+    g.clip();
+    g.strokeStyle = 'rgba(90,75,55,0.18)';
+    g.lineWidth = 1;
+    for (let x = x0; x < x1; x += P / 2) {
+      g.beginPath();
+      g.moveTo(x, y0);
+      g.lineTo(x, y1);
+      g.stroke();
+    }
+    for (let y = y0; y < y1; y += P / 2) {
+      g.beginPath();
+      g.moveTo(x0, y);
+      g.lineTo(x1, y);
+      g.stroke();
+    }
+    g.restore();
+    g.save();
+    zonePath(g, b, P, b.shape ? 0 : P * 0.05);
+    g.strokeStyle = snow ? '#b8bec0' : '#8a7c62';
+    g.lineWidth = P * 0.14;
+    g.stroke();
+  }
+  g.restore();
 }
 
 function roundRect(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {

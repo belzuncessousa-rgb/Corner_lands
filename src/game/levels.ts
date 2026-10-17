@@ -8,6 +8,7 @@ import {
   materialsOf,
   needsMaterials,
   recompute,
+  zoneTiles,
 } from './sim';
 import type { Building, BuildingType, Cost, GameState } from './types';
 import { idx, inBounds } from './world';
@@ -98,7 +99,7 @@ export const UPGRADABLE_WORK: BuildingType[] = [
 /** Worker slots, including the expansion of a level 2 workplace. */
 /** Stalls a marketplace has room for: one for every six tiles, up to six. */
 export function marketStalls(b: Building): number {
-  return Math.max(1, Math.min(6, Math.floor((b.w * b.h) / 6)));
+  return Math.max(1, Math.min(6, Math.floor(zoneTiles(b) / 6)));
 }
 
 export function workersOf(b: Building): number {

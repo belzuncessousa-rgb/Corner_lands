@@ -49,7 +49,7 @@ import { checkQuests } from './quests';
 import { StateRng } from './rng';
 import type { Building, BuildingType, Category, Cost, GameState, Herd, MessageKind, ResourceId, Season, Shoal } from './types';
 import { RESOURCE_IDS } from './types';
-import { curveTiles } from './curves';
+import { cellsRect, curveTiles, perimeter, polygonCells } from './curves';
 import { cellsOf, footprintCells, getBuilding, idx, inBounds, makeBuilding, placeBuilding, removeBuilding, setRoad } from './world';
 
 // ---------------------------------------------------------------- time helpers
@@ -279,11 +279,61 @@ export function isZone(type: BuildingType): boolean {
   return !!BUILDINGS[type].zone;
 }
 
-/** What it costs to lay out a zone: fences for pastures, saplings for orchards. */
-export function zoneCost(type: BuildingType, w: number, h: number): Cost {
-  if (type === 'pasture') return { wood: w + h };
-  if (type === 'orchard') return { gold: 2 * w * h };
+/**
+ * What it costs to lay out a zone: fences for pastures (a timber for every
+ * two tiles of fence), saplings for orchards. A free shape passes its own
+ * tile count and outline length.
+ */
+export function zoneCost(type: BuildingType, w: number, h: number, tiles = w * h, fence = 2 * (w + h)): Cost {
+  if (type === 'pasture') return { wood: Math.round(fence / 2) };
+  if (type === 'orchard') return { gold: 2 * tiles };
   return {};
+}
+
+/** Tiles a zone covers: a free shape counts the tiles inside its outline. */
+export function zoneTiles(z: Building): number {
+  return z.cells?.length ?? z.w * z.h;
+}
+
+/** What a zone cost to lay out (refunds), free shapes included. */
+export function zoneCostOf(z: Building): Cost {
+  return z.shape ? zoneCost(z.type, z.w, z.h, zoneTiles(z), perimeter(z.shape)) : zoneCost(z.type, z.w, z.h);
+}
+
+/** Why a zone cannot be drawn as this free shape (corners in tiles), or null. */
+export function shapeError(s: GameState, type: BuildingType, pts: [number, number][]): string | null {
+  const d = BUILDINGS[type];
+  const z = d.zone;
+  if (!z) return 'Not a zone';
+  if (!isUnlocked(s, type)) return `Requires ${TIERS[d.tier].name}`;
+  if (pts.length < 3) return 'Click at least three corners';
+  const cells = polygonCells(s, pts);
+  if (cells.length < z.min * z.min) return `At least ${z.min * z.min} tiles`;
+  if (cells.length > z.max * z.max) return `At most ${z.max * z.max} tiles`;
+  const r = cellsRect(s, cells);
+  if (r.w > z.max * 2 || r.h > z.max * 2) return `At most ${z.max * 2} tiles across`;
+  const clear = cellsClear(s, cells);
+  if (clear) return clear;
+  if (!canAfford(s, zoneCost(type, r.w, r.h, cells.length, perimeter(pts)))) return type === 'orchard' ? 'Not enough coins' : 'Not enough timber for fences';
+  return null;
+}
+
+/** Lays out a zone as a free shape through the clicked corners. */
+export function placeShape(s: GameState, type: BuildingType, pts: [number, number][]): Building | null {
+  if (shapeError(s, type, pts)) return null;
+  const cells = polygonCells(s, pts);
+  const r = cellsRect(s, cells);
+  pay(s, zoneCost(type, r.w, r.h, cells.length, perimeter(pts)));
+  const b = makeBuilding(s.nextId++, type, r.x, r.y);
+  b.w = r.w;
+  b.h = r.h;
+  b.cells = cells;
+  b.shape = pts.map(([x, y]) => [x, y] as [number, number]);
+  b.build = 1;
+  if (type === 'orchard') b.age = 0;
+  placeBuilding(s, b);
+  recompute(s);
+  return b;
 }
 
 function zoneRect(x0: number, y0: number, x1: number, y1: number) {
@@ -351,7 +401,7 @@ export function zonesOf(s: GameState, b: Building): Building[] {
 }
 
 export function zoneArea(zones: Building[]): number {
-  return zones.reduce((a, z) => a + z.w * z.h, 0);
+  return zones.reduce((a, z) => a + zoneTiles(z), 0);
 }
 
 /** Materials already carried to a construction site. */
@@ -515,7 +565,7 @@ export function demolish(s: GameState, b: Building): boolean {
   const d = BUILDINGS[b.type];
   // Sites return what was delivered (and the gold); finished buildings half.
   if (b.build >= 1) {
-    refund(s, d.zone ? zoneCost(b.type, b.w, b.h) : d.cost, 0.5);
+    refund(s, d.zone ? zoneCostOf(b) : d.cost, 0.5);
     if (b.upgrading) {
       // A renovation under way gives back its gold and what was carried in.
       const cost = upgradeCost(b);
@@ -1793,9 +1843,10 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
 }
 
 function farmFertility(s: GameState, b: Building): number {
+  const cells = cellsOf(s, b);
   let f = 0;
-  for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) f += s.fertility[idx(s, x, y)];
-  return f / (b.w * b.h);
+  for (const i of cells) f += s.fertility[i];
+  return f / Math.max(1, cells.length);
 }
 
 /** Grain (or barley, oats, flax) per tile from a fully tended field on rich soil. */
@@ -1816,7 +1867,7 @@ export function cropOf(f: Building): string {
 function fieldYield(s: GameState, f: Building, crew: number): number {
   const crop = cropOf(f);
   const rotation = (f.lastCrop === crop ? 0.85 : 1) * fieldCharterFactor(s);
-  return Math.round(f.w * f.h * FIELD_YIELD * f.growth * (0.5 + 0.5 * farmFertility(s, f)) * (0.6 + 0.4 * crew) * CROP_FACTOR[crop] * rotation);
+  return Math.round(zoneTiles(f) * FIELD_YIELD * f.growth * (0.5 + 0.5 * farmFertility(s, f)) * (0.6 + 0.4 * crew) * CROP_FACTOR[crop] * rotation);
 }
 
 /**
@@ -2346,7 +2397,7 @@ function dailyOrchards(s: GameState): void {
     o.age = (o.age ?? 0) + 1;
     const m = orchardMaturity(o, hasCharter(s, 'orchard2'));
     if (month === 5 && first) {
-      o.growth = Math.round(o.w * o.h * ORCHARD_YIELD * (m >= 1 ? 1 : m * m) * (hasCharter(s, 'orchard1') ? 1.3 : 1));
+      o.growth = Math.round(zoneTiles(o) * ORCHARD_YIELD * (m >= 1 ? 1 : m * m) * (hasCharter(s, 'orchard1') ? 1.3 : 1));
       o.lastOutput = 0;
     }
     if (month === 7 && first) o.growth = 0;
