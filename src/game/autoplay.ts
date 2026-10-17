@@ -22,6 +22,7 @@ import {
   placeOrder,
   placementError,
   nearestResource,
+  seatOf,
   resourceInRange,
   roadError,
   stepDay,
@@ -56,7 +57,7 @@ export function tryPlace(s: GameState, type: BuildingType, near?: { x: number; y
   if (type === 'cathedral' || type === 'guildhall' || type === 'belltower' ? s.res.gold < (d.cost.gold ?? 0) + 500 : type !== 'woodcutter' && !affordsWithPromises(s, d.cost)) return false;
   const reached = reachableRoads(s);
   let best: { x: number; y: number; score: number } | null = null;
-  const hall = s.buildings.find((b) => b.type === 'townhall')!;
+  const hall = seatOf(s)!;
   // A bigger town spreads further from the manor.
   const reach = 26 + 5 * Math.max(0, s.tier - 2);
   for (let y = 0; y < s.height; y++) {
@@ -107,7 +108,7 @@ export function tryPlace(s: GameState, type: BuildingType, near?: { x: number; y
 
 /** Lays out a marketplace square near a spot (the manor by default). */
 function drawMarket(s: GameState, near?: { x: number; y: number }): boolean {
-  const hall = s.buildings.find((b) => b.type === 'townhall');
+  const hall = seatOf(s);
   const c = near ?? (hall ? bCenter(hall) : { x: s.width / 2, y: s.height / 2 });
   const spot = zoneSpot(s, 'market', { x: Math.floor(c.x) - 1, y: Math.floor(c.y) - 1, w: 2, h: 2 }, [
     [4, 4],
@@ -193,7 +194,7 @@ function drawFields(s: GameState): void {
 /** Lays a road from the network towards the nearest ore deposit. */
 function roadToOre(s: GameState, deposits: Uint8Array = s.ore): void {
   const reached = reachableRoads(s);
-  const hall = s.buildings.find((b) => b.type === 'townhall')!;
+  const hall = seatOf(s)!;
   let ore = -1;
   let best = Infinity;
   deposits.forEach((v, i) => {
@@ -246,7 +247,7 @@ function roadToOre(s: GameState, deposits: Uint8Array = s.ore): void {
 const GRID = 7;
 
 function onGrid(s: GameState, x: number, y: number): boolean {
-  const hall = s.buildings.find((b) => b.type === 'townhall')!;
+  const hall = seatOf(s)!;
   const gx = (((x - (hall.x - 2)) % GRID) + GRID) % GRID;
   const gy = (((y - (hall.y + 3)) % GRID) + GRID) % GRID;
   return gx === 0 || gy === 0;
@@ -369,7 +370,9 @@ function affordsWithPromises(s: GameState, cost: Cost): boolean {
 
 /** Raises the manor when possible, and a couple of homes at a time. */
 function renovate(s: GameState): void {
-  const hall = s.buildings.find((b) => b.type === 'townhall');
+  // A manor for feasts and festivals, once the town is a Village with coins to spare.
+  if (s.tier >= 1 && !s.buildings.some((b) => b.type === 'townhall') && s.res.gold > (BUILDINGS.townhall.cost.gold ?? 0) + 150 && s.day % DAYS_PER_MONTH === 5) tryPlace(s, 'townhall');
+  const hall = s.buildings.find((b) => b.type === 'townhall' && b.build >= 1);
   const plan = hall ? upgradePlan(s, hall) : null;
   let saving = false;
   if (hall && plan && !hall.upgrading && plan.reqs.every((r) => r.met)) {
@@ -494,6 +497,8 @@ export function act(s: GameState, rand: () => number): void {
     // Fill the existing jobs first; homes still bring more hands.
     if (totalHousing(s) - pop < 4) wants.push('house');
     for (const t of wants) if (BUILDINGS[t].tier <= s.tier && tryPlace(s, t)) return;
+    // No room left by the lanes for the homes we need: lay more road.
+    if (wants.includes('house')) growRoads(s, rand);
     return;
   }
   // Woods felled bare: plant before anything else, as a careful player would.

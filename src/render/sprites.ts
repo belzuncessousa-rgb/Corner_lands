@@ -1867,6 +1867,84 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       p.barrel(2.65, 2.55);
       break;
     }
+    case 'camp': {
+      // Three canvas tents round a fire, the cart they came with, and their goods.
+      p.poly(
+        [
+          [0.15, 0.15, 0],
+          [2.85, 0.15, 0],
+          [2.85, 2.85, 0],
+          [0.15, 2.85, 0],
+        ],
+        season === 3 ? '#d6dbd9' : '#a89a72',
+      );
+      const tent = (x: number, y: number, cloth: string) => {
+        p.shadow(x - 0.05, y - 0.05, x + 0.85, y + 0.75);
+        // A ridge tent: two sloping sides and a dark mouth at the front.
+        p.poly(
+          [
+            [x, y + 0.7, 0],
+            [x + 0.8, y + 0.7, 0],
+            [x + 0.8, y + 0.35, 16],
+            [x, y + 0.35, 16],
+          ],
+          p.snow ? '#eef2f4' : shade(cloth, 1),
+          shade(cloth, 0.6),
+        );
+        p.poly(
+          [
+            [x, y, 0],
+            [x + 0.8, y, 0],
+            [x + 0.8, y + 0.35, 16],
+            [x, y + 0.35, 16],
+          ],
+          p.snow ? '#dfe5e8' : shade(cloth, 0.82),
+          shade(cloth, 0.55),
+        );
+        p.poly(
+          [
+            [x + 0.8, y, 0],
+            [x + 0.8, y + 0.7, 0],
+            [x + 0.8, y + 0.35, 16],
+          ],
+          shade(cloth, 0.7),
+          shade(cloth, 0.5),
+        );
+        p.poly(
+          [
+            [x + 0.8, y + 0.2, 0],
+            [x + 0.8, y + 0.5, 0],
+            [x + 0.8, y + 0.35, 9],
+          ],
+          '#3a2c20',
+        );
+      };
+      tent(0.3, 0.25, '#d8cfb8');
+      tent(1.6, 0.3, '#c8b48c');
+      tent(0.35, 1.5, '#e0d6c0');
+      // The cart, unhitched.
+      p.box(1.7, 1.65, 2.55, 2.15, 4, 5, '#8a6440');
+      p.box(1.75, 1.7, 2.5, 2.1, 9, 3, '#c8a46c');
+      p.sack(1.95, 1.85);
+      p.sack(2.2, 1.9, '#c8b48c');
+      p.line([1.7, 1.9, 6], [1.3, 1.9, 2], '#5e4129', 1.4);
+      for (const y of [1.62, 2.18] as const) {
+        const [wx, wy] = iso(2.1, y, 4);
+        p.ctx.strokeStyle = '#4a3020';
+        p.ctx.lineWidth = 1.2;
+        p.ctx.beginPath();
+        p.ctx.ellipse(wx, wy, 4, 5, 0, 0, Math.PI * 2);
+        p.ctx.stroke();
+      }
+      // A fire ring between the tents (its smoke rises live).
+      for (let k = 0; k < 7; k++) p.circle(1.35 + Math.cos(k) * 0.16, 1.2 + Math.sin(k) * 0.16, 0, 1.4, '#8a8478');
+      p.circle(1.35, 1.2, 1, 2.2, season === 3 ? '#8a7060' : '#e8742a');
+      smoke.push([1.35, 1.2, 4]);
+      p.barrel(2.45, 0.95);
+      p.crate(0.55, 2.45);
+      p.logPile(2.55, 2.45, 2);
+      break;
+    }
     case 'tradingpost': {
       // A merchants' hall: stone ground floor, timber loft with a hoist,
       // a covered loading bay, bales and casks for the road, and a pennant.

@@ -129,6 +129,7 @@ export const RESOURCE_STORAGE: Record<ResourceId, StorageKind | null> = Object.f
 /** Storage capacity each building provides. */
 export const STORAGE_CAPACITY: Partial<Record<BuildingType, Partial<Record<StorageKind, number>>>> = {
   townhall: { materials: 150, food: 120 },
+  camp: { materials: 150, food: 120 },
   storehouse: { materials: 300 },
   granary: { food: 300 },
 };
@@ -223,15 +224,27 @@ function def(d: Partial<BuildingDef> & Pick<BuildingDef, 'type' | 'name' | 'desc
 }
 
 export const BUILDINGS: Record<BuildingType, BuildingDef> = {
-  townhall: def({
-    type: 'townhall',
-    name: 'Manor Hall',
-    desc: 'The heart of your settlement. Stores goods and shelters the first settlers.',
+  camp: def({
+    type: 'camp',
+    name: "Settlers' Camp",
+    desc: 'Tents and the cart the first families came with: shelter for eight and a store for what they brought, until houses and a storehouse stand.',
     category: 'civic',
     w: 3,
     h: 3,
     housing: 8,
     buildable: false,
+  }),
+  townhall: def({
+    type: 'townhall',
+    name: 'Manor',
+    desc: "The lord's seat, built where you choose (one to a town). Feasts and festivals are held here; it stores goods, brings a little prestige each month, and grows from hall to castle, needing more room at each step.",
+    category: 'civic',
+    w: 3,
+    h: 3,
+    housing: 4,
+    cost: { wood: 60, planks: 20, stone: 20, gold: 60 },
+    buildDays: 30,
+    tier: 1,
   }),
   house: def({
     type: 'house',
@@ -914,6 +927,7 @@ export const BUILD_ORDER: BuildingType[] = [
   'granary',
   'market',
   'tradingpost',
+  'townhall',
   'tavern',
   'apothecary',
   'scriptorium',
@@ -940,10 +954,10 @@ export const CATEGORY_NAMES: Record<Category, string> = {
 
 export const TIERS = [
   { name: 'Hamlet', pop: 0, desc: 'A handful of families clearing the land.' },
-  { name: 'Village', pop: 20, desc: 'Unlocks farms, bakeries, sawpits, markets, taverns, Timber Houses and workshop expansions.' },
+  { name: 'Village', pop: 20, desc: 'Unlocks farms, bakeries, sawpits, taverns, the trading post, a manor, Timber Houses and workshop expansions.' },
   { name: 'Town', pop: 45, desc: 'Unlocks mines, bloomeries, blacksmiths, churches, Townhouses and town charters.' },
   { name: 'Borough', pop: 90, desc: 'Your lands prosper. A true seat of a lord!' },
-  { name: 'City', pop: 150, desc: 'A castle crowns your city. Songs are sung of your house across the realm.' },
+  { name: 'City', pop: 150, desc: 'Songs are sung of your town across the realm, and its manor may rise into a castle.' },
 ];
 
 export const TAX_LEVELS = [

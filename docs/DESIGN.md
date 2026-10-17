@@ -373,9 +373,9 @@ art, the logic and balance get this pass. Grouped by how deep each change goes.
 - [x] Trade with the outside world needs a Trading Post (its own building, separate from the market): buying, selling and the merchants' monthly visit
 
 ### Phase 37 — The manor and the town
-- [ ] The game starts without a manor; the town grows sizes by meeting conditions on its own, and the game pauses when it does
-- [ ] The manor is built by choice, anywhere: it gives bonuses and allows feasts and celebrations, and grows towards a castle, needing more room as it does
-- [ ] Specialised houses are built as such (not converted between each other), cost a lot, and get their own looks
+- [x] The game starts without a manor, in a settlers' camp (tents and a cart: shelter for eight and a store). The town grows sizes by itself when it meets the next one's needs: Village 20 people, a marketplace and a well; Town 45, a tavern and a trading post; Borough 90 and a church; City 150 and three charters. The game pauses when it does
+- [x] The manor is built by choice, anywhere, once (from Village): storage, prestige, feasts and festivals. Each level waits for a town size, and from the Stone Manor its grounds spread to 4×4 and then 5×5 onto ground that must be kept clear, with a courtyard, walls, and at the Castle, corner towers and a gatehouse
+- [x] Specialised houses are built as such: a home craft is a building project (15 timber, 25 planks, 2 tools, 40 coins, about 12 days) and the family keeps it for good. (Their own looks: the existing craft signs for now; more in the visual phase)
 
 ### Phase 38 — Herds
 - [ ] Each animal is bought separately, only once there is a trading post

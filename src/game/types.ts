@@ -102,6 +102,7 @@ export type BuildingType =
   | 'well'
   | 'market'
   | 'tradingpost'
+  | 'camp'
   | 'church'
   | 'cathedral'
   | 'guildhall'
@@ -146,6 +147,8 @@ export interface Building {
   carry?: number;
   /** Renovation progress 0..1 once materials are delivered. */
   upProgress?: number;
+  /** The craft a home's workshop is being built for. */
+  craftTo?: BuildingType;
   /** Goods made here and waiting in the yard for haulers. */
   stock?: Partial<Record<ResourceId, number>>;
   /** Haulers serve this workplace: its workers no longer walk to storage. */

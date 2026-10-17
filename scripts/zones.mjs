@@ -18,7 +18,7 @@ const info = await page.evaluate(() => {
   cl.playBot(s, 3.2, 5);
   s.res.gold += 500; s.res.wood += 100; s.res.planks += 40;
   // Animal farm + pasture, orchard lodge + orchard near the edge of town.
-  const hall = s.buildings.find((b) => b.type === 'townhall');
+  const hall = s.buildings.find((b) => (b.type === 'townhall' || b.type === 'camp'));
   const out = [];
   const tryAt = (fn, c = hall, r0 = 6) => { for (let r = r0; r < 26; r++) for (const [dx, dy] of [[r,0],[0,r],[-r,0],[0,-r],[r,r],[-r,r],[r,-r],[-r,-r]]) { const v = fn(c.x + dx, c.y + dy); if (v) return v; } return null; };
   const byre = tryAt((x, y) => cl.placementError(s, 'byre', x, y) ? null : cl.placeOrder(s, 'byre', x, y));

@@ -44,7 +44,7 @@ function monkey(s: GameState, seed: number) {
   const rng = new StateRng({ rngState: seed });
   const r = () => rng.next();
   const pick = <T,>(a: T[]): T => a[Math.floor(r() * a.length)];
-  const hall = s.buildings.find((b) => b.type === 'townhall')!;
+  const hall = s.buildings.find((b) => (b.type === 'townhall' || b.type === 'camp'))!;
   const near = () => ({ x: hall.x + Math.floor(r() * 31) - 15, y: hall.y + Math.floor(r() * 31) - 15 });
   const types = BUILD_ORDER.filter((t) => !BUILDINGS[t].zone) as BuildingType[];
   const actions: (() => unknown)[] = [

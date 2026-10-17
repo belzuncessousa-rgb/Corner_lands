@@ -42,6 +42,8 @@ import {
   setTrade,
   workDef,
   HOME_TRADES,
+  HOME_TRADE_COST,
+  tradeError,
   setYard,
   YARDS,
   zonesOf,
@@ -84,6 +86,7 @@ import {
   MARKET_DAY,
   yearGoal,
   yearGoalMet,
+  seatOf,
   yardTotal,
 } from '../game/sim';
 import type { Building, BuildingType, Category, Cost, GoodsGroup, ResourceId } from '../game/types';
@@ -931,7 +934,7 @@ export class Hud {
         const label = b.type === 'townhall' ? `Raise the manor to a ${plan.name}` : `Upgrade to ${plan.name}`;
         const what =
           b.type === 'townhall'
-            ? `Your settlement becomes a ${TIERS[plan.to - 1].name}, unlocking new buildings. More storage.`
+            ? `More storage and prestige${plan.to >= 3 ? ', and the grounds grow' : ''}.`
             : b.type === 'house'
               ? `Houses ${HOUSE_LEVELS[plan.to].housing} villagers and pays more taxes.`
               : `Room for ${Math.ceil(d.workers / 2)} more worker${Math.ceil(d.workers / 2) > 1 ? 's' : ''}.`;
@@ -1038,10 +1041,15 @@ export class Hud {
       rows.push(`<div class="kv"><span>Orchards</span><span>${orchards.length} · ${zoneArea(orchards)} tiles</span></div>`);
     }
     if (b.type === 'house' && b.build >= 1 && b.level >= 2) {
-      const trades = HOME_TRADES.filter((t) => isUnlocked(s, t));
-      rows.push(`<div class="kv product" data-tip="<b>Home craft</b><br>Members of the family work a craft from home, making half as much again as a common workshop. Setting up costs 6 timber and 6 planks."><span>Home craft</span><span class="seg">${[undefined, ...trades]
-        .map((t) => `<button data-action="trade-home" data-t="${t ?? ''}" class="${(b.trade ?? '') === (t ?? '') ? 'active' : ''}" data-tip="${t ? `<b>${esc(BUILDINGS[t].name)}</b><br>${esc(BUILDINGS[t].desc)}` : 'No craft: the family works wherever it is needed.'}">${t ? (ICONS[Object.keys(BUILDINGS[t].outputs)[0] as ResourceId] ?? '') : ''}${t ? BUILDINGS[t].name.split(' ')[0] : 'None'}</button>`)
-        .join('')}</span></div>`);
+      if (b.trade) {
+        rows.push(`<div class="kv"><span>Home craft</span><span>${ICONS[Object.keys(BUILDINGS[b.trade].outputs)[0] as ResourceId] ?? ''} ${esc(BUILDINGS[b.trade].name)} <small class="muted">for good</small></span></div>`);
+      } else if (!b.craftTo && !b.upgrading) {
+        const trades = HOME_TRADES.filter((t) => isUnlocked(s, t));
+        const cost = esc(costText(HOME_TRADE_COST));
+        rows.push(`<div class="kv product" data-tip="<b>Home craft</b><br>Build a workshop onto the house: the family works a craft from home for good, making half as much again as a common workshop. Costs ${cost}."><span>Home craft</span><span class="seg">${trades
+          .map((t) => `<button data-action="trade-home" data-t="${t}" ${tradeError(s, b, t) ? 'disabled' : ''} data-tip="<b>${esc(BUILDINGS[t].name)}</b><br>${esc(BUILDINGS[t].desc)}<br>Costs ${cost}. The family keeps it for good.">${ICONS[Object.keys(BUILDINGS[t].outputs)[0] as ResourceId] ?? ''}${BUILDINGS[t].name.split(' ')[0]}</button>`)
+          .join('')}</span></div>`);
+      }
     }
     if (b.type === 'house' && b.build >= 1) {
       const opts = [{ id: '', name: 'None', cost: {} as Cost, desc: 'Nothing but a woodpile.', tier: 0 }, ...Object.entries(YARDS).map(([id, y]) => ({ id, ...y }))];
@@ -1981,7 +1989,7 @@ export class Hud {
     c.drawImage(tiles, 0, 0, W * k, H * k);
     c.restore();
     // What a settler would ask about the land.
-    const hall = s.buildings.find((b) => b.type === 'townhall')!;
+    const hall = seatOf(s)!;
     const c0 = bCenter(hall);
     let near = 0;
     let rock = 0;
@@ -2389,6 +2397,7 @@ export class Hud {
 }
 
 function upgradeName(b: Building): string {
+  if (b.craftTo) return `a ${BUILDINGS[b.craftTo].name}`;
   const to = b.upgrading ?? b.level + 1;
   if (b.type === 'house') return HOUSE_LEVELS[to]?.name ?? '';
   if (b.type === 'townhall') return MANOR_LEVELS[to]?.name ?? '';

@@ -19,7 +19,7 @@ await page.evaluate((years) => {
   g.setSpeed(0);
   g.renderer.noteRenderTime = () => { g.renderer.light = false; };
   g.renderer.light = false;
-  const hall = s.buildings.find((b) => b.type === 'townhall');
+  const hall = s.buildings.find((b) => (b.type === 'townhall' || b.type === 'camp'));
   g.renderer.centerOn(hall.x + 2, hall.y + 2);
   g.renderer.cam.zoom = 1.15;
   g.hud.update();

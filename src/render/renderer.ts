@@ -1,7 +1,7 @@
 import { BUILDINGS, DAYS_PER_MONTH, DAYS_PER_YEAR, RESOURCE_STORAGE, STORAGE_CAPACITY, type StorageKind } from '../game/data';
 import { marketStalls, upgradeBlocker } from '../game/levels';
 import { hasCharter } from '../game/charters';
-import { HOME_TRADES, deliveredTo, hasProblem, isMarketDay, monthOf, nearestShoal, orchardMaturity, seasonOf, storageCap } from '../game/sim';
+import { HOME_TRADES, deliveredTo, hasProblem, isMarketDay, monthOf, nearestShoal, orchardMaturity, seasonOf, seatOf, storageCap } from '../game/sim';
 import type { Building, BuildingType, GameState, ResourceId, Season } from '../game/types';
 import { idx, inBounds } from '../game/world';
 import type { Agent } from './agents';
@@ -1072,7 +1072,10 @@ export class Renderer {
       this.drawWall(s, b);
       return;
     }
+    const grounds = b.type === 'townhall' && b.w > 3;
+    if (grounds) this.drawManorGrounds(b, season, 'ground');
     this.blit(sp, wx, wy);
+    if (grounds) this.drawManorGrounds(b, season, 'walls');
     if (turning) {
       const [hx, hy] = iso(b.x + 1.0, b.y + 1.42, 34);
       drawSails(c, hx, hy, this.time * 0.9 + b.id, season);
@@ -2735,6 +2738,61 @@ export class Renderer {
     c.globalAlpha = 1;
   }
 
+  /**
+   * A grown manor's grounds, beyond the hall in the back corner: a paved
+   * courtyard, then a garden wall (Stone Manor), a curtain wall (Lord's Keep)
+   * and corner towers and a gatehouse (Castle) along the front edges.
+   */
+  private drawManorGrounds(b: Building, season: Season, part: 'ground' | 'walls'): void {
+    const p = new Pen(this.ctx);
+    p.snow = season === 3;
+    const x0 = b.x;
+    const y0 = b.y;
+    const x1 = b.x + b.w;
+    const y1 = b.y + b.h;
+    if (part === 'ground') {
+      p.poly(
+        [
+          [x0 + 0.1, y0 + 0.1, 0],
+          [x1 - 0.1, y0 + 0.1, 0],
+          [x1 - 0.1, y1 - 0.1, 0],
+          [x0 + 0.1, y1 - 0.1, 0],
+        ],
+        season === 3 ? '#d8dcdc' : '#b8b0a0',
+      );
+      for (let x = x0 + 0.5; x < x1; x += 0.5) p.line([x, y0 + 0.1, 0], [x, y1 - 0.1, 0], 'rgba(90,80,65,0.15)', 0.5);
+      return;
+    }
+    const stone = b.level >= 4 ? '#9d978c' : '#a8a093';
+    const h = b.level >= 4 ? 16 : 7;
+    const t = 0.18;
+    // Front walls: along the far x edge and the far y edge, with a gate in the middle of the front.
+    const gate = (x0 + x1) / 2;
+    p.box(x1 - t, y0 + 0.1, x1, y1, 0, h, stone, undefined, 'stone');
+    p.box(x0 + 0.1, y1 - t, gate - 0.45, y1, 0, h, stone, undefined, 'stone');
+    p.box(gate + 0.45, y1 - t, x1, y1, 0, h, stone, undefined, 'stone');
+    if (b.level >= 4) {
+      // Crenels along the top.
+      for (let y = y0 + 0.2; y < y1 - 0.2; y += 0.3) p.box(x1 - t, y, x1, y + 0.15, h, 3, stone);
+      for (let x = x0 + 0.2; x < x1 - 0.2; x += 0.3) if (Math.abs(x + 0.07 - gate) > 0.5) p.box(x, y1 - t, x + 0.15, y1, h, 3, stone);
+    }
+    if (b.level >= 5) {
+      // Round-ish corner towers and a gatehouse.
+      for (const [tx, ty] of [
+        [x1 - 0.45, y0 + 0.05],
+        [x1 - 0.45, y1 - 0.45],
+        [x0 + 0.05, y1 - 0.45],
+      ] as const) {
+        p.box(tx, ty, tx + 0.45, ty + 0.45, 0, 34, stone, undefined, 'stone');
+        p.roofPyramid(tx - 0.03, ty - 0.03, tx + 0.48, ty + 0.48, 34, 16, 'slate');
+      }
+      p.box(gate - 0.55, y1 - 0.3, gate - 0.3, y1 + 0.05, 0, 26, stone, undefined, 'stone');
+      p.box(gate + 0.3, y1 - 0.3, gate + 0.55, y1 + 0.05, 0, 26, stone, undefined, 'stone');
+      p.box(gate - 0.55, y1 - 0.3, gate + 0.55, y1 + 0.05, 18, 8, stone, undefined, 'stone');
+      p.flag(x1 - 0.22, y1 - 0.22, 50, 22, '#a8322d');
+    }
+  }
+
   /** Market stalls by tile, rebuilt each frame. */
   private stallTiles = new Map<number, { b: Building; k: number; open: boolean }>();
 
@@ -2750,7 +2808,7 @@ export class Renderer {
     const month = monthOf(s.day);
     const d = s.day % DAYS_PER_MONTH;
     if ((month !== 2 && month !== 8) || d < 2 || d > 7) return -1;
-    const hall = s.buildings.find((b) => b.type === 'townhall' && b.build >= 1);
+    const hall = seatOf(s);
     if (!hall) return -1;
     const key = `${hall.id}:${Math.floor(s.day / DAYS_PER_MONTH)}`;
     if (this.festCache.key === key) return this.festCache.tile;

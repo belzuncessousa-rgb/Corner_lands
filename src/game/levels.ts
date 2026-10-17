@@ -2,13 +2,15 @@ import { BUILDINGS, TIERS } from './data';
 import {
   coveredBy,
   hasSupply,
-  hasBuilt,
+  HOME_TRADE_COST,
+  HOME_TRADE_DAYS,
   log,
   materialsOf,
   needsMaterials,
   recompute,
 } from './sim';
 import type { Building, BuildingType, Cost, GameState } from './types';
+import { idx, inBounds } from './world';
 
 /**
  * Building levels: houses grow as their needs are met, the manor grows with
@@ -41,6 +43,24 @@ export const MANOR_LEVELS: { name: string; cost?: Cost; days?: number }[] = [
   { name: "Lord's Keep", cost: { dressedstone: 80, stone: 40, planks: 60, tools: 15, gold: 400 }, days: 40 },
   { name: 'Castle', cost: { dressedstone: 160, stone: 80, planks: 60, tools: 25, weapons: 20, gold: 800, prestige: 150 }, days: 60 },
 ];
+
+/** The manor's grounds at each level: it needs more room as it grows. */
+export const MANOR_SIZE = [0, 3, 3, 4, 4, 5];
+/** The town size each manor level waits for. */
+export const MANOR_TIER = [0, 1, 1, 2, 3, 4];
+
+/** Whether the ground the manor would grow onto is clear. */
+export function roomToGrow(s: GameState, b: Building, size: number): boolean {
+  for (let y = b.y; y < b.y + size; y++) {
+    for (let x = b.x; x < b.x + size; x++) {
+      if (x < b.x + b.w && y < b.y + b.h) continue;
+      if (!inBounds(s, x, y)) return false;
+      const i = idx(s, x, y);
+      if (s.occ[i] >= 0 || s.terrain[i] || s.road[i] || s.rock[i] || s.ore[i]) return false;
+    }
+  }
+  return true;
+}
 
 /** Extra storage each manor level above the first provides. */
 export const MANOR_STORAGE_PER_LEVEL = { materials: 60, food: 50 };
@@ -146,12 +166,12 @@ export function upgradePlan(s: GameState, b: Building): UpgradePlan | null {
   if (b.type === 'townhall') {
     const next = MANOR_LEVELS[b.level + 1];
     if (!next?.cost) return null;
-    const tier = TIERS[b.level];
-    const reqs: Need[] = [{ label: `${tier.pop} villagers (${s.population})`, met: s.population >= tier.pop }];
-    if (b.level + 1 === 3) reqs.push({ label: 'A marketplace', met: hasBuilt(s, 'market') });
-    if (b.level + 1 === 4) reqs.push({ label: 'A church', met: hasBuilt(s, 'church') || hasBuilt(s, 'cathedral') });
-    if (b.level + 1 === 5) reqs.push({ label: 'Three town charters', met: (s.charters?.length ?? 0) >= 3 });
-    return { to: b.level + 1, name: next.name, cost: next.cost, days: next.days ?? 20, reqs };
+    const to = b.level + 1;
+    const tier = MANOR_TIER[to];
+    const size = MANOR_SIZE[to];
+    const reqs: Need[] = [{ label: `Settlement is a ${TIERS[tier].name}`, met: s.tier >= tier }];
+    if (size > b.w) reqs.push({ label: `Clear ground to grow to ${size}×${size}`, met: roomToGrow(s, b, size) });
+    return { to, name: next.name, cost: next.cost, days: next.days ?? 20, reqs };
   }
   if (UPGRADABLE_WORK.includes(b.type) && b.level < 2) {
     return {
@@ -193,6 +213,7 @@ export function startUpgrade(s: GameState, b: Building): boolean {
 
 /** Days of labour a renovation takes once materials are on site. */
 export function upgradeDays(b: Building): number {
+  if (b.craftTo) return HOME_TRADE_DAYS;
   if (b.type === 'townhall') return MANOR_LEVELS[b.upgrading ?? 2]?.days ?? 20;
   if (b.type === 'house') return 6 + (b.upgrading ?? 2) * 3;
   return 8;
@@ -200,6 +221,7 @@ export function upgradeDays(b: Building): number {
 
 /** Cost of the renovation in progress (for showing delivered materials). */
 export function upgradeCost(b: Building): Cost {
+  if (b.craftTo) return HOME_TRADE_COST;
   if (b.type === 'townhall') return MANOR_LEVELS[b.upgrading ?? 2]?.cost ?? {};
   if (b.type === 'house') return HOUSE_LEVELS[b.upgrading ?? 2]?.cost ?? {};
   return WORKPLACE_UPGRADE;
@@ -207,15 +229,35 @@ export function upgradeCost(b: Building): Cost {
 
 /** Called when a renovation finishes. */
 export function finishUpgrade(s: GameState, b: Building): void {
+  if (b.craftTo) {
+    // A home workshop: the family takes up its craft for good.
+    b.trade = b.craftTo;
+    b.craftTo = undefined;
+    b.upgrading = undefined;
+    b.upProgress = undefined;
+    b.upNote = undefined;
+    b.need = undefined;
+    b.recipe = undefined;
+    b.work = 0;
+    b.blocked = 0;
+    log(s, `A family opened its ${BUILDINGS[b.trade].name.toLowerCase()} at home.`, 'good', b);
+    s.dirty = true;
+    return;
+  }
   b.level = b.upgrading ?? b.level;
   b.upgrading = undefined;
   b.upProgress = undefined;
   b.upNote = undefined;
   b.need = undefined;
   if (b.type === 'townhall') {
-    s.tier = b.level - 1;
-    const t = TIERS[s.tier];
-    log(s, `The manor is now a ${MANOR_LEVELS[b.level].name}. Your settlement is a ${t.name}! ${t.desc}`, 'good', b);
+    // The grounds spread onto the ground kept clear for them.
+    const size = MANOR_SIZE[b.level] ?? b.w;
+    if (size > b.w && roomToGrow(s, b, size)) {
+      for (let y = b.y; y < b.y + size; y++) for (let x = b.x; x < b.x + size; x++) s.occ[idx(s, x, y)] = b.id;
+      b.w = size;
+      b.h = size;
+    }
+    log(s, `The manor is now a ${MANOR_LEVELS[b.level].name}.`, 'good', b);
   } else {
     log(s, `${buildingName(b)} finished.`, b.type === 'house' ? 'info' : 'good', b);
   }

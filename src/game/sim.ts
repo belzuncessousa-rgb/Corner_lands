@@ -38,7 +38,7 @@ import {
   isProject,
   upgradeCost,
   upgradeDays,
-  upgradePlan,
+  type Need,
   workersOf,
   buildingName,
 } from './levels';
@@ -182,6 +182,7 @@ export function placementError(s: GameState, type: BuildingType, x: number, y: n
     return 'Must be next to water';
   }
   if (type === 'cathedral' && s.buildings.some((b) => b.type === 'cathedral')) return 'Your town has its cathedral';
+  if (type === 'townhall' && s.buildings.some((b) => b.type === 'townhall')) return 'Your town has its manor';
   if (type === 'guildhall' && s.buildings.some((b) => b.type === 'guildhall')) return 'Your town has its guildhall';
   if (type === 'belltower' && s.buildings.some((b) => b.type === 'belltower')) return 'Your town has its bell tower';
   if ((d.cost.gold ?? 0) > s.res.gold) return 'Not enough coins';
@@ -417,7 +418,7 @@ export function layRoads(s: GameState, days: number): number {
 }
 
 export function demolish(s: GameState, b: Building): boolean {
-  if (b.type === 'townhall') return false;
+  if (b.type === 'townhall' && b.build >= 1) return false;
   const d = BUILDINGS[b.type];
   // Sites return what was delivered (and the gold); finished buildings half.
   if (b.build >= 1) {
@@ -757,10 +758,10 @@ export function coveredBy(s: GameState, b: Building, type: BuildingType): boolea
 
 // ---------------------------------------------------------------- travel
 
-/** Road tiles linked to the manor hall (used by the autoplayer's planning). */
+/** Road tiles linked to the town's seat (used by the autoplayer's planning). */
 export function reachableRoads(s: GameState): Uint8Array {
   const reached = new Uint8Array(s.width * s.height);
-  const hall = s.buildings.find((b) => b.type === 'townhall');
+  const hall = seatOf(s);
   const queue: number[] = [];
   if (hall) {
     forPerimeter(s, hall, (i) => {
@@ -1047,8 +1048,10 @@ export function recompute(s: GameState): void {
 
 /** Crafts a family may take up at home. */
 export const HOME_TRADES: BuildingType[] = ['bakery', 'brewhouse', 'dairy', 'weaver', 'tailor', 'tanner', 'apothecary'];
-/** Setting up a home workshop. */
-export const HOME_TRADE_COST: Cost = { wood: 6, planks: 6 };
+/** Turning a home into a craftsman's house: a workshop built on, carried in by builders. */
+export const HOME_TRADE_COST: Cost = { wood: 15, planks: 25, tools: 2, gold: 40 };
+/** Days of building work to add a home workshop. */
+export const HOME_TRADE_DAYS = 12;
 /** A family working from home produces this much more than a common workshop. */
 export const HOME_TRADE_BONUS = 1.5;
 
@@ -1060,23 +1063,29 @@ export function workDef(b: Building): BuildingDef {
 /** Why a home cannot take up a craft, or null. */
 export function tradeError(s: GameState, b: Building, trade: BuildingType | undefined): string | null {
   if (b.type !== 'house' || b.build < 1) return 'Only homes';
-  if (!trade) return null;
+  if (b.trade) return `This family keeps its ${BUILDINGS[b.trade].name.toLowerCase()} for good`;
+  if (b.craftTo || b.upgrading) return 'Builders are already at work here';
+  if (!trade) return 'Choose a craft';
   if (!HOME_TRADES.includes(trade)) return 'Not a home craft';
   if (b.level < 2) return 'Only Timber Houses and Townhouses';
   if (!isUnlocked(s, trade)) return `Requires ${TIERS[BUILDINGS[trade].tier].name}`;
-  if (b.trade !== trade && !canAfford(s, HOME_TRADE_COST)) return 'Needs 6 timber and 6 planks';
+  if (s.res.gold < (HOME_TRADE_COST.gold ?? 0)) return `Needs ${HOME_TRADE_COST.gold} coins`;
   return null;
 }
 
-/** Sets the family to work a craft from home (or gives it up). */
+/**
+ * Builds a workshop onto a home for the family to work a craft: coins now,
+ * materials carried in by builders, and the craft is the family's for good.
+ */
 export function setTrade(s: GameState, b: Building, trade: BuildingType | undefined): string | null {
   const err = tradeError(s, b, trade);
   if (err) return err;
-  if (trade && trade !== b.trade) pay(s, HOME_TRADE_COST);
-  b.trade = trade;
-  b.recipe = undefined;
-  b.work = 0;
-  b.blocked = 0;
+  s.res.gold -= HOME_TRADE_COST.gold ?? 0;
+  b.craftTo = trade;
+  b.upgrading = b.level;
+  b.upProgress = 0;
+  b.need = materialsOf(HOME_TRADE_COST);
+  b.carry = 0;
   recompute(s);
   return null;
 }
@@ -3027,19 +3036,54 @@ export function checkMilestones(s: GameState): void {
   }
 }
 
-/** The settlement's rank follows the manor's level. */
-export function updateTier(s: GameState): void {
-  const hall = s.buildings.find((b) => b.type === 'townhall');
-  if (hall) s.tier = Math.max(0, Math.min(TIERS.length - 1, hall.level - 1));
+/**
+ * What a town needs to grow to each size: people, and the places a town of
+ * that size would have. Met, the town grows at the start of the next month.
+ */
+export function rankNeeds(s: GameState, tier: number): Need[] {
+  const t = TIERS[tier];
+  if (!t) return [];
+  const has = (type: BuildingType) => s.buildings.some((b) => (b.type === type || (type === 'church' && b.type === 'cathedral')) && b.build >= 1);
+  const out: Need[] = [{ label: `${t.pop} villagers (${s.population})`, met: s.population >= t.pop }];
+  if (tier === 1) {
+    out.push({ label: 'A marketplace', met: has('market') });
+    out.push({ label: 'A well', met: has('well') });
+  }
+  if (tier === 2) {
+    out.push({ label: 'A tavern', met: has('tavern') });
+    out.push({ label: 'A trading post', met: has('tradingpost') });
+  }
+  if (tier === 3) out.push({ label: 'A church', met: has('church') });
+  if (tier === 4) out.push({ label: 'Three town charters', met: (s.charters?.length ?? 0) >= 3 });
+  return out;
 }
 
-/** Requirements for raising the manor (and so the settlement), for the UI. */
+/** The town grows a size once it meets the next one's needs (never shrinks). */
+export function updateTier(s: GameState): void {
+  while (s.tier < TIERS.length - 1 && rankNeeds(s, s.tier + 1).every((n) => n.met)) {
+    s.tier++;
+    const t = TIERS[s.tier];
+    log(s, `Your settlement is now a ${t.name}! ${t.desc}`, 'good');
+  }
+}
+
+/** Requirements for the town's next size, for the UI. */
 export function nextTierRequirements(s: GameState): string[] {
-  const hall = s.buildings.find((b) => b.type === 'townhall');
-  if (!hall || s.tier >= TIERS.length - 1) return [];
-  const plan = upgradePlan(s, hall);
-  if (!plan) return [];
-  return [...plan.reqs.map((r) => `${r.label}${r.met ? ' ✓' : ''}`), `then raise the manor`];
+  if (s.tier >= TIERS.length - 1) return [];
+  return rankNeeds(s, s.tier + 1).map((r) => `${r.label}${r.met ? ' ✓' : ''}`);
+}
+
+/**
+ * The heart of the town that roads and the autoplayer reckon from: the manor
+ * once built, else the settlers' camp, else the first home.
+ */
+export function seatOf(s: GameState): Building | undefined {
+  return (
+    s.buildings.find((b) => b.type === 'townhall' && b.build >= 1) ??
+    s.buildings.find((b) => b.type === 'camp') ??
+    s.buildings.find((b) => b.type === 'townhall') ??
+    s.buildings.find((b) => b.type === 'house')
+  );
 }
 
 // ---------------------------------------------------------------- main step

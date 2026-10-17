@@ -20,7 +20,7 @@ const tileXY = (x, y) => page.evaluate(([x, y]) => window.game.renderer.tileToSc
 /** Clicks so that a size x size building lands with its corner on (x, y). */
 const placeAt = async (x, y, size) => { const [sx, sy] = await page.evaluate(([x, y, n]) => window.game.renderer.tileToScreen(x + n / 2, y + n / 2), [x, y, size]); await page.mouse.move(sx, sy); await page.mouse.click(sx, sy); await page.waitForTimeout(150); };
 const clickTile = async (x, y) => { const [sx, sy] = await tileXY(x, y); await page.mouse.move(sx, sy); await page.mouse.click(sx, sy); await page.waitForTimeout(150); };
-const hall = await page.evaluate(() => { const h = window.game.state.buildings.find((b) => b.type === 'townhall'); return { x: h.x, y: h.y }; });
+const hall = await page.evaluate(() => { const h = window.game.state.buildings.find((b) => (b.type === 'townhall' || b.type === 'camp')); return { x: h.x, y: h.y }; });
 const pick = async (cat, type) => {
   if (!(await page.$(`#buildbar [data-type="${type}"]`))) await page.click(`[data-cat="${cat}"]`);
   await page.click(`#buildbar [data-type="${type}"]`);
@@ -131,6 +131,9 @@ check('keep hens in the backyard', (await page.evaluate((id) => window.game.stat
 await page.evaluate((id) => { const b = window.game.state.buildings.find((x) => x.id === id); b.level = 2; window.game.hud.update(); }, houseId);
 await page.waitForTimeout(300);
 await page.click('#inspector [data-action="trade-home"][data-t="weaver"]');
+check('start a weaving workshop at home', (await page.evaluate((id) => window.game.state.buildings.find((b) => b.id === id).craftTo, houseId)) === 'weaver');
+// Builders add the workshop; the craft is the family's for good.
+await page.evaluate(() => { const s = window.game.state; s.res.planks += 40; s.res.wood += 40; s.res.tools += 4; for (let i = 0; i < 25; i++) window.cl.stepDay(s); });
 check('take up weaving at home', (await page.evaluate((id) => window.game.state.buildings.find((b) => b.id === id).trade, houseId)) === 'weaver');
 await page.keyboard.press('Escape');
 // Grant a charter through the charter screen.
@@ -143,14 +146,14 @@ await page.click('[data-action="close-modal"]');
 // With a trading post, the manor's store panel sells planks above the stock target.
 const sale = await page.evaluate(() => {
   const s = window.game.state;
-  const h = s.buildings.find((b) => b.type === 'townhall');
+  const h = s.buildings.find((b) => (b.type === 'townhall' || b.type === 'camp'));
   let m = null;
   for (let r = 3; r < 20 && !m; r++) for (const [dx, dy] of [[r, 0], [0, r], [-r, 0], [0, -r], [r, r], [-r, -r]]) if (!m && !window.cl.placementError(s, 'tradingpost', h.x + dx, h.y + dy)) m = window.cl.placeOrder(s, 'tradingpost', h.x + dx, h.y + dy);
   m.build = 1;
   m.need = undefined;
   window.cl.recompute(s);
   s.res.planks = window.cl.keepOf(s, 'planks') + 40;
-  window.game.select(s.buildings.find((b) => b.type === 'townhall').id);
+  window.game.select(s.buildings.find((b) => (b.type === 'townhall' || b.type === 'camp')).id);
   window.game.hud.update();
   return { planks: s.res.planks, gold: s.res.gold };
 });
@@ -159,8 +162,22 @@ await page.screenshot({ path: process.env.SHOT || '/tmp/claude-0/store.png', cli
 await page.click('#inspector [data-action="store-sell"][data-res="planks"]');
 const after = await page.evaluate(() => ({ planks: window.game.state.res.planks, gold: window.game.state.res.gold }));
 check('sell surplus from the store panel', after.planks === sale.planks - 40 && after.gold > sale.gold, JSON.stringify([sale, after]));
-// Call a harvest feast from the manor in autumn.
-await page.evaluate(() => { const s = window.game.state; s.day = 6 * 10 + 1; s.res.bread = 200; window.game.hud.update(); });
+// Build a manor (once the town is a Village) and call a harvest feast from it in autumn.
+await page.evaluate(() => {
+  const s = window.game.state;
+  s.tier = Math.max(s.tier, 1);
+  s.res.gold += 200;
+  const c = s.buildings.find((b) => b.type === 'camp');
+  let m = null;
+  for (let r = 4; r < 24 && !m; r++) for (const [dx, dy] of [[r, 0], [0, r], [-r, 0], [0, -r], [r, r], [-r, -r], [r, -r], [-r, r]]) if (!m && !window.cl.placementError(s, 'townhall', c.x + dx, c.y + dy)) m = window.cl.placeOrder(s, 'townhall', c.x + dx, c.y + dy);
+  m.build = 1;
+  m.need = undefined;
+  window.cl.recompute(s);
+  window.game.select(m.id);
+  s.day = 6 * 10 + 1;
+  s.res.bread = 200;
+  window.game.hud.update();
+});
 await page.waitForTimeout(300);
 await page.click('#inspector [data-action="feast"]');
 check('call a harvest feast', (await page.evaluate(() => window.game.state.lastFeast)) === 0);
@@ -199,6 +216,8 @@ check('reach overlay toggles', reach === 'well' && (await page.evaluate(() => wi
 // A long game: once the chronicle is full, new news still shows.
 const late = await page.evaluate(() => {
   const g = window.game;
+  // Warnings outrank good news on screen: start from a clear log.
+  document.querySelectorAll('#log .msg').forEach((e) => e.remove());
   for (let i = 0; i < 60; i++) { window.cl.log(g.state, `Old news ${i}`, 'good'); g.hud.update(); }
   window.cl.log(g.state, 'Fresh news after a long game', 'good');
   g.hud.update();

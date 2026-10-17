@@ -1,6 +1,6 @@
 import { BUILDINGS, DAY_SECONDS, GATHER_REACH, GATHERERS, OFFROAD_TILES_PER_DAY, RESOURCE_STORAGE, ROAD_TILES_PER_DAY, STONE_ROAD_TILES_PER_DAY, STORAGE_CAPACITY } from '../game/data';
 import { findPath } from '../game/path';
-import { chooseRecipe, doorTile, forTilesInRadius, bCenter, isMarketDay, isWinter, MARKET_DAY, nearestHerd, needsMaterials } from '../game/sim';
+import { chooseRecipe, doorTile, forTilesInRadius, bCenter, isMarketDay, isWinter, MARKET_DAY, nearestHerd, needsMaterials, seatOf } from '../game/sim';
 import type { Building, GameState, ResourceId } from '../game/types';
 import { getBuilding, idx, inBounds } from '../game/world';
 
@@ -179,7 +179,7 @@ export class AgentSystem {
   }
 
   private hallDoor(s: GameState): { x: number; y: number } {
-    const hall = s.buildings.find((b) => b.type === 'townhall');
+    const hall = seatOf(s);
     return hall ? doorTile(s, hall) : { x: s.width >> 1, y: s.height >> 1 };
   }
 

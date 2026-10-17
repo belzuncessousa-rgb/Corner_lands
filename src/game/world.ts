@@ -196,8 +196,9 @@ export function generateWorld(seed: number, opts: { relaxed?: boolean; hardy?: b
 
   seedNature(s, site, rand);
 
-  // --- The manor hall and a stub of road.
-  const hall = makeBuilding(s.nextId++, 'townhall', site.x, site.y);
+  // --- The settlers' camp and a stub of road.
+  // The settlers' camp: tents and their cart. The manor, if any, comes later.
+  const hall = makeBuilding(s.nextId++, 'camp', site.x, site.y);
   hall.build = 1;
   placeBuilding(s, hall);
   const roadY = site.y + 3;

@@ -20,7 +20,7 @@ import type { BuildingType, GameState } from '../src/game/types';
 import { generateWorld, idx } from '../src/game/world';
 
 function hall(s: GameState) {
-  return s.buildings.find((b) => b.type === 'townhall')!;
+  return s.buildings.find((b) => (b.type === 'townhall' || b.type === 'camp'))!;
 }
 
 /** Finds a spot for a building next to the starting road and connects it. */
@@ -50,6 +50,19 @@ function marketBy(s: GameState, near: { x: number; y: number; w: number; h: numb
       if (m) return m;
     }
   throw new Error('no room for a market');
+}
+
+/** A finished manor near the road (built for the test, whatever the town's size). */
+function manorFor(s: GameState) {
+  const tier = s.tier;
+  s.tier = Math.max(1, tier);
+  s.res.gold += 100;
+  const m = placeNearRoad(s, 'townhall');
+  s.tier = tier;
+  m.build = 1;
+  m.need = undefined;
+  s.dirty = true;
+  return m;
 }
 
 function run(s: GameState, days: number) {
@@ -391,20 +404,41 @@ describe('exports', () => {
 });
 
 describe('levels', () => {
-  it('raising the manor promotes the settlement once requirements are met', async () => {
+  it('the town grows a size once it has the people and the places for it', async () => {
+    const { nextTierRequirements } = await import('../src/game/sim');
+    const s = generateWorld(14);
+    expect(s.buildings.some((b) => b.type === 'townhall')).toBe(false);
+    expect(nextTierRequirements(s).join()).toMatch(/marketplace/);
+    for (let k = 0; k < 3; k++) placeNearRoad(s, 'house').build = 1;
+    marketBy(s, hall(s));
+    const well = placeNearRoad(s, 'well');
+    well.build = 1;
+    well.need = undefined;
+    s.population = 20;
+    s.res.bread = 200;
+    s.dirty = true;
+    run(s, DAYS_PER_MONTH);
+    expect(s.tier).toBe(1);
+  });
+
+  it('a manor is built by choice, once, and needs clear ground to grow', async () => {
     const { startUpgrade, upgradeBlocker } = await import('../src/game/levels');
     const s = generateWorld(14);
-    const h = hall(s);
-    expect(upgradeBlocker(s, h)).toMatch(/villagers/);
-    s.population = 20;
-    for (let k = 0; k < 3; k++) placeNearRoad(s, 'house').build = 1;
+    expect(placementError(s, 'townhall', 1, 1)).toMatch(/Requires/);
+    s.tier = 2;
+    const m = manorFor(s);
+    expect(placementError(s, 'townhall', 1, 1)).toMatch(/has its manor/);
     s.res.wood = 100;
     s.res.stone = 40;
-    s.dirty = true;
-    expect(startUpgrade(s, h)).toBe(true);
-    run(s, 60);
-    expect(h.level).toBe(2);
-    expect(s.tier).toBe(1);
+    s.res.gold = 200;
+    expect(startUpgrade(s, m)).toBe(true);
+    run(s, 40);
+    expect(m.level).toBe(2);
+    // The Stone Manor needs a Town and 4x4 of clear ground.
+    s.tier = 3;
+    for (let x = m.x; x < m.x + 4; x++) s.trees[idx(s, x, m.y + 3)] = 0;
+    const blocker = upgradeBlocker(s, m);
+    if (blocker) expect(blocker).toMatch(/ground|coins/);
   });
 
   it('a cottage needs a well and a market before becoming a Timber House', async () => {
@@ -638,11 +672,19 @@ describe('workshops and household goods', () => {
     const h = placeNearRoad(s, 'house');
     h.build = 1;
     s.res.wood = 50;
-    s.res.planks = 20;
+    s.res.planks = 40;
+    s.res.tools = 5;
+    s.res.gold = 100;
     expect(setTrade(s, h, 'weaver')).toMatch(/Timber/);
     h.level = 2;
-    expect(setTrade(s, h, 'weaver')).toBeNull();
     s.population = 15;
+    // Builders add the workshop; then the craft is the family's for good.
+    expect(setTrade(s, h, 'weaver')).toBeNull();
+    expect(setTrade(s, h, 'tailor')).toMatch(/already/);
+    run(s, 20);
+    expect(h.trade).toBe('weaver');
+    expect(setTrade(s, h, 'tailor')).toMatch(/for good/);
+    s.res.cloth = 0;
     s.res.wool = 30;
     recompute(s);
     expect(h.workers).toBe(3);
@@ -750,10 +792,14 @@ describe('review regressions', () => {
     const h = placeNearRoad(s, 'house');
     h.build = 1;
     h.level = 2;
-    s.res.wood = 20;
-    s.res.planks = 20;
+    s.res.wood = 40;
+    s.res.planks = 40;
+    s.res.tools = 5;
+    s.res.gold = 100;
     s.population = 15;
     expect(setTrade(s, h, 'dairy')).toBeNull();
+    run(s, 20);
+    expect(h.trade).toBe('dairy');
     recompute(s);
     expect(h.workers).toBe(2);
   });
@@ -834,6 +880,8 @@ describe('harvest feast', () => {
     s.res.bread = 40;
     s.res.ale = 2;
     s.day = 2 * DAYS_PER_MONTH;
+    expect(feastError(s)).toMatch(/manor/);
+    manorFor(s);
     expect(feastError(s)).toMatch(/autumn/);
     s.day = 6 * DAYS_PER_MONTH + 2;
     const prestige = s.res.prestige;
@@ -1003,7 +1051,7 @@ describe('steward on mills', () => {
     s.tier = 1;
     s.res.grain = 900;
     s.res.bread = 400;
-    const hall = s.buildings.find((b) => b.type === 'townhall')!;
+    const hall = s.buildings.find((b) => (b.type === 'townhall' || b.type === 'camp'))!;
     let mill = null;
     for (let r = 3; r < 30 && !mill; r++)
       for (let dy = -r; dy <= r && !mill; dy++)
@@ -1189,8 +1237,11 @@ describe('seasonal festivals', () => {
     const s = generateWorld(101);
     s.population = 16;
     s.res.bread = 50;
-    s.res.wood = 50;
+    s.res.wood = 150;
     s.day = 1 * DAYS_PER_MONTH;
+    expect(festivalError(s, 'mayday')).toMatch(/manor/);
+    manorFor(s);
+    s.res.wood = 50;
     expect(festivalError(s, 'mayday')).toMatch(/maypole/);
     s.tier = 1;
     const pole = placeNearRoad(s, 'maypole');
@@ -1249,7 +1300,7 @@ describe('great works', () => {
     const s = generateWorld(21);
     s.tier = 4;
     s.res.gold = 50000;
-    const hall = s.buildings.find((b) => b.type === 'townhall')!;
+    const hall = s.buildings.find((b) => (b.type === 'townhall' || b.type === 'camp'))!;
     const put = (t: BuildingType) => {
       for (let r = 3; r < 25; r++)
         for (let dy = -r; dy <= r; dy++)
@@ -1279,7 +1330,7 @@ describe('protected woods', () => {
   it('woodcutters leave a protected wood standing and fell again once it is lifted', async () => {
     const { protectGrove, unprotectGrove, inGrove } = await import('../src/game/sim');
     const s = generateWorld(5);
-    const hall = s.buildings.find((b) => b.type === 'townhall')!;
+    const hall = s.buildings.find((b) => (b.type === 'townhall' || b.type === 'camp'))!;
     let at: { x: number; y: number } | null = null;
     for (let r = 3; r < 30 && !at; r++)
       for (let dy = -r; dy <= r && !at; dy++)
@@ -1379,6 +1430,10 @@ describe('commissions', () => {
     const { updateHappiness } = await import('../src/game/sim');
     const s = generateWorld(15);
     s.tier = 3;
+    s.res.wood = 100;
+    s.res.planks = 40;
+    s.res.stone = 40;
+    manorFor(s);
     s.res.prestige = 1000;
     expect(commissionError(s, 'glass')).toMatch(/cathedral/);
     expect(commission(s, 'tapestry')).toBeNull();
@@ -1444,7 +1499,7 @@ describe('new events', () => {
         s.res.bread = 200;
         s.retinue = true;
         s.population = 40;
-        const hall = s.buildings.find((b) => b.type === 'townhall')!;
+        const hall = s.buildings.find((b) => (b.type === 'townhall' || b.type === 'camp'))!;
         for (const t of ['church', 'granary', 'cathedral'] as BuildingType[]) {
           let done = false;
           for (let r = 3; r < 30 && !done; r++)

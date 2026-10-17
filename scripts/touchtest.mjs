@@ -12,7 +12,7 @@ await page.click('text=New Settlement');
 await page.fill('#seed', '4242');
 await page.click('text=Found the Settlement');
 await page.waitForTimeout(600);
-const hall = await page.evaluate(() => { const g = window.game; g.setSpeed(0); const h = g.state.buildings.find((b) => b.type === 'townhall'); g.renderer.centerOn(h.x + 1.5, h.y + 1.5); return window.game.renderer.tileToScreen(h.x + 1.5, h.y + 1.5); });
+const hall = await page.evaluate(() => { const g = window.game; g.setSpeed(0); const h = g.state.buildings.find((b) => (b.type === 'townhall' || b.type === 'camp')); g.renderer.centerOn(h.x + 1.5, h.y + 1.5); return window.game.renderer.tileToScreen(h.x + 1.5, h.y + 1.5); });
 const cdp = await ctx.newCDPSession(page);
 const touch = async (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
 // A tap that wobbles 9 px.

@@ -16,7 +16,7 @@ await page.waitForTimeout(500);
 const result = await page.evaluate(() => {
   const { game, cl } = window;
   const s = game.state;
-  const hall = s.buildings.find((b) => b.type === 'townhall');
+  const hall = s.buildings.find((b) => (b.type === 'townhall' || b.type === 'camp'));
   const ry = hall.y + 3;
   const placed = [];
   // Extend the main road both ways and add a cross street.

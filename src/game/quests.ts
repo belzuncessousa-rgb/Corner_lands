@@ -16,7 +16,7 @@ export const QUESTS: Quest[] = [
   {
     id: 'houses',
     title: 'Build 2 houses',
-    hint: 'Place Burgage Houses near the Manor Hall. Idle villagers will carry the timber and build them.',
+    hint: "Place Burgage Houses near the settlers' camp. Idle villagers will carry the timber and build them.",
     reward: { wood: 20 },
     done: (s) => count(s, 'house') >= 2,
   },
@@ -93,7 +93,7 @@ export const QUESTS: Quest[] = [
   {
     id: 'village',
     title: 'Become a Village',
-    hint: 'Reach 20 villagers, then select the Manor Hall and raise it to a Manor House.',
+    hint: 'Reach 20 villagers with a marketplace and a well: the hamlet then grows into a Village by itself.',
     reward: { gold: 60 },
     done: (s) => s.tier >= 1,
   },
@@ -170,7 +170,7 @@ export const QUESTS: Quest[] = [
   {
     id: 'town',
     title: 'Become a Town',
-    hint: "With 45 villagers and a marketplace, raise the manor to a Stone Manor. A Stonemason's Yard squares the stone it needs.",
+    hint: 'Reach 45 villagers with a tavern and a trading post: the village then grows into a Town.',
     reward: { gold: 100 },
     done: (s) => s.tier >= 2,
   },
@@ -198,7 +198,7 @@ export const QUESTS: Quest[] = [
   {
     id: 'borough',
     title: 'Become a Borough',
-    hint: "With 90 villagers and a church, raise the manor to a Lord's Keep.",
+    hint: 'Reach 90 villagers with a church: the town then grows into a Borough.',
     reward: { gold: 200 },
     done: (s) => s.tier >= 3,
   },

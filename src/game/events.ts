@@ -106,6 +106,7 @@ export function festivalError(s: GameState, id: string): string | null {
   const f = FESTIVALS.find((x) => x.id === id);
   if (!f) return 'Unknown festival';
   const month = Math.floor(s.day / DAYS_PER_MONTH) % 12;
+  if (!s.buildings.some((b) => b.type === 'townhall' && b.build >= 1)) return 'Festivals are held by a manor';
   if (!f.months.includes(month)) return f.id === 'mayday' ? 'Held in spring' : 'Held at midsummer';
   if (f.needs && !s.buildings.some((b) => b.type === f.needs && b.build >= 1)) return 'Needs a maypole (Decor)';
   if (s.festivals?.[id] === Math.floor(s.day / DAYS_PER_YEAR)) return 'Already held this year';
@@ -229,6 +230,7 @@ export function commission(s: GameState, id: string): string | null {
 
 /** Why the lord cannot call a feast now, or null. */
 export function feastError(s: GameState): string | null {
+  if (!s.buildings.some((b) => b.type === 'townhall' && b.build >= 1)) return 'Feasts are held at a manor';
   if (!FEAST_MONTHS.includes(Math.floor(s.day / DAYS_PER_MONTH) % 12)) return 'In autumn, after the harvest';
   if (s.lastFeast === Math.floor(s.day / DAYS_PER_YEAR)) return 'There has been a feast this year';
   if (s.population < 8) return 'Too few villagers';

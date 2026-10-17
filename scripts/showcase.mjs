@@ -21,7 +21,7 @@ const placed = await page.evaluate(() => {
   s.tier = 4;
   s.commissions = ['tapestry', 'glass'];
   s.population = 60;
-  const hall = s.buildings.find((b) => b.type === 'townhall');
+  const hall = s.buildings.find((b) => (b.type === 'townhall' || b.type === 'camp'));
   const ry = hall.y + 3;
   for (let x = hall.x - 16; x <= hall.x + 16; x++) cl.buildRoad(s, x, ry);
   for (let y = ry - 12; y <= ry + 12; y++) { cl.buildRoad(s, hall.x + 5, y); cl.buildRoad(s, hall.x - 6, y); }

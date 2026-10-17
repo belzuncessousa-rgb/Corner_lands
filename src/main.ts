@@ -27,6 +27,7 @@ import {
   recompute,
   removeRoad,
   nearestResource,
+  seatOf,
   resourceInRange,
   roadError,
   zoneError,
@@ -202,7 +203,7 @@ export class Game {
   }
 
   private resetView(): void {
-    const hall = this.state.buildings.find((b) => b.type === 'townhall');
+    const hall = seatOf(this.state);
     const c = hall ? bCenter(hall) : { x: this.state.width / 2, y: this.state.height / 2 };
     this.renderer.centerOn(c.x, c.y + 2);
     this.renderer.cam.zoom = window.innerWidth < 700 ? 0.8 : 1.1;
@@ -1025,7 +1026,7 @@ export class Game {
   /** Slow circling pan over the demo village. */
   private driftCamera(dt: number): void {
     this.demoTime += dt;
-    const hall = this.state.buildings.find((b) => b.type === 'townhall');
+    const hall = seatOf(this.state);
     if (!hall) return;
     const t = this.demoTime * 0.04;
     this.renderer.centerOn(hall.x + 1.5 + Math.cos(t) * 7, hall.y + 1.5 + Math.sin(t) * 7);
