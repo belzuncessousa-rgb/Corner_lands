@@ -268,9 +268,17 @@ export class AgentSystem {
       const here = idx(s, Math.floor(a.x), Math.floor(a.y));
       let move = dt * (s.road[here] === 2 ? PAVED_SPEED : s.road[here] ? ROAD_SPEED : OFFROAD_SPEED) * (a.carry ? 0.85 : 1);
       while (move > 0 && a.path.length) {
+        // Walk from the middle of one step to the middle of the next: each
+        // leg stays inside one tile of the path, and a staircase of tiles
+        // (a road at an angle) becomes a straight walk instead of a zig-zag.
         const t = a.path[0];
-        const tx = (t % s.width) + 0.5;
-        const ty = Math.floor(t / s.width) + 0.5;
+        let tx = (t % s.width) + 0.5;
+        let ty = Math.floor(t / s.width) + 0.5;
+        if (a.path.length > 1) {
+          const u = a.path[1];
+          tx = (tx + (u % s.width) + 0.5) / 2;
+          ty = (ty + Math.floor(u / s.width) + 0.5) / 2;
+        }
         const dx = tx - a.x;
         const dy = ty - a.y;
         const d = Math.hypot(dx, dy);
