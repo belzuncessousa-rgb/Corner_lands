@@ -101,6 +101,7 @@ export type BuildingType =
   | 'armoury'
   | 'well'
   | 'market'
+  | 'tradingpost'
   | 'church'
   | 'cathedral'
   | 'guildhall'
@@ -221,6 +222,10 @@ export interface MonthReport {
   trade?: number;
   /** Villagers fed on pottage (grain or oats boiled whole) last month. */
   pottage?: number;
+  /** Villagers out of reach of a staffed market last month. */
+  unserved?: number;
+  /** Share of working time spent on errands (market, well, church, tavern). */
+  errands?: number;
 }
 
 /** One month's snapshot for the ledger charts. */

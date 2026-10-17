@@ -140,12 +140,12 @@ await page.click('[data-action="charter-sel"][data-id="farm1"]');
 await page.click('[data-action="charter-grant"]');
 check('grant a charter', (await page.evaluate(() => window.game.state.charters?.includes('farm1'))) === true);
 await page.click('[data-action="close-modal"]');
-// The manor's store panel sells planks above the stock target.
+// With a trading post, the manor's store panel sells planks above the stock target.
 const sale = await page.evaluate(() => {
   const s = window.game.state;
   const h = s.buildings.find((b) => b.type === 'townhall');
   let m = null;
-  for (let r = 3; r < 20 && !m; r++) for (const [dx, dy] of [[r, 0], [0, r], [-r, 0], [0, -r], [r, r], [-r, -r]]) if (!m && !window.cl.placementError(s, 'market', h.x + dx, h.y + dy)) m = window.cl.placeOrder(s, 'market', h.x + dx, h.y + dy);
+  for (let r = 3; r < 20 && !m; r++) for (const [dx, dy] of [[r, 0], [0, r], [-r, 0], [0, -r], [r, r], [-r, -r]]) if (!m && !window.cl.placementError(s, 'tradingpost', h.x + dx, h.y + dy)) m = window.cl.placeOrder(s, 'tradingpost', h.x + dx, h.y + dy);
   m.build = 1;
   m.need = undefined;
   window.cl.recompute(s);

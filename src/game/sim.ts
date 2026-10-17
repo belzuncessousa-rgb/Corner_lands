@@ -264,7 +264,8 @@ export function placeZone(s: GameState, type: BuildingType, x0: number, y0: numb
 function assignOwners(s: GameState): void {
   for (const z of s.buildings) {
     const zd = BUILDINGS[z.type].zone;
-    if (!zd) continue;
+    // A marketplace tends itself.
+    if (!zd || zd.owner === z.type) continue;
     const c = bCenter(z);
     let best: Building | undefined;
     let bestD = Infinity;
@@ -465,7 +466,7 @@ export function sellPrice(s: GameState, id: ResourceId, n: number): number {
 }
 
 export function trade(s: GameState, id: ResourceId, amount: number): string | null {
-  if (!hasBuilt(s, 'market')) return 'Requires a marketplace';
+  if (!hasBuilt(s, 'tradingpost')) return 'Requires a trading post';
   if (!priceOf(s, id)) return 'Cannot trade this';
   if (amount > 0) {
     const cost = buyPrice(s, id, amount);
@@ -549,6 +550,8 @@ export function hasLuxury(s: GameState, b: Building): boolean {
 function supplyHomes(s: GameState): void {
   for (const b of s.buildings) {
     if (b.type !== 'house' || b.residents === 0) continue;
+    // Clothes, boots and luxuries are bought at the market, like food.
+    if (!coveredBy(s, b, 'market')) continue;
     if (b.level >= 3 && !hasLuxury(s, b)) {
       const lux = LUXURIES.find((id) => s.res[id] >= 1);
       if (lux) {
@@ -621,9 +624,9 @@ export function noteSeen(s: GameState): void {
   for (const id of RESOURCE_IDS) if (s.res[id] > 0 && !s.seen.includes(id)) s.seen.push(id);
 }
 
-/** Monthly visit of merchants buying surplus goods at staffed markets. */
+/** Monthly visit of merchants buying surplus goods at staffed trading posts. */
 export function exportGoods(s: GameState): number {
-  const markets = s.buildings.filter((b) => b.type === 'market' && b.build >= 1 && b.workers > 0).length;
+  const markets = s.buildings.filter((b) => b.type === 'tradingpost' && b.build >= 1 && b.workers > 0).length;
   let budget = markets * EXPORT_PER_MARKET * (hasCharter(s, 'trade2') ? 2 : 1) * ((s.title ?? 0) >= 3 ? 1.5 : 1);
   const guild = s.buildings.some((b) => b.type === 'guildhall' && b.build >= 1 && b.workers > 0);
   let gold = 0;
@@ -1001,8 +1004,10 @@ export function recompute(s: GameState): void {
   // villagers are not stuck at a forager with no berries while a hunter idles.
   const prio = (b: Building) =>
     (2 - (b.priority ?? 1)) * 100 +
-    // Haulers keep every workplace's yard from filling: staffed with raw materials.
-    (b.type === 'storehouse' || b.type === 'granary' ? 1.05 : CATEGORY_PRIORITY[workDef(b).category]) +
+    // Market vendors are how food reaches the table: staffed with the food
+    // makers. Haulers keep every workplace's yard from filling: staffed with
+    // raw materials.
+    (b.type === 'market' ? 0.45 : b.type === 'storehouse' || b.type === 'granary' ? 1.05 : CATEGORY_PRIORITY[workDef(b).category]) +
     (TYPE_PRIORITY[b.type] ?? 0) +
     (isBlocked(b) ? 10 : 0);
   type Job = { b: Building; site: boolean; p: number };
@@ -2277,6 +2282,7 @@ export function dailyProduction(s: GameState, rng: StateRng): void {
       b.blocked = 0;
       continue;
     }
+    if (b.type === 'market') b.status = b.workers > 0 ? `${b.workers} stall${b.workers > 1 ? 's' : ''} open` : 'No vendors: the stalls are shut';
     if (d.zone) continue;
     if (b.type === 'farm') {
       stepFarm(s, b);
@@ -2321,7 +2327,8 @@ export function dailyProduction(s: GameState, rng: StateRng): void {
     }
     b.hauled = servedByHaulers(s, b);
     b.efficiency = workEfficiency(b);
-    b.work += ((b.workers / d.workers) * b.efficiency) / d.cycle;
+    // Time spent on the household's errands is time not spent at work.
+    b.work += ((b.workers / d.workers) * b.efficiency * (1 - (s.report.errands ?? 0))) / d.cycle;
     let status: string | null = null;
     let tried = false;
     while (b.work >= 1) {
@@ -2459,6 +2466,61 @@ const VARIETY_BONUS = [0, 0, 6, 12, 18];
 const POTTAGE: ResourceId[] = ['grain', 'oats'];
 export const POTTAGE_FOOD = 0.5;
 
+/**
+ * Errands each household runs a month: to market for food and goods, to the
+ * well for water, to church and to the tavern. Each is a walk there and back,
+ * so homes far from them lose working time; the share is taken off every
+ * villager's work.
+ */
+export const ERRANDS: { type: BuildingType; trips: number; fallback?: number }[] = [
+  { type: 'market', trips: 3, fallback: 16 },
+  { type: 'well', trips: 4, fallback: 10 },
+  { type: 'church', trips: 1 },
+  { type: 'tavern', trips: 2 },
+];
+const MAX_ERRANDS = 0.35;
+
+export function errandShare(s: GameState): number {
+  let days = 0;
+  let people = 0;
+  const near = (h: Building, t: BuildingType) => {
+    const c = bCenter(h);
+    let best = Infinity;
+    for (const o of s.buildings) {
+      if ((o.type !== t && !(t === 'church' && o.type === 'cathedral')) || o.build < 1) continue;
+      const oc = bCenter(o);
+      best = Math.min(best, Math.hypot(oc.x - c.x, oc.y - c.y));
+    }
+    return best;
+  };
+  for (const h of s.buildings) {
+    if (h.residents <= 0 || !housingOf(h)) continue;
+    people += h.residents;
+    for (const e of ERRANDS) {
+      let d = near(h, e.type);
+      if (!Number.isFinite(d)) {
+        if (e.fallback === undefined) continue;
+        // No well: water from the river or a spring further off.
+        d = e.fallback;
+      }
+      days += (e.trips * 2 * d) / ROAD_TILES_PER_DAY;
+    }
+  }
+  if (!people) return 0;
+  return Math.min(MAX_ERRANDS, days / (people * DAYS_PER_MONTH));
+}
+
+/** A new town's first months, when villagers live off the cart they came with. */
+export const MARKET_GRACE_DAYS = DAYS_PER_MONTH * 2;
+
+/** Villagers who can fetch food at a staffed market (everyone in a new town's first months). */
+export function marketReach(s: GameState): number {
+  if (s.day <= MARKET_GRACE_DAYS) return s.population;
+  let n = 0;
+  for (const b of s.buildings) if (b.residents > 0 && coveredBy(s, b, 'market')) n += b.residents;
+  return Math.min(s.population, n);
+}
+
 export function eatFood(s: GameState, mouths: number): { hungry: number; groups: number; pottage: number } {
   let need = mouths;
   const groups = new Set<string>();
@@ -2506,14 +2568,20 @@ export function monthly(s: GameState, rng: StateRng): void {
   }
 
   // Eating: each villager needs one unit of nourishment a month. Villagers
-  // take a little of every food in turn; richer foods go further.
-  const eaten = eatFood(s, s.population);
-  report.eaten = s.population - eaten.hungry;
-  report.shortage = eaten.hungry;
+  // take a little of every food in turn; richer foods go further. Food is
+  // fetched at a market: households out of reach of one go without.
+  const reach = marketReach(s);
+  const eaten = eatFood(s, reach);
+  const unserved = s.population - reach;
+  report.eaten = reach - eaten.hungry;
+  report.shortage = eaten.hungry + unserved;
+  report.unserved = unserved;
   report.variety = eaten.groups;
   report.pottage = eaten.pottage;
-  const need = eaten.hungry;
-  if (need > 0) log(s, `Food shortage! ${need} villagers went hungry.`, 'bad');
+  report.errands = errandShare(s);
+  const need = report.shortage;
+  if (unserved > 0) log(s, `${unserved} villagers live out of reach of a staffed market and went without food.`, 'bad');
+  else if (need > 0) log(s, `Food shortage! ${need} villagers went hungry.`, 'bad');
   if (s.year) s.year.hungry = (s.year.hungry ?? 0) + need;
 
   // Heating in winter: each household burns a bundle of split firewood, or

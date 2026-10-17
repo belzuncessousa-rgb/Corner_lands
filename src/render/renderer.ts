@@ -1,5 +1,5 @@
 import { BUILDINGS, DAYS_PER_MONTH, DAYS_PER_YEAR, RESOURCE_STORAGE, STORAGE_CAPACITY, type StorageKind } from '../game/data';
-import { upgradeBlocker } from '../game/levels';
+import { marketStalls, upgradeBlocker } from '../game/levels';
 import { hasCharter } from '../game/charters';
 import { HOME_TRADES, deliveredTo, hasProblem, isMarketDay, monthOf, nearestShoal, orchardMaturity, seasonOf, storageCap } from '../game/sim';
 import type { Building, BuildingType, GameState, ResourceId, Season } from '../game/types';
@@ -24,6 +24,7 @@ import {
   YARD_CODES,
   pavedTile,
   rockSprite,
+  stallSprite,
   treeSprite,
   waterTile,
 } from './sprites';
@@ -316,7 +317,23 @@ export class Renderer {
     if (this.buckets.length !== nb) this.buckets = Array.from({ length: nb }, () => []);
     for (const b of this.buckets) b.length = 0;
     this.orchardTiles.clear();
+    this.stallTiles.clear();
     s.buildings.forEach((b, bi) => {
+      if (b.type === 'market') {
+        // Stalls on every other tile, spread evenly over the square.
+        const slots = marketStalls(b);
+        const cands: number[] = [];
+        for (let y = b.y; y < b.y + b.h; y += 2) for (let x = b.x; x < b.x + b.w; x += 2) cands.push(y * W + x);
+        for (let k = 0; k < Math.min(slots, cands.length); k++) {
+          const i = cands[Math.floor(((k + 0.5) * cands.length) / slots)];
+          const x = i % W;
+          const y = (i / W) | 0;
+          this.stallTiles.set(i, { b, k, open: k < b.workers });
+          const [wx, wy] = iso(x, y);
+          if (visible(wx, wy)) this.buckets[Math.max(x + y, this.boost[i])].push(i * 4);
+        }
+        return;
+      }
       if (BUILDINGS[b.type].zone) {
         if (b.type === 'orchard') {
           for (let y = b.y; y < b.y + b.h; y++) {
@@ -561,6 +578,21 @@ export class Renderer {
           ],
           season === 3 ? '#d6dbd9' : '#9c8a5e',
         );
+      } else if (b.type === 'market') {
+        // A trodden square of packed earth with a cobbled edge.
+        p.poly(
+          [
+            [b.x + 0.05, b.y + 0.05, 0],
+            [b.x + b.w - 0.05, b.y + 0.05, 0],
+            [b.x + b.w - 0.05, b.y + b.h - 0.05, 0],
+            [b.x + 0.05, b.y + b.h - 0.05, 0],
+          ],
+          season === 3 ? '#d6dadb' : '#b5a88e',
+          season === 3 ? '#b8bec0' : '#8a7c62',
+          1.5,
+        );
+        for (let i = 1; i < b.w * 2; i++) p.line([b.x + i * 0.5, b.y + 0.1, 0], [b.x + i * 0.5, b.y + b.h - 0.1, 0], 'rgba(90,75,55,0.18)', 0.5);
+        for (let i = 1; i < b.h * 2; i++) p.line([b.x + 0.1, b.y + i * 0.5, 0], [b.x + b.w - 0.1, b.y + i * 0.5, 0], 'rgba(90,75,55,0.18)', 0.5);
       } else if (b.type === 'field') {
         this.drawField(p, b, season, month);
       } else if (b.type === 'pasture') {
@@ -895,6 +927,15 @@ export class Renderer {
   private drawTileObjects(s: GameState, i: number, season: Season): void {
     const x = i % s.width;
     const y = (i - x) / s.width;
+    const stall = this.stallTiles.get(i);
+    if (stall) {
+      const kind = (stall.b.id * 3 + stall.k) % 6;
+      const sp = this.sprite(`stall:${kind}:${season}:${stall.open}`, () => stallSprite(kind, season, stall.open));
+      const [wx, wy] = iso(x, y);
+      this.blit(sp, wx, wy);
+      if (stall.k === 0 && !this.light && isMarketDay(s, stall.b)) this.drawMarketDay(stall.b);
+      return;
+    }
     if (i === this.festTile) {
       this.drawFestival(s, x + 0.5, y + 0.5);
       if (!s.trees[i] && !s.rock[i] && !s.ore[i] && !s.berriesMax[i] && !s.stumps?.[i]) return;
@@ -2693,6 +2734,9 @@ export class Renderer {
     }
     c.globalAlpha = 1;
   }
+
+  /** Market stalls by tile, rebuilt each frame. */
+  private stallTiles = new Map<number, { b: Building; k: number; open: boolean }>();
 
   /** The tile where this month's village festivity stands, or -1. */
   private festTile = -1;

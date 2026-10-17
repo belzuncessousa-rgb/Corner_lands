@@ -367,10 +367,10 @@ art, the logic and balance get this pass. Grouped by how deep each change goes.
 - [x] Mushrooms to gather (visible on the map at the wood's edge, coming up in late summer and autumn)
 
 ### Phase 36 — Villagers' days
-- [ ] Villagers spend time on their needs: fetch food and goods at the market, water at the well, go to church, the tavern, and sleep once a "day" (a month)
-- [ ] Food and goods can only be had where there is a market
-- [ ] The market is free: a drawn area where stalls pop up, stocked from the storehouses
-- [ ] Trade with the outside world needs a Trading Post (its own building, separate from the market)
+- [x] Villagers spend time on their needs: each household's walks to market (3 a month), the well (4), church (1) and the tavern (2) are taken off everyone's working time, up to 35%; the villagers panel shows the share and the Steward warns when it runs high. Workers are seen fetching baskets from the market and pails from the well. (Sleeping is not modelled yet.)
+- [x] Food and goods can only be had where there is a market: homes out of reach of a staffed market go without (a new town's first two months live off the settlers' cart)
+- [x] The market is free: a drawn area (3 to 8 tiles a side) where stalls pop up, one for every six tiles, each with a vendor hired right after the food makers. Old market buildings become 3×3 squares
+- [x] Trade with the outside world needs a Trading Post (its own building, separate from the market): buying, selling and the merchants' monthly visit
 
 ### Phase 37 — The manor and the town
 - [ ] The game starts without a manor; the town grows sizes by meeting conditions on its own, and the game pauses when it does

@@ -737,16 +737,27 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   market: def({
     type: 'market',
     name: 'Marketplace',
-    desc: 'Households nearby are happier. Lets you buy and sell goods, and merchants visit to buy your surplus.',
+    desc: 'A square for stalls, free to lay out: click one corner, then the other. A vendor for each stall stocks it from the storehouse and granary; households nearby fetch their food and goods here, and cannot get them anywhere else.',
     category: 'civic',
     w: 3,
     h: 3,
-    cost: { wood: 20, planks: 10 },
-    buildDays: 14,
+    cost: {},
+    buildDays: 0,
     workers: 2,
     radius: 11,
-    cycle: 5,
-    outputs: { gold: 4 },
+    tier: 0,
+    zone: { owner: 'market', min: 3, max: 8 },
+  }),
+  tradingpost: def({
+    type: 'tradingpost',
+    name: 'Trading Post',
+    desc: 'Where the outside world comes to trade: buy and sell goods, and visiting merchants buy your surplus each month. Animals for the pastures are bought here too.',
+    category: 'civic',
+    w: 3,
+    h: 2,
+    cost: { wood: 30, planks: 10 },
+    buildDays: 14,
+    workers: 2,
     tier: 1,
   }),
   church: def({
@@ -860,7 +871,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
  */
 export const CREW_FACTOR = 1.5;
 for (const d of Object.values(BUILDINGS)) {
-  if (d.cycle > 0 && d.workers > 0 && d.type !== 'market') d.workers = Math.ceil(d.workers * CREW_FACTOR);
+  if (d.cycle > 0 && d.workers > 0) d.workers = Math.ceil(d.workers * CREW_FACTOR);
 }
 
 /** Most beauty a home can enjoy from decorations. */
@@ -902,6 +913,7 @@ export const BUILD_ORDER: BuildingType[] = [
   'storehouse',
   'granary',
   'market',
+  'tradingpost',
   'tavern',
   'apothecary',
   'scriptorium',

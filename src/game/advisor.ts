@@ -54,8 +54,8 @@ function usefulJobs(s: GameState): string {
   if (food(s) < s.population * 3) ideas.push('another farm, fisher or hunter');
   if (s.res.planks < 30 && isUnlocked(s, 'sawmill')) ideas.push(`a ${BUILDINGS.sawmill.name}`);
   if (s.res.stone < 30) ideas.push('a quarry');
-  if (built(s, 'market')) ideas.push('a workshop whose wares the market can sell');
-  else ideas.push('woodcutters and quarries, whose surplus a market can sell');
+  if (built(s, 'tradingpost')) ideas.push('a workshop whose wares the merchants will buy');
+  else ideas.push('woodcutters and quarries, whose surplus merchants at a trading post would buy');
   return ideas.slice(0, 3).join(', or ');
 }
 
@@ -69,6 +69,21 @@ function millMonths(s: GameState): number {
 }
 
 const ADVICE: Advice[] = [
+  {
+    id: 'no-market',
+    when: (s) => !s.buildings.some((b) => b.type === 'market') && s.day >= 3,
+    text: () => 'Steward: our people can only get their food and goods at a market. Lay out a Marketplace near the homes (Civic): it is free, and the cart we came with will not last past the second month.',
+  },
+  {
+    id: 'unserved',
+    when: (s) => (s.report.unserved ?? 0) > 0,
+    text: (s) => `Steward: ${s.report.unserved} villagers live out of reach of a staffed market and went without. Lay out a Marketplace near their homes, or see that its stalls have vendors.`,
+  },
+  {
+    id: 'errands',
+    when: (s) => (s.report.errands ?? 0) > 0.22,
+    text: (s) => `Steward: our people lose ${Math.round((s.report.errands ?? 0) * 100)}% of their working time walking to market, the well, church and the tavern. These places nearer the homes would give us that time back.`,
+  },
   {
     id: 'food-low',
     when: (s) => s.population > 0 && fed(s) < s.population * 2 && s.report.shortage === 0,

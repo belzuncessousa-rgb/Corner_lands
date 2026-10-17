@@ -75,7 +75,7 @@ export class AgentSystem {
     const marketDay = s.day % 10 === MARKET_DAY ? s.day : null;
     if (marketDay !== null && this.lastCartDay !== null && marketDay !== this.lastCartDay && dt > 0) {
       for (const m of s.buildings) {
-        if (m.type === 'market' && m.build >= 1 && Object.keys(s.sell ?? {}).length) this.sendCart(s, m);
+        if (m.type === 'tradingpost' && m.build >= 1 && Object.keys(s.sell ?? {}).length) this.sendCart(s, m);
       }
     }
     if (marketDay !== null || this.lastCartDay === null) this.lastCartDay = marketDay ?? -1;
@@ -575,7 +575,19 @@ export class AgentSystem {
       this.walkTo(s, a, door.x, door.y, [b.id], 'enter-work');
       return;
     }
-    // Inside the workplace: decide what to do next.
+    // Inside the workplace: decide what to do next. Now and then the
+    // household's errands call: a basket from the market, a pail from the well.
+    if (Math.random() < 0.07) {
+      const errand = this.errandStop(s, a);
+      if (errand) {
+        this.exitAt(a, door);
+        a.carry = null;
+        a.want = errand.carry;
+        const ed = doorTile(s, errand.at);
+        this.walkTo(s, a, ed.x, ed.y, [b.id, errand.at.id], 'fetch');
+        return;
+      }
+    }
     const target = this.workTarget(s, b);
     if (a.home !== -1 && Math.random() < 0.08) {
       const home = getBuilding(s, a.home);
@@ -610,6 +622,26 @@ export class AgentSystem {
     a.phase = 'inside';
     a.visible = false;
     a.timer = 3 + Math.random() * 4;
+  }
+
+  /** The nearest market or well to a villager's home, for an errand. */
+  private errandStop(s: GameState, a: Agent): { at: Building; carry: ResourceId } | null {
+    const home = getBuilding(s, a.home);
+    if (!home) return null;
+    const type = Math.random() < 0.5 ? 'market' : 'well';
+    const hc = bCenter(home);
+    let best: Building | null = null;
+    let bd = Infinity;
+    for (const o of s.buildings) {
+      if (o.type !== type || o.build < 1) continue;
+      const oc = bCenter(o);
+      const d = Math.hypot(oc.x - hc.x, oc.y - hc.y);
+      if (d < bd) {
+        bd = d;
+        best = o;
+      }
+    }
+    return best ? { at: best, carry: type === 'market' ? 'vegetables' : 'milk' } : null;
   }
 
   private exitAt(a: Agent, door: { x: number; y: number }): void {

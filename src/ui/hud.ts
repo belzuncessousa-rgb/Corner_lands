@@ -21,7 +21,7 @@ import {
 } from '../game/data';
 import { commission, commissionError, COMMISSIONS, nextTitle, takeTitle, titleError, TITLES, fairCost, fairError, fairPrestige, FAIR_TIER, feastCost, feastError, FESTIVALS, festivalError, getEvent, holdFair, holdFeast, holdFestival, resolveEvent } from '../game/events';
 import { CHARTERS, CHARTER_TIER, PATHS, charterCost, charterError, grantCharter, hasCharter } from '../game/charters';
-import { HOUSE_LEVELS, MANOR_LEVELS, buildingName, houseNeeds, startUpgrade, upgradeBlocker, upgradePlan, workersOf } from '../game/levels';
+import { HOUSE_LEVELS, MANOR_LEVELS, buildingName, houseNeeds, marketStalls, startUpgrade, upgradeBlocker, upgradePlan, workersOf } from '../game/levels';
 import { activeQuests } from '../game/quests';
 import { StateRng } from '../game/rng';
 import {
@@ -514,6 +514,8 @@ export class Hud {
     const blocked = settlerBlocker(s);
     return `<h3>${ICONS.people} Villagers ${s.population} <small>of ${housing} beds</small></h3>
       <div class="kv"><span>Newcomers</span><span class="${blocked ? 'neg' : 'pos'}">${blocked ? esc(blocked) : 'Settlers are arriving'}</span></div>
+      <div class="kv" data-tip="Each household walks to market, the well, church and the tavern; that time is taken off everyone's work. Homes near these places lose less."><span>Errands</span><span class="${(s.report.errands ?? 0) > 0.22 ? 'neg' : ''}">${Math.round((s.report.errands ?? 0) * 100)}% of working time</span></div>
+      ${(s.report.unserved ?? 0) > 0 ? `<div class="kv"><span>Out of reach of a market</span><span class="neg">${s.report.unserved} villagers</span></div>` : ''}
       <div class="labour-sum">
         <div><b>${l.workers}</b><span>at work</span></div>
         <div><b>${l.builders}</b><span>building</span></div>
@@ -576,7 +578,7 @@ export class Hud {
       }
       ${this.titleRow()}
       ${this.commissionRows()}
-      <div class="row">${hasBuilt(s, 'market') ? '<button data-action="trade">⚖ Trade</button>' : ''}<button data-action="ledger">Ledger</button><button data-action="charters">${ICONS.prestige} Charters</button></div>`;
+      <div class="row">${hasBuilt(s, 'tradingpost') ? '<button data-action="trade">⚖ Trade</button>' : ''}<button data-action="ledger">Ledger</button><button data-action="charters">${ICONS.prestige} Charters</button></div>`;
   }
 
   /**
@@ -617,7 +619,7 @@ export class Hud {
 
   private goodsPanel(group: GoodsGroup): string {
     const s = this.game.state;
-    const market = hasBuilt(s, 'market');
+    const market = hasBuilt(s, 'tradingpost');
     const ids = RESOURCE_IDS.filter((r) => GOODS[r].group === group && (s.seen?.includes(r) || s.res[r] > 0 || ALWAYS_SHOWN.includes(r)));
     const rows = ids
       .map((r) => {
@@ -854,7 +856,20 @@ export class Hud {
       if (b.type === 'market' && b.build >= 1) {
         const left = (MARKET_DAY - (s.day % DAYS_PER_MONTH) + DAYS_PER_MONTH) % DAYS_PER_MONTH;
         const when = isMarketDay(s, b) ? '<span class="pos">Today!</span>' : !b.workers ? '<span class="neg">Needs a stallholder</span>' : left === 0 ? 'Not in winter' : `In ${left} day${left > 1 ? 's' : ''}`;
-        rows.push(`<div class="kv" data-tip="Once a month the square fills with townsfolk and the merchants' cart comes for the goods you sell."><span>Market day</span><span>${when}</span></div>`);
+        rows.push(`<div class="kv"><span>Stalls</span><span>${b.workers} of ${marketStalls(b)} open</span></div>`);
+        let homes = 0;
+        let fed = 0;
+        for (const h of s.buildings) {
+          if (!h.residents || !housingOf(h)) continue;
+          const hc = bCenter(h);
+          const mc = bCenter(b);
+          if (Math.hypot(hc.x - mc.x, hc.y - mc.y) <= BUILDINGS.market.radius) {
+            homes++;
+            fed += h.residents;
+          }
+        }
+        rows.push(`<div class="kv" data-tip="Households within reach fetch their food and goods here. Those out of reach of every market go without."><span>Serves</span><span>${homes} home${homes === 1 ? '' : 's'} · ${fed} villagers</span></div>`);
+        rows.push(`<div class="kv" data-tip="Once a month the square fills with townsfolk."><span>Market day</span><span>${when}</span></div>`);
       }
       rows.push(...this.storeRows(b));
       if (b.type === 'townhall') {
@@ -932,7 +947,7 @@ export class Hud {
       actions.push(`<button data-action="pause-b">${b.paused ? '▶ Resume' : '❚❚ Pause'}</button>`);
     }
     if (b.type !== 'townhall') actions.push(`<button data-action="demolish-b">✖ ${b.build < 1 ? 'Cancel' : 'Demolish'}</button>`);
-    if (b.type === 'market' && b.build >= 1) actions.push('<button data-action="trade">⚖ Trade</button>');
+    if (b.type === 'tradingpost' && b.build >= 1) actions.push('<button data-action="trade">⚖ Trade</button>');
     box.innerHTML = `
       <button class="close" data-action="deselect">✕</button>
       <h2>${esc(buildingName(b))}${b.trade ? ` <small>· ${esc(BUILDINGS[b.trade].name)}</small>` : ''}</h2>
@@ -947,7 +962,7 @@ export class Hud {
   private storeRows(b: Building): string[] {
     const s = this.game.state;
     const kinds = Object.keys(STORAGE_CAPACITY[b.type] ?? {}) as StorageKind[];
-    const market = hasBuilt(s, 'market');
+    const market = hasBuilt(s, 'tradingpost');
     const rows: string[] = [];
     for (const kind of kinds) {
       const used = Math.floor(stored(s, kind));
@@ -2230,7 +2245,7 @@ export class Hud {
 
   private showTrade(): void {
     const s = this.game.state;
-    const staffed = s.buildings.some((b) => b.type === 'market' && b.build >= 1 && b.workers > 0);
+    const staffed = s.buildings.some((b) => b.type === 'tradingpost' && b.build >= 1 && b.workers > 0);
     // Every tradeable good, in tabs by kind.
     const tab = this.tradeTab;
     const tabs = (['food', 'materials', 'goods'] as const)
@@ -2254,8 +2269,8 @@ export class Hud {
       .join('');
     const wasOpen = this.modal && this.modal.querySelector('.trade');
     const last = s.report.trade ?? 0;
-    const html = `<h2>Marketplace Trade</h2>
-      <p>Gold: <b>${Math.floor(s.res.gold)}</b> ${ICONS.gold} · ${staffed ? `Merchants visit every month and buy up to ${EXPORT_PER_MARKET} goods per market${last ? ` (last month: +${last} gold)` : ''}.` : '<span class="neg">Staff the marketplace so merchants will visit.</span>'}</p>
+    const html = `<h2>Trading Post</h2>
+      <p>Gold: <b>${Math.floor(s.res.gold)}</b> ${ICONS.gold} · ${staffed ? `Merchants visit every month and buy up to ${EXPORT_PER_MARKET} goods per market${last ? ` (last month: +${last} gold)` : ''}.` : '<span class="neg">Staff the trading post so merchants will visit.</span>'}</p>
       <div class="trade-tabs">${tabs}</div>
       <table class="trade">${rows}</table>
       <div class="row" style="justify-content:flex-end;margin-top:10px"><button class="primary" data-action="close-modal">Done</button></div>`;

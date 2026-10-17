@@ -1867,6 +1867,58 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       p.barrel(2.65, 2.55);
       break;
     }
+    case 'tradingpost': {
+      // A merchants' hall: stone ground floor, timber loft with a hoist,
+      // a covered loading bay, bales and casks for the road, and a pennant.
+      p.poly(
+        [
+          [0.1, 1.2, 0],
+          [2.9, 1.2, 0],
+          [2.9, 1.95, 0],
+          [0.1, 1.95, 0],
+        ],
+        season === 3 ? '#d4d8d6' : '#a89a7a',
+      );
+      p.shadow(0.25, 0.2, 2.1, 1.15);
+      p.box(0.25, 0.2, 2.1, 1.15, 0, 12, STONE, undefined, 'stone');
+      p.box(0.25, 0.2, 2.1, 1.15, 12, 13, PLASTER);
+      p.timber(0.25, 0.2, 2.1, 1.15, 12, 13, BEAM);
+      p.doorL(1.15, 0.85, 0.32, 11);
+      p.windowL(1.15, 0.45, 16, 0.18, 6);
+      p.windowL(1.15, 1.6, 16, 0.18, 6);
+      p.windowR(2.1, 0.5, 16, 0.18, 6);
+      p.roofX(0.25, 0.2, 2.1, 1.15, 25, 18, 'tile', PLASTER, 0.12);
+      // Hoist beam over the loft door.
+      p.line([1.0, 1.15, 31], [1.0, 1.45, 31], '#4a3020', 1.6);
+      p.line([1.0, 1.45, 31], [1.0, 1.45, 22], '#6b5a44', 0.6);
+      p.box(0.93, 1.4, 1.07, 1.5, 19, 3, '#c8a46c');
+      // Lean-to loading bay on posts.
+      for (const [x, y] of [
+        [2.2, 0.3],
+        [2.85, 0.3],
+        [2.2, 1.1],
+        [2.85, 1.1],
+      ] as const)
+        p.line([x, y, 0], [x, y, 14], '#5e4129', 1.4);
+      p.poly(
+        [
+          [2.1, 0.25, 17],
+          [2.92, 0.25, 13],
+          [2.92, 1.15, 13],
+          [2.1, 1.15, 17],
+        ],
+        p.snow ? '#eef2f4' : '#8a5a3a',
+        '#4a3020',
+      );
+      p.barrel(2.45, 0.7);
+      p.barrel(2.65, 0.95);
+      p.crate(2.35, 1.3);
+      p.sack(0.5, 1.45);
+      p.sack(0.75, 1.55);
+      p.crate(1.6, 1.45);
+      p.flag(2.85, 1.85, 0, 30, '#c8962a');
+      break;
+    }
     case 'storehouse': {
       // Barn at the back, open stacking yard in front (piles drawn live).
       p.poly(
@@ -2498,6 +2550,61 @@ function vineSprite(season: Season, stage: number, fruiting: boolean): Sprite {
 }
 
 /** A small fruit tree; stage 0..1 from sapling to mature. */
+/** What each kind of market stall sells: awning colour and the goods on its board. */
+const STALLS: { color: string; goods: string[] }[] = [
+  { color: '#b03a2e', goods: ['#c8a46c', '#d9b77a', '#b98a4a'] }, // bread
+  { color: '#3d7a3a', goods: ['#7aa040', '#e8742a', '#c42b3a'] }, // greens and roots
+  { color: '#2e5e9a', goods: ['#a8b8c0', '#98a8b0', '#b8c8d0'] }, // fish
+  { color: '#a07a2a', goods: ['#f2e8d6', '#e8c860', '#c8a46c'] }, // cheese and eggs
+  { color: '#6a4a8a', goods: ['#4a6a9a', '#a04a3a', '#d8c79c'] }, // cloth
+  { color: '#7a5a3a', goods: ['#8a6236', '#a8adb2', '#b0704a'] }, // pots and tools
+];
+
+/**
+ * One stall of a marketplace, on a tile: posts, a board of goods and a
+ * striped awning; shut (no awning or goods) when it has no vendor.
+ */
+export function stallSprite(kind: number, season: Season, open: boolean): Sprite {
+  return makeSprite(TW + 8, TH + 40, TW / 2 + 4, 36, (ctx) => {
+    const p = new Pen(ctx);
+    p.snow = season === 3;
+    const st = STALLS[kind % STALLS.length];
+    const x = 0.12;
+    const y = 0.2;
+    for (const [px, py] of [
+      [x, y],
+      [x + 0.76, y],
+      [x, y + 0.6],
+      [x + 0.76, y + 0.6],
+    ]) {
+      p.line([px, py, 0], [px, py, open ? 15 : 9], '#5e4129', 1.4);
+    }
+    p.box(x + 0.05, y + 0.35, x + 0.72, y + 0.6, 0, 7, '#8a6440');
+    if (!open) return;
+    st.goods.forEach((g, i) => {
+      const [gx, gy] = iso(x + 0.15 + i * 0.2, y + 0.47, 8);
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.ellipse(gx, gy, 3.5, 2, 0, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    const stripes = 6;
+    for (let i = 0; i < stripes; i++) {
+      const x0 = x - 0.05 + (i * 0.88) / stripes;
+      const x1 = x0 + 0.88 / stripes;
+      p.poly(
+        [
+          [x0, y - 0.05, 18],
+          [x1, y - 0.05, 18],
+          [x1, y + 0.7, 13],
+          [x0, y + 0.7, 13],
+        ],
+        p.snow ? (i % 2 ? '#f2f5f6' : '#e2e7e9') : i % 2 ? '#f1e8d6' : st.color,
+      );
+    }
+  });
+}
+
 export function fruitTreeSprite(fruit: string, season: Season, stage: number, fruiting: boolean, blossom = false): Sprite {
   if (fruit === 'grapes') return vineSprite(season, stage, fruiting);
   return makeSprite(36, 48, 18, 42, (ctx) => {

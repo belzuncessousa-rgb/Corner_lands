@@ -72,12 +72,18 @@ export const UPGRADABLE_WORK: BuildingType[] = [
   'stonemason',
   'carpenter',
   'bloomery',
-  'market',
   'tavern',
 ];
 
 /** Worker slots, including the expansion of a level 2 workplace. */
+/** Stalls a marketplace has room for: one for every six tiles, up to six. */
+export function marketStalls(b: Building): number {
+  return Math.max(1, Math.min(6, Math.floor((b.w * b.h) / 6)));
+}
+
 export function workersOf(b: Building): number {
+  // A vendor for every stall.
+  if (b.type === 'market') return marketStalls(b);
   // A family craft is worked by as many of the household as the workshop needs.
   if (b.trade) return Math.min(BUILDINGS[b.trade].workers, b.residents);
   const base = BUILDINGS[b.type].workers;

@@ -47,6 +47,7 @@ const count = (s: GameState, t: BuildingType) => s.buildings.filter((b) => b.typ
 
 /** Places a building near the manor, or near `near` (a home that lacks it). */
 export function tryPlace(s: GameState, type: BuildingType, near?: { x: number; y: number }): boolean {
+  if (type === 'market') return drawMarket(s, near);
   const d = BUILDINGS[type];
   // Count materials already promised to unfinished sites. The cathedral, like a
   // player would, is begun with the coins alone; builders gather the rest over years.
@@ -102,6 +103,19 @@ export function tryPlace(s: GameState, type: BuildingType, near?: { x: number; y
   if (!best) return false;
   if (d.gathers && !GATHERERS.has(type) && resourceInRange(s, type, centerOf(best.x, best.y, d.w, d.h)) < 3) return false;
   return !!placeOrder(s, type, best.x, best.y);
+}
+
+/** Lays out a marketplace square near a spot (the manor by default). */
+function drawMarket(s: GameState, near?: { x: number; y: number }): boolean {
+  const hall = s.buildings.find((b) => b.type === 'townhall');
+  const c = near ?? (hall ? bCenter(hall) : { x: s.width / 2, y: s.height / 2 });
+  const spot = zoneSpot(s, 'market', { x: Math.floor(c.x) - 1, y: Math.floor(c.y) - 1, w: 2, h: 2 }, [
+    [4, 4],
+    [3, 4],
+    [4, 3],
+    [3, 3],
+  ]);
+  return !!(spot && placeZone(s, 'market', spot.x, spot.y, spot.x + spot.w - 1, spot.y + spot.h - 1));
 }
 
 /** Finds the best clear rectangle for a zone near a workplace. */
@@ -307,7 +321,7 @@ export function playBot(s: GameState, years: number, seed = 1): BotReport {
 
 /** Buys what is short at the market, as a sensible player would. */
 function shop(s: GameState): void {
-  if (!hasBuilt(s, 'market')) return;
+  if (!hasBuilt(s, 'tradingpost')) return;
   // Let the merchants take what is above the stock targets.
   s.sell ??= {};
   for (const r of ['leather', 'cloth', 'hides', 'wool'] as ResourceId[]) s.sell[r] = true;
@@ -368,7 +382,7 @@ function renovate(s: GameState): void {
         const id = k as ResourceId;
         if (id === 'gold') continue;
         const short = (plan.cost[id] ?? 0) - s.res[id];
-        if (short > 0 && hasBuilt(s, 'market') && s.res.gold > (plan.cost.gold ?? 0) + 60) trade(s, id, Math.min(short, roomFor(s, id)));
+        if (short > 0 && hasBuilt(s, 'tradingpost') && s.res.gold > (plan.cost.gold ?? 0) + 60) trade(s, id, Math.min(short, roomFor(s, id)));
       }
       saving = true;
     }
@@ -431,6 +445,8 @@ export function act(s: GameState, rand: () => number): void {
   for (const c of COMMISSIONS) if (!commissionError(s, c.id) && s.res.prestige > c.prestige + 300 && (!nextTitle(s) || s.res.prestige > (nextTitle(s)?.prestige ?? 0) + c.prestige)) commission(s, c.id);
   for (const f of FESTIVALS) if (!festivalError(s, f.id) && food > pop * 4) holdFestival(s, f.id);
   if (s.tier >= 4 && s.res.dressedstone > 60 && s.res.gold > 500) layWall(s);
+  // Food is only had at a market: the first square is laid out at once.
+  if (count(s, 'market') < 1 && drawMarket(s)) return;
   renovate(s);
   drawFields(s);
   const sites = s.buildings.filter((b) => b.build < 1).length;
@@ -442,8 +458,8 @@ export function act(s: GameState, rand: () => number): void {
   const wants: BuildingType[] = [];
   // Key buildings for progression come first once unlocked.
   if (s.tier >= 1) {
-    for (const t of ['sawmill', 'carpenter', 'windmill', 'bakery', 'market', 'stonemason'] as BuildingType[]) {
-      const ready = t === 'sawmill' || t === 'market' || (t === 'stonemason' ? hasBuilt(s, 'market') : count(s, 'farm') > 0);
+    for (const t of ['sawmill', 'carpenter', 'windmill', 'bakery', 'tradingpost', 'stonemason'] as BuildingType[]) {
+      const ready = t === 'sawmill' || t === 'tradingpost' || (t === 'stonemason' ? hasBuilt(s, 'tradingpost') : count(s, 'farm') > 0);
       if (count(s, t) === 0 && ready) wants.push(t);
     }
   }
@@ -492,6 +508,11 @@ export function act(s: GameState, rand: () => number): void {
   // No rock beside the roads yet: lay a road towards the nearest outcrop.
   if (count(s, 'quarry') === 0 && pop >= 8 && s.day % DAYS_PER_MONTH === 0) roadToOre(s, s.rock);
   if (pop >= 10 && count(s, 'well') < Math.ceil(pop / 20)) wants.push('well');
+  // Homes out of reach of a market go hungry: a square near them, at once.
+  if (s.day % 5 === 0) {
+    const lone = s.buildings.find((h) => h.residents > 0 && !coveredBy(s, h, 'market'));
+    if (lone && drawMarket(s, bCenter(lone))) return;
+  }
   // Homes out of reach of a well, the market or a tavern cannot grow: serve them first.
   if (s.tier >= 2 && s.day % 10 === 0) {
     for (const t of ['well', 'market', 'tavern'] as BuildingType[]) {

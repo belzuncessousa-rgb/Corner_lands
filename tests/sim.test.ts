@@ -11,6 +11,7 @@ import {
   removeRoad,
   placeOrder,
   placementError,
+  placeZone,
   recompute,
   stepDay,
   totalHousing,
@@ -37,6 +38,18 @@ function placeNearRoad(s: GameState, type: BuildingType) {
     }
   }
   throw new Error(`could not place ${type}`);
+}
+
+/** Lays out a small marketplace near a building, so its households can fetch food. */
+function marketBy(s: GameState, near: { x: number; y: number; w: number; h: number }) {
+  for (let r = 1; r < 14; r++)
+    for (const [dx, dy] of [[near.w + r - 1, 0], [0, near.h + r - 1], [-r - 3, 0], [0, -r - 3], [r, r], [-r - 3, -r - 3]]) {
+      const x = near.x + dx;
+      const y = near.y + dy;
+      const m = placeZone(s, 'market', x, y, x + 2, y + 2);
+      if (m) return m;
+    }
+  throw new Error('no room for a market');
 }
 
 function run(s: GameState, days: number) {
@@ -328,7 +341,8 @@ describe('job queue', () => {
     const farm = placeNearRoad(s, 'farm');
     farm.build = 1;
     forager.build = 1;
-    s.population = 3;
+    marketBy(s, hall(s));
+    s.population = 4;
     // Jump to the last day of winter.
     s.day = DAYS_PER_YEAR - 1;
     s.dirty = true;
@@ -358,11 +372,11 @@ describe('decision events', () => {
 });
 
 describe('exports', () => {
-  it('merchants buy surplus above the kept amount at staffed markets', async () => {
+  it('merchants buy surplus above the kept amount at staffed trading posts', async () => {
     const { setExport } = await import('../src/game/sim');
     const s = generateWorld(8);
     s.tier = 2;
-    const m = placeNearRoad(s, 'market');
+    const m = placeNearRoad(s, 'tradingpost');
     m.build = 1;
     m.need = undefined;
     s.res.wood = 110;
@@ -606,6 +620,7 @@ describe('workshops and household goods', () => {
     const h = placeNearRoad(s, 'house');
     h.build = 1;
     h.level = 2;
+    marketBy(s, h);
     // The manor hall fills first.
     s.population = 15;
     s.res.clothes = 3;
@@ -700,6 +715,7 @@ describe('charter goods', () => {
     const h = placeNearRoad(s, 'house');
     h.build = 1;
     h.level = 3;
+    marketBy(s, h);
     s.population = 17;
     s.res.wine = 2;
     recompute(s);
@@ -1240,7 +1256,7 @@ describe('great works', () => {
           for (let dx = -r; dx <= r; dx++) if (!placementError(s, t, hall.x + dx, hall.y + dy)) return placeOrder(s, t, hall.x + dx, hall.y + dy)!;
       throw new Error(`no room for ${t}`);
     };
-    const market = put('market');
+    const market = put('tradingpost');
     market.build = 1;
     market.workers = 1;
     const guild = put('guildhall');
@@ -1394,13 +1410,15 @@ describe('town score', () => {
   it('rises with people, rank and deeds, and counts years without hunger', async () => {
     const { townScore } = await import('../src/game/sim');
     const s = generateWorld(16);
+    marketBy(s, hall(s));
     const start = townScore(s);
     s.population += 10;
     expect(townScore(s)).toBe(start + 100);
     s.tier = 2;
     s.title = 1;
     expect(townScore(s)).toBe(start + 100 + 1000 + 400);
-    // A year with no hunger counts once it ends.
+    // A year with no hunger counts once it ends (the ten extra had no homes to shop from).
+    s.population -= 10;
     stepDay(s);
     s.day = DAYS_PER_YEAR - 1;
     s.year!.hungry = 0;

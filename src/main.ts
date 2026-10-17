@@ -443,16 +443,21 @@ export class Game {
       const owner = d.zone!.owner;
       const ownerName = BUILDINGS[owner].name;
       // Show the reach of the workplaces that would tend it.
-      const near = s.buildings.find((o) => o.type === owner && o.build >= 1 && Math.hypot(bCenter(o).x - (x0 + w / 2), bCenter(o).y - (y0 + h / 2)) <= BUILDINGS[owner].radius + Math.max(w, h) / 2);
-      const any = s.buildings.find((o) => o.type === owner);
-      if (near || any) {
-        const c = bCenter(near ?? any!);
+      // A marketplace tends itself: show the homes it would serve instead.
+      const selfTended = owner === tool.type;
+      const near = selfTended ? true : s.buildings.find((o) => o.type === owner && o.build >= 1 && Math.hypot(bCenter(o).x - (x0 + w / 2), bCenter(o).y - (y0 + h / 2)) <= BUILDINGS[owner].radius + Math.max(w, h) / 2);
+      const any = selfTended ? undefined : s.buildings.find((o) => o.type === owner);
+      if (selfTended) {
+        ov.range = { cx: x0 + w / 2, cy: y0 + h / 2, r: d.radius, highlight: rangeHighlighter(s, tool.type) };
+      } else if (near || any) {
+        const c = bCenter((near as Building | undefined) ?? any!);
         ov.range = { cx: c.x, cy: c.y, r: BUILDINGS[owner].radius };
       }
       const cost = zoneCost(tool.type, w, h);
       const costText = cost.wood ? ` · ${cost.wood} timber for fences` : cost.gold ? ` · ${cost.gold} coins for saplings` : '';
+      const stalls = tool.type === 'market' ? ` · room for ${Math.max(1, Math.min(6, Math.floor((w * h) / 6)))} stalls` : '';
       if (!this.zoneAnchor) {
-        this.hud.setHint(`${d.name}: click one corner, then the opposite corner · ${d.zone!.min}–${d.zone!.max} tiles a side`, false);
+        this.hud.setHint(`${d.name}: click one corner, then the opposite corner · ${d.zone!.min}–${d.zone!.max} tiles a side${selfTended ? ' · free' : ''}`, false);
       } else {
         const where = near ? '' : ` · no ${ownerName} in range: nobody will tend it`;
         // Fields care about the soil: say how rich the ground under the plan is.
@@ -463,7 +468,7 @@ export class Game {
           const avg = f / (w * h);
           soil = ` · ${avg < 0.4 ? 'poor' : avg < 0.7 ? 'fair' : 'rich'} soil (${Math.round(avg * 100)}%)`;
         }
-        this.hud.setHint(err ? `${d.name} ${w}×${h}: ${err}` : `${d.name} ${w}×${h} (${w * h} tiles)${soil}${costText}${where} · click to place`, !!err || !near);
+        this.hud.setHint(err ? `${d.name} ${w}×${h}: ${err}` : `${d.name} ${w}×${h} (${w * h} tiles)${soil}${costText}${stalls}${where} · click to place`, !!err || !near);
       }
     } else if (tool.kind === 'grove') {
       ov.groves = true;
