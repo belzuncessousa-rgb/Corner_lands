@@ -53,6 +53,30 @@ export function groundTexture(s: GameState, season: Season): THREE.CanvasTexture
   c.width = W;
   c.height = H;
   const g = c.getContext('2d')!;
+  // Grass, water and shores change only with the season: painted once, then
+  // fields and roads go on top of a copy each time they change.
+  g.drawImage(groundBase(s, season, P), 0, 0);
+  // Zones: fields, pastures, orchards and market squares, laid square or drawn as free shapes.
+  for (const b of s.buildings) if (BUILDINGS[b.type].zone) paintZone(g, b, P, season);
+  paintRoads(g, s, P, season);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
+  return tex;
+}
+
+let baseCache: { key: string; canvas: HTMLCanvasElement } | null = null;
+
+/** Grass with its soil wash and tufts, and the water with its shores. */
+function groundBase(s: GameState, season: Season, P: number): HTMLCanvasElement {
+  const key = `${s.seed}:${s.width}:${season}:${s.founded ?? 0}`;
+  if (baseCache?.key === key) return baseCache.canvas;
+  const W = s.width * P;
+  const H = s.height * P;
+  const c = document.createElement('canvas');
+  c.width = W;
+  c.height = H;
+  const g = c.getContext('2d')!;
   const rand = mulberry32(s.seed);
   // Soil richness as a soft wash: one pixel per tile, smoothed as it is enlarged.
   const small = document.createElement('canvas');
@@ -63,7 +87,8 @@ export function groundTexture(s: GameState, season: Season): THREE.CanvasTexture
   for (let y = 0; y < s.height; y++) {
     for (let x = 0; x < s.width; x++) {
       const i = y * s.width + x;
-      sg.fillStyle = s.terrain[i] === 1 ? (season === 3 ? '#a3b9ca' : '#4a83ad') : mixHex(lush[0], lush[1], 1 - s.fertility[i]);
+      // Water is laid over afterwards along a smooth shore; under it, plain grass.
+      sg.fillStyle = s.terrain[i] === 1 ? lush[0] : mixHex(lush[0], lush[1], 1 - s.fertility[i]);
       sg.fillRect(x, y, 1, 1);
     }
   }
@@ -82,34 +107,30 @@ export function groundTexture(s: GameState, season: Season): THREE.CanvasTexture
     g.lineTo(x + (rand() - 0.5) * 2, y - 2 - rand() * 3);
     g.stroke();
   }
-  // Sandy shores where land meets water, and ripples on the water.
+  // Water with smooth shores: the map's water tiles as a mask, enlarged
+  // smoothly and softened, then cut at half way. A sandy rim runs round it and
+  // the water deepens away from the bank. (The simulation keeps its tiles.)
+  paintWater(g, s, P, season);
   g.lineCap = 'round';
-  for (let y = 0; y < s.height; y++) {
-    for (let x = 0; x < s.width; x++) {
-      const i = y * s.width + x;
-      if (s.terrain[i] !== 1) continue;
-      const land = (xx: number, yy: number) => xx >= 0 && yy >= 0 && xx < s.width && yy < s.height && s.terrain[yy * s.width + xx] !== 1;
-      g.strokeStyle = season === 3 ? '#e8ece8' : '#d8c890';
-      g.lineWidth = P * 0.28;
-      const edge = (ax: number, ay: number, bx: number, by: number) => {
+  if (season !== 3) {
+    g.strokeStyle = 'rgba(255,255,255,0.22)';
+    g.lineWidth = 1;
+    for (let y = 0; y < s.height; y++) {
+      for (let x = 0; x < s.width; x++) {
+        if (s.terrain[y * s.width + x] !== 1 || rand() > 0.3) continue;
         g.beginPath();
-        g.moveTo(ax, ay);
-        g.lineTo(bx, by);
+        g.moveTo(x * P + rand() * P * 0.6, y * P + rand() * P);
+        g.lineTo(x * P + P * 0.4 + rand() * P * 0.6, y * P + rand() * P);
         g.stroke();
-      };
-      if (land(x - 1, y)) edge(x * P, y * P, x * P, (y + 1) * P);
-      if (land(x + 1, y)) edge((x + 1) * P, y * P, (x + 1) * P, (y + 1) * P);
-      if (land(x, y - 1)) edge(x * P, y * P, (x + 1) * P, y * P);
-      if (land(x, y + 1)) edge(x * P, (y + 1) * P, (x + 1) * P, (y + 1) * P);
-      if (season !== 3 && rand() < 0.3) {
-        g.strokeStyle = 'rgba(255,255,255,0.25)';
-        g.lineWidth = 1;
-        edge(x * P + rand() * P * 0.6, y * P + rand() * P, x * P + P * 0.4 + rand() * P * 0.6, y * P + rand() * P);
       }
     }
   }
-  // Zones: fields, pastures, orchards and market squares, laid square or drawn as free shapes.
-  for (const b of s.buildings) if (BUILDINGS[b.type].zone) paintZone(g, b, P, season);
+  baseCache = { key, canvas: c };
+  return c;
+}
+
+/** Roads: continuous bands with a darker verge, bending at corners. */
+function paintRoads(g: CanvasRenderingContext2D, s: GameState, P: number, season: Season): void {
   // Roads: continuous bands with a darker verge, bending at corners. Roads
   // laid as free curves are drawn along their curve instead of tile by tile.
   const road = (x: number, y: number) => x >= 0 && y >= 0 && x < s.width && y < s.height && s.road[y * s.width + x] > 0;
@@ -171,10 +192,57 @@ export function groundTexture(s: GameState, season: Season): THREE.CanvasTexture
       }
     }
   }
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 8;
-  return tex;
+}
+
+function paintWater(g: CanvasRenderingContext2D, s: GameState, P: number, season: Season): void {
+  const W = s.width * P;
+  const H = s.height * P;
+  const small = document.createElement('canvas');
+  small.width = s.width;
+  small.height = s.height;
+  const sg = small.getContext('2d')!;
+  const img = sg.createImageData(s.width, s.height);
+  let any = false;
+  for (let i = 0; i < s.width * s.height; i++) {
+    const v = s.terrain[i] === 1 ? 255 : 0;
+    if (v) any = true;
+    img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = v;
+    img.data[i * 4 + 3] = 255;
+  }
+  if (!any) return;
+  sg.putImageData(img, 0, 0);
+  const mask = document.createElement('canvas');
+  mask.width = W;
+  mask.height = H;
+  const mg = mask.getContext('2d', { willReadFrequently: true })!;
+  mg.imageSmoothingEnabled = true;
+  mg.filter = `blur(${P * 0.4}px)`;
+  // Smoothing blends between tile centres, so the shore cuts across corners.
+  mg.drawImage(small, 0, 0, W, H);
+  mg.filter = 'none';
+  const m = mg.getImageData(0, 0, W, H).data;
+  const out = mg.createImageData(W, H);
+  const d = out.data;
+  const winter = season === 3;
+  const shallow = winter ? [176, 196, 210] : [86, 146, 184];
+  const deep = winter ? [150, 172, 190] : [52, 104, 150];
+  const sand = winter ? [232, 236, 232] : [216, 200, 144];
+  const ramp = (a: number, b: number, v: number) => Math.max(0, Math.min(1, (v - a) / (b - a)));
+  for (let k = 0; k < W * H; k++) {
+    const v = m[k * 4] / 255;
+    if (v < 0.3) continue;
+    const water = ramp(0.47, 0.53, v);
+    const depth = ramp(0.55, 0.95, v);
+    const o = k * 4;
+    for (let c = 0; c < 3; c++) {
+      const wc = shallow[c] + (deep[c] - shallow[c]) * depth;
+      d[o + c] = sand[c] + (wc - sand[c]) * water;
+    }
+    // The rim fades into the grass on the land side.
+    d[o + 3] = Math.round(255 * Math.max(water, ramp(0.3, 0.4, v)));
+  }
+  mg.putImageData(out, 0, 0);
+  g.drawImage(mask, 0, 0);
 }
 
 /** Traces a zone's outline: its drawn shape, or its rectangle with round corners. */

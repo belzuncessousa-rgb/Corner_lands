@@ -150,7 +150,7 @@ export class Game {
   private roadAnchor: { x: number; y: number } | null = null;
   /** First corner of a field, pasture or orchard being drawn. */
   private zoneAnchor: { x: number; y: number } | null = null;
-  private pinch: { dist: number; zoom: number } | null = null;
+  private pinch: { dist: number; zoom: number; angle: number } | null = null;
   private keys = new Set<string>();
 
   constructor() {
@@ -295,6 +295,7 @@ export class Game {
     }
     if (this.view3d) this.view3d.visible = on;
     this.renderer.threeD = on;
+    document.body.classList.toggle('three-d', on);
     // The flat view is never turned.
     if (!on) {
       this.turnTo = 0;
@@ -1128,7 +1129,7 @@ export class Game {
       this.lastPointer = { x: e.clientX, y: e.clientY };
       if (this.pointers.size === 2) {
         const [a, b] = [...this.pointers.values()];
-        this.pinch = { dist: Math.hypot(a.x - b.x, a.y - b.y), zoom: this.renderer.cam.zoom };
+        this.pinch = { dist: Math.hypot(a.x - b.x, a.y - b.y), zoom: this.renderer.cam.zoom, angle: Math.atan2(b.y - a.y, b.x - a.x) };
         this.dragFrom = null;
         this.dragTile = null;
         return;
@@ -1159,6 +1160,13 @@ export class Game {
         const [a, b] = [...this.pointers.values()];
         const d = Math.hypot(a.x - b.x, a.y - b.y);
         this.setZoom((this.pinch.zoom * d) / this.pinch.dist);
+        // A two-finger twist turns the 3D view a quarter round, the way the fingers turn.
+        let twist = Math.atan2(b.y - a.y, b.x - a.x) - this.pinch.angle;
+        twist = Math.atan2(Math.sin(twist), Math.cos(twist));
+        if (this.renderer.threeD && Math.abs(twist) > 0.6) {
+          this.turnView(Math.sign(twist));
+          this.pinch.angle += twist;
+        }
         return;
       }
       const df = this.dragFrom;

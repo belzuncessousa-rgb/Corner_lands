@@ -248,6 +248,13 @@ export class Hud {
       this.el[id] = root.querySelector(`#${id}`)!;
     }
     this.minimap = new Minimap(root, game.renderer, () => game.state);
+    // Turning the 3D view, for mice and touch screens alike ([ and ] on a keyboard).
+    const turn = document.createElement('div');
+    turn.id = 'turnbar';
+    turn.className = 'panel';
+    turn.innerHTML = '<button data-turn="-1" data-tip="Turn the view ( [ )">⟲</button><button data-turn="1" data-tip="Turn the view ( ] )">⟳</button>';
+    turn.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => game.turnView(Number(b.dataset.turn))));
+    root.appendChild(turn);
     root.addEventListener('click', (e) => this.onClick(e));
     root.addEventListener('mousemove', (e) => this.onTipMove(e));
     root.addEventListener('mouseleave', () => (this.el.tooltip.style.display = 'none'));

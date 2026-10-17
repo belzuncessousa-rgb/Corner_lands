@@ -455,6 +455,27 @@ button.active {
   background: #3a4a2a;
 }
 
+/* Turning the 3D view: two round buttons above the minimap, only in 3D. */
+#turnbar {
+  position: absolute;
+  right: 8px;
+  bottom: 116px;
+  display: none;
+  gap: 4px;
+  padding: 4px;
+}
+body.three-d #turnbar {
+  display: flex;
+}
+#turnbar button {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  font-size: 19px;
+  line-height: 1;
+  border-radius: 50%;
+}
+
 /* ------------------------------------------------------------ inspector */
 
 #inspector {
@@ -775,6 +796,9 @@ button.active {
   }
   #minimap {
     display: none;
+  }
+  #turnbar {
+    bottom: 96px;
   }
   #log {
     width: 240px;
