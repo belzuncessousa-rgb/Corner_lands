@@ -705,21 +705,54 @@ export class Game {
   private freeSpot(type: BuildingType, fx: number, fy: number): { cx: number; cy: number; rot: number } {
     const s = this.state;
     if (this.freeTurn !== null) return { cx: fx, cy: fy, rot: this.freeTurn };
-    // Face the nearest road tile within a few tiles: the front (+y) turned towards it.
     const d = BUILDINGS[type];
     const reach = Math.max(d.w, d.h) / 2 + 3;
-    let best: { x: number; y: number; d: number } | null = null;
-    for (let y = Math.floor(fy - reach); y <= Math.ceil(fy + reach); y++) {
-      for (let x = Math.floor(fx - reach); x <= Math.ceil(fx + reach); x++) {
-        if (!inBounds(s, x, y) || !s.road[idx(s, x, y)]) continue;
-        const dist = Math.hypot(x + 0.5 - fx, y + 0.5 - fy);
-        if (!best || dist < best.d) best = { x: x + 0.5, y: y + 0.5, d: dist };
+    // The nearest point of road, and which way the road runs there.
+    let best: { x: number; y: number; d: number; tx: number; ty: number } | null = null;
+    const consider = (x: number, y: number, tx: number, ty: number) => {
+      const dist = Math.hypot(x - fx, y - fy);
+      if (dist <= reach && (!best || dist < best.d)) best = { x, y, d: dist, tx, ty };
+    };
+    for (const cv of s.curves ?? []) {
+      const pts = curveSamples(cv.pts, 0.25);
+      for (let k = 0; k < pts.length; k++) {
+        const a = pts[Math.max(0, k - 1)];
+        const b = pts[Math.min(pts.length - 1, k + 1)];
+        consider(pts[k][0], pts[k][1], b[0] - a[0], b[1] - a[1]);
       }
     }
-    if (!best) return { cx: fx, cy: fy, rot: 0 };
-    // Snap the turn to 5° steps so rows of houses line up.
-    const raw = Math.atan2(-(best.x - fx), best.y - fy);
+    const road = (x: number, y: number) => inBounds(s, x, y) && s.road[idx(s, x, y)] > 0;
+    for (let y = Math.floor(fy - reach); y <= Math.ceil(fy + reach); y++) {
+      for (let x = Math.floor(fx - reach); x <= Math.ceil(fx + reach); x++) {
+        if (!road(x, y)) continue;
+        const across = road(x - 1, y) || road(x + 1, y);
+        const along = road(x, y - 1) || road(x, y + 1);
+        // A straight run: its direction; a crossing or a lone tile: none.
+        consider(x + 0.5, y + 0.5, across && !along ? 1 : 0, along && !across ? 1 : 0);
+      }
+    }
+    const b = best as { x: number; y: number; d: number; tx: number; ty: number } | null;
+    if (!b) return { cx: fx, cy: fy, rot: 0 };
+    let nx = fx - b.x;
+    let ny = fy - b.y;
+    const len = Math.hypot(b.tx, b.ty);
+    if (len > 0) {
+      // Square to the road: the normal on the pointer's side of it.
+      const px = -b.ty / len;
+      const py = b.tx / len;
+      const side = px * nx + py * ny >= 0 ? 1 : -1;
+      nx = px * side;
+      ny = py * side;
+    } else {
+      const l = Math.hypot(nx, ny) || 1;
+      nx /= l;
+      ny /= l;
+    }
+    // Front (+y, turned by rot) faces the road; snapped to 5° so rows line up.
+    const raw = Math.atan2(nx, -ny);
     const rot = Math.round(raw / (Math.PI / 36)) * (Math.PI / 36);
+    // Close to the road, the building steps back to stand just off its edge.
+    if (len > 0 && b.d < d.h / 2 + 1.6) return { cx: b.x + nx * (d.h / 2 + 0.45), cy: b.y + ny * (d.h / 2 + 0.45), rot };
     return { cx: fx, cy: fy, rot };
   }
 
@@ -1403,7 +1436,7 @@ function rangeHighlighter(s: GameState, type: BuildingType): ((i: number) => boo
 const game = new Game();
 // Handy hooks for debugging and automated screenshots.
 (window as unknown as Record<string, unknown>).game = game;
-(window as unknown as Record<string, unknown>).cl = { placeShape, placeOrder, buildRoad, planRoad, buyAnimal, stepDay, recompute, placementError, playBot, placeZone, setYard, keepOf, log };
+(window as unknown as Record<string, unknown>).cl = { layCurve, layRoads, placeShape, placeOrder, buildRoad, planRoad, buyAnimal, stepDay, recompute, placementError, playBot, placeZone, setYard, keepOf, log };
 
 /** Hands the player a file to save. */
 function download(blob: Blob, name: string): void {
