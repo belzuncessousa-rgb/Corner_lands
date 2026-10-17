@@ -347,7 +347,7 @@ export class Game {
         this.onNewMonth();
       }
     }
-    this.agents.update(this.state, gameDt);
+    this.agents.update(this.state, gameDt, this.simAcc / DAY_SECONDS);
     this.wildlife.update(this.state, gameDt);
     // Dusk only at normal speed: faster, the days would flicker.
     this.renderer.setDayTime(this.simAcc / DAY_SECONDS, !this.demo && this.speed <= 1, dt);

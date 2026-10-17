@@ -69,7 +69,12 @@ export class AgentSystem {
 
   private lastCartDay: number | null = null;
 
-  update(s: GameState, dt: number): void {
+  /** Dusk to night: villagers head home and the lanes go quiet until morning. */
+  private evening = false;
+
+  /** `dayFrac` is how far through the day it is (0 at dawn, 1 at the next). */
+  update(s: GameState, dt: number, dayFrac = 0.5): void {
+    this.evening = dayFrac > 0.8 && dayFrac < 0.97;
     // Each month, on market day, a merchant cart visits markets that export goods.
     // The first market day seen after a load sends no cart; later ones do.
     const marketDay = s.day % 10 === MARKET_DAY ? s.day : null;
@@ -338,6 +343,20 @@ export class AgentSystem {
   private decide(s: GameState, a: Agent): void {
     const r = a.role;
     if (r.kind === 'settler') return;
+    if (this.evening && (r.kind === 'work' || r.kind === 'build' || r.kind === 'idle')) {
+      // Evening: home to supper and bed. Those already in stay in.
+      const home = getBuilding(s, a.home);
+      if (!a.visible || !home) {
+        a.phase = 'inside';
+        a.visible = false;
+        a.timer = 1.5 + Math.random() * 2;
+        return;
+      }
+      a.carry = null;
+      const d = doorTile(s, home);
+      this.walkTo(s, a, d.x, d.y, [home.id], 'enter-home');
+      return;
+    }
     if (r.kind === 'cart') {
       if (r.leaving) {
         a.gone = true;

@@ -293,7 +293,7 @@ Note for later runs: when a feature players would notice goes in, add a line to 
 
 ### Phase 26 — Ideas for the next runs
 - [ ] A second map type: a river valley with islands and fords, or a hilly land with more rock and less soil, chosen on New Settlement
-- [ ] Villagers react to evening: they walk home at dusk and the lanes are quieter until morning
+- [x] Villagers react to evening: they walk home at dusk (lanterns lit) and stay in until morning; only newcomers on the road are out
 - [x] The uitest covers the new menus (photo mode, town files, seed link, music switch) so later changes cannot break them unnoticed
 
 ### Phase 27 — Hide the grid (art direction agreed: de-square first, AI art for standalone pictures later, 3D only as a separate experiment)
@@ -353,7 +353,7 @@ art, the logic and balance get this pass. Grouped by how deep each change goes.
 - [x] Stone roads easy to find: the button is "Stone road" and is there from the start (it used to appear only at Village rank)
 - [x] Trading post lists every good, in tabs by kind (Food, Materials, Goods); it used to show only basics and goods already seen
 - [x] Bug: the manor stopped improving in one playthrough (renovations never said what they were waiting for; now the upgrade box shows it, e.g. "Waiting for dressed stone in storage")
-- [~] Haulers visibly carry what they move (loads now drawn 1.7x larger; real haulers come with Phase 35)
+- [x] Haulers visibly carry what they move (loads drawn larger; storehouse and granary haulers fetch from the yards since Phase 35)
 - [x] Fishers sit in their boats (no legs or shadow); fewer duck families, five to seven ducklings each
 - [x] Less stone early: level 1 buildings are timber (wells, dairies, sawpits, tanneries, windmills, Timber Houses); stone is for better buildings
 - [x] Coins only for what must be imported: woodcutter and forester cost timber only, as do markets, taverns, smithies and upgrades; orchards, decorations and backyard extensions cost coins (and some materials); great works keep coins for their bells, glass and the like. Taxes halved and the start purse 100, so coins are hard to come by and worth spending. A woodcutter's lodge can always be built: with no timber in store its builders fell trees on the spot
@@ -367,7 +367,7 @@ art, the logic and balance get this pass. Grouped by how deep each change goes.
 - [x] Mushrooms to gather (visible on the map at the wood's edge, coming up in late summer and autumn)
 
 ### Phase 36 — Villagers' days
-- [x] Villagers spend time on their needs: each household's walks to market (3 a month), the well (4), church (1) and the tavern (2) are taken off everyone's working time, up to 35%; the villagers panel shows the share and the Steward warns when it runs high. Workers are seen fetching baskets from the market and pails from the well. (Sleeping is not modelled yet.)
+- [x] Villagers spend time on their needs: each household's walks to market (3 a month), the well (4), church (1) and the tavern (2) are taken off everyone's working time, up to 35%; the villagers panel shows the share and the Steward warns when it runs high. Workers are seen fetching baskets from the market and pails from the well. (At dusk everyone goes home to sleep.)
 - [x] Food and goods can only be had where there is a market: homes out of reach of a staffed market go without (a new town's first two months live off the settlers' cart)
 - [x] The market is free: a drawn area (3 to 8 tiles a side) where stalls pop up, one for every six tiles, each with a vendor hired right after the food makers. Old market buildings become 3×3 squares
 - [x] Trade with the outside world needs a Trading Post (its own building, separate from the market): buying, selling and the merchants' monthly visit
