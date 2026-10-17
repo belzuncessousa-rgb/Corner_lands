@@ -369,6 +369,8 @@ export interface GameState {
   roadWork?: number;
   /** Roads laid as free curves: the clicked bends, dirt or paved, and the tiles under them. */
   curves?: { pts: [number, number][]; paved: boolean; tiles: number[] }[];
+  /** Town walls laid as free curves: the clicked bends and the tiles under them (roads it crosses are gates). */
+  wallCurves?: { pts: [number, number][]; tiles: number[] }[];
   /** Years that ended with no one having gone hungry. */
   fedYears?: number;
   /** The cathedral holds a relic (bought from a travelling friar). */

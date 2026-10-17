@@ -1694,3 +1694,45 @@ describe('curved roads', () => {
     expect(s.road[tiles[0]]).toBe(1);
   });
 });
+
+describe('curved town walls', () => {
+  it('a wall laid along a curve takes the clear tiles under it and leaves gates on roads', async () => {
+    const { layWallCurve, wallCurveError, buildRoad } = await import('../src/game/sim');
+    const s = generateWorld(18);
+    s.tier = 4;
+    s.res.stone = 9999;
+    s.res.dressedstone = 9999;
+    s.res.gold = 9999;
+    s.res.wood = 999;
+    const hall = seatOf(s)!;
+    const ox = hall.x + 8;
+    const oy = hall.y - 6;
+    for (let y = oy - 2; y < oy + 14; y++)
+      for (let x = ox - 2; x < ox + 14; x++) {
+        const i = y * s.width + x;
+        if (s.occ[i] >= 0) continue;
+        s.terrain[i] = 0;
+        s.trees[i] = 0;
+        s.rock[i] = 0;
+        s.ore[i] = 0;
+        s.road[i] = 0;
+      }
+    for (let x = ox; x < ox + 10; x++) buildRoad(s, x, oy + 5);
+    const pts: [number, number][] = [
+      [ox + 4.5, oy + 0.5],
+      [ox + 6.2, oy + 5.5],
+      [ox + 4.5, oy + 10.5],
+    ];
+    expect(wallCurveError(s, [pts[0]])).toMatch(/Click/);
+    expect(wallCurveError(s, pts)).toBeNull();
+    const n = layWallCurve(s, pts);
+    expect(n).toBeGreaterThan(8);
+    const cv = s.wallCurves![0];
+    const walls = cv.tiles.filter((i) => s.buildings.some((b) => b.type === 'wall' && b.y * s.width + b.x === i));
+    expect(walls.length).toBe(n);
+    // The road it crosses stays a road: a gate.
+    expect(cv.tiles.some((i) => s.road[i] > 0)).toBe(true);
+    const back = deserialize(serialize(s));
+    expect(back.wallCurves![0].pts).toEqual(cv.pts);
+  });
+});

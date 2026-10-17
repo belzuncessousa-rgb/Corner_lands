@@ -6,7 +6,7 @@ import type { Building, GameState, Season } from '../game/types';
 import { TREE_SLOTS, variantOf } from '../render/renderer';
 import { bushSprite, fruitTreeSprite, rockSprite, treeSprite } from '../render/sprites';
 import type { Sprite, TreeKind } from '../render/sprites';
-import { buildingModel, groundTexture } from './scene3d';
+import { buildingModel, groundTexture, wallsModel } from './scene3d';
 import { VIEW, turnPoint } from '../render/pen';
 
 /**
@@ -249,6 +249,7 @@ export class View3D {
     const season = seasonOf(s.day);
     this.syncGround(s, season);
     this.syncBuildings(s, season);
+    this.syncWalls(s, season);
     this.syncObjects(s, season);
     this.moving.begin();
     for (const f of figures) this.moving.add(f.sprite, f.x, f.y);
@@ -292,6 +293,8 @@ export class View3D {
     this.seed = s.seed;
     for (const { obj } of this.buildings.values()) this.scene.remove(obj);
     this.buildings.clear();
+    if (this.walls) this.scene.remove(this.walls.obj);
+    this.walls = null;
     this.groundKey = '';
     this.objectsKey = '';
     this.ground.scale.set(s.width, s.height, 1);
@@ -313,6 +316,25 @@ export class View3D {
     mat.map?.dispose();
     mat.map = groundTexture(s, season);
     mat.needsUpdate = true;
+  }
+
+  private walls: { key: string; obj: THREE.Object3D } | null = null;
+
+  /** Rebuilds the town walls when a section is laid, finished or pulled down. */
+  private syncWalls(s: GameState, season: Season): void {
+    let sum = season;
+    for (const b of s.buildings) if (b.type === 'wall') sum = (sum * 31 + b.id * 7 + (b.build >= 1 ? 1 : 0)) >>> 0;
+    for (let i = 0; i < s.road.length; i++) if (s.road[i]) sum = (sum * 17 + i) >>> 0;
+    const key = `${sum}:${(s.wallCurves ?? []).length}`;
+    if (this.walls?.key === key) return;
+    if (this.walls) this.scene.remove(this.walls.obj);
+    const obj = wallsModel(s, season);
+    obj.traverse((o) => {
+      o.castShadow = true;
+      o.receiveShadow = true;
+    });
+    this.scene.add(obj);
+    this.walls = { key, obj };
   }
 
   /** Adds, removes and rebuilds building models as the town changes. */

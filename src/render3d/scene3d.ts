@@ -455,3 +455,130 @@ export function isoCamera(width: number, height: number, target: { x: number; y:
   cam.lookAt(target.x, 0, target.y);
   return cam;
 }
+
+// ---------------------------------------------------------------- town walls
+
+const WALL_STONE = '#b5ac9b';
+const WALL_TOP = '#cdc4b3';
+const WALL_H = 24;
+const wallModels = new Map<string, THREE.Group>();
+
+function wallPiece(key: string, draw: (p: Pen3D) => void, snow: boolean): THREE.Group {
+  const k = `${key}:${snow}`;
+  let m = wallModels.get(k);
+  if (!m) {
+    const p = new Pen3D();
+    p.snow = snow;
+    draw(p);
+    m = p.build();
+    wallModels.set(k, m);
+  }
+  return m;
+}
+
+/** A stretch of wall `len` tiles long along +x, with merlons along the top. */
+function wallSegment(len: number, snow: boolean): THREE.Group {
+  const q = Math.max(1, Math.round(len * 20));
+  return wallPiece(`seg:${q}`, (p) => {
+    const l = q / 20;
+    p.box(0, -0.16, l, 0.16, 0, WALL_H, WALL_STONE, WALL_TOP, 'stone');
+    for (let x = 0.04; x + 0.12 <= l; x += 0.3) p.box(x, -0.16, x + 0.13, 0.16, WALL_H, 5, WALL_STONE, WALL_TOP, 'stone');
+  }, snow);
+}
+
+/** A round-cornered tower at a bend or an end of the wall, with a slate cap. */
+function wallTower(snow: boolean): THREE.Group {
+  return wallPiece('tower', (p) => {
+    p.box(-0.3, -0.3, 0.3, 0.3, 0, WALL_H + 14, WALL_STONE, WALL_TOP, 'stone');
+    p.roofPyramid(-0.3, -0.3, 0.3, 0.3, WALL_H + 14, 20, 'slate', 0.06);
+  }, snow);
+}
+
+/** A gatehouse over a road: an arch between two short towers, along +x. */
+function wallGate(snow: boolean): THREE.Group {
+  return wallPiece('gate', (p) => {
+    for (const x of [-0.62, 0.32]) {
+      p.box(x, -0.26, x + 0.3, 0.26, 0, WALL_H + 10, WALL_STONE, WALL_TOP, 'stone');
+      p.roofPyramid(x, -0.26, x + 0.3, 0.26, WALL_H + 10, 14, 'slate', 0.05);
+    }
+    p.box(-0.32, -0.2, 0.32, 0.2, WALL_H - 6, 8, WALL_STONE, WALL_TOP, 'stone');
+  }, snow);
+}
+
+function placeAlong(m: THREE.Group, ax: number, ay: number, bx: number, by: number, lift = 1): THREE.Object3D {
+  const o = m.clone();
+  o.position.set(ax, 0, ay);
+  o.rotation.y = -Math.atan2(by - ay, bx - ax);
+  o.scale.y = lift;
+  return o;
+}
+
+/**
+ * The town walls in 3D: walls laid on the grid join from tile centre to
+ * tile centre, walls laid as curves follow their curve; towers stand at
+ * ends and bends, gatehouses where a wall crosses a road. Unfinished
+ * sections show as low courses.
+ */
+export function wallsModel(s: GameState, season: Season): THREE.Group {
+  const g = new THREE.Group();
+  const snow = season === 3;
+  const W = s.width;
+  const wallAt = (x: number, y: number) => {
+    if (x < 0 || y < 0 || x >= W || y >= s.height) return null;
+    const id = s.occ[y * W + x];
+    const b = id >= 0 ? s.buildings.find((o) => o.id === id) : undefined;
+    return b?.type === 'wall' ? b : null;
+  };
+  const lift = (b: { build: number } | null) => (b && b.build >= 1 ? 1 : 0.3);
+  const curved = new Set<number>();
+  for (const cv of s.wallCurves ?? []) for (const i of cv.tiles) curved.add(i);
+  // Walls along curves.
+  for (const cv of s.wallCurves ?? []) {
+    const pts = curveSamples(cv.pts, 0.3);
+    let inGate = false;
+    for (let k = 0; k + 1 < pts.length; k++) {
+      const [ax, ay] = pts[k];
+      const [bx, by] = pts[k + 1];
+      const mx = Math.floor((ax + bx) / 2);
+      const my = Math.floor((ay + by) / 2);
+      const w = wallAt(mx, my);
+      const road = mx >= 0 && my >= 0 && mx < W && my < s.height && s.road[my * W + mx] > 0;
+      if (road && !inGate) g.add(placeAlong(wallGate(snow), (ax + bx) / 2, (ay + by) / 2, bx, by));
+      inGate = road;
+      if (w) g.add(placeAlong(wallSegment(Math.hypot(bx - ax, by - ay) + 0.02, snow), ax, ay, bx, by, lift(w)));
+    }
+    const [sx, sy] = pts[0];
+    const [ex, ey] = pts[pts.length - 1];
+    if (wallAt(Math.floor(sx), Math.floor(sy))) g.add(placeAlong(wallTower(snow), sx, sy, sx + 1, sy));
+    if (wallAt(Math.floor(ex), Math.floor(ey))) g.add(placeAlong(wallTower(snow), ex, ey, ex + 1, ey));
+  }
+  // Walls on the grid.
+  for (const b of s.buildings) {
+    if (b.type !== 'wall' || curved.has(b.y * W + b.x)) continue;
+    const cx = b.x + 0.5;
+    const cy = b.y + 0.5;
+    const n: [number, number][] = [];
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+      const o = wallAt(b.x + dx, b.y + dy);
+      if (o && !curved.has((b.y + dy) * W + b.x + dx)) {
+        n.push([dx, dy]);
+        // Each joint once: to the right and downwards.
+        if (dx > 0 || dy > 0) g.add(placeAlong(wallSegment(1, snow), cx, cy, cx + dx, cy + dy, Math.min(lift(b), lift(o))));
+      }
+      // A road with wall beyond it: a gate across it.
+      const rx = b.x + dx;
+      const ry = b.y + dy;
+      if ((dx > 0 || dy > 0) && rx < W && ry < s.height && s.road[ry * W + rx] > 0 && wallAt(b.x + 2 * dx, b.y + 2 * dy)) {
+        g.add(placeAlong(wallGate(snow), rx + 0.5, ry + 0.5, rx + 0.5 + dx, ry + 0.5 + dy));
+        g.add(placeAlong(wallSegment(0.5, snow), cx, cy, cx + dx * 0.5, cy + dy * 0.5, lift(b)));
+        const far = wallAt(b.x + 2 * dx, b.y + 2 * dy)!;
+        g.add(placeAlong(wallSegment(0.5, snow), cx + dx * 1.5, cy + dy * 1.5, cx + dx * 2, cy + dy * 2, lift(far)));
+      }
+    }
+    // Towers at ends and corners, and every sixth section along a run.
+    const straight = n.length === 2 && n[0][0] === -n[1][0] && n[0][1] === -n[1][1];
+    if (b.build >= 1 && (!straight || (b.x + b.y) % 6 === 0)) g.add(placeAlong(wallTower(snow), cx, cy, cx + 1, cy));
+    if (!n.length) g.add(placeAlong(wallSegment(0.6, snow), cx - 0.3, cy, cx + 0.3, cy, lift(b)));
+  }
+  return g;
+}

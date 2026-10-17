@@ -48,6 +48,8 @@ import {
   freePlacementError,
   placeFree,
   curveError,
+  layWallCurve,
+  wallCurveError,
   placeShape,
   shapeError,
   layCurve,
@@ -619,7 +621,7 @@ export class Game {
             : `Protected wood ${w}×${h} · ${trees} tree${trees === 1 ? "" : "s"} kept standing · click to mark it`,
         big,
       );
-    } else if (tool.kind === 'road' && tool.wall) {
+    } else if (tool.kind === 'road' && tool.wall && !this.curving()) {
       // Town walls: laid like a road; road tiles become gates.
       const tiles = this.roadTiles(tx, ty);
       const gate = (t: { x: number; y: number }) => inBounds(s, t.x, t.y) && s.road[idx(s, t.x, t.y)] > 0;
@@ -636,6 +638,30 @@ export class Game {
             : 'Click where the wall starts, then where it ends · roads it crosses get gate towers',
         !!err,
       );
+    } else if (tool.kind === 'road' && tool.wall && this.curving()) {
+      // A town wall along a free curve: sections on clear tiles, gates over roads.
+      const pts: [number, number][] = [...this.curvePts, [ftx, fty]];
+      const c = BUILDINGS.wall.cost;
+      if (pts.length >= 2) {
+        ov.curve = curveSamples(pts, 0.25);
+        ov.tiles = curveTiles(s, pts).map((i) => {
+          const x = i % s.width;
+          const y = (i - x) / s.width;
+          return { x, y, ok: s.road[i] > 0 || !placementError(s, 'wall', x, y) };
+        });
+        ov.tileColor = 'road';
+        const n = ov.tiles.filter((t) => !s.road[idx(s, t.x, t.y)] && !placementError(s, 'wall', t.x, t.y)).length;
+        const gates = ov.tiles.filter((t) => s.road[idx(s, t.x, t.y)] > 0).length;
+        const err = wallCurveError(s, pts);
+        this.hud.setHint(
+          err
+            ? `Town wall: ${err}`
+            : `Town wall: ${n} sections · ${n * (c.stone ?? 0)} stone, ${n * (c.dressedstone ?? 0)} dressed stone, ${n * (c.gold ?? 0)} coins${gates ? ` · ${gates} gate${gates > 1 ? 's' : ''}` : ''} · click to add a bend · click the last bend again, Enter or right-click to finish`,
+          !!err,
+        );
+      } else {
+        this.hud.setHint(isUnlocked(s, 'wall') ? 'Town wall: click where it starts, then each bend; it follows a smooth curve · roads it crosses get gates' : `Town walls: ${lockReason(s, 'wall')}`, !isUnlocked(s, 'wall'));
+      }
     } else if (tool.kind === 'road' && this.curving()) {
       const pts = [...this.curvePts, this.snapToRoad(ftx, fty)];
       if (pts.length >= 2) {
@@ -882,9 +908,9 @@ export class Game {
   /** Bends of the curved road being drawn (3D view), in tiles. */
   private curvePts: [number, number][] = [];
 
-  /** Roads are drawn as free curves in the 3D view (walls stay on the grid). */
+  /** Roads and town walls are drawn as free curves in the 3D view. */
   private curving(): boolean {
-    return this.tool.kind === 'road' && !this.tool.wall && this.renderer.threeD && !!this.view3d;
+    return this.tool.kind === 'road' && this.renderer.threeD && !!this.view3d;
   }
 
   /** Starts and ends snap to a road close by, so curves join the network. */
@@ -909,7 +935,8 @@ export class Game {
 
   private clickCurve(fx: number, fy: number): void {
     if (!inBounds(this.state, Math.floor(fx), Math.floor(fy))) return;
-    const p = this.snapToRoad(fx, fy);
+    // Roads snap onto roads close by; walls go exactly where clicked.
+    const p: [number, number] = this.tool.kind === 'road' && this.tool.wall ? [fx, fy] : this.snapToRoad(fx, fy);
     const last = this.curvePts[this.curvePts.length - 1];
     // Clicking the last bend again finishes the road.
     if (last && Math.hypot(last[0] - p[0], last[1] - p[1]) < 0.5) {
@@ -965,6 +992,12 @@ export class Game {
     const pts = this.curvePts;
     this.curvePts = [];
     if (pts.length < 2) return;
+    if (this.tool.kind === 'road' && this.tool.wall) {
+      const err = wallCurveError(s, pts);
+      if (err) this.hud.flash(err);
+      else if (layWallCurve(s, pts)) this.hud.sound('stone');
+      return;
+    }
     const paved = this.tool.kind === 'road' && !!this.tool.paved;
     const err = curveError(s, pts, paved);
     if (err) {
@@ -1436,7 +1469,7 @@ function rangeHighlighter(s: GameState, type: BuildingType): ((i: number) => boo
 const game = new Game();
 // Handy hooks for debugging and automated screenshots.
 (window as unknown as Record<string, unknown>).game = game;
-(window as unknown as Record<string, unknown>).cl = { layCurve, layRoads, placeShape, placeOrder, buildRoad, planRoad, buyAnimal, stepDay, recompute, placementError, playBot, placeZone, setYard, keepOf, log };
+(window as unknown as Record<string, unknown>).cl = { layWallCurve, layCurve, layRoads, placeShape, placeOrder, buildRoad, planRoad, buyAnimal, stepDay, recompute, placementError, playBot, placeZone, setYard, keepOf, log };
 
 /** Hands the player a file to save. */
 function download(blob: Blob, name: string): void {

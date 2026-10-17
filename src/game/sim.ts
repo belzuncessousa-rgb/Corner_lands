@@ -562,6 +562,38 @@ export function layCurve(s: GameState, pts: [number, number][], paved = false): 
   return n;
 }
 
+/** Why a town wall cannot follow this curve, or null. */
+export function wallCurveError(s: GameState, pts: [number, number][]): string | null {
+  if (!isUnlocked(s, 'wall')) return lockReason(s, 'wall');
+  if (pts.length < 2) return 'Click where the wall should bend, then where it ends';
+  let fresh = 0;
+  for (const i of curveTiles(s, pts)) {
+    const x = i % s.width;
+    const y = (i - x) / s.width;
+    if (s.road[i] > 0) continue;
+    if (!placementError(s, 'wall', x, y)) fresh++;
+  }
+  return fresh ? null : 'No room for a wall there';
+}
+
+/**
+ * Lays a town wall along a free curve: a section on every clear tile under
+ * it, and gates where it crosses a road. Returns the sections ordered.
+ */
+export function layWallCurve(s: GameState, pts: [number, number][]): number {
+  if (wallCurveError(s, pts)) return 0;
+  const tiles = curveTiles(s, pts);
+  let n = 0;
+  for (const i of tiles) {
+    const x = i % s.width;
+    const y = (i - x) / s.width;
+    if (s.road[i] > 0 || placementError(s, 'wall', x, y)) continue;
+    if (placeOrder(s, 'wall', x, y)) n++;
+  }
+  (s.wallCurves ??= []).push({ pts: pts.map(([x, y]) => [x, y] as [number, number]), tiles });
+  return n;
+}
+
 export function demolish(s: GameState, b: Building): boolean {
   if (b.type === 'townhall' && b.build >= 1) return false;
   const d = BUILDINGS[b.type];
