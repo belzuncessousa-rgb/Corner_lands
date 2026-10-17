@@ -359,12 +359,12 @@ art, the logic and balance get this pass. Grouped by how deep each change goes.
 - [x] Coins only for what must be imported: woodcutter and forester cost timber only, as do markets, taverns, smithies and upgrades; orchards, decorations and backyard extensions cost coins (and some materials); great works keep coins for their bells, glass and the like. Taxes halved and the start purse 100, so coins are hard to come by and worth spending. A woodcutter's lodge can always be built: with no timber in store its builders fell trees on the spot
 
 ### Phase 35 — How work and goods move
-- [ ] Yield is throughput: what a workplace makes depends on how much its workers get done in a day (walking included)
+- [x] Yield is throughput: what a workplace makes depends on how much its workers get done in a day (walking included). It already was; now the walk to the resource counts for hunters and fishers too, and served workplaces skip the walk to storage
 - [x] Workplaces have more jobs and each worker yields less, so labour is a real (but not harsh) concern; idle workers become rare (crews of workplaces that make things are half as large again; a full crew makes what it did)
 - [x] Workplaces keep a small local store; granary and warehouse workers fetch from them (a yard of 30; two haulers per storehouse or granary, staffed right after raw materials; served workplaces no longer lose time walking to storage; without a working store, workers carry their goods themselves as before)
-- [ ] No gathering areas: foragers, hunters and fishers go as far as they must, and the walking costs them time
-- [ ] Resources are concentrated but sparse: stone, berries and mushrooms in patches, hunting in the woods where deer and rabbits roam, fishing where fish shoal. Animals keep to their region and clearing the forest drives them off
-- [ ] Mushrooms to gather (visible on the map)
+- [x] No gathering areas: woodcutters, quarries, mines, foragers, hunters and fishers go to the nearest of what they gather (up to 26 tiles), and the walking costs them time. No range circle when placing them: the hint says how far the nearest is
+- [x] Resources are concentrated but sparse: stone in fewer, deeper outcrops; berries and mushrooms in patches; deer herds in woodland glades and rabbit warrens at wood edges; fish in shoals. Herds recover each month unless overhunted; clearing or building over their woods drives them to better cover, or they dwindle
+- [x] Mushrooms to gather (visible on the map at the wood's edge, coming up in late summer and autumn)
 
 ### Phase 36 — Villagers' days
 - [ ] Villagers spend time on their needs: fetch food and goods at the market, water at the well, go to church, the tavern, and sleep once a "day" (a month)

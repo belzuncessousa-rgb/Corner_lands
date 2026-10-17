@@ -3,6 +3,7 @@ import {
   CARRY_LOAD,
   DAYS_PER_MONTH,
   DAYS_PER_YEAR,
+  GATHER_REACH,
   HAUL_LOAD,
   OFFROAD_TILES_PER_DAY,
   RESOURCE_STORAGE,
@@ -44,7 +45,7 @@ import {
 import { Heap } from './path';
 import { checkQuests } from './quests';
 import { StateRng } from './rng';
-import type { Building, BuildingType, Category, Cost, GameState, MessageKind, ResourceId, Season } from './types';
+import type { Building, BuildingType, Category, Cost, GameState, Herd, MessageKind, ResourceId, Season, Shoal } from './types';
 import { RESOURCE_IDS } from './types';
 import { getBuilding, idx, inBounds, makeBuilding, placeBuilding, removeBuilding, setRoad } from './world';
 
@@ -690,6 +691,31 @@ export function countInRadius(
   return n;
 }
 
+/** How far the nearest of what a gatherer gathers lies from a spot (null if none within reach). */
+export function nearestResource(s: GameState, type: BuildingType, c: { x: number; y: number }): number | null {
+  const d = BUILDINGS[type];
+  let best: number | null = null;
+  const consider = (dist: number) => {
+    if (dist <= GATHER_REACH && (best === null || dist < best)) best = dist;
+  };
+  if (type === 'hunter') for (const h of s.herds ?? []) h.n >= 1 && consider(Math.hypot(h.x - c.x, h.y - c.y));
+  else if (type === 'fisher') for (const h of s.shoals ?? []) h.n >= 1 && consider(Math.hypot(h.x - c.x, h.y - c.y));
+  else {
+    const has: Partial<Record<string, (i: number) => boolean>> = {
+      trees: (i) => s.trees[i] > 0 && !inGrove(s, i),
+      rock: (i) => s.rock[i] > 0,
+      ore: (i) => s.ore[i] > 0,
+      berries: (i) => s.berriesMax[i] > 0,
+    };
+    const pred = has[d.gathers ?? ''];
+    if (!pred) return null;
+    forTilesInRadius(s, c, GATHER_REACH, (i, _x, _y, dist) => {
+      if (pred(i)) consider(dist);
+    });
+  }
+  return best;
+}
+
 /** Amount of the gathered map resource available around a spot. */
 export function resourceInRange(s: GameState, type: BuildingType, c: { x: number; y: number }): number {
   const d = BUILDINGS[type];
@@ -697,7 +723,8 @@ export function resourceInRange(s: GameState, type: BuildingType, c: { x: number
     case 'trees':
       return countInRadius(s, c, d.radius, (i) => s.trees[i] > 0 && !inGrove(s, i));
     case 'forest':
-      return countInRadius(s, c, d.radius, (i) => s.trees[i] > 0);
+      // Game: the animals of the herds within a fair walk.
+      return Math.floor((s.herds ?? []).reduce((n, h) => n + (Math.hypot(h.x - c.x, h.y - c.y) <= GATHER_REACH / 2 ? h.n : 0), 0));
     case 'rock':
       return countInRadius(s, c, d.radius, (i) => s.rock[i] > 0);
     case 'ore':
@@ -705,6 +732,7 @@ export function resourceInRange(s: GameState, type: BuildingType, c: { x: number
     case 'berries':
       return countInRadius(s, c, d.radius, (i) => s.berriesMax[i] > 0);
     case 'water':
+      if (type === 'fisher') return Math.floor((s.shoals ?? []).reduce((n, h) => n + (Math.hypot(h.x - c.x, h.y - c.y) <= GATHER_REACH / 2 ? h.n : 0), 0));
       return countInRadius(s, c, d.radius, (i) => s.terrain[i] === 1);
     default:
       return 0;
@@ -1115,7 +1143,15 @@ function recipeReady(s: GameState, b: Building, r: Recipe): boolean {
   if (!recipeInMonth(r, monthOf(s.day))) return false;
   if (!canAfford(s, r.inputs)) return false;
   if (b.type === 'forager' && r.id === 'berries') {
-    return countInRadius(s, bCenter(b), BUILDINGS.forager.radius, (i) => s.berries[i] > 0) > 0;
+    return countInRadius(s, bCenter(b), GATHER_REACH, (i) => s.berries[i] > 0) > 0;
+  }
+  if (b.type === 'forager' && r.id === 'mushrooms') {
+    const c = bCenter(b);
+    for (const k in s.mushrooms ?? {}) {
+      const i = Number(k);
+      if ((s.mushrooms![k] ?? 0) > 0 && Math.hypot((i % s.width) + 0.5 - c.x, Math.floor(i / s.width) + 0.5 - c.y) <= GATHER_REACH) return true;
+    }
+    return false;
   }
   return true;
 }
@@ -1356,6 +1392,87 @@ export function dailyHaul(s: GameState): void {
   }
 }
 
+/** The nearest herd with game to hunt, within reach. */
+export function nearestHerd(s: GameState, b: Building): Herd | null {
+  const c = bCenter(b);
+  let best: Herd | null = null;
+  let bd = Infinity;
+  for (const h of s.herds ?? []) {
+    if (h.n < 1) continue;
+    const d = Math.hypot(h.x - c.x, h.y - c.y);
+    if (d <= GATHER_REACH && d < bd) {
+      bd = d;
+      best = h;
+    }
+  }
+  return best;
+}
+
+/** The nearest shoal with fish to catch, within reach. */
+export function nearestShoal(s: GameState, b: Building): Shoal | null {
+  const c = bCenter(b);
+  let best: Shoal | null = null;
+  let bd = Infinity;
+  for (const h of s.shoals ?? []) {
+    if (h.n < 1) continue;
+    const d = Math.hypot(h.x - c.x, h.y - c.y);
+    if (d <= GATHER_REACH && d < bd) {
+      bd = d;
+      best = h;
+    }
+  }
+  return best;
+}
+
+/**
+ * Each month the game recovers where the woods are quiet. Herds whose woods
+ * are cleared or crowded by the town move off to better cover, or dwindle
+ * if there is none; fish shoals refill, slowly in winter.
+ */
+export function natureMonthly(s: GameState, rng: StateRng): void {
+  const winter = seasonOf(s.day) === 3;
+  const cover = (x: number, y: number) => countInRadius(s, { x, y }, 4, (i) => s.trees[i] > 0);
+  const crowd = (x: number, y: number) => countInRadius(s, { x, y }, 4, (i) => s.occ[i] >= 0 || s.road[i] > 0);
+  for (const h of s.herds ?? []) {
+    const need = h.kind === 'deer' ? 18 : 6;
+    const here = cover(h.x, h.y) - crowd(h.x, h.y) * 3;
+    if (here < need) {
+      // Look for better cover nearby.
+      let best: { x: number; y: number; v: number } | null = null;
+      for (let k = 0; k < 30; k++) {
+        const x = Math.floor(h.x + (rng.next() * 2 - 1) * 14);
+        const y = Math.floor(h.y + (rng.next() * 2 - 1) * 14);
+        if (!inBounds(s, x, y) || s.terrain[idx(s, x, y)]) continue;
+        const v = cover(x, y) - crowd(x, y) * 3;
+        if (v >= need && (!best || v > best.v)) best = { x, y, v };
+      }
+      if (best) {
+        h.x = best.x + 0.5;
+        h.y = best.y + 0.5;
+      } else {
+        h.n = Math.max(0, h.n - 1);
+      }
+      continue;
+    }
+    if (!winter) h.n = Math.min(h.max, h.n + (h.kind === 'deer' ? 1 : 2));
+  }
+  for (const sh of s.shoals ?? []) sh.n = Math.min(sh.max, sh.n + (winter ? 1 : 3));
+  // Mushrooms come up in late summer and autumn, a few in spring.
+  const m = monthOf(s.day);
+  if (s.mushroomsMax && (m >= 5 && m <= 8 || m === 2)) {
+    s.mushrooms ??= {};
+    for (const k in s.mushroomsMax) {
+      const i = Number(k);
+      if (!s.trees[i]) {
+        delete s.mushroomsMax[k];
+        delete s.mushrooms[k];
+        continue;
+      }
+      s.mushrooms[k] = Math.min(s.mushroomsMax[k], (s.mushrooms[k] ?? 0) + 1);
+    }
+  }
+}
+
 /** Performs one production cycle. Returns a status string on failure. */
 function produce(s: GameState, b: Building, rng: StateRng): string | null {
   const d = workDef(b);
@@ -1372,8 +1489,8 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
       const e = enoughOf(s, r.outputs);
       if (e) return `Enough ${GOODS[e].name.toLowerCase()} in store`;
       if (fullFor(s, r.outputs)) return 'Storage full';
-      const t = nearestTile(s, b, d.radius, (i, dist) => (s.trees[i] > 0 && !inGrove(s, i) ? dist - s.trees[i] * 1.2 : null));
-      if (t < 0) return s.groves?.length && nearestTile(s, b, d.radius, (i, dist) => (s.trees[i] > 0 ? dist : null)) >= 0 ? 'Only protected woods in range' : 'No trees in range';
+      const t = nearestTile(s, b, GATHER_REACH, (i, dist) => (s.trees[i] > 0 && !inGrove(s, i) ? dist - s.trees[i] * 1.2 : null));
+      if (t < 0) return s.groves?.length && nearestTile(s, b, GATHER_REACH, (i, dist) => (s.trees[i] > 0 ? dist : null)) >= 0 ? 'Only protected woods within reach' : 'No trees within reach';
       b.resDist = tileDist(s, b, t);
       s.trees[t]--;
       if (s.trees[t] === 0) (s.stumps ??= {})[t] = s.day;
@@ -1401,8 +1518,8 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
       const arr = b.type === 'quarry' ? s.rock : s.ore;
       const out = b.type === 'quarry' ? 'stone' : 'ore';
       if (roomFor(s, out) <= 0) return 'Storage full';
-      const t = nearestTile(s, b, d.radius, (i, dist) => (arr[i] > 0 ? dist : null));
-      if (t < 0) return b.type === 'quarry' ? 'No rock in range' : 'No ore in range';
+      const t = nearestTile(s, b, GATHER_REACH, (i, dist) => (arr[i] > 0 ? dist : null));
+      if (t < 0) return b.type === 'quarry' ? 'No rock within reach' : 'No ore within reach';
       b.resDist = tileDist(s, b, t);
       // Deep shafts never exhaust a vein.
       if (!(b.type === 'mine' && hasCharter(s, 'metal1'))) arr[t]--;
@@ -1418,32 +1535,52 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
       if (fixedEnough) return `Enough ${GOODS[fixedEnough].name.toLowerCase()} in store`;
       if (fullFor(s, r.outputs)) return 'Storage full';
       if (r.id === 'berries') {
-        const t = nearestTile(s, b, d.radius, (i, dist) => (s.berries[i] > 0 ? dist : null));
+        const t = nearestTile(s, b, GATHER_REACH, (i, dist) => (s.berries[i] > 0 ? dist : null));
         if (t < 0) {
-          return countInRadius(s, bCenter(b), d.radius, (i) => s.berriesMax[i] > 0) > 0
+          return countInRadius(s, bCenter(b), GATHER_REACH, (i) => s.berriesMax[i] > 0) > 0
             ? 'Bushes picked clean for now'
-            : 'No berry bushes in range';
+            : 'No berry bushes within reach';
         }
         b.resDist = tileDist(s, b, t);
         s.berries[t]--;
+      } else if (r.id === 'mushrooms') {
+        // Mushrooms come up in rings in the old woods, and are picked out.
+        const m = s.mushrooms ?? {};
+        let best = -1;
+        let bd = Infinity;
+        for (const k in m) {
+          if ((m[k] ?? 0) <= 0) continue;
+          const dd = tileDist(s, b, Number(k));
+          if (dd <= GATHER_REACH && dd < bd) {
+            bd = dd;
+            best = Number(k);
+          }
+        }
+        if (best < 0) return Object.keys(s.mushroomsMax ?? {}).length ? 'Mushrooms picked out for now' : 'No mushrooms within reach';
+        b.resDist = bd;
+        m[best]--;
       } else {
-        // Mushrooms and herbs grow in the woods.
-        const t = nearestTile(s, b, d.radius, (i, dist) => (s.trees[i] > 0 ? dist : null));
-        const woods = countInRadius(s, bCenter(b), d.radius, (i) => s.trees[i] > 0);
-        if (r.id === 'mushrooms' && woods < 6) return 'No woods nearby for mushrooms';
-        if (t >= 0) b.resDist = tileDist(s, b, t);
+        // Herbs grow in the woods.
+        const t = nearestTile(s, b, GATHER_REACH, (i, dist) => (s.trees[i] > 0 ? dist : null));
+        if (t < 0) return 'No woods within reach for herbs';
+        b.resDist = tileDist(s, b, t);
       }
       addOutput(s, b, r.outputs);
       return null;
     }
     case 'hunter': {
-      const forest = countInRadius(s, bCenter(b), d.radius, (i) => s.trees[i] > 0);
-      if (forest < 8) return 'Not enough forest for game';
-      if (roomFor(s, 'meat') <= 0) return 'Storage full';
-      const amount = Math.max(1, Math.round((d.outputs.meat ?? 0) * Math.min(1, forest / 40)));
-      addOutput(s, b, { meat: amount });
-      // Every few kills bring a hide worth tanning.
-      if (rng.next() < 0.5) produced(s, 'hides', 1);
+      if (roomFor(s, 'meat') <= 0 && !b.hauled) return 'Storage full';
+      const h = nearestHerd(s, b);
+      if (!h) return s.herds?.some((o) => o.n >= 1) ? 'No game within reach' : 'The game has been hunted out';
+      b.resDist = Math.hypot(h.x - bCenter(b).x, h.y - bCenter(b).y);
+      // A deer feeds four outings' worth of meat; a rabbit, two.
+      h.n -= h.kind === 'deer' ? 0.25 : 0.5;
+      if (!addOutput(s, b, { meat: h.kind === 'deer' ? 5 : 3 })) {
+        h.n += h.kind === 'deer' ? 0.25 : 0.5;
+        return 'Storage full';
+      }
+      // Deer bring a hide worth tanning now and then.
+      if (h.kind === 'deer' && rng.next() < 0.5) produced(s, 'hides', 1);
       return null;
     }
     case 'claypit': {
@@ -1455,11 +1592,15 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
       return null;
     }
     case 'fisher': {
-      const water = countInRadius(s, bCenter(b), d.radius, (i) => s.terrain[i] === 1);
-      if (water < 2) return 'No water nearby';
-      if (roomFor(s, 'fish') <= 0) return 'Storage full';
-      const amount = Math.max(1, Math.round((d.outputs.fish ?? 0) * Math.min(1, water / 12) * (season === 3 ? 0.5 : 1)));
-      addOutput(s, b, { fish: amount });
+      if (roomFor(s, 'fish') <= 0 && !b.hauled) return 'Storage full';
+      const sh = nearestShoal(s, b);
+      if (!sh) return s.shoals?.length ? 'The fish are fished out for now' : 'No fish within reach';
+      b.resDist = Math.hypot(sh.x - bCenter(b).x, sh.y - bCenter(b).y);
+      sh.n -= 0.5;
+      if (!addOutput(s, b, { fish: Math.max(1, Math.round((d.outputs.fish ?? 0) * (season === 3 ? 0.5 : 1))) })) {
+        sh.n += 0.5;
+        return 'Storage full';
+      }
       return null;
     }
     default: {
@@ -2119,7 +2260,7 @@ function passiveStatus(s: GameState, b: Building): string {
 export function workEfficiency(b: Building): number {
   const d = workDef(b);
   if (!d.cycle) return 1;
-  const toResource = d.gathers && d.gathers !== 'water' && d.gathers !== 'forest' ? (2 * (b.resDist ?? d.radius / 2)) / OFFROAD_TILES_PER_DAY : 0;
+  const toResource = d.gathers && b.type !== 'claypit' ? (2 * (b.resDist ?? d.radius / 2)) / OFFROAD_TILES_PER_DAY : 0;
   // Served by haulers, the workers no longer carry their goods to storage.
   const walking = ((b.hauled ? 0 : (b.trip ?? 0)) + toResource) / Math.max(1, d.workers);
   return d.cycle / (d.cycle + TRAVEL_WEIGHT * walking);
@@ -2347,6 +2488,7 @@ export function eatFood(s: GameState, mouths: number): { hungry: number; groups:
 
 export function monthly(s: GameState, rng: StateRng): void {
   const month = monthOf(s.day); // the month that just started
+  natureMonthly(s, rng);
   const prevMonth = (month + MONTHS_PER_YEAR - 1) % MONTHS_PER_YEAR;
   const report = s.report;
   report.arrived = 0;

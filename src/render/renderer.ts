@@ -1,7 +1,7 @@
 import { BUILDINGS, DAYS_PER_MONTH, DAYS_PER_YEAR, RESOURCE_STORAGE, STORAGE_CAPACITY, type StorageKind } from '../game/data';
 import { upgradeBlocker } from '../game/levels';
 import { hasCharter } from '../game/charters';
-import { HOME_TRADES, deliveredTo, hasProblem, isMarketDay, monthOf, orchardMaturity, seasonOf, storageCap } from '../game/sim';
+import { HOME_TRADES, deliveredTo, hasProblem, isMarketDay, monthOf, nearestShoal, orchardMaturity, seasonOf, storageCap } from '../game/sim';
 import type { Building, BuildingType, GameState, ResourceId, Season } from '../game/types';
 import { idx, inBounds } from '../game/world';
 import type { Agent } from './agents';
@@ -373,6 +373,7 @@ export class Renderer {
     if (!this.light) this.drawPuddles(s, season, dt, visible);
     if (!this.light && season !== 3) {
       this.drawDucks(s, visible);
+      this.drawShoals(s, visible);
       this.drawBoats(s, visible);
       this.drawMist(s, season, visible);
     }
@@ -975,6 +976,29 @@ export class Renderer {
       const jy = ((v >> 4) % 5) * 0.03 - 0.06;
       const [wx, wy] = iso(x + jx, y + jy);
       this.blit(sp, wx, wy);
+    }
+    const shrooms = s.mushrooms?.[i] ?? 0;
+    if (shrooms > 0 && season !== 3) this.drawMushrooms(x, y, shrooms, v);
+  }
+
+  /** A few red-capped and brown mushrooms at the foot of the trees. */
+  private drawMushrooms(x: number, y: number, n: number, v: number): void {
+    const c = this.ctx;
+    for (let k = 0; k < n + 1; k++) {
+      const [sx, sy] = iso(x + 0.25 + ((v * (k + 3)) % 7) * 0.08, y + 0.75 + ((v * (k + 5)) % 3) * 0.07);
+      const red = (v + k) % 3 !== 0;
+      const r = 2.2 + ((v + k) % 2) * 0.6;
+      c.fillStyle = '#efe6d2';
+      c.fillRect(sx - 0.6, sy - 2.6, 1.2, 2.6);
+      c.fillStyle = red ? '#c8382a' : '#9a6a3e';
+      c.beginPath();
+      c.ellipse(sx, sy - 2.6, r, r * 0.65, 0, Math.PI, 0);
+      c.fill();
+      if (red) {
+        c.fillStyle = '#f8f2e4';
+        c.fillRect(sx - 0.8, sy - 3.4, 0.6, 0.6);
+        c.fillRect(sx + 0.4, sy - 3.0, 0.5, 0.5);
+      }
     }
   }
 
@@ -1605,6 +1629,49 @@ export class Renderer {
     }
   }
 
+  /** Fish shoaling under the surface, and now and then one leaping. */
+  private drawShoals(s: GameState, visible: (x: number, y: number) => boolean): void {
+    const c = this.ctx;
+    (s.shoals ?? []).forEach((sh, k) => {
+      if (sh.n < 1) return;
+      const [cx, cy] = iso(sh.x, sh.y);
+      if (!visible(cx, cy)) return;
+      const n = Math.ceil(sh.n / 4);
+      // A darker patch of water where they gather, and silver backs turning in it.
+      c.fillStyle = 'rgba(20,40,60,0.18)';
+      c.beginPath();
+      c.ellipse(cx, cy, 30, 14, 0, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = 'rgba(190,210,220,0.6)';
+      for (let j = 0; j < n; j++) {
+        const a = this.time * (0.4 + j * 0.07) + j * 1.9 + k;
+        const [fx, fy] = iso(sh.x + Math.cos(a) * (0.5 + j * 0.15), sh.y + Math.sin(a) * (0.4 + j * 0.1));
+        const dir = -Math.sin(a) > 0 ? 1 : -1;
+        c.beginPath();
+        c.ellipse(fx, fy, 2.6, 0.9, 0, 0, Math.PI * 2);
+        c.moveTo(fx - dir * 2.4, fy);
+        c.lineTo(fx - dir * 3.8, fy - 1);
+        c.lineTo(fx - dir * 3.8, fy + 1);
+        c.fill();
+      }
+      // A fish leaps, once in a while.
+      const ph = (this.time * 0.5 + k * 0.37) % 1;
+      if (ph < 0.2) {
+        const t = ph / 0.2;
+        const [jx, jy] = iso(sh.x + 0.4, sh.y - 0.2);
+        c.fillStyle = '#b8c8d0';
+        c.beginPath();
+        c.ellipse(jx + (t - 0.5) * 10, jy - Math.sin(t * Math.PI) * 9, 2.4, 1, (t - 0.5) * 1.6, 0, Math.PI * 2);
+        c.fill();
+        c.strokeStyle = `rgba(235,245,250,${0.7 * (1 - t)})`;
+        c.lineWidth = 0.7;
+        c.beginPath();
+        c.ellipse(jx - 5, jy + 1, 3 + t * 4, 1 + t * 1.5, 0, 0, Math.PI * 2);
+        c.stroke();
+      }
+    });
+  }
+
   /** For each fishery, the open water tile its boat rows out to (or -1). */
   private boatSpots = new Map<number, number>();
 
@@ -1616,26 +1683,35 @@ export class Renderer {
     const c = this.ctx;
     for (const b of s.buildings) {
       if (b.type !== 'fisher' || b.build < 1 || b.workers <= 0 || b.paused) continue;
-      let spot = this.boatSpots.get(b.id);
-      if (spot === undefined) {
-        // The nearest water with open water all round, within a short row.
-        spot = -1;
-        let bd = 1e9;
-        const cx = b.x + b.w / 2;
-        const cy = b.y + b.h / 2;
-        for (let y = b.y - 6; y < b.y + b.h + 6; y++) {
-          for (let x = b.x - 6; x < b.x + b.w + 6; x++) {
-            let open = true;
-            for (let dy = -1; dy <= 1 && open; dy++) for (let dx = -1; dx <= 1; dx++) open &&= water(x + dx, y + dy);
-            if (!open) continue;
-            const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy) + ((x * 7 + y * 13 + b.id) % 5) * 0.3;
-            if (d < bd) {
-              bd = d;
-              spot = y * W + x;
+      // Out on the shoal the fisher works, once it is at sea; otherwise near home.
+      const sh = nearestShoal(s, b);
+      let spot = -1;
+      if (sh) {
+        const ox = ((b.id * 7) % 5) * 0.4 - 0.8;
+        const oy = ((b.id * 3) % 5) * 0.3 - 0.6;
+        const tx = Math.floor(sh.x + ox);
+        const ty = Math.floor(sh.y + oy);
+        spot = water(tx, ty) ? ty * W + tx : Math.floor(sh.y) * W + Math.floor(sh.x);
+      } else {
+        spot = this.boatSpots.get(b.id) ?? -1;
+        if (!this.boatSpots.has(b.id)) {
+          let bd = 1e9;
+          const cx = b.x + b.w / 2;
+          const cy = b.y + b.h / 2;
+          for (let y = b.y - 6; y < b.y + b.h + 6; y++) {
+            for (let x = b.x - 6; x < b.x + b.w + 6; x++) {
+              let open = true;
+              for (let dy = -1; dy <= 1 && open; dy++) for (let dx = -1; dx <= 1; dx++) open &&= water(x + dx, y + dy);
+              if (!open) continue;
+              const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
+              if (d < bd) {
+                bd = d;
+                spot = y * W + x;
+              }
             }
           }
+          this.boatSpots.set(b.id, spot);
         }
-        this.boatSpots.set(b.id, spot);
       }
       if (spot < 0) continue;
       const t = this.time;
@@ -2219,7 +2295,49 @@ export class Renderer {
     c.globalAlpha = 1;
   }
 
+  /** A brown (in winter, paler) rabbit: hopping, or sitting up with its ears high. */
+  private drawRabbit(a: Animal, season: Season): void {
+    const c = this.ctx;
+    const [wx, wy] = iso(a.x, a.y);
+    const f = a.dir;
+    const hop = a.grazing ? 0 : Math.abs(Math.sin(a.step)) * 3;
+    const coat = season === 3 ? '#b8a890' : '#8a6a4a';
+    c.globalAlpha = a.alpha;
+    c.fillStyle = 'rgba(20,20,10,0.22)';
+    c.beginPath();
+    c.ellipse(wx, wy, 3, 1.1, 0, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = coat;
+    c.beginPath();
+    c.ellipse(wx, wy - 2.2 - hop, 2.8, 2, 0, 0, Math.PI * 2);
+    c.fill();
+    // Head and ears.
+    const hx = wx + 2.2 * f;
+    const hy = wy - 3.6 - hop;
+    c.beginPath();
+    c.arc(hx, hy, 1.4, 0, Math.PI * 2);
+    c.fill();
+    c.strokeStyle = coat;
+    c.lineWidth = 0.9;
+    c.beginPath();
+    c.moveTo(hx - 0.3 * f, hy - 0.8);
+    c.lineTo(hx - 1.2 * f, hy - (a.grazing ? 4 : 3));
+    c.moveTo(hx + 0.3 * f, hy - 0.8);
+    c.lineTo(hx - 0.2 * f, hy - (a.grazing ? 4.2 : 3.2));
+    c.stroke();
+    // White scut.
+    c.fillStyle = '#f4efe6';
+    c.beginPath();
+    c.arc(wx - 2.6 * f, wy - 2.6 - hop, 0.8, 0, Math.PI * 2);
+    c.fill();
+    c.globalAlpha = 1;
+  }
+
   private drawAnimal(a: Animal, season: Season): void {
+    if (a.kind === 'rabbit') {
+      this.drawRabbit(a, season);
+      return;
+    }
     const c = this.ctx;
     const [wx, wy] = iso(a.x, a.y);
     const f = a.dir;

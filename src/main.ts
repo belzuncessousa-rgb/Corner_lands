@@ -1,6 +1,6 @@
 import './ui/styles.css';
 import { deleteSave, listSaves, loadGame, saveGame } from './api';
-import { BUILDINGS, BUILD_ORDER, DAY_SECONDS, MONTH_NAMES, TIERS } from './game/data';
+import { BUILDINGS, BUILD_ORDER, DAY_SECONDS, GATHERERS, MONTH_NAMES, TIERS } from './game/data';
 import { playBot } from './game/autoplay';
 import { autoResolve, TITLES } from './game/events';
 import { placeName, townName } from './game/names';
@@ -26,6 +26,7 @@ import {
   placementError,
   recompute,
   removeRoad,
+  nearestResource,
   resourceInRange,
   roadError,
   zoneError,
@@ -397,7 +398,7 @@ export class Game {
       const b = s.buildings.find((o) => o.id === this.selected);
       if (b) {
         const d = BUILDINGS[b.type];
-        if (d.radius) {
+        if (d.radius && !GATHERERS.has(b.type)) {
           const c = bCenter(b);
           ov.range = { cx: c.x, cy: c.y, r: d.radius, highlight: rangeHighlighter(s, b.type) };
         }
@@ -418,7 +419,7 @@ export class Game {
       const err = placementError(s, tool.type, p.x, p.y);
       ov.ghost = { type: tool.type, x: p.x, y: p.y, ok: !err };
       const d = BUILDINGS[tool.type];
-      if (d.radius) {
+      if (d.radius && !GATHERERS.has(tool.type)) {
         const c = centerOf(p.x, p.y, d.w, d.h);
         ov.range = { cx: c.x, cy: c.y, r: d.radius, highlight: rangeHighlighter(s, tool.type) };
       }
@@ -554,6 +555,15 @@ export class Game {
   private buildHint(type: BuildingType, x: number, y: number, err: string | null): string {
     const d = BUILDINGS[type];
     if (err) return `${d.name}: ${err}`;
+    if (GATHERERS.has(type)) {
+      // No area to fill: what matters is how far the workers must walk.
+      const c = centerOf(x, y, d.w, d.h);
+      const dist = nearestResource(this.state, type, c);
+      const what = { woodcutter: 'trees', quarry: 'rock', mine: 'ore', forager: 'berry bushes', hunter: 'game', fisher: 'fish' }[type as string] ?? 'resources';
+      if (dist === null) return `${d.name}: no ${what} within reach · the workers would have nothing to do`;
+      const walk = dist < 6 ? 'a short walk' : dist < 14 ? 'a fair walk' : 'a long walk: they will lose time on the way';
+      return `${d.name}: nearest ${what} ${Math.round(dist)} tiles away, ${walk} · Click to place`;
+    }
     if (d.gathers) {
       const c = centerOf(x, y, d.w, d.h);
       const n = resourceInRange(this.state, type, c);

@@ -2,7 +2,7 @@
  * A simple greedy player. Tests use it to check the game is winnable and to
  * tune balance; the title screen uses it to grow a demo village.
  */
-import { BUILDINGS, DAYS_PER_MONTH } from './data';
+import { BUILDINGS, DAYS_PER_MONTH, GATHERERS } from './data';
 import { autoResolve, commission, commissionError, COMMISSIONS, nextTitle, takeTitle, titleError, fairCost, fairError, feastError, FESTIVALS, festivalError, holdFair, holdFeast, holdFestival } from './events';
 import { grantCharter } from './charters';
 import { startUpgrade, upgradeBlocker, upgradePlan } from './levels';
@@ -21,6 +21,7 @@ import {
   monthOf,
   placeOrder,
   placementError,
+  nearestResource,
   resourceInRange,
   roadError,
   stepDay,
@@ -78,7 +79,13 @@ export function tryPlace(s: GameState, type: BuildingType, near?: { x: number; y
       const c = centerOf(x, y, d.w, d.h);
       const to = near ?? hall;
       let score = -Math.hypot(c.x - to.x, c.y - to.y);
-      if (d.gathers) {
+      if (GATHERERS.has(type)) {
+        // Gatherers walk to the nearest of what they gather: the shorter the walk the better.
+        const dist = nearestResource(s, type, c);
+        if (dist === null || dist > 14) continue;
+        score -= dist * 2;
+        if (type === 'woodcutter' || type === 'quarry') score += Math.min(10, resourceInRange(s, type, c)) * 0.5;
+      } else if (d.gathers) {
         const res = resourceInRange(s, type, c);
         // Only spots with something to gather are worth considering.
         if (res < 3) continue;
@@ -93,7 +100,7 @@ export function tryPlace(s: GameState, type: BuildingType, near?: { x: number; y
     }
   }
   if (!best) return false;
-  if (d.gathers && resourceInRange(s, type, centerOf(best.x, best.y, d.w, d.h)) < 3) return false;
+  if (d.gathers && !GATHERERS.has(type) && resourceInRange(s, type, centerOf(best.x, best.y, d.w, d.h)) < 3) return false;
   return !!placeOrder(s, type, best.x, best.y);
 }
 
@@ -461,7 +468,7 @@ export function act(s: GameState, rand: () => number): void {
   // Grain piling up: more mills and ovens before anything else.
   if (s.tier >= 1 && s.res.grain > 60 && count(s, 'windmill') < 1 + Math.floor(s.res.grain / 60)) wants.push('windmill');
   if (s.tier >= 1 && s.res.flour > 20 && count(s, 'bakery') < 1 + count(s, 'windmill')) wants.push('bakery');
-  if (food < pop * 4 && foodMakers < 1 + pop / 6) {
+  if (food < pop * 8 && foodMakers < 1 + pop / 6) {
     if (s.tier >= 1 && count(s, 'farm') < 1 + Math.floor(pop / (idle > pop / 10 ? 25 : 40))) wants.push('farm');
     if (count(s, 'forager') < 2) wants.push('forager');
     if (count(s, 'fisher') < 2 + Math.floor(pop / 30)) wants.push('fisher');

@@ -1,6 +1,6 @@
-import { BUILDINGS, DAY_SECONDS, OFFROAD_TILES_PER_DAY, RESOURCE_STORAGE, ROAD_TILES_PER_DAY, STONE_ROAD_TILES_PER_DAY, STORAGE_CAPACITY } from '../game/data';
+import { BUILDINGS, DAY_SECONDS, GATHER_REACH, GATHERERS, OFFROAD_TILES_PER_DAY, RESOURCE_STORAGE, ROAD_TILES_PER_DAY, STONE_ROAD_TILES_PER_DAY, STORAGE_CAPACITY } from '../game/data';
 import { findPath } from '../game/path';
-import { chooseRecipe, doorTile, forTilesInRadius, bCenter, isMarketDay, isWinter, MARKET_DAY, needsMaterials } from '../game/sim';
+import { chooseRecipe, doorTile, forTilesInRadius, bCenter, isMarketDay, isWinter, MARKET_DAY, nearestHerd, needsMaterials } from '../game/sim';
 import type { Building, GameState, ResourceId } from '../game/types';
 import { getBuilding, idx, inBounds } from '../game/world';
 
@@ -623,14 +623,25 @@ export class AgentSystem {
   private workTarget(s: GameState, b: Building): { x: number; y: number; act: string } | null {
     const d = BUILDINGS[b.type];
     const c = bCenter(b);
+    // Gatherers go to the nearest of what they gather, however far; others work their own area.
+    const reach = GATHERERS.has(b.type) ? GATHER_REACH : d.radius;
     const pick = (pred: (i: number) => boolean, act: string) => {
-      const cands: number[] = [];
-      forTilesInRadius(s, c, d.radius, (i) => {
-        if (pred(i)) cands.push(i);
+      const cands: [number, number][] = [];
+      forTilesInRadius(s, c, reach, (i, _x, _y, dist) => {
+        if (pred(i)) cands.push([i, dist]);
       });
       if (!cands.length) return null;
-      const t = cands[Math.floor(Math.random() * cands.length)];
+      if (GATHERERS.has(b.type)) cands.sort((p, q) => p[1] - q[1]);
+      const t = cands[Math.floor(Math.random() * (GATHERERS.has(b.type) ? Math.min(6, cands.length) : cands.length))][0];
       return { x: t % s.width, y: Math.floor(t / s.width), act };
+    };
+    const nearHerd = (hx: number, hy: number, act: string) => {
+      for (let tries = 0; tries < 12; tries++) {
+        const x = Math.floor(hx + (Math.random() * 2 - 1) * 2.5);
+        const y = Math.floor(hy + (Math.random() * 2 - 1) * 2.5);
+        if (inBounds(s, x, y) && s.terrain[idx(s, x, y)] === 0 && s.occ[idx(s, x, y)] < 0) return { x, y, act };
+      }
+      return null;
     };
     const open = (i: number) => s.terrain[i] === 0 && s.occ[i] < 0;
     switch (b.type) {
@@ -640,12 +651,17 @@ export class AgentSystem {
         return pick((i) => s.rock[i] > 0, 'dig');
       case 'mine':
         return pick((i) => s.ore[i] > 0, 'dig');
-      case 'forager':
-        return isWinter(s.day) ? null : pick((i) => s.berries[i] > 0, 'pick');
+      case 'forager': {
+        if (isWinter(s.day)) return null;
+        if (chooseRecipe(s, b)?.id === 'mushrooms') return pick((i) => (s.mushrooms?.[i] ?? 0) > 0, 'pick');
+        return pick((i) => s.berries[i] > 0, 'pick');
+      }
       case 'forester':
         return pick((i) => open(i) && !s.road[i] && s.trees[i] < 4, 'plant');
-      case 'hunter':
-        return pick((i) => s.trees[i] > 0, 'hunt');
+      case 'hunter': {
+        const h = nearestHerd(s, b);
+        return h ? nearHerd(h.x, h.y, 'hunt') : null;
+      }
       case 'fisher':
       case 'claypit': {
         // A dry tile next to water.

@@ -8,6 +8,14 @@ export const DAY_SECONDS = 22.5;
 export const STONE_ROAD_TILES_PER_DAY = 30;
 export const ROAD_TILES_PER_DAY = 22;
 export const OFFROAD_TILES_PER_DAY = 12;
+/**
+ * How far gatherers go for what they gather: there is no fixed area, only
+ * the walk, which costs them working time. Beyond this they will not go.
+ */
+export const GATHER_REACH = 26;
+/** Workplaces that go out for what they gather. */
+export const GATHERERS: ReadonlySet<BuildingType> = new Set<BuildingType>(['woodcutter', 'quarry', 'mine', 'forager', 'hunter', 'fisher']);
+
 /** Goods a workplace can keep in its own yard until haulers fetch them. */
 export const YARD_STORE = 30;
 /** Goods a hauler carries in one trip (a handcart). */

@@ -18,8 +18,9 @@ describe('balance', () => {
     // Every map reaches Town; the crude bot should reach Borough on most.
     for (const r of results) expect(r.townYear).not.toBeNull();
     expect(results.filter((r) => r.boroughYear !== null).length).toBeGreaterThanOrEqual(2);
-    // The castle crowns the late game: most maps get there within twelve years.
-    expect(results.filter((r) => r.cityYear !== null).length).toBeGreaterThanOrEqual(2);
+    // The castle crowns the late game: with labour to plan and game to hunt
+    // down, at least one map gets there within twelve years.
+    expect(results.filter((r) => r.cityYear !== null).length).toBeGreaterThanOrEqual(1);
   });
 
   // Slow: SWEEP=1. Hardy mode is harder, but the autoplayer still gets to Town.

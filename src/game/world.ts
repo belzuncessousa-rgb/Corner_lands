@@ -188,36 +188,13 @@ export function generateWorld(seed: number, opts: { relaxed?: boolean; hardy?: b
       return;
     }
   };
-  depositNear(s.rock, 8, 13, 2, 30, true);
-  for (let k = 0; k < 6; k++) depositNear(s.rock, 14, 40, 1 + Math.floor(rand() * 2), 30);
-  depositNear(s.ore, 14, 22, 1, 25);
-  for (let k = 0; k < 3; k++) depositNear(s.ore, 18, 40, 1, 25);
+  // Few outcrops, but deep: stone is found in places, not everywhere.
+  depositNear(s.rock, 8, 13, 2, 40, true);
+  for (let k = 0; k < 4; k++) depositNear(s.rock, 16, 40, 1 + Math.floor(rand() * 2), 45);
+  depositNear(s.ore, 14, 22, 1, 30);
+  for (let k = 0; k < 2; k++) depositNear(s.ore, 20, 40, 1, 35);
 
-  // --- Berry bushes: open land near forest edges.
-  for (let y = 1; y < H - 1; y++) {
-    for (let x = 1; x < W - 1; x++) {
-      const i = idx(s, x, y);
-      if (s.terrain[i] !== 0 || s.trees[i] || s.rock[i] || s.ore[i]) continue;
-      let near = 0;
-      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (s.trees[idx(s, x + dx, y + dy)]) near++;
-      if (near > 2 && rand() < 0.1) {
-        s.berriesMax[i] = 2 + Math.floor(rand() * 2);
-      }
-    }
-  }
-  // Guarantee bushes close to the start.
-  let guaranteed = 0;
-  for (let tries = 0; tries < 400 && guaranteed < 8; tries++) {
-    const x = site.x + 1 + Math.round((rand() - 0.5) * 16);
-    const y = site.y + 1 + Math.round((rand() - 0.5) * 16);
-    if (!inBounds(s, x, y)) continue;
-    const i = idx(s, x, y);
-    if (Math.hypot(x - site.x - 1, y - site.y - 1) < 5) continue;
-    if (s.terrain[i] || s.trees[i] || s.rock[i] || s.ore[i] || s.berriesMax[i]) continue;
-    s.berriesMax[i] = 3;
-    guaranteed++;
-  }
-  s.berries.set(s.berriesMax);
+  seedNature(s, site, rand);
 
   // --- The manor hall and a stub of road.
   const hall = makeBuilding(s.nextId++, 'townhall', site.x, site.y);
@@ -242,6 +219,106 @@ export function generateWorld(seed: number, opts: { relaxed?: boolean; hardy?: b
     for (const k of ['wood', 'stone', 'berries', 'meat', 'gold'] as const) s.res[k] = Math.round(s.res[k] * 0.6);
   }
   return s;
+}
+
+/**
+ * What can be gathered and hunted, in patches: berry bushes at forest edges,
+ * mushrooms on the forest floor, herds of deer and rabbits in the woods and
+ * shoals of fish in the water. One of each lies within a short walk of the
+ * start; the rest is spread thin over the land.
+ */
+export function seedNature(s: GameState, site: { x: number; y: number }, rand: () => number, berries = true): void {
+  const cx = site.x + 1;
+  const cy = site.y + 1;
+  const trees = (x: number, y: number, r: number) => {
+    let n = 0;
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (inBounds(s, x + dx, y + dy) && s.trees[idx(s, x + dx, y + dy)]) n++;
+    return n;
+  };
+  const free = (i: number) => s.terrain[i] === 0 && s.occ[i] < 0 && !s.road[i] && !s.rock[i] && !s.ore[i];
+  /** A spot `minD`–`maxD` from the start that passes `ok`. */
+  const spot = (minD: number, maxD: number, ok: (x: number, y: number) => boolean) => {
+    for (let tries = 0; tries < 400; tries++) {
+      const a = rand() * Math.PI * 2;
+      const d = minD + rand() * (maxD - minD);
+      const x = Math.round(cx + Math.cos(a) * d);
+      const y = Math.round(cy + Math.sin(a) * d);
+      if (inBounds(s, x, y) && ok(x, y)) return { x, y };
+    }
+    return null;
+  };
+
+  // Berry patches: a cluster of bushes on open ground by the trees.
+  const edge = (x: number, y: number) => free(idx(s, x, y)) && !s.trees[idx(s, x, y)] && trees(x, y, 2) >= 3;
+  const berryPatch = (x: number, y: number) => {
+    const n = 5 + Math.floor(rand() * 5);
+    for (let k = 0, placed = 0; k < 40 && placed < n; k++) {
+      const bx = x + Math.round((rand() - 0.5) * 5);
+      const by = y + Math.round((rand() - 0.5) * 5);
+      if (!inBounds(s, bx, by)) continue;
+      const i = idx(s, bx, by);
+      if (!free(i) || s.trees[i] || s.berriesMax[i]) continue;
+      s.berriesMax[i] = 2 + Math.floor(rand() * 2);
+      placed++;
+    }
+  };
+  if (berries) {
+    const near = spot(6, 12, edge) ?? spot(6, 14, (x, y) => free(idx(s, x, y)) && !s.trees[idx(s, x, y)]);
+    if (near) berryPatch(near.x, near.y);
+    for (let k = 0; k < 9; k++) {
+      const p = spot(14, 45, edge);
+      if (p) berryPatch(p.x, p.y);
+    }
+    s.berries.set(s.berriesMax);
+  }
+
+  // Mushrooms: rings on the floor of older woods.
+  s.mushrooms = {};
+  s.mushroomsMax = {};
+  const deepWood = (x: number, y: number) => s.trees[idx(s, x, y)] >= 1 && trees(x, y, 2) >= 10;
+  // Mushrooms are seen at the wood's edge, where nothing stands in front of them.
+  const openFront = (x: number, y: number) =>
+    (inBounds(s, x + 1, y) && !s.trees[idx(s, x + 1, y)] && s.terrain[idx(s, x + 1, y)] === 0) ||
+    (inBounds(s, x, y + 1) && !s.trees[idx(s, x, y + 1)] && s.terrain[idx(s, x, y + 1)] === 0);
+  for (let k = 0; k < 8; k++) {
+    const p = spot(k === 0 ? 7 : 14, k === 0 ? 16 : 45, deepWood);
+    if (!p) continue;
+    const n = 4 + Math.floor(rand() * 5);
+    for (let j = 0, placed = 0; j < 60 && placed < n; j++) {
+      const mx = p.x + Math.round((rand() - 0.5) * 6);
+      const my = p.y + Math.round((rand() - 0.5) * 6);
+      if (!inBounds(s, mx, my)) continue;
+      const i = idx(s, mx, my);
+      if (!s.trees[i] || s.mushroomsMax[i] || !openFront(mx, my)) continue;
+      s.mushroomsMax[i] = 2 + Math.floor(rand() * 2);
+      placed++;
+    }
+  }
+  s.mushrooms = { ...s.mushroomsMax };
+
+  // Game: deer in the deep woods, rabbits where wood meets meadow.
+  s.herds = [];
+  // Deer keep to glades in the woods: open ground with forest all about.
+  const woods = (x: number, y: number) => free(idx(s, x, y)) && s.trees[idx(s, x, y)] <= 1 && trees(x, y, 4) >= 30;
+  for (let k = 0; k < 6; k++) {
+    const p = spot(k === 0 ? 9 : 16, k === 0 ? 18 : 45, woods);
+    if (p) s.herds.push({ kind: 'deer', x: p.x + 0.5, y: p.y + 0.5, n: 6, max: 8 });
+  }
+  for (let k = 0; k < 6; k++) {
+    const p = spot(k === 0 ? 7 : 14, k === 0 ? 15 : 45, edge);
+    if (p) s.herds.push({ kind: 'rabbit', x: p.x + 0.5, y: p.y + 0.5, n: 10, max: 14 });
+  }
+
+  // Fish shoal in open water, away from the banks.
+  s.shoals = [];
+  const deep = (x: number, y: number) => {
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (!inBounds(s, x + dx, y + dy) || s.terrain[idx(s, x + dx, y + dy)] !== 1) return false;
+    return true;
+  };
+  for (let k = 0; k < 6; k++) {
+    const p = spot(k === 0 ? 4 : 12, k === 0 ? 18 : 50, (x, y) => deep(x, y) && !s.shoals!.some((o) => Math.hypot(o.x - x, o.y - y) < 8));
+    if (p) s.shoals.push({ x: p.x + 0.5, y: p.y + 0.5, n: 16, max: 20 });
+  }
 }
 
 function findSite(s: GameState, rand: () => number): { x: number; y: number } {

@@ -1277,8 +1277,7 @@ describe('protected woods', () => {
     expect(before).toBeGreaterThan(0);
     for (let d = 0; d < 33; d++) stepDay(s);
     const after = Array.from(s.trees).reduce((a, t, i) => a + (inGrove(s, i) ? t : 0), 0);
-    expect(wc.status).toBe('Only protected woods in range');
-    // Trees may grow back, but none are felled inside the wood.
+    // Woodcutters go further afield; trees may grow back, but none are felled inside the wood.
     expect(after).toBeGreaterThanOrEqual(before);
     expect(unprotectGrove(s, wc.x, wc.y)).toBe(true);
     expect(s.groves!.length).toBe(1 - 1);

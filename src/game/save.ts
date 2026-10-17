@@ -1,5 +1,6 @@
 import type { GameState, ResourceId } from './types';
-import { emptyResources, makeBuilding } from './world';
+import { mulberry32 } from './rng';
+import { emptyResources, makeBuilding, seedNature } from './world';
 
 const TYPED_KEYS = [
   'terrain',
@@ -48,6 +49,11 @@ export function deserialize(json: string): GameState {
     else (s as unknown as Record<string, Uint8Array>)[k] = new Uint8Array(buf);
   }
   s.res = { ...emptyResources(), ...s.res };
+  // Older lands had no herds, shoals or mushrooms: give them some, around the manor.
+  if (!s.herds) {
+    const hall = s.buildings.find((b) => b.type === 'townhall');
+    seedNature(s, hall ? { x: hall.x, y: hall.y } : { x: s.width >> 1, y: s.height >> 1 }, mulberry32(s.seed + 404), false);
+  }
   s.history ??= [];
   if (s.exports) {
     for (const k in s.exports) {

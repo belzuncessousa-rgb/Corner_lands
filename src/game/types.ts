@@ -233,6 +233,24 @@ export interface HistoryPoint {
   gold: number;
 }
 
+/** A herd of deer or warren of rabbits, roaming near its centre. */
+export interface Herd {
+  kind: 'deer' | 'rabbit';
+  x: number;
+  y: number;
+  /** Animals now (fractional: a hunt takes part of one). */
+  n: number;
+  max: number;
+}
+
+/** A shoal of fish around a stretch of water. */
+export interface Shoal {
+  x: number;
+  y: number;
+  n: number;
+  max: number;
+}
+
 export interface GameState {
   version: number;
   seed: number;
@@ -310,6 +328,14 @@ export interface GameState {
   year?: { pop: number; gold: number; prestige: number; arrived: number; left: number; built: number; harvest: number; stock?: Partial<Record<ResourceId, number>>; hungry?: number };
   /** Tiles cleared by woodcutters and the day the last tree fell (stumps on the map). */
   stumps?: Record<number, number>;
+  /** Herds of game that keep to their part of the woods. */
+  herds?: Herd[];
+  /** Where fish shoal in the rivers and lakes. */
+  shoals?: Shoal[];
+  /** Mushrooms on the forest floor: tile -> how many can be picked now. */
+  mushrooms?: Record<number, number>;
+  /** Tile -> most mushrooms that tile grows. */
+  mushroomsMax?: Record<number, number>;
   /** Road tiles drawn by the player and not laid yet: tile index * 4 + kind (1 dirt, 2 paved), in order. */
   roadPlan?: number[];
   /** Progress towards laying the next planned road tile (in tiles). */
