@@ -185,7 +185,7 @@ export class Game {
     // Show a meaningful happiness breakdown from the very first day.
     this.state.report.variety = FOOD_IDS.filter((f) => this.state.res[f] > 0).length;
     updateHappiness(this.state);
-    log(this.state, 'Your settlers have arrived at a quiet corner of the land. Build houses and gather food!', 'info');
+    log(this.state, 'Your settlers have made camp in a quiet corner of the land. Lay out a free Marketplace (Civic) where families will fetch their food, gather food and timber, and build houses before the cart runs out.', 'info');
     this.afterLoad();
   }
 

@@ -2236,15 +2236,19 @@ export class Hud {
     const m = this.openModal(
       `<h2>How to Play</h2>
       <div class="help">
-        <p><b>Grow your settlement</b> from a Hamlet into a City. Open the objectives pill (top left) for guidance; raise the Manor Hall to climb the ranks.</p>
-        <p><b>Building:</b> pick a category at the bottom, then a building, then click the map. Builders carry the materials over from storage, one load per trip, and then raise the walls. Plans can wait for materials.</p>
-        <p><b>Fields, pastures and orchards</b> (Farming) are drawn: click one corner, then the opposite one, near a Farmstead, Animal Farm or Orchard Keeper's Lodge. Choose each field's crop and each farm's animals in the panel.</p>
-        <p><b>Roads</b> are optional but villagers walk faster on them, faster still on paved stone (T). Click to start, click again to lay it, keep clicking to continue.</p>
+        <p><b>Grow your settlement</b> from a settlers' camp into a City. The town climbs the ranks by itself once it is big enough and has what each rank needs (open the rank pill, top left, to see what the next one needs).</p>
+        <p><b>Building:</b> pick a category at the bottom, then a building, then click the map. Builders carry the materials over from storage, one load per trip, and then raise the walls. Plans can wait for materials. Buildings you cannot build yet stay hidden.</p>
+        <p><b>Markets</b> (Civic) are free and drawn like fields. Families fetch their food and goods from a staffed market within reach; homes out of reach go hungry, however full the stores.</p>
+        <p><b>Gatherers</b> walk to the nearest trees, rocks, berries, game or fish, so place them close. Goods pile up in each workplace's yard until haulers from a Storehouse or Granary fetch them.</p>
+        <p><b>Fields, pastures and orchards</b> (Farming) are drawn: click one corner, then the opposite one, near a Farmstead, Animal Farm or Orchard Keeper's Lodge. Choose each field's crop in the panel; animals are bought at the Animal Farm once you have a Trading Post, and share its pasture room.</p>
+        <p><b>Trading Post:</b> merchants come here to buy your surplus, and coins buy what you lack.</p>
+        <p><b>Roads</b> are optional but villagers walk faster on them, faster still on paved stone (T). Click to start, click again to plan it, keep clicking to continue; the road is laid a few tiles each day.</p>
         <p><b>The top bar</b> shows happiness, villagers, food, materials, goods and the treasury. Hover a chip for the details, click to pin it: set how much of each good to keep and whether merchants may buy the surplus. Workers rest when their goods reach the target.</p>
         <p><b>Workers:</b> select a workplace to choose how many villagers work there, its priority and its product. Seasonal work frees hands in the off season. Hover the villagers chip to see who is idle and where hands are short.</p>
+        <p><b>The Manor</b> is optional: build it for feasts, festivals and prestige, and renovate it as the town grows until it becomes a castle.</p>
         <p><b>Retinue</b>: a Borough can raise men-at-arms at the manor for prestige and arms. Paid 10 coins a month, they ride out against wolves and bandits.</p>
         <p><b>Harvest feast</b>: once each autumn, select the manor to call a feast. A meal for everyone and drink for every eight cheer the town for half a year and bring prestige.</p>
-        <p><b>Homes</b> eat one food a month each; several food groups (grain, meat, produce, dairy) cheer them. When every food is gone they boil stored wheat into pottage, which is only half as filling. Each winter month a home burns firewood. Finer homes need clothes, a tavern, boots and medicine, and enjoy luxuries; families in them can work a craft from home.</p>
+        <p><b>Homes</b> eat one food a month each; several food groups (grain, meat, produce, dairy) cheer them. When every food is gone they boil stored wheat into pottage, which is only half as filling. Each winter month a home burns firewood. Finer homes need clothes, a tavern, boots and medicine, and enjoy luxuries. A family may set up a craft at home: the workshop costs materials and takes days to build, and the craft stays for good.</p>
         <p><b>Prestige</b> comes from a fine manor, a church and monuments. From Town on, spend it on <b>charters</b> (crown button) to specialise your town.</p>
         <p>Your <b>steward</b> warns you when things go wrong; the <b>Chronicle</b> (scroll button) keeps the full story.</p>
         <div class="ornament">❦</div>
