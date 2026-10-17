@@ -7,7 +7,8 @@ import { TREE_SLOTS, variantOf } from '../render/renderer';
 import { bushSprite, fruitTreeSprite, rockSprite, treeSprite } from '../render/sprites';
 import type { Sprite, TreeKind } from '../render/sprites';
 import { buildingModel, groundTexture, wallsModel } from './scene3d';
-import { VIEW, turnPoint } from '../render/pen';
+import { VIEW, ZS, turnPoint } from '../render/pen';
+import { PX_PER_UNIT } from './pen3d';
 
 /**
  * A building's model where it stands: on its grid rectangle, or for a freely
@@ -26,6 +27,35 @@ export function placedModel(type: Building['type'], level: number, season: Seaso
   pivot.position.set(at.cx, 0, at.cy);
   pivot.rotation.y = -at.rot;
   return pivot;
+}
+
+/** A post mill's four lattice sails, in the plane facing +z (the mill's front). */
+const sailCache = new Map<boolean, THREE.Group>();
+function millSails(season: Season): THREE.Group {
+  const snow = season === 3;
+  let g = sailCache.get(snow);
+  if (!g) {
+    g = new THREE.Group();
+    const wood = new THREE.MeshLambertMaterial({ color: '#5e4129' });
+    const cloth = new THREE.MeshLambertMaterial({ color: snow ? '#e6ecf0' : '#f0e8d6', side: THREE.DoubleSide });
+    const R = 0.95;
+    for (let k = 0; k < 4; k++) {
+      const arm = new THREE.Group();
+      const spar = new THREE.Mesh(new THREE.BoxGeometry(0.04, R, 0.03), wood);
+      spar.position.y = R / 2;
+      const sail = new THREE.Mesh(new THREE.PlaneGeometry(0.17, R * 0.72), cloth);
+      sail.position.set(0.1, R * 0.6, 0.01);
+      arm.add(spar, sail);
+      arm.rotation.z = Math.PI / 4 + (k * Math.PI) / 2;
+      g.add(arm);
+    }
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.08, 8), wood);
+    hub.rotation.x = Math.PI / 2;
+    g.add(hub);
+    g.traverse((o) => (o.castShadow = true));
+    sailCache.set(snow, g);
+  }
+  return g.clone();
 }
 
 /** Screen pixels per world unit across the view at zoom 1 (a tile edge). */
@@ -251,6 +281,13 @@ export class View3D {
     this.syncBuildings(s, season);
     this.syncWalls(s, season);
     this.syncObjects(s, season);
+    // Working mills turn their sails.
+    const now = performance.now() / 1000;
+    for (const b of s.buildings) {
+      if (b.type !== 'windmill') continue;
+      const sails = this.buildings.get(b.id)?.obj.userData.sails as THREE.Object3D | undefined;
+      if (sails && b.workers > 0 && !b.paused && (b.output > 0 || b.lastOutput > 0)) sails.rotation.z = -(now * 0.9 + b.id);
+    }
     this.moving.begin();
     for (const f of figures) this.moving.add(f.sprite, f.x, f.y);
     this.moving.end();
@@ -349,6 +386,13 @@ export class View3D {
       if (cur?.key === key) continue;
       if (cur) this.scene.remove(cur.obj);
       const obj = placedModel(b.type, b.level, season, variantOf(s, b), b);
+      if (b.type === 'windmill' && b.build >= 1) {
+        // Sails on the hub at the front, as in the flat drawing (pen 1.0, 1.42, 34).
+        const sails = millSails(season);
+        sails.position.set(1.0, (34 * ZS) / PX_PER_UNIT, 1.47);
+        (b.rot === undefined ? obj : obj.children[0]).add(sails);
+        obj.userData.sails = sails;
+      }
       // Building sites rise as the work goes on.
       if (b.build < 1) obj.scale.y = Math.max(0.12, Math.ceil(b.build * 6) / 6);
       this.scene.add(obj);

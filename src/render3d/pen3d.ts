@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Pen, TW } from '../render/pen';
+import { Pen, TW, ZS } from '../render/pen';
 import type { Material, RoofKind, V3 } from '../render/pen';
 import { patternTexture, WORLD } from './patterns';
 import type { Pattern } from './patterns';
@@ -10,8 +10,12 @@ import type { Pattern } from './patterns';
  * height covers cos(30°) of the 45.25 px a tile edge spans on screen.
  */
 export const PX_PER_UNIT = (TW / Math.SQRT2) * Math.cos(Math.PI / 6);
-/** Pen coordinates (x, y in tiles, z in pixels) to world space (y up). */
-export const toWorld = (x: number, y: number, z: number): THREE.Vector3 => new THREE.Vector3(x, z / PX_PER_UNIT, y);
+/**
+ * Pen coordinates (x, y in tiles, z in pixels) to world space (y up). Heights
+ * are stretched as in the flat projection, so buildings stand as tall as
+ * they do there.
+ */
+export const toWorld = (x: number, y: number, z: number): THREE.Vector3 => new THREE.Vector3(x, (z * ZS) / PX_PER_UNIT, y);
 
 /** Shared materials: colours come from the vertices, patterns from the swatches. */
 const materials = new Map<Pattern | null, THREE.Material>();
@@ -137,6 +141,26 @@ export class Pen3D extends Pen {
       this.tri(top, p0, p1, fill);
       this.tri(bot, p1, p0, fill);
     }
+  }
+
+  override cylinder(cx: number, cy: number, r: number, z0: number, h: number, color: string, top?: string, mat?: Material): void {
+    const n = 16;
+    const pt = (k: number, z: number) => toWorld(cx + Math.cos((k / n) * Math.PI * 2) * r, cy + Math.sin((k / n) * Math.PI * 2) * r, z);
+    const m = mat ?? this.matFor?.(color);
+    const wall: Pattern | null = !m ? null : m === 'plank' ? 'boards' : m;
+    const lid = toWorld(cx, cy, z0 + h);
+    for (let k = 0; k < n; k++) {
+      this.quadW(pt(k, z0), pt(k + 1, z0), pt(k + 1, z0 + h), pt(k, z0 + h), color, wall);
+      this.tri(lid, pt(k + 1, z0 + h), pt(k, z0 + h), this.snow && !top ? '#eef2f4' : (top ?? color));
+    }
+  }
+
+  override cone(cx: number, cy: number, r: number, z0: number, h: number, color: string): void {
+    const n = 16;
+    const pt = (k: number) => toWorld(cx + Math.cos((k / n) * Math.PI * 2) * r, cy + Math.sin((k / n) * Math.PI * 2) * r, z0);
+    const apex = toWorld(cx, cy, z0 + h);
+    const col = this.snow ? '#eef2f4' : color;
+    for (let k = 0; k < n; k++) this.tri(pt(k), pt(k + 1), apex, col, null);
   }
 
   // Real shadows replace the painted ones.

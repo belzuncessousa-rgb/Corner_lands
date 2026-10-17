@@ -663,6 +663,56 @@ export class Pen {
     this.wallR(x + 0.002, y, y + w, 0, hgt, '#4a2f1b');
   }
 
+  /** An upright round drum (a well, a silo) of radius r tiles, shaded from the left. */
+  cylinder(cx: number, cy: number, r: number, z0: number, h: number, color: string, top?: string, _mat?: Material): void {
+    const c = this.ctx;
+    const rx = r * (TW / 2) * Math.SQRT2;
+    const ry = r * (TH / 2) * Math.SQRT2;
+    const [x, yb] = iso(cx, cy, z0);
+    const [, yt] = iso(cx, cy, z0 + h);
+    const g = c.createLinearGradient(x - rx, 0, x + rx, 0);
+    g.addColorStop(0, shade(color, 1.05));
+    g.addColorStop(0.45, shade(color, 0.95));
+    g.addColorStop(1, shade(color, 0.62));
+    c.fillStyle = g;
+    c.beginPath();
+    c.ellipse(x, yb, rx, ry, 0, 0, Math.PI);
+    c.lineTo(x - rx, yt);
+    c.ellipse(x, yt, rx, ry, 0, Math.PI, 0, true);
+    c.closePath();
+    c.fill();
+    c.strokeStyle = shade(color, 0.5);
+    c.lineWidth = 0.6;
+    c.stroke();
+    c.fillStyle = this.snow && !top ? '#eef2f4' : (top ?? shade(color, 1.1));
+    c.beginPath();
+    c.ellipse(x, yt, rx, ry, 0, 0, Math.PI * 2);
+    c.fill();
+  }
+
+  /** A cone (a conical roof) of radius r tiles on z0, rising h. */
+  cone(cx: number, cy: number, r: number, z0: number, h: number, color: string): void {
+    const c = this.ctx;
+    const rx = r * (TW / 2) * Math.SQRT2;
+    const ry = r * (TH / 2) * Math.SQRT2;
+    const [x, yb] = iso(cx, cy, z0);
+    const [, ya] = iso(cx, cy, z0 + h);
+    const col = this.snow ? '#eef2f4' : color;
+    const g = c.createLinearGradient(x - rx, 0, x + rx, 0);
+    g.addColorStop(0, shade(col, 1.08));
+    g.addColorStop(1, shade(col, 0.65));
+    c.fillStyle = g;
+    c.beginPath();
+    c.moveTo(x - rx, yb);
+    c.ellipse(x, yb, rx, ry, 0, Math.PI, 0, true);
+    c.lineTo(x, ya);
+    c.closePath();
+    c.fill();
+    c.strokeStyle = shade(color, 0.45);
+    c.lineWidth = 0.6;
+    c.stroke();
+  }
+
   chimney(x: number, y: number, zBase: number, h: number, color = '#8a7d70'): V3 {
     this.box(x, y, x + 0.12, y + 0.12, zBase, h, color, undefined, 'stone');
     return [x + 0.06, y + 0.06, zBase + h + 2];

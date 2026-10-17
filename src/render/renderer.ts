@@ -2175,9 +2175,12 @@ export class Renderer {
     return this.sprite(key, () =>
       makeSprite(70, 64, 35, 50, (ctx) => {
         const old = this.ctx;
+        const lights = this.nightLights.length;
         this.ctx = ctx;
         this.drawAgent({ ...a, x: 0, y: 0, ox: 0, oy: 0, fadeIn: 1, step: (frame * Math.PI) / 3 });
         this.ctx = old;
+        // Lantern glows belong on the map, not at the sprite's origin.
+        this.nightLights.length = lights;
       }),
     );
   }
@@ -2578,17 +2581,17 @@ export class Renderer {
         if (!active || Math.random() > 0.35) continue;
         // Steam rising from the brewhouse coppers while the brewer works.
         if (!this.light && b.type === 'brewhouse' && b.workers > 0 && !b.paused && (b.output > 0 || b.lastOutput > 0)) {
-          const [vx, vy] = iso(b.x + 0.95, b.y + 0.85, 40);
+          const [vx, vy] = iso(...onBuilding(b, 0.95, 0.85), 40);
           for (let k = 0; k < 2; k++) this.particles.push({ x: vx + (Math.random() - 0.5) * 6, y: vy, vx: this.wind * 4 + Math.random() * 2, vy: -16 - Math.random() * 8, life: 0, max: 1.2 + Math.random() * 0.6, size: 2.4 + Math.random(), steam: true });
         }
         // Forges at work throw sparks from the anvil.
         if (!this.light && (b.type === 'smithy' || b.type === 'armoury' || b.type === 'bloomery') && b.workers > 0 && !b.paused && (b.output > 0 || b.lastOutput > 0)) {
-          const [ax, ay] = iso(b.x + b.w * 0.8, b.y + b.h - 0.05, 6);
+          const [ax, ay] = iso(...onBuilding(b, b.w * 0.8, b.h - 0.05), 6);
           for (let k = 0; k < 4; k++) this.sparks.push({ x: ax, y: ay, vx: (Math.random() - 0.5) * 30, vy: -18 - Math.random() * 22, life: 0, max: 0.5 + Math.random() * 0.4 });
         }
         const sp = this.buildingSprite(b.type, b.level, season, variantOf(s, b));
         for (const [x, y, z] of sp.smoke) {
-          const [wx, wy] = iso(b.x + x, b.y + y, z);
+          const [wx, wy] = iso(...onBuilding(b, x, y), z);
           this.particles.push({
             x: wx + (Math.random() - 0.5) * 2,
             y: wy,
@@ -3150,6 +3153,20 @@ export class Renderer {
 const fract = (v: number) => v - Math.floor(v);
 
 /** A cow or a pig at a screen point. */
+/**
+ * A point of a building's drawing (local tiles from its corner) on the map:
+ * for a building turned in the 3D view, turned with it about its centre.
+ */
+export function onBuilding(b: Building, lx: number, ly: number): [number, number] {
+  if (b.rot === undefined || b.cx === undefined || b.cy === undefined) return [b.x + lx, b.y + ly];
+  const d = BUILDINGS[b.type];
+  const dx = lx - d.w / 2;
+  const dy = ly - d.h / 2;
+  const c = Math.cos(b.rot);
+  const sn = Math.sin(b.rot);
+  return [b.cx + dx * c - dy * sn, b.cy + dx * sn + dy * c];
+}
+
 /** The tiles a market's stalls stand on: every other tile, spread evenly over the square (or shape). */
 export function stallSpots(b: Building, W: number): number[] {
   const slots = marketStalls(b);

@@ -107,6 +107,30 @@ function groundBase(s: GameState, season: Season, P: number): HTMLCanvasElement 
     g.lineTo(x + (rand() - 0.5) * 2, y - 2 - rand() * 3);
     g.stroke();
   }
+  // Wildflowers in clumps, thicker on rich soil, and pebbles here and there.
+  const blooms = season === 3 ? [] : season === 2 ? ['#d88a3a', '#b8482a', '#e0c050'] : ['#e84a6a', '#f2d34a', '#f4f0e0', '#b97ae0', '#5a7ad8', '#d84a3a'];
+  for (let k = 0; k < s.width * s.height * 1.6; k++) {
+    const tx = Math.floor(rand() * s.width);
+    const ty = Math.floor(rand() * s.height);
+    const i = ty * s.width + tx;
+    const r = rand();
+    if (s.terrain[i] === 1) continue;
+    if (r < 0.06) {
+      g.fillStyle = rand() < 0.5 ? '#9a9286' : '#b4ada0';
+      g.beginPath();
+      g.ellipse((tx + rand()) * P, (ty + rand()) * P, 1.6 + rand(), 1.1, 0, 0, Math.PI * 2);
+      g.fill();
+    } else if (blooms.length && r < 0.06 + 0.3 * s.fertility[i]) {
+      g.fillStyle = blooms[Math.floor(rand() * blooms.length)];
+      const cx = (tx + rand()) * P;
+      const cy = (ty + rand()) * P;
+      for (let f = 0; f < 4; f++) {
+        g.beginPath();
+        g.arc(cx + (rand() - 0.5) * P * 0.4, cy + (rand() - 0.5) * P * 0.4, 1.7, 0, Math.PI * 2);
+        g.fill();
+      }
+    }
+  }
   // Water with smooth shores: the map's water tiles as a mask, enlarged
   // smoothly and softened, then cut at half way. A sandy rim runs round it and
   // the water deepens away from the bank. (The simulation keeps its tiles.)
