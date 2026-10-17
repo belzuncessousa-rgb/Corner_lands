@@ -53,7 +53,12 @@ import {
   CHAINS,
   chainReport,
   settlerBlocker,
-  herdCapacity,
+  ANIMAL_KINDS,
+  buyAnimal,
+  buyAnimalError,
+  slaughterAnimal,
+  herdRoom,
+  animalsOf,
   HERDS,
   orchardMaturity,
   TEND_PER_TILE,
@@ -643,7 +648,7 @@ export class Hud {
     const kind = group === 'food' ? 'food' : group === 'materials' ? 'materials' : null;
     let storage = '';
     if (group === 'goods') {
-      storage = `<div class="kv" data-tip="Wares share the storehouses with materials; wheat, barley, oats and flour go to the granaries."><span>${ICONS.storage} Storehouses</span><span>${Math.floor(stored(s, 'materials'))} / ${storageCap(s, 'materials')}</span></div>
+      storage = `<div class="kv" data-tip="Wares share the storehouses with materials; wheat, barley and flour go to the granaries."><span>${ICONS.storage} Storehouses</span><span>${Math.floor(stored(s, 'materials'))} / ${storageCap(s, 'materials')}</span></div>
         <div class="kv"><span>${ICONS.granary} Granaries</span><span>${Math.floor(stored(s, 'food'))} / ${storageCap(s, 'food')}</span></div>`;
     } else if (kind) {
       const used = Math.floor(stored(s, kind));
@@ -798,8 +803,8 @@ export class Hud {
     const plan = upgradePlan(s, b);
     const blocker = upgradeBlocker(s, b);
     const key = JSON.stringify([
-      b.id, b.status, b.workers, b.builders, b.residents, b.build.toFixed(2), b.paused, b.level, b.lastOutput, b.growth.toFixed(2), b.want, b.priority, b.recipe, b.yard, b.trade, b.herd, b.owner, Math.floor(b.growth),
-      s.tier, blocker, b.need, (b.upProgress ?? 0).toFixed(2), b.unmet, Math.floor(yardTotal(b)), b.hauled, Math.floor(s.res.gold / 10), s.population,
+      b.id, b.status, b.workers, b.builders, b.residents, b.build.toFixed(2), b.paused, b.level, b.lastOutput, b.growth.toFixed(2), b.want, b.priority, b.recipe, b.yard, b.trade, b.herd, JSON.stringify(b.animals ?? {}), b.owner, Math.floor(b.growth),
+      s.tier, blocker, b.need, (b.upProgress ?? 0).toFixed(2), b.unmet, Math.floor(yardTotal(b)), b.hauled, s.buildings.length, Math.floor(s.res.gold / 10), s.population,
       s.lastFeast, s.festivals, monthOf(s.day), b.type === 'market' ? s.day : 0, s.retinue, Math.floor(s.res.wood), Math.floor(totalFood(s)), b.barn, Math.floor(s.res.prestige), Math.floor(s.res.weapons),
       STORAGE_CAPACITY[b.type] ? RESOURCE_IDS.map((r) => (RESOURCE_STORAGE[r] ? Math.floor(s.res[r]) : 0)).join() : '',
     ]);
@@ -1031,9 +1036,18 @@ export class Hud {
       }
     }
     if (b.type === 'byre' && b.build >= 1) {
-      const capy = herdCapacity(s, b);
-      const kind = HERDS[b.recipe ?? 'sheep'];
-      rows.push(`<div class="kv" data-tip="A ${kind.name} needs ${kind.tiles} tiles of pasture. With oats in store the herd may grow half as large again, eating oats each winter month."><span>Herd</span><span>${b.herd ?? 0} ${kind.plural} · room for ${capy.free}${capy.fed > capy.free ? ` (+${capy.fed - capy.free} on oats)` : ''}</span></div>`);
+      const room = herdRoom(s, b);
+      const a = animalsOf(b);
+      rows.push(`<div class="kv" data-tip="A sheep needs 2 tiles of pasture, a pig 3, a cow 4; kinds share the pastures. Animals do not breed: buy them at the trading post."><span>Pasture used</span><span class="${room.used >= room.room ? 'neg' : ''}">${room.used} of ${room.room} tiles</span></div>`);
+      for (const k of ANIMAL_KINDS) {
+        const h = HERDS[k];
+        const n = a[k] ?? 0;
+        const err = buyAnimalError(s, b, k);
+        const meat = Object.entries(h.meat).map(([id, v]) => `${v} ${GOODS[id as ResourceId].name.toLowerCase()}`).join(' and ');
+        rows.push(`<div class="kv herd-row"><span>${n} ${n === 1 ? h.name : h.plural}</span><span>
+          <button data-action="buy-animal" data-k="${k}" ${err ? 'disabled' : ''} data-tip="${esc(err ?? `Buy a ${h.name} from the drovers for ${h.price} coins (needs ${h.tiles} tiles of pasture).`)}">Buy <small>${h.price}c</small></button>
+          <button data-action="slaughter" data-k="${k}" ${n ? '' : 'disabled'} data-tip="Slaughter one for ${meat}. It will not be replaced unless you buy another.">Slaughter</button></span></div>`);
+      }
       rows.push(`<div class="kv"><span>Pastures</span><span>${zonesOf(s, b).length} · ${zoneArea(zonesOf(s, b))} tiles</span></div>`);
     }
     if (b.type === 'orchardist' && b.build >= 1) {
@@ -1604,6 +1618,18 @@ export class Hud {
         if (err) this.flash(err);
         else this.sound('coin');
         this.lastInspectorKey = '';
+        break;
+      }
+      case 'buy-animal':
+      case 'slaughter': {
+        const b = s.buildings.find((o) => o.id === this.game.selected);
+        if (!b) break;
+        const k = t.dataset.k as 'sheep' | 'cattle' | 'pigs';
+        const err = t.dataset.action === 'buy-animal' ? buyAnimal(s, b, k) : slaughterAnimal(s, b, k);
+        if (err) this.flash(err);
+        else this.sound(t.dataset.action === 'buy-animal' ? 'coin' : 'place');
+        this.lastInspectorKey = '';
+        this.update();
         break;
       }
       case 'trade-tab':
@@ -2210,7 +2236,7 @@ export class Hud {
         <p><b>Workers:</b> select a workplace to choose how many villagers work there, its priority and its product. Seasonal work frees hands in the off season. Hover the villagers chip to see who is idle and where hands are short.</p>
         <p><b>Retinue</b>: a Borough can raise men-at-arms at the manor for prestige and arms. Paid 10 coins a month, they ride out against wolves and bandits.</p>
         <p><b>Harvest feast</b>: once each autumn, select the manor to call a feast. A meal for everyone and drink for every eight cheer the town for half a year and bring prestige.</p>
-        <p><b>Homes</b> eat one food a month each; several food groups (grain, meat, produce, dairy) cheer them. When every food is gone they boil stored wheat or oats into pottage, which is only half as filling. Each winter month a home burns firewood. Finer homes need clothes, a tavern, boots and medicine, and enjoy luxuries; families in them can work a craft from home.</p>
+        <p><b>Homes</b> eat one food a month each; several food groups (grain, meat, produce, dairy) cheer them. When every food is gone they boil stored wheat into pottage, which is only half as filling. Each winter month a home burns firewood. Finer homes need clothes, a tavern, boots and medicine, and enjoy luxuries; families in them can work a craft from home.</p>
         <p><b>Prestige</b> comes from a fine manor, a church and monuments. From Town on, spend it on <b>charters</b> (crown button) to specialise your town.</p>
         <p>Your <b>steward</b> warns you when things go wrong; the <b>Chronicle</b> (scroll button) keeps the full story.</p>
         <div class="ornament">❦</div>

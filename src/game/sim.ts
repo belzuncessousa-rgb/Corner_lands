@@ -1675,8 +1675,8 @@ export const TEND_PER_TILE = 4;
 /** Converters leave this much timber in stock for firewood. */
 export const WOOD_RESERVE = 20;
 
-const CROP_GOOD: Record<string, ResourceId> = { wheat: 'grain', barley: 'barley', oats: 'oats', flax: 'flax' };
-const CROP_FACTOR: Record<string, number> = { wheat: 1, barley: 1, oats: 1.15, flax: 0.5 };
+const CROP_GOOD: Record<string, ResourceId> = { wheat: 'grain', barley: 'barley', flax: 'flax' };
+const CROP_FACTOR: Record<string, number> = { wheat: 1, barley: 1, flax: 0.5 };
 
 export function cropOf(f: Building): string {
   return f.recipe ?? 'wheat';
@@ -2018,50 +2018,116 @@ function fieldCharterFactor(s: GameState): number {
 const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 
 /** Animals each pasture tile carries, and how fast the herd grows each spring. */
-export const HERDS: Record<string, { tiles: number; births: number; name: string; plural: string }> = {
-  sheep: { tiles: 2, births: 0.8, name: 'sheep', plural: 'sheep' },
-  cattle: { tiles: 4, births: 0.5, name: 'cow', plural: 'cattle' },
-  pigs: { tiles: 3, births: 1.5, name: 'pig', plural: 'pigs' },
+export type AnimalKind = 'sheep' | 'cattle' | 'pigs';
+export const ANIMAL_KINDS: AnimalKind[] = ['sheep', 'cattle', 'pigs'];
+
+/** Each animal: pasture it needs, its price at the trading post, and what slaughtering one gives. */
+export const HERDS: Record<AnimalKind, { tiles: number; price: number; name: string; plural: string; meat: Cost }> = {
+  sheep: { tiles: 2, price: 20, name: 'sheep', plural: 'sheep', meat: { meat: 2, hides: 1 } },
+  cattle: { tiles: 4, price: 45, name: 'cow', plural: 'cattle', meat: { meat: 5, hides: 1 } },
+  pigs: { tiles: 3, price: 25, name: 'pig', plural: 'pigs', meat: { pork: 4, hides: 1 } },
 };
 
-export function herdKindOf(b: Building): string {
-  return b.recipe ?? 'sheep';
+/** The animals an animal farm keeps, by kind (older saves kept one kind). */
+export function animalsOf(b: Building): Partial<Record<AnimalKind, number>> {
+  if (!b.animals && b.herd) b.animals = { [(b.herdKind as AnimalKind) ?? 'sheep']: b.herd };
+  return b.animals ?? {};
 }
 
-/** How many animals the pastures feed for free, and with oats over winter. */
-export function herdCapacity(s: GameState, b: Building): { free: number; fed: number } {
-  const per = HERDS[herdKindOf(b)].tiles;
+export function herdTotal(b: Building): number {
+  let n = 0;
+  for (const k of ANIMAL_KINDS) n += animalsOf(b)[k] ?? 0;
+  return n;
+}
+
+/** Pasture an animal farm's fences hold, and how much its animals take. */
+export function herdRoom(s: GameState, b: Building): { used: number; room: number } {
   const mult = (hasCharter(s, 'herd2') ? 1.5 : 1) * (onPath(s, 'farm') ? 0.8 : 1);
-  const free = Math.floor((zoneArea(zonesOf(s, b)) / per) * mult);
-  return { free, fed: free + (s.res.oats >= 1 ? Math.floor(free / 2) : 0) };
+  let used = 0;
+  for (const k of ANIMAL_KINDS) used += (animalsOf(b)[k] ?? 0) * HERDS[k].tiles;
+  return { used, room: Math.floor(zoneArea(zonesOf(s, b)) * mult) };
 }
 
-/** A fresh herd of a few animals arrives when the farm opens or changes animal. */
-const STARTING_HERD = 6;
+/** Takes animals away (lost to sickness, wolves or a shrinking pasture), the commonest first. */
+function removeAnimals(b: Building, n: number): void {
+  const a = animalsOf(b);
+  for (let k = 0; k < n; k++) {
+    const kind = ANIMAL_KINDS.filter((x) => (a[x] ?? 0) > 0).sort((p, q) => (a[q] ?? 0) - (a[p] ?? 0))[0];
+    if (!kind) break;
+    a[kind] = (a[kind] ?? 0) - 1;
+  }
+}
+
+/** Why an animal cannot be bought for a farm now, or null. */
+export function buyAnimalError(s: GameState, b: Building, kind: AnimalKind): string | null {
+  if (b.type !== 'byre' || b.build < 1) return 'Only an animal farm keeps animals';
+  if (!s.buildings.some((o) => o.type === 'tradingpost' && o.build >= 1)) return 'Animals are bought at a trading post';
+  const r = herdRoom(s, b);
+  if (r.used + HERDS[kind].tiles > r.room) return 'No room on the pastures: fence more';
+  if (s.res.gold < HERDS[kind].price) return `Needs ${HERDS[kind].price} coins`;
+  return null;
+}
+
+/** Buys one animal from the drovers at the trading post. */
+export function buyAnimal(s: GameState, b: Building, kind: AnimalKind): string | null {
+  const err = buyAnimalError(s, b, kind);
+  if (err) return err;
+  s.res.gold -= HERDS[kind].price;
+  const a = animalsOf(b);
+  a[kind] = (a[kind] ?? 0) + 1;
+  b.animals = a;
+  b.herd = herdTotal(b);
+  return null;
+}
+
+/** Slaughters one animal for its meat and hide (there is no breeding: buy another to replace it). */
+export function slaughterAnimal(s: GameState, b: Building, kind: AnimalKind): string | null {
+  const a = animalsOf(b);
+  if (!(a[kind] ?? 0)) return `No ${HERDS[kind].plural} to slaughter`;
+  a[kind] = (a[kind] ?? 0) - 1;
+  b.herd = herdTotal(b);
+  const meat = (hasCharter(s, 'herd1') ? 1.3 : 1) * (hasCharter(s, 'herd3a') ? 1.5 : 1);
+  for (const k in HERDS[kind].meat) {
+    const id = k as ResourceId;
+    const n = HERDS[kind].meat[id] ?? 0;
+    b.output += produced(s, id, id === 'hides' ? n : Math.round(n * meat));
+  }
+  return null;
+}
 
 function stepByre(s: GameState, b: Building): void {
-  const kind = herdKindOf(b);
+  // Animals lost to an event (which lower the herd's count) leave the pastures.
+  const total = herdTotal(b);
+  if (b.herd !== undefined && b.herd < total) removeAnimals(b, total - b.herd);
+  // Pastures shrank below the herd: the surplus is sold back to the drovers.
+  const room = herdRoom(s, b);
+  if (room.used > room.room) {
+    let over = room.used - room.room;
+    const a = animalsOf(b);
+    for (const k of [...ANIMAL_KINDS].reverse()) {
+      while (over > 0 && (a[k] ?? 0) > 0) {
+        a[k] = (a[k] ?? 0) - 1;
+        over -= HERDS[k].tiles;
+        s.res.gold += Math.floor(HERDS[k].price / 2);
+      }
+    }
+  }
+  b.herd = herdTotal(b);
   const pastures = zonesOf(s, b);
-  const capy = herdCapacity(s, b);
-  // A fresh herd arrives once there is pasture for it (and when the animal changes).
-  if (capy.free > 0 && (b.herdKind !== kind || !b.herd)) {
-    if (b.herdKind !== kind || b.herd === undefined) b.herd = Math.min(STARTING_HERD, capy.free);
-    else if (!b.herd) b.herd = Math.min(2, capy.free);
-    b.herdKind = kind;
-  }
-  // Pastures shrank below the herd: the surplus is sold at market.
-  if ((b.herd ?? 0) > capy.fed) {
-    const extra = (b.herd ?? 0) - capy.fed;
-    b.herd = capy.fed;
-    s.res.gold += extra * 3;
-  }
-  const H = HERDS[kind];
   const winter = monthOf(s.day) >= 10;
-  for (const z of pastures) z.status = winter ? `${b.herd} ${H.plural} sheltering in the byre` : `${b.herd} ${b.herd === 1 ? H.name : H.plural} grazing`;
+  const a = animalsOf(b);
+  const list = ANIMAL_KINDS.filter((k) => (a[k] ?? 0) > 0)
+    .map((k) => `${a[k]} ${a[k] === 1 ? HERDS[k].name : HERDS[k].plural}`)
+    .join(', ');
+  for (const z of pastures) z.status = !b.herd ? 'Empty: buy animals at the trading post' : winter ? `${list} sheltering in the byre` : `${list} grazing`;
   b.blocked = 0;
   if (!pastures.length) {
     b.status = 'Fence pastures nearby for the animals';
     b.blocked = BLOCK_PROBLEM;
+    return;
+  }
+  if (!b.herd) {
+    b.status = 'No animals yet: buy them at the trading post';
     return;
   }
   if (b.workers === 0) {
@@ -2070,65 +2136,30 @@ function stepByre(s: GameState, b: Building): void {
   }
   const month = monthOf(s.day);
   const crew = b.workers / workersOf(b);
-  if (kind === 'cattle' && month >= 1 && month <= 8) {
-    b.work += (b.herd ?? 0) * 0.12 * crew * (hasCharter(s, 'herd1') ? 1.3 : 1);
+  const cows = a.cattle ?? 0;
+  if (cows > 0 && month >= 1 && month <= 8) {
+    b.work += cows * 0.12 * crew * (hasCharter(s, 'herd1') ? 1.3 : 1);
     const n = Math.floor(b.work);
     if (n > 0) {
       b.work -= n;
       b.output += produced(s, 'milk', n);
     }
-    b.status = `Milking ${b.herd} cattle`;
+    b.status = `Milking ${cows} ${cows === 1 ? 'cow' : 'cattle'}, herding ${list}`;
   } else {
-    b.status = `Herding ${b.herd} ${b.herd === 1 ? H.name : H.plural}`;
+    b.status = `Herding ${list}`;
   }
 }
 
-/** Monthly herd events: spring lambing and shearing, autumn slaughter, winter fodder. */
+/** Spring shearing: each sheep gives two fleeces of wool. */
 function monthlyHerds(s: GameState, month: number): void {
+  if (month !== 1) return;
   for (const b of s.buildings) {
-    if (b.type !== 'byre' || b.build < 1 || !b.herd) continue;
-    const kind = herdKindOf(b);
-    const capy = herdCapacity(s, b);
-    const herd = b.herd ?? 0;
-    const staffed = b.workers > 0;
-    if (month === 1 && herd > 0) {
-      b.herd = Math.min(capy.fed, herd + Math.max(1, Math.round(herd * HERDS[kind].births)));
-      if (kind === 'sheep' && staffed) {
-        const n = produced(s, 'wool', Math.round(herd * 2 * (hasCharter(s, 'herd1') ? 1.3 : 1)));
-        b.output += n;
-        if (n) log(s, `Shearing time: ${n} wool from the flock.`, 'info', b);
-      }
-    }
-    if (month === 8 && staffed) {
-      const keep = Math.max(2, Math.ceil(capy.free * 0.5));
-      const cull = Math.max(0, herd - keep);
-      if (cull > 0) {
-        b.herd = herd - cull;
-        const got: string[] = [];
-        const add = (id: ResourceId, n: number) => {
-          const k = produced(s, id, n);
-          if (k) got.push(`${k} ${GOODS[id].name.toLowerCase()}`);
-          b.output += k;
-        };
-        const meat = (hasCharter(s, 'herd1') ? 1.3 : 1) * (hasCharter(s, 'herd3a') ? 1.5 : 1);
-        if (kind === 'pigs') add('pork', Math.round(cull * 4 * meat));
-        else add('meat', Math.round(cull * (kind === 'cattle' ? 5 : 2) * meat));
-        add('hides', cull);
-        log(s, `Autumn slaughter: ${got.join(', ')}.`, 'info', b);
-      }
-    }
-    if (month >= 9 || month === 0) {
-      // Animals beyond what the pasture feeds eat oats through winter.
-      const extra = Math.max(0, (b.herd ?? 0) - capy.free);
-      if (extra > 0) {
-        const eat = Math.min(extra, Math.floor(s.res.oats));
-        s.res.oats -= eat;
-        if (eat < extra) {
-          b.herd = (b.herd ?? 0) - (extra - eat);
-          log(s, `Without oats, ${extra - eat} animals had to be sold off.`, 'bad', b);
-        }
-      }
-    }
+    if (b.type !== 'byre' || b.build < 1 || !b.workers) continue;
+    const sheep = animalsOf(b).sheep ?? 0;
+    if (!sheep) continue;
+    const n = produced(s, 'wool', Math.round(sheep * 2 * (hasCharter(s, 'herd1') ? 1.3 : 1)));
+    b.output += n;
+    if (n) log(s, `Shearing time: ${n} wool from the flock.`, 'info', b);
   }
 }
 
@@ -2472,7 +2503,7 @@ const VARIETY_BONUS = [0, 0, 6, 12, 18];
  * (grain, meat, produce, dairy) were on the table.
  */
 /** Famine food: a measure of grain or oats boiled into pottage feeds half a villager for a month. */
-const POTTAGE: ResourceId[] = ['grain', 'oats'];
+const POTTAGE: ResourceId[] = ['grain'];
 export const POTTAGE_FOOD = 0.5;
 
 /**

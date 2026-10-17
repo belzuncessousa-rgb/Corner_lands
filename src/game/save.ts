@@ -49,6 +49,12 @@ export function deserialize(json: string): GameState {
     else (s as unknown as Record<string, Uint8Array>)[k] = new Uint8Array(buf);
   }
   s.res = { ...emptyResources(), ...s.res };
+  // Oats are no longer grown: oat fields go to wheat, and the oats in store to grain.
+  for (const b of s.buildings) if (b.type === 'field' && b.recipe === 'oats') b.recipe = 'wheat';
+  if (s.res.oats > 0) {
+    s.res.grain += s.res.oats;
+    s.res.oats = 0;
+  }
   // Older lands had no herds, shoals or mushrooms: give them some, around the manor.
   if (!s.herds) {
     const hall = s.buildings.find((b) => b.type === 'townhall');

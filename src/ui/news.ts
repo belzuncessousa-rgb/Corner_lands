@@ -3,6 +3,10 @@
  * something worth telling returning players goes in; the number only grows.
  */
 export const NEWS: { n: number; text: string }[] = [
+  { n: 23, text: 'Herds: buy each sheep, cow or pig at the trading post; kinds share the pastures; no oats, no breeding, slaughter when you choose' },
+  { n: 22, text: "A new start: the settlers' camp. Towns grow by themselves when they have the people and places for it; the manor is built by choice and grows into a castle" },
+  { n: 21, text: 'Free marketplaces you draw, where households fetch their food; a Trading Post for the outside world; errands take working time' },
+  { n: 20, text: 'Bigger crews and haulers fetching from workplace yards; hunters, foragers and fishers go where the game, berries, mushrooms and fish are' },
   { n: 19, text: 'Evenings and festivals: lanterns after dark, a maypole in late spring, a harvest bonfire, wreaths and candles in midwinter, and dogs and cats about the town' },
   { n: 18, text: 'Water and weather: ducks with their broods, fishers out in rowing boats, puddles after the spring rain, morning mist on the river, and smoke drifting with the wind' },
   { n: 17, text: 'Village life: children at play and neighbours chatting by their doors, hens in the yards, stooks at harvest, glowing ovens, and heavy snow and icicles in midwinter' },

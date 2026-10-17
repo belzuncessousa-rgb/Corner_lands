@@ -118,10 +118,22 @@ const past = await page.evaluate(() => { const s = window.game.state; window.cl.
 check('fence a pasture beside it', past === byreId);
 await page.evaluate((id) => window.game.select(id), byreId);
 await page.waitForTimeout(300);
-await page.click('#inspector [data-action="recipe"][data-r="cattle"]');
+// Animals are bought at a trading post, one by one.
+await page.evaluate(() => {
+  const s = window.game.state;
+  const c = s.buildings.find((b) => b.type === 'camp');
+  let t = null;
+  for (let r = 3; r < 24 && !t; r++) for (const [dx, dy] of [[-r, 0], [0, -r], [r, 0], [0, r], [-r, -r]]) if (!t && !window.cl.placementError(s, 'tradingpost', c.x + dx, c.y + dy)) t = window.cl.placeOrder(s, 'tradingpost', c.x + dx, c.y + dy);
+  t.build = 1;
+  t.need = undefined;
+  window.cl.recompute(s);
+  window.game.hud.update();
+});
+await page.waitForTimeout(300);
+await page.click('#inspector [data-action="buy-animal"][data-k="cattle"]');
 await page.evaluate(() => { for (let i = 0; i < 3; i++) window.cl.stepDay(window.game.state); });
-const herd = await page.evaluate(() => { const b = window.game.state.buildings.find((x) => x.type === 'byre'); return { kind: b.herdKind, herd: b.herd }; });
-check('keep cattle', herd.kind === 'cattle' && herd.herd > 0, JSON.stringify(herd));
+const herd = await page.evaluate(() => { const b = window.game.state.buildings.find((x) => x.type === 'byre'); return { cattle: b.animals?.cattle, herd: b.herd }; });
+check('buy a cow for the pasture', herd.cattle === 1 && herd.herd === 1, JSON.stringify(herd));
 await page.keyboard.press('Escape');
 // A house: backyard hens, then raise it and take up weaving at home.
 const houseId = await page.evaluate(([hx, hy]) => { const s = window.game.state; for (let r = 4; r < 16; r++) for (const [dx, dy] of [[-r, -r], [r, r], [-r, r]]) { const b = window.cl.placeOrder(s, 'house', hx + dx, hy + dy); if (b) { b.build = 1; b.need = undefined; window.game.select(b.id); return b.id; } } return null; }, [hall.x, hall.y]);

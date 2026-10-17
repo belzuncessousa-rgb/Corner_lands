@@ -14,6 +14,7 @@ import {
   canAfford,
   materialsOf,
   bCenter,
+  buyAnimal,
   isBridge,
   centerOf,
   log,
@@ -1098,7 +1099,7 @@ function rangeHighlighter(s: GameState, type: BuildingType): ((i: number) => boo
 const game = new Game();
 // Handy hooks for debugging and automated screenshots.
 (window as unknown as Record<string, unknown>).game = game;
-(window as unknown as Record<string, unknown>).cl = { placeOrder, buildRoad, planRoad, stepDay, recompute, placementError, playBot, placeZone, setYard, keepOf, log };
+(window as unknown as Record<string, unknown>).cl = { placeOrder, buildRoad, planRoad, buyAnimal, stepDay, recompute, placementError, playBot, placeZone, setYard, keepOf, log };
 
 /** Hands the player a file to save. */
 function download(blob: Blob, name: string): void {

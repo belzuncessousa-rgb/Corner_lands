@@ -85,7 +85,8 @@ export const GOODS: Record<ResourceId, GoodDef> = {
 
   grain: good('Wheat', 'goods', 2, 'Harvested in autumn, milled and baked into bread.', { storage: 'food', keep: 300 }),
   barley: good('Barley', 'goods', 2, 'Brewed into ale.', { storage: 'food' }),
-  oats: good('Oats', 'goods', 1, 'Winter fodder for large herds.', { storage: 'food' }),
+  // No longer grown (kept so older saves load).
+  oats: good('Oats', 'goods', 0, 'No longer grown.', { storage: 'food' }),
   flour: good('Flour', 'goods', 3, 'Milled wheat, ready for the oven.', { storage: 'food' }),
   flax: good('Flax', 'goods', 2, 'Retted and spun into linen.'),
   wool: good('Wool', 'goods', 3, 'Shorn from sheep in spring.'),
@@ -355,7 +356,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   field: def({
     type: 'field',
     name: 'Field',
-    desc: 'Draw a field near a Farmstead and choose its crop: wheat for bread, barley for ale, oats for fodder or flax for linen. Changing crops each year keeps the soil rich.',
+    desc: 'Draw a field near a Farmstead and choose its crop: wheat for bread, barley for ale or flax for linen. Changing crops each year keeps the soil rich.',
     category: 'farming',
     w: 1,
     h: 1,
@@ -365,30 +366,24 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     recipes: [
       { id: 'wheat', name: 'Wheat', inputs: {}, outputs: { grain: 1 } },
       { id: 'barley', name: 'Barley', inputs: {}, outputs: { barley: 1 } },
-      { id: 'oats', name: 'Oats', inputs: {}, outputs: { oats: 1 } },
       { id: 'flax', name: 'Flax', inputs: {}, outputs: { flax: 1 } },
     ],
   }),
   byre: def({
     type: 'byre',
     name: 'Animal Farm',
-    desc: 'Herders keep sheep (wool), cattle (milk, beef, hides) or pigs (pork) on the pastures you fence nearby. Herds grow each spring and the surplus is slaughtered in autumn.',
+    desc: 'Herders keep sheep (wool each spring), cattle (milk) and pigs on the pastures you fence nearby. Animals are bought one by one at a trading post and do not breed; slaughter one for its meat and hide when you choose.',
     category: 'farming',
     cost: { wood: 30, planks: 5 },
     buildDays: 12,
     workers: 2,
     tier: 1,
     radius: 12,
-    recipes: [
-      { id: 'sheep', name: 'Sheep', inputs: {}, outputs: { wool: 1 } },
-      { id: 'cattle', name: 'Cattle', inputs: {}, outputs: { milk: 1 } },
-      { id: 'pigs', name: 'Pigs', inputs: {}, outputs: { pork: 1 } },
-    ],
   }),
   pasture: def({
     type: 'pasture',
     name: 'Pasture',
-    desc: 'Fenced grazing for an Animal Farm: a sheep needs 2 tiles, a pig 3, a cow 4. With oats in store the herd can grow half as large again, eating oats through winter.',
+    desc: 'Fenced grazing for an Animal Farm: a sheep needs 2 tiles, a pig 3, a cow 4, and kinds share it. Buy the animals at a trading post.',
     category: 'farming',
     w: 1,
     h: 1,

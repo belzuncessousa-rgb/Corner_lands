@@ -181,6 +181,8 @@ export interface Building {
   /** Byres: animals in the herd, and which animal they are. */
   herd?: number;
   herdKind?: string;
+  /** Byres: the animals bought for it, by kind. */
+  animals?: Partial<Record<'sheep' | 'cattle' | 'pigs', number>>;
   /** Orchards: days since planting. */
   age?: number;
   /** Fields: the crop harvested last year (for rotation). */

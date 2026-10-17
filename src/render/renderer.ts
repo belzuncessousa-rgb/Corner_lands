@@ -1,7 +1,7 @@
 import { BUILDINGS, DAYS_PER_MONTH, DAYS_PER_YEAR, RESOURCE_STORAGE, STORAGE_CAPACITY, type StorageKind } from '../game/data';
 import { marketStalls, upgradeBlocker } from '../game/levels';
 import { hasCharter } from '../game/charters';
-import { HOME_TRADES, deliveredTo, hasProblem, isMarketDay, monthOf, nearestShoal, orchardMaturity, seasonOf, seatOf, storageCap } from '../game/sim';
+import { ANIMAL_KINDS, HOME_TRADES, animalsOf, deliveredTo, hasProblem, herdTotal, isMarketDay, monthOf, nearestShoal, orchardMaturity, seasonOf, seatOf, storageCap } from '../game/sim';
 import type { Building, BuildingType, GameState, ResourceId, Season } from '../game/types';
 import { idx, inBounds } from '../game/world';
 import type { Agent } from './agents';
@@ -714,23 +714,35 @@ export class Renderer {
     const owner = s.buildings.find((o) => o.id === b.owner);
     // In deep winter the herd shelters in the byre.
     const sheltered = monthOf(s.day) >= 10;
-    if (owner && owner.herd && !sheltered) {
+    if (owner && herdTotal(owner) && !sheltered) {
       const zones = s.buildings.filter((z) => z.owner === owner.id && z.type === 'pasture');
       const total = zones.reduce((a, z) => a + z.w * z.h, 0);
-      let n = Math.round(((owner.herd ?? 0) * b.w * b.h) / Math.max(1, total));
+      const herd = herdTotal(owner);
+      let n = Math.round((herd * b.w * b.h) / Math.max(1, total));
       const used = herds.get(owner.id) ?? 0;
-      if (zones[zones.length - 1] === b) n = Math.max(0, (owner.herd ?? 0) - used);
+      if (zones[zones.length - 1] === b) n = Math.max(0, herd - used);
       herds.set(owner.id, used + n);
-      const kind = owner.herdKind ?? 'sheep';
-      for (let j = 0; j < Math.min(n, 40); j++) {
+      // The farm's animals, kind by kind, shared out over its pastures.
+      const a = animalsOf(owner);
+      const flock: string[] = [];
+      for (const k of ANIMAL_KINDS) for (let i = 0; i < (a[k] ?? 0); i++) flock.push(k);
+      const mine = flock.slice(used, used + Math.min(n, 40));
+      // Each wanders slowly about its own spot (no wrapping round the edges),
+      // facing the way it moves; nearer animals are drawn last.
+      const beasts = mine.map((kind, j) => {
         const seed = b.id * 97 + j * 13;
         const r1 = fract(Math.sin(seed) * 43758.5);
         const r2 = fract(Math.sin(seed * 1.7) * 24634.6);
         const t = this.time * 0.05 + r1 * 10;
-        const ax = x0 + 0.4 + (b.w - 0.8) * fract(r1 + 0.08 * Math.sin(t));
-        const ay = y0 + 0.4 + (b.h - 0.8) * fract(r2 + 0.06 * Math.cos(t * 0.8));
+        const ax = x0 + 0.45 + (b.w - 0.9) * (0.5 + 0.42 * Math.sin(r1 * 6.283 + t * 0.6));
+        const ay = y0 + 0.45 + (b.h - 0.9) * (0.5 + 0.42 * Math.sin(r2 * 6.283 + t * 0.45 + 1));
+        const dx = (b.w - 0.9) * Math.cos(r1 * 6.283 + t * 0.6) * 0.6;
+        const dy = (b.h - 0.9) * Math.cos(r2 * 6.283 + t * 0.45 + 1) * 0.45;
+        return { kind, ax, ay, f: dx - dy >= 0 ? 1 : -1, j };
+      });
+      beasts.sort((p1, p2) => p1.ax + p1.ay - (p2.ax + p2.ay));
+      for (const { kind, ax, ay, f, j } of beasts) {
         const [sx, sy] = iso(ax, ay);
-        const f = Math.cos(t) > 0 ? 1 : -1;
         if (kind === 'sheep') drawSheep(p.ctx, sx, sy, f, season === 3 ? '#e2ddd2' : '#f2ece0');
         else drawBeast(p.ctx, sx, sy, f, kind, j);
       }

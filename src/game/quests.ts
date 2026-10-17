@@ -121,7 +121,7 @@ export const QUESTS: Quest[] = [
   {
     id: 'herd',
     title: 'Raise a flock',
-    hint: 'Build an Animal Farm and fence a pasture beside it for sheep, cattle or pigs.',
+    hint: 'Build an Animal Farm, fence a pasture beside it and buy sheep at the trading post.',
     reward: { gold: 40 },
     done: (s) => s.buildings.some((b) => b.type === 'byre' && (b.herd ?? 0) > 0),
   },

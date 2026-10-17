@@ -23,6 +23,8 @@ import {
   placementError,
   nearestResource,
   seatOf,
+  animalsOf,
+  buyAnimal,
   resourceInRange,
   roadError,
   stepDay,
@@ -188,6 +190,15 @@ function drawFields(s: GameState): void {
       [4, 4],
     ]);
     if (spot) placeZone(s, 'pasture', spot.x, spot.y, spot.x + spot.w - 1, spot.y + spot.h - 1);
+  }
+  // Stock the pastures from the trading post: a flock first, then a few cows.
+  for (const byre of s.buildings) {
+    if (byre.type !== 'byre' || byre.build < 1) continue;
+    for (let k = 0; k < 3; k++) {
+      const a = animalsOf(byre);
+      const kind = (a.sheep ?? 0) < 8 ? 'sheep' : (a.cattle ?? 0) < 4 ? 'cattle' : 'sheep';
+      if (s.res.gold < 150 || buyAnimal(s, byre, kind)) break;
+    }
   }
 }
 

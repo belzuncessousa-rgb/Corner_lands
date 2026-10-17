@@ -576,25 +576,35 @@ describe('fields, herds, orchards and backyards', () => {
     expect(farm.status).toMatch(/Draw fields/);
   });
 
-  it('herds grow in spring, are shorn and slaughtered in autumn', async () => {
+  it('animals are bought at a trading post, share the pastures, are shorn in spring and slaughtered by choice', async () => {
+    const { buyAnimal, slaughterAnimal } = await import('../src/game/sim');
     const s = generateWorld(33);
     s.tier = 1;
+    s.res.gold = 1000;
     ready(s, 'storehouse');
     ready(s, 'granary');
     const byre = ready(s, 'byre');
     await zoneNear(s, 'pasture', byre, 6, 6);
-    s.population = 6;
+    s.population = 8;
     run(s, 1);
-    expect(byre.herd).toBe(6);
+    expect(byre.herd ?? 0).toBe(0);
+    expect(buyAnimal(s, byre, 'sheep')).toMatch(/trading post/);
+    ready(s, 'tradingpost');
+    // 36 tiles: six sheep (12), three cows (12) and four pigs (12) fill it.
+    for (let k = 0; k < 6; k++) expect(buyAnimal(s, byre, 'sheep')).toBeNull();
+    for (let k = 0; k < 3; k++) expect(buyAnimal(s, byre, 'cattle')).toBeNull();
+    for (let k = 0; k < 4; k++) expect(buyAnimal(s, byre, 'pigs')).toBeNull();
+    expect(buyAnimal(s, byre, 'pigs')).toMatch(/room/);
+    expect(byre.herd).toBe(13);
     run(s, DAYS_PER_MONTH * 3);
-    expect(byre.herd).toBeGreaterThan(6);
+    // No breeding; wool in spring, milk from the cows.
+    expect(byre.herd).toBe(13);
     expect(s.res.wool).toBeGreaterThan(0);
-    // A big flock is thinned out in autumn.
-    byre.herd = 18;
-    run(s, DAYS_PER_MONTH * 6);
-    expect(byre.herd).toBeLessThan(18);
-    expect(s.res.wool).toBeGreaterThan(0);
-    expect(s.res.meat + s.res.hides).toBeGreaterThan(0);
+    expect(s.res.milk).toBeGreaterThan(0);
+    const pork = s.res.pork;
+    expect(slaughterAnimal(s, byre, 'pigs')).toBeNull();
+    expect(s.res.pork).toBeGreaterThan(pork);
+    expect(byre.herd).toBe(12);
   });
 
   it('orchards bear fruit once grown and pickers bring it in', async () => {
@@ -768,21 +778,26 @@ describe('charter goods', () => {
 });
 
 describe('review regressions', () => {
-  it('an animal farm raised by builders gets its herd once pastures exist', async () => {
-    const { placeZone } = await import('../src/game/sim');
+  it('an animal farm raised by builders keeps the animals bought for it', async () => {
+    const { placeZone, buyAnimal } = await import('../src/game/sim');
     const s = generateWorld(71);
     s.tier = 1;
     s.res.wood = 150;
-    s.res.gold = 200;
+    s.res.gold = 400;
     s.res.planks = 20;
     s.population = 12;
     const byre = placeNearRoad(s, 'byre');
     let z = null;
     for (let r = 1; r < 10 && !z; r++) z = placeZone(s, 'pasture', byre.x + 2 + r, byre.y, byre.x + 7 + r, byre.y + 5) ?? placeZone(s, 'pasture', byre.x, byre.y + 2 + r, byre.x + 5, byre.y + 7 + r);
     expect(z).not.toBeNull();
+    const tp = placeNearRoad(s, 'tradingpost');
+    tp.build = 1;
+    tp.need = undefined;
     run(s, 40);
     expect(byre.build).toBe(1);
-    expect(byre.herd).toBeGreaterThan(0);
+    expect(buyAnimal(s, byre, 'cattle')).toBeNull();
+    run(s, 2);
+    expect(byre.herd).toBe(1);
   });
 
   it('a home dairy makes half as much again as a dairy, not three times', async () => {
