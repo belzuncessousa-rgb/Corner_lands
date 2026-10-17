@@ -1011,7 +1011,8 @@ export function recompute(s: GameState): void {
     (b.type === 'market' ? 0.45 : b.type === 'storehouse' || b.type === 'granary' ? 1.05 : CATEGORY_PRIORITY[workDef(b).category]) +
     (TYPE_PRIORITY[b.type] ?? 0) +
     (isBlocked(b) ? 10 : 0);
-  type Job = { b: Building; site: boolean; p: number };
+  // `cap` limits a job to some of the building's places, `more` adds to those already filled.
+  type Job = { b: Building; site: boolean; p: number; cap?: number; more?: boolean };
   const jobs: Job[] = [];
   for (const b of s.buildings) {
     b.workers = 0;
@@ -1025,14 +1026,23 @@ export function recompute(s: GameState): void {
     if (isProject(b) && !starvedSite(s, b)) jobs.push({ b, site: true, p: 100 + (b.type === 'wall' ? WALL_SITE_PRIORITY : SITE_PRIORITY) + b.id * 1e-6 });
     if (b.paused) continue;
     if (b.build >= 1 && workDef(b).workers > 0 && (b.want ?? 1) > 0 && !restingNow(s, b)) {
-      // Families working a craft from home always tend to it first.
-      jobs.push({ b, site: false, p: b.trade ? -1 : prio(b) });
+      if (b.type === 'market') {
+        // One vendor opens the market, hired with the food makers; the
+        // other stalls are kept only when there are hands to spare.
+        jobs.push({ b, site: false, p: prio(b), cap: 1 });
+        jobs.push({ b, site: false, p: (2 - (b.priority ?? 1)) * 100 + CATEGORY_PRIORITY.civic + 0.5, more: true });
+      } else {
+        // Families working a craft from home always tend to it first.
+        jobs.push({ b, site: false, p: b.trade ? -1 : prio(b) });
+      }
     }
   }
   jobs.sort((a, c) => a.p - c.p || a.b.id - c.b.id);
   for (const j of jobs) {
-    const n = Math.min(free, j.site ? (j.b.type === 'wall' ? 1 : SITE_BUILDERS) : Math.min(workersOf(j.b), j.b.want ?? Infinity));
+    const places = Math.min(workersOf(j.b), j.b.want ?? Infinity);
+    const n = Math.min(free, j.site ? (j.b.type === 'wall' ? 1 : SITE_BUILDERS) : j.more ? places - j.b.workers : Math.min(places, j.cap ?? Infinity));
     if (j.site) j.b.builders = n;
+    else if (j.more) j.b.workers += n;
     else j.b.workers = n;
     free -= n;
   }

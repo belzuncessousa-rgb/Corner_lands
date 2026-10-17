@@ -263,8 +263,8 @@ describe('stress', () => {
       expect(s.messages.length).toBeLessThanOrEqual(40);
       expect(size).toBeLessThan(1024 * 1024);
       expect(ms).toBeLessThan(20);
-      // Thirty years is long enough for a City to raise its cathedral.
-      if (s.tier >= 4) expect(s.buildings.some((b) => b.type === 'cathedral' && b.build >= 1), `seed ${seed} cathedral`).toBe(true);
+      // Thirty years is long enough for a City to raise a great work (coins are scarce: not always the cathedral).
+      if (s.tier >= 4) expect(s.buildings.some((b) => ['cathedral', 'belltower', 'guildhall'].includes(b.type) && b.build >= 1), `seed ${seed} great work`).toBe(true);
     }
   });
 

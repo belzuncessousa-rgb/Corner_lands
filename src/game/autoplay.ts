@@ -504,6 +504,8 @@ export function act(s: GameState, rand: () => number): void {
     if (count(s, 'fisher') < 2 + Math.floor(pop / 30)) wants.push('fisher');
     if (count(s, 'hunter') < 2 + Math.floor(pop / 30)) wants.push('hunter');
   }
+  // A Village of thirty wants its first tavern to grow into a Town, short of hands or not.
+  if (s.tier >= 1 && pop >= 30 && count(s, 'tavern') < 1) wants.unshift('tavern');
   if (short >= 8) {
     // Fill the existing jobs first; homes still bring more hands.
     if (totalHousing(s) - pop < 4) wants.push('house');
