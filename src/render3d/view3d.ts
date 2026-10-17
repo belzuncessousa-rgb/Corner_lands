@@ -1,14 +1,14 @@
 import * as THREE from 'three';
-import { BUILDINGS } from '../game/data';
+import { BUILDINGS, STORAGE_CAPACITY } from '../game/data';
 import { hasCharter } from '../game/charters';
 import { monthOf, orchardMaturity, seasonOf } from '../game/sim';
 import type { Building, GameState, Season } from '../game/types';
-import { TREE_SLOTS, variantOf } from '../render/renderer';
-import { bushSprite, fruitTreeSprite, rockSprite, treeSprite } from '../render/sprites';
+import { TREE_SLOTS, drawGood, stockSpots, variantOf } from '../render/renderer';
+import { bushSprite, fruitTreeSprite, rockSprite, treeSprite, wallMaterial } from '../render/sprites';
 import type { Sprite, TreeKind } from '../render/sprites';
 import { buildingModel, groundTexture, wallsModel } from './scene3d';
 import { VIEW, ZS, turnPoint } from '../render/pen';
-import { PX_PER_UNIT } from './pen3d';
+import { PX_PER_UNIT, Pen3D } from './pen3d';
 
 /**
  * A building's model where it stands: on its grid rectangle, or for a freely
@@ -280,6 +280,7 @@ export class View3D {
     this.syncGround(s, season);
     this.syncBuildings(s, season);
     this.syncWalls(s, season);
+    this.syncStock(s, season);
     this.syncObjects(s, season);
     // Working mills turn their sails.
     const now = performance.now() / 1000;
@@ -332,6 +333,8 @@ export class View3D {
     this.buildings.clear();
     if (this.walls) this.scene.remove(this.walls.obj);
     this.walls = null;
+    if (this.stock) this.scene.remove(this.stock.obj);
+    this.stock = null;
     this.groundKey = '';
     this.objectsKey = '';
     this.ground.scale.set(s.width, s.height, 1);
@@ -356,6 +359,22 @@ export class View3D {
   }
 
   private walls: { key: string; obj: THREE.Object3D } | null = null;
+  private stock: { key: string; obj: THREE.Object3D } | null = null;
+
+  /** Piles of goods in the yards of the stores, rebuilt as the stocks change. */
+  private syncStock(s: GameState, season: Season): void {
+    const piles = s.buildings.filter((b) => STORAGE_CAPACITY[b.type] && b.build >= 1).flatMap((b) => stockSpots(s, b));
+    const key = `${season}:${piles.map((g) => `${g.id}${g.x.toFixed(2)},${g.y.toFixed(2)}`).join(';')}`;
+    if (this.stock?.key === key) return;
+    if (this.stock) this.scene.remove(this.stock.obj);
+    const p = new Pen3D();
+    p.snow = season === 3;
+    p.matFor = wallMaterial;
+    for (const g of piles) drawGood(p, g.id, g.x, g.y);
+    const obj = p.build();
+    this.scene.add(obj);
+    this.stock = { key, obj };
+  }
 
   /** Rebuilds the town walls when a section is laid, finished or pulled down. */
   private syncWalls(s: GameState, season: Season): void {

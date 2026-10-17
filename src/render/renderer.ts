@@ -419,6 +419,13 @@ export class Renderer {
       }
     }
 
+    if (this.threeD) {
+      // Festivals, market days, lamplight and scaffolds over the 3D buildings.
+      for (const b of s.buildings) {
+        const [wx, wy] = iso(b.x + b.w / 2, b.y + b.h / 2);
+        if (visible(wx, wy)) this.drawExtras(s, b);
+      }
+    }
     if (ov.ghost) this.drawGhost(s, ov.ghost, season);
 
     this.mark('objects');
@@ -1133,14 +1140,7 @@ export class Renderer {
     }
     if (STORAGE_CAPACITY[b.type]) this.drawStock(s, b, season);
     if (b.type === 'townhall' && s.feastDay !== undefined && s.day - s.feastDay < DAYS_PER_MONTH) this.drawFeast(b);
-    const fest = s.festivalDay && s.day - s.festivalDay.day < DAYS_PER_MONTH ? s.festivalDay.id : null;
-    if (fest === 'mayday' && b.type === 'maypole') this.drawMayDance(b);
-    if (fest === 'midsummer' && b.type === 'townhall') this.drawBonfire(b);
-    if (b.type === 'market' && !this.light && isMarketDay(s, b)) this.drawMarketDay(b);
-    if (b.type === 'townhall' && s.commissions?.includes('tapestry')) this.drawHeraldry(b);
-    // Lamplight in lived-in homes and the tavern as evening falls.
-    if (this.dusk > 0.25 && b.build >= 1 && (b.residents > 0 || (b.type === 'tavern' && b.workers > 0))) this.drawLamplight(b);
-    if (b.upgrading) this.drawScaffold(b);
+    this.drawExtras(s, b);
     if (selected) {
       c.save();
       c.globalCompositeOperation = 'lighter';
@@ -1884,9 +1884,25 @@ export class Renderer {
   }
 
   /** A soft window glow on the front of a building. */
+  /**
+   * What happens at a building beyond its drawing: festivals, market days,
+   * the manor's banner, lamplight at dusk and scaffolding (in 3D drawn over
+   * the 3D view).
+   */
+  drawExtras(s: GameState, b: Building): void {
+    const fest = s.festivalDay && s.day - s.festivalDay.day < DAYS_PER_MONTH ? s.festivalDay.id : null;
+    if (fest === 'mayday' && b.type === 'maypole') this.drawMayDance(b);
+    if (fest === 'midsummer' && b.type === 'townhall') this.drawBonfire(b);
+    if (b.type === 'market' && !this.light && isMarketDay(s, b)) this.drawMarketDay(b);
+    if (b.type === 'townhall' && s.commissions?.includes('tapestry')) this.drawHeraldry(b);
+    // Lamplight in lived-in homes and the tavern as evening falls.
+    if (this.dusk > 0.25 && b.build >= 1 && (b.residents > 0 || (b.type === 'tavern' && b.workers > 0))) this.drawLamplight(b);
+    if (b.upgrading) this.drawScaffold(b);
+  }
+
   private drawLamplight(b: Building): void {
     const c = this.ctx;
-    const [x, y] = iso(b.x + b.w * 0.75, b.y + b.h, 9);
+    const [x, y] = iso(...onBuilding(b, BUILDINGS[b.type].w * 0.75, BUILDINGS[b.type].h), 9);
     // One glow drawn once and stamped on every lit window: cheap in big towns.
     if (!this.glow) {
       const g = document.createElement('canvas');
@@ -1994,45 +2010,7 @@ export class Renderer {
   private drawStock(s: GameState, b: Building, season: Season): void {
     const p = new Pen(this.ctx);
     p.snow = season === 3;
-    const kinds: StorageKind[] = b.type === 'storehouse' ? ['materials'] : b.type === 'granary' ? ['food'] : ['materials', 'food'];
-    const slots: [number, number][] =
-      b.type === 'townhall'
-        ? [
-            [0.45, 2.55],
-            [2.3, 2.75],
-            [2.75, 2.25],
-            [0.35, 2.05],
-          ]
-        : [
-            [0.45, 1.8],
-            [1.05, 1.8],
-            [1.65, 1.8],
-            [2.25, 1.8],
-            [0.45, 2.45],
-            [1.05, 2.45],
-            [1.65, 2.45],
-            [2.25, 2.45],
-          ];
-    const per = Math.floor(slots.length / kinds.length);
-    let slot = 0;
-    for (const kind of kinds) {
-      const cap = storageCap(s, kind);
-      if (!cap) continue;
-      const ids = (Object.keys(RESOURCE_STORAGE) as ResourceId[]).filter((r) => RESOURCE_STORAGE[r] === kind && s.res[r] >= 1);
-      const total = ids.reduce((a, r) => a + s.res[r], 0);
-      const filled = Math.min(per, Math.ceil((total / cap) * per));
-      // Hand out filled slots to goods in proportion to how much there is.
-      const order = ids.sort((a, c) => s.res[c] - s.res[a]);
-      const counts = order.map((r) => Math.max(1, Math.round((s.res[r] / Math.max(1, total)) * filled)));
-      let k = 0;
-      for (let oi = 0; oi < order.length && k < filled; oi++) {
-        for (let n = 0; n < counts[oi] && k < filled; n++, k++) {
-          const [lx, ly] = slots[slot + k];
-          drawGood(p, order[oi], b.x + lx, b.y + ly);
-        }
-      }
-      slot += per;
-    }
+    for (const g of stockSpots(s, b)) drawGood(p, g.id, g.x, g.y);
   }
 
   /** Poles and planks around a building being renovated. */
@@ -3167,6 +3145,55 @@ export function onBuilding(b: Building, lx: number, ly: number): [number, number
   return [b.cx + dx * c - dy * sn, b.cy + dx * sn + dy * c];
 }
 
+/**
+ * The piles of goods in a store's yard: each slot filled in proportion to
+ * how full the town's stores of that kind are, shared out between goods by
+ * how much there is of each. Map positions (turned with the building).
+ */
+export function stockSpots(s: GameState, b: Building): { id: ResourceId; x: number; y: number }[] {
+  const kinds: StorageKind[] = b.type === 'storehouse' ? ['materials'] : b.type === 'granary' ? ['food'] : ['materials', 'food'];
+  const slots: [number, number][] =
+    b.type === 'townhall'
+      ? [
+          [0.45, 2.55],
+          [2.3, 2.75],
+          [2.75, 2.25],
+          [0.35, 2.05],
+        ]
+      : [
+          [0.45, 1.8],
+          [1.05, 1.8],
+          [1.65, 1.8],
+          [2.25, 1.8],
+          [0.45, 2.45],
+          [1.05, 2.45],
+          [1.65, 2.45],
+          [2.25, 2.45],
+        ];
+  const out: { id: ResourceId; x: number; y: number }[] = [];
+  const per = Math.floor(slots.length / kinds.length);
+  let slot = 0;
+  for (const kind of kinds) {
+    const cap = storageCap(s, kind);
+    if (!cap) continue;
+    const ids = (Object.keys(RESOURCE_STORAGE) as ResourceId[]).filter((r) => RESOURCE_STORAGE[r] === kind && s.res[r] >= 1);
+    const total = ids.reduce((a, r) => a + s.res[r], 0);
+    const filled = Math.min(per, Math.ceil((total / cap) * per));
+    const order = ids.sort((a, c) => s.res[c] - s.res[a]);
+    const counts = order.map((r) => Math.max(1, Math.round((s.res[r] / Math.max(1, total)) * filled)));
+    let k = 0;
+    for (let oi = 0; oi < order.length && k < filled; oi++) {
+      for (let n = 0; n < counts[oi] && k < filled; n++, k++) {
+        const [lx, ly] = slots[slot + k];
+        const [x, y] = onBuilding(b, lx, ly);
+        out.push({ id: order[oi], x, y });
+      }
+    }
+    slot += per;
+  }
+  return out;
+}
+
 /** The tiles a market's stalls stand on: every other tile, spread evenly over the square (or shape). */
 export function stallSpots(b: Building, W: number): number[] {
   const slots = marketStalls(b);
@@ -3232,7 +3259,7 @@ export function variantOf(s: GameState, b: Building): number {
 }
 
 /** A small pile of one kind of goods. */
-function drawGood(p: Pen, id: ResourceId, x: number, y: number): void {
+export function drawGood(p: Pen, id: ResourceId, x: number, y: number): void {
   switch (id) {
     case 'wood':
       p.logPile(x - 0.15, y, 2);
