@@ -115,7 +115,7 @@ export class Game {
 
   // Pointer state.
   private pointers = new Map<number, { x: number; y: number }>();
-  private dragFrom: { x: number; y: number; camX: number; camY: number; button: number; touch?: boolean } | null = null;
+  private dragFrom: { x: number; y: number; camX: number; camY: number; button: number; touch?: boolean; turn?: number } | null = null;
   private moved = false;
   private longPress = 0;
   /** Which service's reach the map is showing (V cycles), if any. */
@@ -1203,7 +1203,9 @@ export class Game {
         return;
       }
       this.moved = false;
-      this.dragFrom = { x: e.clientX, y: e.clientY, camX: this.renderer.cam.x, camY: this.renderer.cam.y, button: e.button, touch: e.pointerType === 'touch' };
+      this.dragFrom = { x: e.clientX, y: e.clientY, camX: this.renderer.cam.x, camY: this.renderer.cam.y, button: e.button, touch: e.pointerType === 'touch', turn: this.turn };
+      // The middle button turns the 3D view; no browser autoscroll.
+      if (e.button === 1) e.preventDefault();
       // Phones have no right button: a long press cancels the tool or deselects.
       clearTimeout(this.longPress);
       if (e.pointerType === 'touch') {
@@ -1249,6 +1251,13 @@ export class Game {
         clearTimeout(this.longPress);
       }
       const panning = df.button !== 0 || (this.tool.kind !== 'road' && this.tool.kind !== 'demolish') || !this.dragTile;
+      if (this.moved && this.renderer.threeD && (df.button === 1 || df.button === 2)) {
+        // Dragging with the right or middle button turns the 3D view to any angle.
+        const rot = (df.turn ?? 0) + (e.clientX - df.x) * 0.006;
+        this.turnTo = rot;
+        this.applyTurn(rot);
+        return;
+      }
       if (this.moved && panning) {
         cv.classList.add('dragging');
         const z = this.renderer.cam.zoom;

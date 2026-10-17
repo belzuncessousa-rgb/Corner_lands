@@ -455,23 +455,27 @@ button.active {
   background: #3a4a2a;
 }
 
-/* Turning the 3D view: two round buttons above the minimap, only in 3D. */
+/* Turning the 3D view: two small round buttons in the minimap's empty
+   bottom-left corner (the map is a diamond), only in 3D. */
 #turnbar {
   position: absolute;
-  right: 8px;
-  bottom: 116px;
+  right: 136px;
+  bottom: 12px;
   display: none;
-  gap: 4px;
-  padding: 4px;
+  gap: 3px;
+  padding: 0;
+  background: none;
+  border: none;
+  box-shadow: none;
 }
 body.three-d #turnbar {
   display: flex;
 }
 #turnbar button {
-  width: 34px;
-  height: 34px;
+  width: 26px;
+  height: 26px;
   padding: 0;
-  font-size: 19px;
+  font-size: 15px;
   line-height: 1;
   border-radius: 50%;
 }
@@ -798,7 +802,13 @@ body.three-d #turnbar {
     display: none;
   }
   #turnbar {
+    right: 8px;
     bottom: 96px;
+  }
+  #turnbar button {
+    width: 34px;
+    height: 34px;
+    font-size: 19px;
   }
   #log {
     width: 240px;

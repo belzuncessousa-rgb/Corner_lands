@@ -77,6 +77,17 @@ await page.click('#turnbar [data-turn="1"]');
 await page.waitForFunction(() => window.game.turn === window.game.turnTo, null, { timeout: 20000 }).catch(() => {});
 const turn = await page.evaluate(() => window.game.turn);
 check('the turn button turns the view', Math.abs(turn - Math.PI / 2) < 1e-6, String(turn));
+// Dragging with the right button turns the view freely.
+{
+  const before = await page.evaluate(() => window.game.turn);
+  await page.mouse.move(640, 400);
+  await page.mouse.down({ button: 'right' });
+  for (let k = 1; k <= 10; k++) await page.mouse.move(640 + k * 10, 400);
+  await page.mouse.up({ button: 'right' });
+  const after = await page.evaluate(() => window.game.turn);
+  check('a right-button drag turns the view freely', Math.abs(after - before - 0.6) < 0.05, `${before} -> ${after}`);
+  if (process.argv[2]) await page.screenshot({ path: process.argv[2] });
+}
 check('no errors', errors.length === 0, JSON.stringify(errors.slice(0, 3)));
 await browser.close();
 process.exit(failed ? 1 : 0);

@@ -6,7 +6,7 @@ import type { Building, GameState, Season } from '../game/types';
 import { TREE_SLOTS, drawGood, stockSpots, variantOf } from '../render/renderer';
 import { bushSprite, fruitTreeSprite, rockSprite, treeSprite, wallMaterial } from '../render/sprites';
 import type { Sprite, TreeKind } from '../render/sprites';
-import { buildingModel, groundTexture, wallsModel } from './scene3d';
+import { buildingModel, groundTexture, prepareGround, wallsModel } from './scene3d';
 import { VIEW, ZS, turnPoint } from '../render/pen';
 import { PX_PER_UNIT, Pen3D } from './pen3d';
 
@@ -206,6 +206,7 @@ export class View3D {
   private sun: THREE.DirectionalLight;
   private ground: THREE.Mesh;
   private groundKey = '';
+  private prepared = '';
   private objectsKey = '';
   private buildings = new Map<number, { key: string; obj: THREE.Object3D }>();
   private billboards = new Billboards();
@@ -278,6 +279,24 @@ export class View3D {
     }
     const season = seasonOf(s.day);
     this.syncGround(s, season);
+    // In a season's last month, paint the next season's ground while the browser is idle.
+    const next = ((season + 1) % 4) as Season;
+    if (monthOf(s.day) % 3 === 2 && this.prepared !== `${s.seed}:${next}`) {
+      this.prepared = `${s.seed}:${next}`;
+      const ric = (window as unknown as { requestIdleCallback?: (f: () => void) => void }).requestIdleCallback ?? ((f: () => void) => setTimeout(f, 200));
+      ric(() => {
+        prepareGround(s, next);
+        // And the town's buildings in next season's dress (snow on the roofs, and so on).
+        const seen = new Set<string>();
+        for (const b of s.buildings) {
+          if (BUILDINGS[b.type].zone || b.type === 'wall') continue;
+          const k = `${b.type}:${b.level}:${variantOf(s, b)}`;
+          if (seen.has(k)) continue;
+          seen.add(k);
+          buildingModel(b.type, b.level, next, variantOf(s, b));
+        }
+      });
+    }
     this.syncBuildings(s, season);
     this.syncWalls(s, season);
     this.syncStock(s, season);

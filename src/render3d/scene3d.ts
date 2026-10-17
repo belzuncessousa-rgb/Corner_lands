@@ -65,12 +65,19 @@ export function groundTexture(s: GameState, season: Season): THREE.CanvasTexture
   return tex;
 }
 
-let baseCache: { key: string; canvas: HTMLCanvasElement } | null = null;
+/** Painted ground bases, this season's and (once prepared) the next one's. */
+const baseCache = new Map<string, HTMLCanvasElement>();
+
+/** Paints a season's ground ahead of time, so the change of season does not stall a frame. */
+export function prepareGround(s: GameState, season: Season): void {
+  groundBase(s, season, 24);
+}
 
 /** Grass with its soil wash and tufts, and the water with its shores. */
 function groundBase(s: GameState, season: Season, P: number): HTMLCanvasElement {
   const key = `${s.seed}:${s.width}:${season}:${s.founded ?? 0}`;
-  if (baseCache?.key === key) return baseCache.canvas;
+  const have = baseCache.get(key);
+  if (have) return have;
   const W = s.width * P;
   const H = s.height * P;
   const c = document.createElement('canvas');
@@ -149,7 +156,9 @@ function groundBase(s: GameState, season: Season, P: number): HTMLCanvasElement 
       }
     }
   }
-  baseCache = { key, canvas: c };
+  // Two seasons at most: the one showing and the one coming.
+  if (baseCache.size >= 2) baseCache.delete(baseCache.keys().next().value!);
+  baseCache.set(key, c);
   return c;
 }
 
@@ -218,7 +227,14 @@ function paintRoads(g: CanvasRenderingContext2D, s: GameState, P: number, season
   }
 }
 
-function paintWater(g: CanvasRenderingContext2D, s: GameState, P: number, season: Season): void {
+/**
+ * The softened water mask, worked out once per map (it never changes): for
+ * each pixel near water, its index and how deep into the water it lies.
+ */
+let maskCache: { key: string; idx: Uint32Array; val: Uint8Array } | null = null;
+function waterMask(s: GameState, P: number): { idx: Uint32Array; val: Uint8Array } | null {
+  const key = `${s.seed}:${s.width}:${s.height}:${s.founded ?? 0}`;
+  if (maskCache?.key === key) return maskCache;
   const W = s.width * P;
   const H = s.height * P;
   const small = document.createElement('canvas');
@@ -233,7 +249,7 @@ function paintWater(g: CanvasRenderingContext2D, s: GameState, P: number, season
     img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = v;
     img.data[i * 4 + 3] = 255;
   }
-  if (!any) return;
+  if (!any) return null;
   sg.putImageData(img, 0, 0);
   const mask = document.createElement('canvas');
   mask.width = W;
@@ -245,6 +261,29 @@ function paintWater(g: CanvasRenderingContext2D, s: GameState, P: number, season
   mg.drawImage(small, 0, 0, W, H);
   mg.filter = 'none';
   const m = mg.getImageData(0, 0, W, H).data;
+  let n = 0;
+  for (let k = 0; k < W * H; k++) if (m[k * 4] >= 77) n++;
+  const idx = new Uint32Array(n);
+  const val = new Uint8Array(n);
+  n = 0;
+  for (let k = 0; k < W * H; k++) {
+    if (m[k * 4] < 77) continue;
+    idx[n] = k;
+    val[n++] = m[k * 4];
+  }
+  maskCache = { key, idx, val };
+  return maskCache;
+}
+
+function paintWater(g: CanvasRenderingContext2D, s: GameState, P: number, season: Season): void {
+  const W = s.width * P;
+  const H = s.height * P;
+  const wm = waterMask(s, P);
+  if (!wm) return;
+  const layer = document.createElement('canvas');
+  layer.width = W;
+  layer.height = H;
+  const mg = layer.getContext('2d')!;
   const out = mg.createImageData(W, H);
   const d = out.data;
   const winter = season === 3;
@@ -252,9 +291,9 @@ function paintWater(g: CanvasRenderingContext2D, s: GameState, P: number, season
   const deep = winter ? [150, 172, 190] : [52, 104, 150];
   const sand = winter ? [232, 236, 232] : [216, 200, 144];
   const ramp = (a: number, b: number, v: number) => Math.max(0, Math.min(1, (v - a) / (b - a)));
-  for (let k = 0; k < W * H; k++) {
-    const v = m[k * 4] / 255;
-    if (v < 0.3) continue;
+  for (let n = 0; n < wm.idx.length; n++) {
+    const k = wm.idx[n];
+    const v = wm.val[n] / 255;
     const water = ramp(0.47, 0.53, v);
     const depth = ramp(0.55, 0.95, v);
     const o = k * 4;
@@ -266,7 +305,7 @@ function paintWater(g: CanvasRenderingContext2D, s: GameState, P: number, season
     d[o + 3] = Math.round(255 * Math.max(water, ramp(0.3, 0.4, v)));
   }
   mg.putImageData(out, 0, 0);
-  g.drawImage(mask, 0, 0);
+  g.drawImage(layer, 0, 0);
 }
 
 /** Traces a zone's outline: its drawn shape, or its rectangle with round corners. */
