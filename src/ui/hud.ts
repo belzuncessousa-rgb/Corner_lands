@@ -1224,6 +1224,7 @@ export class Hud {
       .join('');
     const m = this.openModal(
       `<div class="event">
+        <div class="art-slot" data-art="events/${e.id}"></div>
         <div class="ornament">❦ ❦ ❦</div>
         <h2>${esc(e.title)}</h2>
         <p class="tale"><span class="initial">${esc(text[0])}</span>${esc(text.slice(1))}</p>
@@ -1825,6 +1826,7 @@ export class Hud {
     this.root.appendChild(back);
     this.modal = back;
     this.game.modalOpen = true;
+    fillArt(back);
     return back;
   }
 
@@ -1873,7 +1875,8 @@ export class Hud {
     const saves = await listSaves().catch(() => [] as SaveInfo[]);
     const latest = saves[0];
     const m = this.openModal(
-      `<h1>Corner Lands</h1>
+      `<div class="art-slot title-art" data-art="title"></div>
+      <h1>Corner Lands</h1>
       <div class="sub">Raise a humble hamlet into a thriving medieval city</div>
       <div class="ornament">❦ ❦ ❦</div>
       <div class="menu">
@@ -2520,4 +2523,46 @@ function niceMax(v: number): number {
 
 function fmtNum(v: number): string {
   return v >= 10000 ? `${Math.round(v / 1000)}k` : String(Math.round(v));
+}
+
+/** Known art files (by slot), so a missing picture is asked for only once. */
+const artFound = new Map<string, string | null>();
+
+/**
+ * Picture slots (title screen, event cards): each looks for art/<slot>.webp,
+ * then .jpg and .png, next to the game. A picture dropped there shows up with
+ * no code change; with none, the slot stays out of the way.
+ */
+function fillArt(root: HTMLElement): void {
+  root.querySelectorAll<HTMLElement>('[data-art]').forEach((el) => {
+    const slot = el.dataset.art!;
+    const show = (url: string | null) => {
+      if (!url) {
+        el.remove();
+        return;
+      }
+      el.style.backgroundImage = `url("${url}")`;
+      el.classList.add('has-art');
+    };
+    if (artFound.has(slot)) {
+      show(artFound.get(slot) ?? null);
+      return;
+    }
+    const tryExt = (exts: string[]) => {
+      if (!exts.length) {
+        artFound.set(slot, null);
+        show(null);
+        return;
+      }
+      const url = `art/${slot}.${exts[0]}`;
+      const img = new Image();
+      img.onload = () => {
+        artFound.set(slot, url);
+        show(url);
+      };
+      img.onerror = () => tryExt(exts.slice(1));
+      img.src = url;
+    };
+    tryExt(['webp', 'jpg', 'png']);
+  });
 }

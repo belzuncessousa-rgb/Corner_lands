@@ -300,7 +300,7 @@ Note for later runs: when a feature players would notice goes in, add a line to 
 - [x] Curved roads: draw each road as a smooth band through its tiles, with soft verges, instead of square tiles
 - [x] Organic edges: fields get round-cornered, slightly irregular plots with a grassy headland (pastures keep straight fences; forests were already irregular)
 - [ ] Buildings face the nearest road (four directions) and small props sit a little off-grid (deferred: sprites carry baked shadows, so mirroring would light them from the wrong side; revisit with a lighting rework or 3D)
-- [ ] Image slots for standalone art (title screen, event cards) so pictures made elsewhere drop in without code changes
+- [x] Image slots for standalone art (title screen, event cards) so pictures made elsewhere drop in without code changes: put `title.webp` or `events/<id>.webp` (or .jpg/.png) in `public/art/` (see its README)
 
 ### 3D and a gridless town: kept on their own branch
 The 3D view (built from the game's own drawings) and the first gridless steps (buildings at any angle, roads as free curves) live on the branch `claude/3d-gridless`. The player chose to keep this branch on the flat, hand-drawn look and invest in more art for it; the 3D branch can be picked up again later.
@@ -384,6 +384,8 @@ art, the logic and balance get this pass. Grouped by how deep each change goes.
 - [x] Fix animals' glitchy look: they wrapped from one edge of the pasture to the other; now they wander smoothly, face where they go and are drawn in depth order. (More herding interaction left for the visual phase)
 
 ### For the visual refinement phase (later)
+
+On hold until the player has played the October changes (Phases 34–38) and given feedback on logic and balance: the player asked not to commit to more art before that.
 - [ ] Construction stages as different structures (scaffold, frame, walls, roof) instead of revealing the building
 - [ ] Stone roads look like gravel; a third, dressed-stone cobbled street
 - [ ] Fields worked and filling up progressively, and each crop easy to tell apart

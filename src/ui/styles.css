@@ -2037,3 +2037,20 @@ table.prod td.num {
 .trade-tabs button.active {
   background: linear-gradient(180deg, #e8c860, #c89a38);
 }
+
+/* Picture slots: empty (and out of the way) until a picture is dropped into public/art. */
+.art-slot {
+  display: none;
+}
+.art-slot.has-art {
+  display: block;
+  height: 150px;
+  margin: -4px -4px 10px;
+  border-radius: 5px;
+  background-size: cover;
+  background-position: center;
+  box-shadow: inset 0 0 0 1.5px rgba(91, 58, 34, 0.35);
+}
+.art-slot.title-art.has-art {
+  height: 190px;
+}
