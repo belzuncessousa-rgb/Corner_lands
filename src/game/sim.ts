@@ -49,7 +49,7 @@ import { checkQuests } from './quests';
 import { StateRng } from './rng';
 import type { Building, BuildingType, Category, Cost, GameState, Herd, MessageKind, ResourceId, Season, Shoal } from './types';
 import { RESOURCE_IDS } from './types';
-import { cellsRect, curveTiles, perimeter, polygonCells } from './curves';
+import { cellsRect, curveTiles, perimeter, polygonCells, polygonTouched } from './curves';
 import { cellsOf, footprintCells, getBuilding, idx, inBounds, makeBuilding, placeBuilding, removeBuilding, setRoad } from './world';
 
 // ---------------------------------------------------------------- time helpers
@@ -332,6 +332,8 @@ export function placeShape(s: GameState, type: BuildingType, pts: [number, numbe
   b.build = 1;
   if (type === 'orchard') b.age = 0;
   placeBuilding(s, b);
+  // The ground along the outline is cleared too, so no tree stands on the edge.
+  for (const i of polygonTouched(s, pts)) if (s.occ[i] < 0) s.trees[i] = 0;
   recompute(s);
   return b;
 }

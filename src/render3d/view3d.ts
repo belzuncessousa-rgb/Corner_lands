@@ -381,7 +381,8 @@ export class View3D {
       const fruiting = stage >= 1 && month >= 3 && month <= 6 && (month < 5 || o.growth > 0);
       const blossom = month <= 1 && stage >= 0.5;
       const k = `ft:${fruit}:${season}:${stage}:${fruiting}:${blossom}`;
-      for (let y = o.y; y < o.y + o.h; y++) for (let x = o.x; x < o.x + o.w; x++) bb.add(k, () => this.sprite(k, () => fruitTreeSprite(fruit, season, stage, fruiting, blossom)), x + 0.5, y + 0.5);
+      const own = o.cells && new Set(o.cells);
+      for (let y = o.y; y < o.y + o.h; y++) for (let x = o.x; x < o.x + o.w; x++) if (!own || own.has(y * s.width + x)) bb.add(k, () => this.sprite(k, () => fruitTreeSprite(fruit, season, stage, fruiting, blossom)), x + 0.5, y + 0.5);
     }
     bb.end();
   }

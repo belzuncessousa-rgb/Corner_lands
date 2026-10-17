@@ -63,7 +63,7 @@ import { demolishWithUndo } from './game/undo';
 import type { Agent } from './render/agents';
 import { AgentSystem } from './render/agents';
 import { Wildlife } from './render/wildlife';
-import { type Overlay, Renderer } from './render/renderer';
+import { type Overlay, Renderer, stallSpots } from './render/renderer';
 import { Hud } from './ui/hud';
 
 export type Tool =
@@ -391,6 +391,18 @@ export class Game {
         .filter((a) => a.visible)
         .map((a) => ({ sprite: this.renderer.figureSprite(a), x: a.x + (a.role.kind === 'cart' ? 0 : a.ox * 0.25), y: a.y + (a.role.kind === 'cart' ? 0 : a.oy * 0.25) }));
       for (const an of this.wildlife.animals) figures.push({ sprite: this.renderer.animalSprite(an, season), x: an.x, y: an.y });
+      // Herds in their pastures and the stalls of each market.
+      const herds = new Map<number, number>();
+      for (const b of this.state.buildings) {
+        if (b.type === 'pasture') {
+          for (const an of this.renderer.pastureBeasts(this.state, b, herds)) figures.push({ sprite: this.renderer.beastSprite(an.kind, an.f, an.j, season), x: an.ax, y: an.ay });
+        } else if (b.type === 'market') {
+          stallSpots(b, this.state.width).forEach((i, k) => {
+            const x = i % this.state.width;
+            figures.push({ sprite: this.renderer.stallFigure((b.id * 3 + k) % 6, season, k < b.workers), x: x + 1, y: (i - x) / this.state.width + 1 });
+          });
+        }
+      }
       this.view3d.render(this.state, this.renderer.cam, this.renderer.width, this.renderer.height, this.renderer.dpr, figures);
     }
     this.renderer.render(this.state, this.agents.agents, this.overlay(), running ? dt : 0, this.wildlife.animals);

@@ -86,6 +86,22 @@ export function polygonCells(s: GameState, pts: Pt[]): number[] {
   return out;
 }
 
+/** Tiles a polygon covers any part of (a corner or the centre inside it). */
+export function polygonTouched(s: GameState, pts: Pt[]): number[] {
+  const out: number[] = [];
+  if (pts.length < 3) return out;
+  const xs = pts.map((p) => p[0]);
+  const ys = pts.map((p) => p[1]);
+  for (let y = Math.floor(Math.min(...ys)); y <= Math.ceil(Math.max(...ys)); y++) {
+    for (let x = Math.floor(Math.min(...xs)); x <= Math.ceil(Math.max(...xs)); x++) {
+      if (x < 0 || y < 0 || x >= s.width || y >= s.height) continue;
+      const hit = [[0.5, 0.5], [0.1, 0.1], [0.9, 0.1], [0.1, 0.9], [0.9, 0.9]].some(([dx, dy]) => insidePolygon(pts, x + dx, y + dy));
+      if (hit) out.push(y * s.width + x);
+    }
+  }
+  return out;
+}
+
 /** Length of a closed outline, in tiles. */
 export function perimeter(pts: Pt[]): number {
   let n = 0;

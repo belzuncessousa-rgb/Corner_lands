@@ -1,7 +1,7 @@
 import { BUILDINGS, DAYS_PER_MONTH, DAYS_PER_YEAR, RESOURCE_STORAGE, STORAGE_CAPACITY, type StorageKind } from '../game/data';
 import { marketStalls, upgradeBlocker } from '../game/levels';
 import { hasCharter } from '../game/charters';
-import { ANIMAL_KINDS, HOME_TRADES, animalsOf, deliveredTo, hasProblem, herdTotal, isMarketDay, monthOf, nearestShoal, orchardMaturity, seasonOf, seatOf, storageCap } from '../game/sim';
+import { ANIMAL_KINDS, HOME_TRADES, animalsOf, deliveredTo, hasProblem, herdTotal, isMarketDay, monthOf, nearestShoal, orchardMaturity, seasonOf, seatOf, storageCap, zoneTiles } from '../game/sim';
 import type { Building, BuildingType, GameState, ResourceId, Season } from '../game/types';
 import { idx, inBounds } from '../game/world';
 import type { Agent } from './agents';
@@ -330,13 +330,9 @@ export class Renderer {
     this.stallTiles.clear();
     s.buildings.forEach((b, bi) => {
       if (b.type === 'market') {
-        // Stalls on every other tile, spread evenly over the square.
-        const slots = marketStalls(b);
-        const cands: number[] = [];
-        const own = b.cells && new Set(b.cells);
-        for (let y = b.y; y < b.y + b.h; y += 2) for (let x = b.x; x < b.x + b.w; x += 2) if (!own || own.has(y * W + x)) cands.push(y * W + x);
-        for (let k = 0; k < Math.min(slots, cands.length); k++) {
-          const i = cands[Math.floor(((k + 0.5) * cands.length) / slots)];
+        const spots = stallSpots(b, W);
+        for (let k = 0; k < spots.length; k++) {
+          const i = spots[k];
           const x = i % W;
           const y = (i / W) | 0;
           this.stallTiles.set(i, { b, k, open: k < b.workers });
@@ -742,32 +738,9 @@ export class Renderer {
     const owner = s.buildings.find((o) => o.id === b.owner);
     // In deep winter the herd shelters in the byre.
     const sheltered = monthOf(s.day) >= 10;
-    if (owner && herdTotal(owner) && !sheltered) {
-      const zones = s.buildings.filter((z) => z.owner === owner.id && z.type === 'pasture');
-      const total = zones.reduce((a, z) => a + z.w * z.h, 0);
-      const herd = herdTotal(owner);
-      let n = Math.round((herd * b.w * b.h) / Math.max(1, total));
-      const used = herds.get(owner.id) ?? 0;
-      if (zones[zones.length - 1] === b) n = Math.max(0, herd - used);
-      herds.set(owner.id, used + n);
-      // The farm's animals, kind by kind, shared out over its pastures.
-      const a = animalsOf(owner);
-      const flock: string[] = [];
-      for (const k of ANIMAL_KINDS) for (let i = 0; i < (a[k] ?? 0); i++) flock.push(k);
-      const mine = flock.slice(used, used + Math.min(n, 40));
-      // Each wanders slowly about its own spot (no wrapping round the edges),
-      // facing the way it moves; nearer animals are drawn last.
-      const beasts = mine.map((kind, j) => {
-        const seed = b.id * 97 + j * 13;
-        const r1 = fract(Math.sin(seed) * 43758.5);
-        const r2 = fract(Math.sin(seed * 1.7) * 24634.6);
-        const t = this.time * 0.05 + r1 * 10;
-        const ax = x0 + 0.45 + (b.w - 0.9) * (0.5 + 0.42 * Math.sin(r1 * 6.283 + t * 0.6));
-        const ay = y0 + 0.45 + (b.h - 0.9) * (0.5 + 0.42 * Math.sin(r2 * 6.283 + t * 0.45 + 1));
-        const dx = (b.w - 0.9) * Math.cos(r1 * 6.283 + t * 0.6) * 0.6;
-        const dy = (b.h - 0.9) * Math.cos(r2 * 6.283 + t * 0.45 + 1) * 0.45;
-        return { kind, ax, ay, f: dx - dy >= 0 ? 1 : -1, j };
-      });
+    if (owner && !sheltered) {
+      // Nearer animals are drawn last.
+      const beasts = this.pastureBeasts(s, b, herds);
       beasts.sort((p1, p2) => p1.ax + p1.ay - (p2.ax + p2.ay));
       for (const { kind, ax, ay, f, j } of beasts) {
         const [sx, sy] = iso(ax, ay);
@@ -2208,6 +2181,73 @@ export class Renderer {
     );
   }
 
+  /**
+   * The animals grazing a pasture now: the farm's herd shared out over its
+   * pastures by area, each wandering slowly about its own spot (no wrapping
+   * round the edges) and facing the way it moves. In deep winter the herd
+   * shelters in the byre. `herds` tallies what earlier pastures took.
+   */
+  pastureBeasts(s: GameState, b: Building, herds: Map<number, number>): { kind: string; ax: number; ay: number; f: number; j: number }[] {
+    const owner = s.buildings.find((o) => o.id === b.owner);
+    if (!owner || !herdTotal(owner) || monthOf(s.day) >= 10) return [];
+    const zones = s.buildings.filter((z) => z.owner === owner.id && z.type === 'pasture');
+    const total = zones.reduce((a, z) => a + zoneTiles(z), 0);
+    const herd = herdTotal(owner);
+    let n = Math.round((herd * zoneTiles(b)) / Math.max(1, total));
+    const used = herds.get(owner.id) ?? 0;
+    if (zones[zones.length - 1] === b) n = Math.max(0, herd - used);
+    herds.set(owner.id, used + n);
+    // The farm's animals, kind by kind.
+    const a = animalsOf(owner);
+    const flock: string[] = [];
+    for (const k of ANIMAL_KINDS) for (let i = 0; i < (a[k] ?? 0); i++) flock.push(k);
+    const mine = flock.slice(used, used + Math.min(n, 40));
+    return mine.map((kind, j) => {
+      const seed = b.id * 97 + j * 13;
+      const r1 = fract(Math.sin(seed) * 43758.5);
+      const r2 = fract(Math.sin(seed * 1.7) * 24634.6);
+      const t = this.time * 0.05 + r1 * 10;
+      const sx = Math.sin(r1 * 6.283 + t * 0.6);
+      const sy = Math.sin(r2 * 6.283 + t * 0.45 + 1);
+      const cx = Math.cos(r1 * 6.283 + t * 0.6);
+      const cy = Math.cos(r2 * 6.283 + t * 0.45 + 1);
+      if (b.cells?.length) {
+        // A drawn shape: each animal keeps to a tile of its own inside it.
+        const home = b.cells[Math.floor(r2 * 7919 + j * 31) % b.cells.length];
+        const hx = home % s.width;
+        const hy = (home - hx) / s.width;
+        return { kind, ax: hx + 0.5 + 0.35 * sx, ay: hy + 0.5 + 0.35 * sy, f: cx * 0.6 - cy * 0.45 >= 0 ? 1 : -1, j };
+      }
+      const ax = b.x + 0.45 + (b.w - 0.9) * (0.5 + 0.42 * sx);
+      const ay = b.y + 0.45 + (b.h - 0.9) * (0.5 + 0.42 * sy);
+      const dx = (b.w - 0.9) * cx * 0.6;
+      const dy = (b.h - 0.9) * cy * 0.45;
+      return { kind, ax, ay, f: dx - dy >= 0 ? 1 : -1, j };
+    });
+  }
+
+  /** A pasture animal as a small image, for the 3D view. */
+  beastSprite(kind: string, f: number, j: number, season: Season): Sprite {
+    const coat = j % 4;
+    return this.sprite(`bst:${kind}:${f}:${coat}:${season === 3}`, () =>
+      makeSprite(40, 36, 20, 28, (ctx) => {
+        if (kind === 'sheep') drawSheep(ctx, 0, 0, f, season === 3 ? '#e2ddd2' : '#f2ece0');
+        else drawBeast(ctx, 0, 0, f, kind, coat);
+      }),
+    );
+  }
+
+  /**
+   * A market stall as a small image for the 3D view, standing on the front
+   * corner of its tile (x + 1, y + 1) so none of it sinks below the ground.
+   */
+  stallFigure(kind: number, season: Season, open: boolean): Sprite {
+    return this.sprite(`stall3d:${kind}:${season}:${open}`, () => {
+      const sp = stallSprite(kind, season, open);
+      return { ...sp, ay: sp.ay + TH };
+    });
+  }
+
   /** A deer in its current pose as a small image, for the 3D view. */
   animalSprite(a: Animal, season: Season): Sprite {
     const frame = a.grazing ? 0 : Math.round((((a.step % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) / (Math.PI / 3)) % 6;
@@ -3109,6 +3149,17 @@ export class Renderer {
 const fract = (v: number) => v - Math.floor(v);
 
 /** A cow or a pig at a screen point. */
+/** The tiles a market's stalls stand on: every other tile, spread evenly over the square (or shape). */
+export function stallSpots(b: Building, W: number): number[] {
+  const slots = marketStalls(b);
+  const own = b.cells && new Set(b.cells);
+  const cands: number[] = [];
+  for (let y = b.y; y < b.y + b.h; y += 2) for (let x = b.x; x < b.x + b.w; x += 2) if (!own || own.has(y * W + x)) cands.push(y * W + x);
+  const out: number[] = [];
+  for (let k = 0; k < Math.min(slots, cands.length); k++) out.push(cands[Math.floor(((k + 0.5) * cands.length) / slots)]);
+  return out;
+}
+
 function drawBeast(c: CanvasRenderingContext2D, x: number, y: number, f: number, kind: string, j: number): void {
   const pig = kind === 'pigs';
   const coat = pig ? '#e8a8a0' : ['#8a5a3a', '#f2ece0', '#3a3028', '#b0703a'][j % 4];
