@@ -66,7 +66,7 @@ import type { Agent } from './render/agents';
 import { AgentSystem } from './render/agents';
 import { Wildlife } from './render/wildlife';
 import { type Overlay, Renderer, stallSpots } from './render/renderer';
-import { setViewTurn } from './render/pen';
+import { BASE_PITCH, VIEW, setViewTilt, setViewTurn } from './render/pen';
 import { Hud } from './ui/hud';
 
 export type Tool =
@@ -115,7 +115,7 @@ export class Game {
 
   // Pointer state.
   private pointers = new Map<number, { x: number; y: number }>();
-  private dragFrom: { x: number; y: number; camX: number; camY: number; button: number; touch?: boolean; turn?: number } | null = null;
+  private dragFrom: { x: number; y: number; camX: number; camY: number; button: number; touch?: boolean; turn?: number; tilt?: number } | null = null;
   private moved = false;
   private longPress = 0;
   /** Which service's reach the map is showing (V cycles), if any. */
@@ -304,6 +304,7 @@ export class Game {
     if (!on) {
       this.turnTo = 0;
       this.applyTurn(0);
+      this.applyTilt(BASE_PITCH);
     }
   }
 
@@ -323,6 +324,22 @@ export class Game {
     const [cx, cy] = this.renderer.screenToTile(this.renderer.width / 2, this.renderer.height / 2);
     this.turn = rot;
     setViewTurn(rot, s.width / 2, s.height / 2);
+    this.renderer.centerOn(cx, cy);
+  }
+
+  /** How steeply the 3D view looks down now (radians). */
+  tiltNow(): number {
+    return VIEW.pitch;
+  }
+
+  /** Lowest and steepest the 3D camera may look down. */
+  static readonly TILT_MIN = 0.3;
+  static readonly TILT_MAX = 1.25;
+
+  /** Tilts the 3D view (radians above the ground), keeping the middle of the screen where it is. */
+  applyTilt(pitch: number): void {
+    const [cx, cy] = this.renderer.screenToTile(this.renderer.width / 2, this.renderer.height / 2);
+    setViewTilt(Math.max(Game.TILT_MIN, Math.min(Game.TILT_MAX, pitch)));
     this.renderer.centerOn(cx, cy);
   }
 
@@ -1146,6 +1163,15 @@ export class Game {
   /** Picks the building under the cursor, accounting for sprite height. */
   private pickBuilding(sx: number, sy: number): number | null {
     const s = this.state;
+    if (this.renderer.threeD && this.view3d) {
+      // In 3D, a ray into the models finds the building; else the zone or wall on the ground.
+      const r = this.canvas.getBoundingClientRect();
+      const hit = this.view3d.pick(sx - r.left, sy - r.top, r.width, r.height);
+      if (hit !== null) return hit;
+      const [ftx, fty] = this.renderer.screenToTile(sx, sy);
+      const i = inBounds(s, Math.floor(ftx), Math.floor(fty)) ? idx(s, Math.floor(ftx), Math.floor(fty)) : -1;
+      return i >= 0 && s.occ[i] >= 0 ? s.occ[i] : null;
+    }
     // Try the tile under the cursor and a few tiles "below" it, since tall
     // sprites extend upward on screen.
     for (let lift = 0; lift <= 40; lift += 8) {
@@ -1203,7 +1229,7 @@ export class Game {
         return;
       }
       this.moved = false;
-      this.dragFrom = { x: e.clientX, y: e.clientY, camX: this.renderer.cam.x, camY: this.renderer.cam.y, button: e.button, touch: e.pointerType === 'touch', turn: this.turn };
+      this.dragFrom = { x: e.clientX, y: e.clientY, camX: this.renderer.cam.x, camY: this.renderer.cam.y, button: e.button, touch: e.pointerType === 'touch', turn: this.turn, tilt: VIEW.pitch };
       // The middle button turns the 3D view; no browser autoscroll.
       if (e.button === 1) e.preventDefault();
       // Phones have no right button: a long press cancels the tool or deselects.
@@ -1252,10 +1278,12 @@ export class Game {
       }
       const panning = df.button !== 0 || (this.tool.kind !== 'road' && this.tool.kind !== 'demolish') || !this.dragTile;
       if (this.moved && this.renderer.threeD && (df.button === 1 || df.button === 2)) {
-        // Dragging with the right or middle button turns the 3D view to any angle.
+        // Dragging with the right or middle button turns the 3D view (sideways)
+        // and tilts it (up and down).
         const rot = (df.turn ?? 0) + (e.clientX - df.x) * 0.006;
         this.turnTo = rot;
         this.applyTurn(rot);
+        this.applyTilt((df.tilt ?? BASE_PITCH) + (e.clientY - df.y) * 0.004);
         return;
       }
       if (this.moved && panning) {
@@ -1376,6 +1404,9 @@ export class Game {
         this.cycleCoverage();
       } else if ((k === '[' || k === ']') && this.renderer.threeD) {
         this.turnView(k === '[' ? -1 : 1);
+      } else if ((k === 'pageup' || k === 'pagedown') && this.renderer.threeD) {
+        e.preventDefault();
+        this.applyTilt(VIEW.pitch + (k === 'pageup' ? 0.1 : -0.1));
       } else if (k === 'enter' && this.curvePts.length) {
         this.finishCurve();
       } else if (k === 'u') {

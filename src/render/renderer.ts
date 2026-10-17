@@ -7,7 +7,7 @@ import { idx, inBounds } from '../game/world';
 import type { Agent } from './agents';
 import { ICONS } from '../ui/icons';
 import type { Animal } from './wildlife';
-import { Pen, TH, TW, iso, mix, turnPoint, type V3 } from './pen';
+import { Pen, TH, TW, VIEW, iso, mix, turnPoint, type V3 } from './pen';
 import { mulberry32 } from '../game/rng';
 import {
   type Sprite,
@@ -132,7 +132,7 @@ export class Renderer {
   screenToTile(sx: number, sy: number): [number, number] {
     const [wx, wy] = this.screenToWorld(sx, sy);
     const a = wx / (TW / 2);
-    const b = wy / (TH / 2);
+    const b = wy / VIEW.ty;
     return turnPoint((a + b) / 2, (b - a) / 2, -1);
   }
 
@@ -144,7 +144,7 @@ export class Renderer {
   clampCamera(s: GameState): void {
     // Keep the centre of the view over the map's diamond, not its empty corners.
     const u = this.cam.x / (TW / 2);
-    const v = this.cam.y / (TH / 2);
+    const v = this.cam.y / VIEW.ty;
     const [fx, fy] = turnPoint((u + v) / 2, (v - u) / 2, -1);
     const tx = Math.max(0, Math.min(s.width, fx));
     const ty = Math.max(0, Math.min(s.height, fy));
@@ -763,14 +763,21 @@ export class Renderer {
 
   private drawGroundOverlays(s: GameState, ov: Overlay): void {
     const c = this.ctx;
-    const tileDiamond = (x: number, y: number) => {
+    // A tile through its four corners, so it fits whichever way the view is turned or tilted.
+    const tileQuad = (x: number, y: number) => {
       const [a, b] = iso(x, y);
-      c.beginPath();
+      const [c1, d1] = iso(x + 1, y);
+      const [e, f] = iso(x + 1, y + 1);
+      const [g, h] = iso(x, y + 1);
       c.moveTo(a, b);
-      c.lineTo(a + TW / 2, b + TH / 2);
-      c.lineTo(a, b + TH);
-      c.lineTo(a - TW / 2, b + TH / 2);
+      c.lineTo(c1, d1);
+      c.lineTo(e, f);
+      c.lineTo(g, h);
       c.closePath();
+    };
+    const tileDiamond = (x: number, y: number) => {
+      c.beginPath();
+      tileQuad(x, y);
     };
     if (ov.fertility) {
       // Poor soil red, fair yellow, rich green; batched by shade so it stays cheap.
@@ -791,14 +798,7 @@ export class Renderer {
         if (!list.length) return;
         c.fillStyle = shades[k];
         c.beginPath();
-        for (const i of list) {
-          const [a, b] = iso(i % s.width, (i / s.width) | 0);
-          c.moveTo(a, b);
-          c.lineTo(a + TW / 2, b + TH / 2);
-          c.lineTo(a, b + TH);
-          c.lineTo(a - TW / 2, b + TH / 2);
-          c.closePath();
-        }
+        for (const i of list) tileQuad(i % s.width, (i / s.width) | 0);
         c.fill();
       });
     }

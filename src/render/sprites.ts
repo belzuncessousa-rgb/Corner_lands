@@ -27,13 +27,17 @@ export function makeSprite(w: number, h: number, ax: number, ay: number, draw: (
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
   // Sprites are drawn in their own frame, whichever way the view is turned.
-  const turn = VIEW.rot;
+  const { rot, ty, hz } = VIEW;
   VIEW.rot = 0;
+  VIEW.ty = TH / 2;
+  VIEW.hz = 1;
   try {
     const smoke = draw(ctx) || [];
     return { canvas, ax, ay, w, h, smoke };
   } finally {
-    VIEW.rot = turn;
+    VIEW.rot = rot;
+    VIEW.ty = ty;
+    VIEW.hz = hz;
   }
 }
 

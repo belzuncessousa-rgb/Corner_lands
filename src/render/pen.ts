@@ -17,7 +17,22 @@ export const ZS = 1.3;
  * 3D view (ghosts, ranges, plans) stay on their tiles. Always 0 in the flat
  * view, and while sprites are drawn (they keep their own local frame).
  */
-export const VIEW = { rot: 0, cx: 0, cy: 0, c: 1, s: 0 };
+/** The classic view: the camera 30° above the ground. */
+export const BASE_PITCH = Math.PI / 6;
+
+export const VIEW = {
+  rot: 0,
+  cx: 0,
+  cy: 0,
+  c: 1,
+  s: 0,
+  /** How steeply the 3D view looks down (radians), and what that does to the projection. */
+  pitch: BASE_PITCH,
+  /** Screen pixels per tile along the ground, top to bottom (16 in the classic view). */
+  ty: TH / 2,
+  /** Scale for heights against the classic view (1 at 30°). */
+  hz: 1,
+};
 
 export function setViewTurn(rot: number, cx: number, cy: number): void {
   VIEW.rot = rot;
@@ -25,6 +40,17 @@ export function setViewTurn(rot: number, cx: number, cy: number): void {
   VIEW.cy = cy;
   VIEW.c = Math.cos(rot);
   VIEW.s = Math.sin(rot);
+}
+
+/**
+ * Tilts the 3D view: the camera looks down at `pitch` (radians). The flat
+ * projection follows, so overlays stay on the ground: an orthographic view
+ * from any angle is still a linear map from the map to the screen.
+ */
+export function setViewTilt(pitch: number): void {
+  VIEW.pitch = pitch;
+  VIEW.ty = (TW / 2) * Math.sin(pitch);
+  VIEW.hz = Math.cos(pitch) / Math.cos(BASE_PITCH);
 }
 
 /** A tile point turned by the view (or back again, with sign -1). */
@@ -38,7 +64,7 @@ export function turnPoint(x: number, y: number, sign = 1): [number, number] {
 
 export function iso(x: number, y: number, z = 0): [number, number] {
   if (VIEW.rot) [x, y] = turnPoint(x, y);
-  return [(x - y) * (TW / 2), (x + y) * (TH / 2) - z * ZS];
+  return [(x - y) * (TW / 2), (x + y) * VIEW.ty - z * ZS * VIEW.hz];
 }
 
 export function hexToRgb(hex: string): [number, number, number] {

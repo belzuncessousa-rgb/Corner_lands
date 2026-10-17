@@ -314,7 +314,7 @@ export class View3D {
     // The camera centre, from iso pixels back to the tile plane (and, for a
     // turned view, back from the turned plane to the map).
     const a = cam.x / 32;
-    const b = cam.y / 16;
+    const b = cam.y / VIEW.ty;
     const [tx, ty] = turnPoint((a + b) / 2, (b - a) / 2, -1);
     // Offsets from the target, turned the other way: the camera circles the
     // map's centre as the flat projection turns the map.
@@ -324,8 +324,8 @@ export class View3D {
       return [x * c - z * sn, x * sn + z * c];
     };
     const ppu = PPU * cam.zoom;
-    const camera = new THREE.OrthographicCamera(-width / 2 / ppu, width / 2 / ppu, height / 2 / ppu, -height / 2 / ppu, 0.1, 600);
-    const el = Math.PI / 6;
+    const camera = (this.camera = new THREE.OrthographicCamera(-width / 2 / ppu, width / 2 / ppu, height / 2 / ppu, -height / 2 / ppu, 0.1, 600));
+    const el = VIEW.pitch;
     const dist = 200;
     const [cx, cz] = off(dist * Math.cos(el) * Math.SQRT1_2, dist * Math.cos(el) * Math.SQRT1_2);
     camera.position.set(tx + cx, dist * Math.sin(el), ty + cz);
@@ -412,6 +412,24 @@ export class View3D {
     this.walls = { key, obj };
   }
 
+  private camera: THREE.OrthographicCamera | null = null;
+  private ray = new THREE.Raycaster();
+
+  /**
+   * The building under a screen point (CSS pixels within the view), found by
+   * casting a ray into the models, so a roof can be clicked from any angle.
+   */
+  pick(sx: number, sy: number, width: number, height: number): number | null {
+    if (!this.camera) return null;
+    this.camera.updateMatrixWorld();
+    this.ray.setFromCamera(new THREE.Vector2((sx / width) * 2 - 1, -(sy / height) * 2 + 1), this.camera);
+    const objs = [...this.buildings.values()].map((b) => b.obj);
+    const hit = this.ray.intersectObjects(objs, true)[0];
+    let o: THREE.Object3D | null = hit?.object ?? null;
+    while (o && o.userData.bid === undefined) o = o.parent;
+    return o ? (o.userData.bid as number) : null;
+  }
+
   /** Adds, removes and rebuilds building models as the town changes. */
   private syncBuildings(s: GameState, season: Season): void {
     const seen = new Set<number>();
@@ -431,6 +449,7 @@ export class View3D {
         (b.rot === undefined ? obj : obj.children[0]).add(sails);
         obj.userData.sails = sails;
       }
+      obj.userData.bid = b.id;
       // Building sites rise as the work goes on.
       if (b.build < 1) obj.scale.y = Math.max(0.12, Math.ceil(b.build * 6) / 6);
       this.scene.add(obj);

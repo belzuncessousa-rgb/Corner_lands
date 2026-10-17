@@ -88,6 +88,33 @@ check('the turn button turns the view', Math.abs(turn - Math.PI / 2) < 1e-6, Str
   check('a right-button drag turns the view freely', Math.abs(after - before - 0.6) < 0.05, `${before} -> ${after}`);
   if (process.argv[2]) await page.screenshot({ path: process.argv[2] });
 }
+// Dragging up or down with the right button tilts the view.
+{
+  const p0 = await page.evaluate(() => window.game.tiltNow());
+  await page.mouse.move(640, 400);
+  await page.mouse.down({ button: 'right' });
+  for (let k = 1; k <= 10; k++) await page.mouse.move(640, 400 - k * 10);
+  await page.mouse.up({ button: 'right' });
+  const p1 = await page.evaluate(() => window.game.tiltNow());
+  check('a right-button drag up and down tilts the view', p1 < p0 - 0.15, `${p0} -> ${p1}`);
+}
+// At a low tilt, clicking high on a building picks the building, not the ground behind it.
+{
+  const res = await page.evaluate(() => {
+    const g = window.game;
+    const s = g.state;
+    g.setTool({ kind: 'select' });
+    g.applyTilt(0.45);
+    const b = s.buildings.find((o) => o.type === 'camp');
+    g.renderer.centerOn(b.x + b.w / 2, b.y + b.h / 2);
+    return { id: b.id, at: g.renderer.tileToScreen(b.x + b.w / 2, b.y + b.h / 2, 14) };
+  });
+  await page.waitForTimeout(1500);
+  await page.mouse.click(res.at[0], res.at[1]);
+  await page.waitForTimeout(200);
+  const sel = await page.evaluate(() => window.game.selected);
+  check('a click on a building at a low tilt selects it', sel === res.id, `${sel} vs ${res.id}`);
+}
 check('no errors', errors.length === 0, JSON.stringify(errors.slice(0, 3)));
 await browser.close();
 process.exit(failed ? 1 : 0);
