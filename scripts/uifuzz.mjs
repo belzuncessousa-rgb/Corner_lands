@@ -6,6 +6,8 @@ const browser = await chromium.launch({ executablePath: process.env.CHROME || '/
 const W = Number(process.env.W || 1440);
 const H = Number(process.env.H || 900);
 const page = await browser.newPage({ viewport: { width: W, height: H } });
+// These checks drive the flat view; the 3D view has its own check.
+await page.addInitScript(() => { if (localStorage.getItem('cornerlands.3d') === null) localStorage.setItem('cornerlands.3d', '0'); });
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e.stack || e)));
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });

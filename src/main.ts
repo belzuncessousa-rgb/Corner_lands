@@ -166,12 +166,14 @@ export class Game {
     this.bindInput();
     window.addEventListener('resize', () => this.renderer.resize());
     requestAnimationFrame((t) => this.frame(t));
-    // The 3D view, if the player turned it on last time.
+    // The 3D view is the default; the flat view if the player chose it last time.
+    let flat = false;
     try {
-      if (localStorage.getItem('cornerlands.3d') === '1') void this.set3D(true);
+      flat = localStorage.getItem('cornerlands.3d') === '0';
     } catch {
       /* ignore */
     }
+    if (!flat) void this.set3D(true);
     // A shared link (…?seed=123) goes straight to founding a town on that land.
     const params = new URLSearchParams(location.search);
     const shared = params.get('seed');

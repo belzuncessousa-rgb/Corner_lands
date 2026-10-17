@@ -4,6 +4,8 @@
 import { chromium } from 'playwright';
 const browser = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell' });
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+// These checks drive the flat view; the 3D view has its own check.
+await page.addInitScript(() => { if (localStorage.getItem('cornerlands.3d') === null) localStorage.setItem('cornerlands.3d', '0'); });
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
