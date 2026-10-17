@@ -383,6 +383,11 @@ art, the logic and balance get this pass. Grouped by how deep each change goes.
 - [x] Oats removed (old oat fields turn to wheat, stored oats to grain)
 - [x] Fix animals' glitchy look: they wrapped from one edge of the pasture to the other; now they wander smoothly, face where they go and are drawn in depth order. (More herding interaction left for the visual phase)
 
+### Phase 39 — Balance pass
+- [x] Hunger drives people away in proportion: half of those who went hungry leave (at most an eighth of the town a month), instead of an eighth of the whole town for a single hungry family
+- [x] Hardy mode is hard but fair: every test map reaches Town (in 3 to 6 years, against about 3 on Normal)
+- [x] The autoplayer builds a granary before a harvest spoils, serves homes out of a market's reach even when hands are short, keeps its streets around the camp once a manor is built, and no longer builds a mill for every sack of wheat
+
 ### For the visual refinement phase (later)
 
 On hold until the player has played the October changes (Phases 34–38) and given feedback on logic and balance: the player asked not to commit to more art before that.

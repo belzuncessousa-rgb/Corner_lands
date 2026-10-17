@@ -258,7 +258,9 @@ function roadToOre(s: GameState, deposits: Uint8Array = s.ore): void {
 const GRID = 7;
 
 function onGrid(s: GameState, x: number, y: number): boolean {
-  const hall = seatOf(s)!;
+  // The streets stay where the settlers first laid them, around the camp,
+  // even once a manor is built elsewhere.
+  const hall = s.buildings.find((b) => b.type === 'camp') ?? seatOf(s)!;
   const gx = (((x - (hall.x - 2)) % GRID) + GRID) % GRID;
   const gy = (((y - (hall.y + 3)) % GRID) + GRID) % GRID;
   return gx === 0 || gy === 0;
@@ -496,7 +498,7 @@ export function act(s: GameState, rand: () => number): void {
   // Jobs nobody fills: new workplaces would only spread the villagers thinner.
   const short = labourSummary(s).short.reduce((a, x) => a + x.want - x.have, 0);
   // Grain piling up: more mills and ovens before anything else.
-  if (s.tier >= 1 && s.res.grain > 60 && count(s, 'windmill') < 1 + Math.floor(s.res.grain / 60)) wants.push('windmill');
+  if (s.tier >= 1 && s.res.grain > 60 && count(s, 'windmill') < Math.min(1 + Math.floor(s.res.grain / 60), 1 + count(s, 'farm'))) wants.push('windmill');
   if (s.tier >= 1 && s.res.flour > 20 && count(s, 'bakery') < 1 + count(s, 'windmill')) wants.push('bakery');
   if (food < pop * 8 && foodMakers < 1 + pop / 6) {
     if (s.tier >= 1 && count(s, 'farm') < 1 + Math.floor(pop / (idle > pop / 10 ? 25 : 40))) wants.push('farm');
@@ -506,6 +508,14 @@ export function act(s: GameState, rand: () => number): void {
   }
   // A Village of thirty wants its first tavern to grow into a Town, short of hands or not.
   if (s.tier >= 1 && pop >= 30 && count(s, 'tavern') < 1) wants.unshift('tavern');
+  // Homes out of reach of a market go hungry: a square near them, at once.
+  {
+    const lone = s.buildings.find((h) => h.residents > 0 && !coveredBy(s, h, 'market'));
+    if (lone && drawMarket(s, bCenter(lone))) return;
+  }
+  // A harvest that will not fit spoils in the fields: a granary comes first,
+  // short of hands or not.
+  if (monthOf(s.day) <= 6 && count(s, 'granary') < 2 + Math.floor(pop / 30) && harvestForecast(s).some((h) => h.kind === 'food' && h.expected > h.room + 40)) wants.unshift('granary');
   if (short >= 8) {
     // Fill the existing jobs first; homes still bring more hands.
     if (totalHousing(s) - pop < 4) wants.push('house');
@@ -526,11 +536,6 @@ export function act(s: GameState, rand: () => number): void {
   // No rock beside the roads yet: lay a road towards the nearest outcrop.
   if (count(s, 'quarry') === 0 && pop >= 8 && s.day % DAYS_PER_MONTH === 0) roadToOre(s, s.rock);
   if (pop >= 10 && count(s, 'well') < Math.ceil(pop / 20)) wants.push('well');
-  // Homes out of reach of a market go hungry: a square near them, at once.
-  if (s.day % 5 === 0) {
-    const lone = s.buildings.find((h) => h.residents > 0 && !coveredBy(s, h, 'market'));
-    if (lone && drawMarket(s, bCenter(lone))) return;
-  }
   // Homes out of reach of a well, the market or a tavern cannot grow: serve them first.
   if (s.tier >= 2 && s.day % 10 === 0) {
     for (const t of ['well', 'market', 'tavern'] as BuildingType[]) {

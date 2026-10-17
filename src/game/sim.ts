@@ -2950,7 +2950,11 @@ function migrate(s: GameState, rng: StateRng): void {
     log(s, `${n} homeless villagers left the settlement.`, 'bad');
   }
   if ((s.happiness < 30 || r.shortage > 0) && s.population > 2 && !s.relaxed) {
-    const n = Math.max(1, Math.round(s.population * (r.shortage > 0 ? 0.12 : 0.06) * (s.hardy ? 1.25 : 1)));
+    // Half of those who went hungry give up, up to an eighth of the town; a
+    // gloomy town loses a few more.
+    const hungry = r.shortage > 0 ? Math.min(r.shortage * 0.5, s.population * 0.12) : 0;
+    const gloomy = s.happiness < 30 ? s.population * 0.06 : 0;
+    const n = Math.max(1, Math.round(Math.max(hungry, gloomy) * (s.hardy ? 1.25 : 1)));
     const actual = Math.min(n, s.population - 2);
     s.population -= actual;
     r.left += actual;
