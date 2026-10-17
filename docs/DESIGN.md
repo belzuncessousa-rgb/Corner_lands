@@ -360,8 +360,8 @@ art, the logic and balance get this pass. Grouped by how deep each change goes.
 
 ### Phase 35 — How work and goods move
 - [ ] Yield is throughput: what a workplace makes depends on how much its workers get done in a day (walking included)
-- [ ] Workplaces have more jobs and each worker yields less, so labour is a real (but not harsh) concern; idle workers become rare
-- [ ] Workplaces keep a small local store; granary and warehouse workers fetch from them
+- [x] Workplaces have more jobs and each worker yields less, so labour is a real (but not harsh) concern; idle workers become rare (crews of workplaces that make things are half as large again; a full crew makes what it did)
+- [x] Workplaces keep a small local store; granary and warehouse workers fetch from them (a yard of 30; two haulers per storehouse or granary, staffed right after raw materials; served workplaces no longer lose time walking to storage; without a working store, workers carry their goods themselves as before)
 - [ ] No gathering areas: foragers, hunters and fishers go as far as they must, and the walking costs them time
 - [ ] Resources are concentrated but sparse: stone, berries and mushrooms in patches, hunting in the woods where deer and rabbits roam, fishing where fish shoal. Animals keep to their region and clearing the forest drives them off
 - [ ] Mushrooms to gather (visible on the map)

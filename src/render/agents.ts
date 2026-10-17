@@ -1,4 +1,4 @@
-import { BUILDINGS, DAY_SECONDS, OFFROAD_TILES_PER_DAY, ROAD_TILES_PER_DAY, STONE_ROAD_TILES_PER_DAY, STORAGE_CAPACITY } from '../game/data';
+import { BUILDINGS, DAY_SECONDS, OFFROAD_TILES_PER_DAY, RESOURCE_STORAGE, ROAD_TILES_PER_DAY, STONE_ROAD_TILES_PER_DAY, STORAGE_CAPACITY } from '../game/data';
 import { findPath } from '../game/path';
 import { chooseRecipe, doorTile, forTilesInRadius, bCenter, isMarketDay, isWinter, MARKET_DAY, needsMaterials } from '../game/sim';
 import type { Building, GameState, ResourceId } from '../game/types';
@@ -523,7 +523,45 @@ export class AgentSystem {
     }
   }
 
+  /** Storehouse and granary workers fetch goods from the workplaces' yards. */
+  private decideHaul(s: GameState, a: Agent, b: Building): void {
+    const door = doorTile(s, b);
+    if (a.carry) {
+      this.walkTo(s, a, door.x, door.y, [b.id], 'enter-work');
+      return;
+    }
+    const kind = b.type === 'granary' ? 'food' : 'materials';
+    const c = bCenter(b);
+    const sources: { w: Building; id: ResourceId; score: number }[] = [];
+    for (const w of s.buildings) {
+      if (!w.stock) continue;
+      for (const k in w.stock) {
+        const id = k as ResourceId;
+        if (RESOURCE_STORAGE[id] !== kind || (w.stock[id] ?? 0) < 1) continue;
+        const wc = bCenter(w);
+        sources.push({ w, id, score: (w.stock[id] ?? 0) / (4 + Math.hypot(wc.x - c.x, wc.y - c.y)) });
+      }
+    }
+    if (!sources.length) {
+      a.phase = 'inside';
+      a.visible = false;
+      a.timer = 3 + Math.random() * 3;
+      return;
+    }
+    // Mostly the fullest, nearest yard; sometimes another, so haulers spread out.
+    sources.sort((p, q) => q.score - p.score);
+    const pick = sources[Math.random() < 0.6 ? 0 : Math.floor(Math.random() * Math.min(4, sources.length))];
+    this.exitAt(a, door);
+    a.want = pick.id;
+    const wd = doorTile(s, pick.w);
+    this.walkTo(s, a, wd.x, wd.y, [pick.w.id, b.id], 'fetch');
+  }
+
   private decideWork(s: GameState, a: Agent, b: Building): void {
+    if (b.type === 'storehouse' || b.type === 'granary') {
+      this.decideHaul(s, a, b);
+      return;
+    }
     const d = BUILDINGS[b.type];
     const door = doorTile(s, b);
     // After working outside, carry goods back.
@@ -557,7 +595,8 @@ export class AgentSystem {
       this.walkTo(s, a, target.x, target.y, [b.id], 'act');
       return;
     }
-    if (d.outputs && Object.keys(d.outputs).length && Math.random() < 0.5 && b.type !== 'market') {
+    // Where haulers come for the goods, workers leave them in the yard.
+    if (!b.hauled && d.outputs && Object.keys(d.outputs).length && Math.random() < 0.5 && b.type !== 'market') {
       // Deliver goods to the manor hall or a storehouse.
       const store = nearestStore(s, b);
       if (store) {

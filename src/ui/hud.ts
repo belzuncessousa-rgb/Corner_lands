@@ -17,6 +17,7 @@ import {
   RESOURCE_STORAGE,
   STORAGE_CAPACITY,
   DAYS_PER_MONTH,
+  YARD_STORE,
 } from '../game/data';
 import { commission, commissionError, COMMISSIONS, nextTitle, takeTitle, titleError, TITLES, fairCost, fairError, fairPrestige, FAIR_TIER, feastCost, feastError, FESTIVALS, festivalError, getEvent, holdFair, holdFeast, holdFestival, resolveEvent } from '../game/events';
 import { CHARTERS, CHARTER_TIER, PATHS, charterCost, charterError, grantCharter, hasCharter } from '../game/charters';
@@ -83,6 +84,7 @@ import {
   MARKET_DAY,
   yearGoal,
   yearGoalMet,
+  yardTotal,
 } from '../game/sim';
 import type { Building, BuildingType, Category, Cost, GoodsGroup, ResourceId } from '../game/types';
 import type { StorageKind } from '../game/data';
@@ -792,7 +794,7 @@ export class Hud {
     const blocker = upgradeBlocker(s, b);
     const key = JSON.stringify([
       b.id, b.status, b.workers, b.builders, b.residents, b.build.toFixed(2), b.paused, b.level, b.lastOutput, b.growth.toFixed(2), b.want, b.priority, b.recipe, b.yard, b.trade, b.herd, b.owner, Math.floor(b.growth),
-      s.tier, blocker, b.need, (b.upProgress ?? 0).toFixed(2), b.unmet, Math.floor(s.res.gold / 10), s.population,
+      s.tier, blocker, b.need, (b.upProgress ?? 0).toFixed(2), b.unmet, Math.floor(yardTotal(b)), b.hauled, Math.floor(s.res.gold / 10), s.population,
       s.lastFeast, s.festivals, monthOf(s.day), b.type === 'market' ? s.day : 0, s.retinue, Math.floor(s.res.wood), Math.floor(totalFood(s)), b.barn, Math.floor(s.res.prestige), Math.floor(s.res.weapons),
       STORAGE_CAPACITY[b.type] ? RESOURCE_IDS.map((r) => (RESOURCE_STORAGE[r] ? Math.floor(s.res[r]) : 0)).join() : '',
     ]);
@@ -888,6 +890,12 @@ export class Hud {
       if (cap) rows.push(`<div class="kv"><span>Residents</span><span>${b.residents} / ${cap}</span></div>`);
       if (Object.keys(d.outputs).length || b.type === 'farm' || b.type === 'forester') {
         rows.push(`<div class="kv"><span>${b.type === 'forester' ? 'Trees planted' : 'Produced'} last month</span><span>${b.lastOutput}</span></div>`);
+      }
+      if (b.stock && yardTotal(b) >= 1) {
+        const yard = Object.fromEntries(Object.entries(b.stock).map(([k, v]) => [k, Math.floor(v ?? 0)]).filter(([, v]) => (v as number) > 0));
+        rows.push(`<div class="kv" data-tip="Goods wait here until the storehouse or granary haulers fetch them. A full yard stops the work: more haulers (or a store nearer by) keep it moving."><span>In the yard (${Math.floor(yardTotal(b))}/${YARD_STORE})</span><span class="costline">${costHtml(yard)}</span></div>`);
+      } else if (b.hauled) {
+        rows.push(`<div class="kv"><span>Haulers</span><span>fetch what is made here</span></div>`);
       }
       if (d.cycle && b.efficiency !== undefined && b.efficiency < 0.97) {
         rows.push(`<div class="kv" data-tip="Time lost walking to storage and to resources. Build closer to a storehouse or granary, or lay roads."><span>Walking time</span><span class="${b.efficiency < 0.7 ? 'neg' : ''}">${Math.round(b.efficiency * 100)}% efficient</span></div>`);

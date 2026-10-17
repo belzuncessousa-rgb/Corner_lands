@@ -149,7 +149,7 @@ describe('production chains', () => {
     const s = generateWorld(77);
     s.tier = 2;
     for (const k of ['wood', 'stone', 'planks', 'gold', 'bread'] as const) s.res[k] = 100;
-    s.population = 14;
+    s.population = 24;
     // Find an ore tile and build a road from the hall to it.
     const ore = s.ore.findIndex((v) => v > 0);
     const ox = ore % s.width;
@@ -183,8 +183,13 @@ describe('production chains', () => {
       if (mine) break;
     }
     expect(mine).not.toBeNull();
-    // Room to store everything.
-    for (let k = 0; k < 2; k++) placeNearRoad(s, 'storehouse').build = 1;
+    // Room to store everything; the eight villagers housed work the chain itself.
+    for (let k = 0; k < 2; k++) {
+      const st = placeNearRoad(s, 'storehouse');
+      st.build = 1;
+      st.want = 0;
+    }
+    mine!.want = 2;
     s.dirty = true;
     s.ore[ore] = 30;
     const smithy = placeNearRoad(s, 'smithy');
@@ -229,6 +234,37 @@ describe('bridges', () => {
     s.res.wood = 2;
     const next = s.terrain.findIndex((t, i) => t === 1 && i !== water);
     expect(buildRoad(s, next % s.width, Math.floor(next / s.width))).toBe(false);
+  });
+});
+
+describe('yards and haulers', () => {
+  it('a staffed storehouse fetches from workplace yards; without one, workers carry it themselves', async () => {
+    const { yardTotal } = await import('../src/game/sim');
+    const s = generateWorld(31);
+    s.population = 8;
+    const wc = placeNearRoad(s, 'woodcutter');
+    wc.build = 1;
+    wc.need = undefined;
+    s.dirty = true;
+    recompute(s);
+    s.res.wood = 0;
+    run(s, 6);
+    // No storehouse yet: timber goes straight into the manor's store.
+    expect(wc.hauled).toBe(false);
+    expect(s.res.wood).toBeGreaterThan(0);
+    const st = placeNearRoad(s, 'storehouse');
+    st.build = 1;
+    st.need = undefined;
+    s.population = 12;
+    s.dirty = true;
+    recompute(s);
+    expect(st.workers).toBe(2);
+    const before = s.res.wood;
+    run(s, 10);
+    expect(wc.hauled).toBe(true);
+    // Timber reaches the store by handcart, and the yard never overflows.
+    expect(s.res.wood).toBeGreaterThan(before);
+    expect(yardTotal(wc)).toBeLessThanOrEqual(30);
   });
 });
 
@@ -373,9 +409,9 @@ describe('levels', () => {
     const s = generateWorld(16);
     const wc = placeNearRoad(s, 'woodcutter');
     wc.build = 1;
-    expect(workersOf(wc)).toBe(2);
-    wc.level = 2;
     expect(workersOf(wc)).toBe(3);
+    wc.level = 2;
+    expect(workersOf(wc)).toBe(5);
   });
 });
 
@@ -387,17 +423,17 @@ describe('labour', () => {
     const b = placeNearRoad(s, 'quarry');
     a.build = b.build = 1;
     a.need = b.need = undefined;
-    s.population = 3;
+    s.population = 4;
     recompute(s);
     // Woodcutters come before quarries by default.
-    expect(a.workers).toBe(2);
+    expect(a.workers).toBe(3);
     expect(b.workers).toBe(1);
     setPriority(s, b, 2);
-    expect(b.workers).toBe(2);
+    expect(b.workers).toBe(3);
     expect(a.workers).toBe(1);
     setWorkers(s, b, 1);
     expect(b.workers).toBe(1);
-    expect(a.workers).toBe(2);
+    expect(a.workers).toBe(3);
     setWorkers(s, b, 0);
     expect(b.workers).toBe(0);
   });
@@ -594,7 +630,7 @@ describe('workshops and household goods', () => {
     s.population = 15;
     s.res.wool = 30;
     recompute(s);
-    expect(h.workers).toBe(2);
+    expect(h.workers).toBe(3);
     run(s, 9);
     expect(s.res.cloth).toBeGreaterThan(0);
     expect(s.res.cloth % 3).toBe(0);
@@ -703,7 +739,7 @@ describe('review regressions', () => {
     s.population = 15;
     expect(setTrade(s, h, 'dairy')).toBeNull();
     recompute(s);
-    expect(h.workers).toBe(1);
+    expect(h.workers).toBe(2);
   });
 });
 

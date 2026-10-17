@@ -8,6 +8,10 @@ export const DAY_SECONDS = 22.5;
 export const STONE_ROAD_TILES_PER_DAY = 30;
 export const ROAD_TILES_PER_DAY = 22;
 export const OFFROAD_TILES_PER_DAY = 12;
+/** Goods a workplace can keep in its own yard until haulers fetch them. */
+export const YARD_STORE = 30;
+/** Goods a hauler carries in one trip (a handcart). */
+export const HAUL_LOAD = 10;
 /** Units of materials a builder carries to a site in one trip (a barrow load). */
 export const CARRY_LOAD = 12;
 /** How strongly walking time slows production (0 = ignored). */
@@ -690,22 +694,24 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   storehouse: def({
     type: 'storehouse',
     name: 'Storehouse',
-    desc: 'Stores 300 materials and goods: timber, stone, planks, wool, cloth, tools and the like.',
+    desc: 'Stores 300 materials and goods: timber, stone, planks, wool, cloth, tools and the like. Its haulers fetch them from the workplaces, so the workers there need not walk to storage.',
     category: 'civic',
     w: 3,
     h: 3,
     cost: { wood: 30 },
     buildDays: 12,
+    workers: 2,
   }),
   granary: def({
     type: 'granary',
     name: 'Granary',
-    desc: 'Stores 300 food and grain: bread, meat, fish, fruit, cheese, wheat, barley, flour.',
+    desc: 'Stores 300 food and grain: bread, meat, fish, fruit, cheese, wheat, barley, flour. Its haulers fetch food from the workplaces, so the workers there need not walk to storage.',
     category: 'civic',
     w: 3,
     h: 3,
     cost: { wood: 30 },
     buildDays: 12,
+    workers: 2,
   }),
   tavern: def({
     type: 'tavern',
@@ -838,6 +844,16 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     tier: 2,
   }),
 };
+
+/**
+ * Workplaces that make things take half as many hands again as their
+ * drawings say, each making that much less: a full crew makes the same, but
+ * labour is something to plan, not a surplus to park.
+ */
+export const CREW_FACTOR = 1.5;
+for (const d of Object.values(BUILDINGS)) {
+  if (d.cycle > 0 && d.workers > 0 && d.type !== 'market') d.workers = Math.ceil(d.workers * CREW_FACTOR);
+}
 
 /** Most beauty a home can enjoy from decorations. */
 export const MAX_BEAUTY = 12;

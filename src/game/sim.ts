@@ -3,10 +3,12 @@ import {
   CARRY_LOAD,
   DAYS_PER_MONTH,
   DAYS_PER_YEAR,
+  HAUL_LOAD,
   OFFROAD_TILES_PER_DAY,
   RESOURCE_STORAGE,
   ROAD_TILES_PER_DAY,
   STONE_ROAD_TILES_PER_DAY,
+  YARD_STORE,
   STORAGE_CAPACITY,
   type StorageKind,
   TRAVEL_WEIGHT,
@@ -431,10 +433,14 @@ export function demolish(s: GameState, b: Building): boolean {
     const back = deliveredTo(b);
     for (const k in back) store(s, k as ResourceId, back[k as ResourceId] ?? 0);
   }
-  // A farm's barn is emptied into the stores first.
+  // A farm's barn and a workplace's yard are emptied into the stores first.
   let lost = 0;
   for (const k in b.barn) {
     const n = b.barn[k as ResourceId] ?? 0;
+    lost += n - store(s, k as ResourceId, n);
+  }
+  for (const k in b.stock) {
+    const n = b.stock[k as ResourceId] ?? 0;
     lost += n - store(s, k as ResourceId, n);
   }
   if (lost > 0) log(s, `${Math.floor(lost)} sacks from the barn had no room in the stores and were lost.`, 'bad');
@@ -967,7 +973,8 @@ export function recompute(s: GameState): void {
   // villagers are not stuck at a forager with no berries while a hunter idles.
   const prio = (b: Building) =>
     (2 - (b.priority ?? 1)) * 100 +
-    CATEGORY_PRIORITY[workDef(b).category] +
+    // Haulers keep every workplace's yard from filling: staffed with raw materials.
+    (b.type === 'storehouse' || b.type === 'granary' ? 1.05 : CATEGORY_PRIORITY[workDef(b).category]) +
     (TYPE_PRIORITY[b.type] ?? 0) +
     (isBlocked(b) ? 10 : 0);
   type Job = { b: Building; site: boolean; p: number };
@@ -1244,14 +1251,109 @@ export function charterBonus(s: GameState, b: Building, id: ResourceId): number 
 }
 
 function addOutput(s: GameState, b: Building, out: Cost): boolean {
-  if (fullFor(s, out)) return false;
   const bonus = b.trade ? HOME_TRADE_BONUS : 1;
+  if (b.hauled) {
+    // Into the yard, for the haulers to fetch.
+    let n = 0;
+    for (const k in out) n += (out[k as ResourceId] ?? 0) * bonus * charterBonus(s, b, k as ResourceId);
+    if (yardTotal(b) + n > YARD_STORE) return false;
+    for (const k in out) {
+      const id = k as ResourceId;
+      const m = (out[id] ?? 0) * bonus * charterBonus(s, b, id);
+      (b.stock ??= {})[id] = (b.stock[id] ?? 0) + m;
+      b.output += m;
+      tally(s, 'making', id, m);
+    }
+    return true;
+  }
+  if (fullFor(s, out)) return false;
   for (const k in out) {
     const n = store(s, k as ResourceId, (out[k as ResourceId] ?? 0) * bonus * charterBonus(s, b, k as ResourceId));
     b.output += n;
     tally(s, 'making', k as ResourceId, n);
   }
   return true;
+}
+
+/** Goods waiting in a workplace's yard. */
+export function yardTotal(b: Building): number {
+  let n = 0;
+  if (b.stock) for (const k in b.stock) n += b.stock[k as ResourceId] ?? 0;
+  return n;
+}
+
+/** The store whose workers haul each kind of good: storehouse or granary. */
+export const HAUL_STORES: Record<StorageKind, BuildingType> = { materials: 'storehouse', food: 'granary' };
+
+/** Whether working haulers fetch every good a workplace makes. */
+export function servedByHaulers(s: GameState, b: Building): boolean {
+  const d = workDef(b);
+  const outs = d.recipes ? d.recipes.flatMap((r) => Object.keys(r.outputs)) : Object.keys(d.outputs);
+  if (!outs.length || b.type === 'market') return false;
+  for (const k of outs) {
+    const kind = RESOURCE_STORAGE[k as ResourceId];
+    if (!kind) return false;
+    if (!s.buildings.some((o) => o.type === HAUL_STORES[kind] && o.build >= 1 && o.workers > 0)) return false;
+  }
+  return true;
+}
+
+/**
+ * Storehouse and granary workers walk the round of the workplaces, bringing
+ * back a handcart at a time from the fullest, nearest yards.
+ */
+export function dailyHaul(s: GameState): void {
+  for (const st of s.buildings) {
+    if (st.build < 1 || st.workers <= 0) continue;
+    const kind = (Object.keys(HAUL_STORES) as StorageKind[]).find((k) => HAUL_STORES[k] === st.type);
+    if (!kind) continue;
+    const c = bCenter(st);
+    let moved = 0;
+    let full = false;
+    for (let w = 0; w < st.workers && !full; w++) {
+      let time = 1;
+      while (time > 0 && !full) {
+        let best: Building | null = null;
+        let bestScore = 0;
+        let bestDist = 0;
+        for (const b of s.buildings) {
+          if (!b.stock) continue;
+          let n = 0;
+          for (const k in b.stock) if (RESOURCE_STORAGE[k as ResourceId] === kind) n += b.stock[k as ResourceId] ?? 0;
+          if (n < 1) continue;
+          const bc = bCenter(b);
+          const dist = Math.hypot(bc.x - c.x, bc.y - c.y);
+          const score = Math.min(n, HAUL_LOAD) / (1 + dist);
+          if (score > bestScore) {
+            best = b;
+            bestScore = score;
+            bestDist = dist;
+          }
+        }
+        if (!best) break;
+        // There and back, mostly along lanes, plus loading. A long last trip
+        // is finished tomorrow.
+        const trip = (2 * bestDist) / ROAD_TILES_PER_DAY + 0.05;
+        if (trip > time && time < 1) break;
+        time -= trip;
+        let load = HAUL_LOAD;
+        for (const k in best.stock) {
+          const id = k as ResourceId;
+          if (RESOURCE_STORAGE[id] !== kind || load <= 0) continue;
+          const take = Math.min(load, best.stock![id] ?? 0);
+          const kept = store(s, id, take);
+          best.stock![id] = (best.stock![id] ?? 0) - kept;
+          if ((best.stock![id] ?? 0) <= 0.001) delete best.stock![id];
+          load -= kept;
+          moved += kept;
+          if (kept < take) full = true;
+        }
+        if (load === HAUL_LOAD) break;
+      }
+    }
+    st.output += moved;
+    st.status = moved > 0 ? `Hauling (${Math.round(moved)} brought in today)` : full ? 'Storage full' : 'Waiting for goods to fetch';
+  }
 }
 
 /** Performs one production cycle. Returns a status string on failure. */
@@ -2018,7 +2120,8 @@ export function workEfficiency(b: Building): number {
   const d = workDef(b);
   if (!d.cycle) return 1;
   const toResource = d.gathers && d.gathers !== 'water' && d.gathers !== 'forest' ? (2 * (b.resDist ?? d.radius / 2)) / OFFROAD_TILES_PER_DAY : 0;
-  const walking = ((b.trip ?? 0) + toResource) / Math.max(1, d.workers);
+  // Served by haulers, the workers no longer carry their goods to storage.
+  const walking = ((b.hauled ? 0 : (b.trip ?? 0)) + toResource) / Math.max(1, d.workers);
   return d.cycle / (d.cycle + TRAVEL_WEIGHT * walking);
 }
 
@@ -2075,6 +2178,7 @@ export function dailyProduction(s: GameState, rng: StateRng): void {
       if (!isBlocked(b)) b.status = 'No workers available';
       continue;
     }
+    b.hauled = servedByHaulers(s, b);
     b.efficiency = workEfficiency(b);
     b.work += ((b.workers / d.workers) * b.efficiency) / d.cycle;
     let status: string | null = null;
@@ -2099,6 +2203,7 @@ export function dailyProduction(s: GameState, rng: StateRng): void {
         !!status?.startsWith('Batch done') ||
         !!status?.startsWith('Enough');
       b.blocked = status ? (idle ? BLOCK_SEASONAL : BLOCK_PROBLEM) : 0;
+      if (status === 'Storage full' && b.hauled && yardTotal(b) > 0) status = 'Yard full: waiting for haulers';
     }
     if (status || !b.blocked) b.status = status ?? 'Working';
   }
@@ -2736,6 +2841,7 @@ export function stepDay(s: GameState): void {
   dailyConstruction(s);
   dailyOrchards(s);
   dailyProduction(s, rng);
+  dailyHaul(s);
   reportHarvest(s);
   noteSeen(s);
   checkMilestones(s);

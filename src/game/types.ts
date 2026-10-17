@@ -145,6 +145,10 @@ export interface Building {
   carry?: number;
   /** Renovation progress 0..1 once materials are delivered. */
   upProgress?: number;
+  /** Goods made here and waiting in the yard for haulers. */
+  stock?: Partial<Record<ResourceId, number>>;
+  /** Haulers serve this workplace: its workers no longer walk to storage. */
+  hauled?: boolean;
   /** What a renovation in progress is doing or waiting for. */
   upNote?: string;
   /** House needs that are not met (for the inspector). */
