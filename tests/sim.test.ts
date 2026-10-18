@@ -446,7 +446,6 @@ describe('levels', () => {
   it('a manor is built by choice, once, and needs clear ground to grow', async () => {
     const { startUpgrade, upgradeBlocker } = await import('../src/game/levels');
     const s = generateWorld(14);
-    expect(placementError(s, 'townhall', 1, 1)).toMatch(/Requires/);
     s.tier = 2;
     const m = manorFor(s);
     expect(placementError(s, 'townhall', 1, 1)).toMatch(/has its manor/);
@@ -762,15 +761,16 @@ describe('charters', () => {
 });
 
 describe('charter goods', () => {
-  it('charter buildings stay locked until granted', async () => {
+  it('every building is open from the start but decorations; charters still shape recipes', async () => {
     const { grantCharter } = await import('../src/game/charters');
     const { isUnlocked, chooseRecipe } = await import('../src/game/sim');
     const s = generateWorld(61);
-    s.tier = 2;
     s.res.prestige = 2000;
-    expect(isUnlocked(s, 'scriptorium')).toBe(false);
-    grantCharter(s, 'learning1');
     expect(isUnlocked(s, 'scriptorium')).toBe(true);
+    expect(isUnlocked(s, 'cathedral')).toBe(true);
+    expect(isUnlocked(s, 'maypole')).toBe(false);
+    s.tier = 1;
+    expect(isUnlocked(s, 'maypole')).toBe(true);
     // Vines only once the orchard charter allows them.
     s.tier = 1;
     const lodge = placeNearRoad(s, 'orchardist');

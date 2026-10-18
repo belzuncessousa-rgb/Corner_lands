@@ -20,8 +20,6 @@ export const GATHERERS: ReadonlySet<BuildingType> = new Set<BuildingType>(['wood
 export const YARD_STORE = 30;
 /** Goods a hauler carries in one trip (a handcart). */
 export const HAUL_LOAD = 10;
-/** Units of materials a builder carries to a site in one trip (a barrow load). */
-export const CARRY_LOAD = 12;
 /** How strongly walking time slows production (0 = ignored). */
 export const TRAVEL_WEIGHT = 2;
 
@@ -710,7 +708,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     h: 1,
     cost: { wood: 12 },
     buildDays: 5,
-    radius: 7,
+    radius: 16,
   }),
   storehouse: def({
     type: 'storehouse',
@@ -968,9 +966,9 @@ export const CATEGORY_NAMES: Record<Category, string> = {
 
 export const TIERS = [
   { name: 'Hamlet', pop: 0, desc: 'A handful of families clearing the land.' },
-  { name: 'Village', pop: 20, desc: 'Unlocks farms, bakeries, sawpits, taverns, the trading post, a manor, Timber Houses and workshop expansions.' },
-  { name: 'Town', pop: 45, desc: 'Unlocks mines, bloomeries, blacksmiths, churches, Townhouses and town charters.' },
-  { name: 'Borough', pop: 90, desc: 'Your lands prosper. A true seat of a lord!' },
+  { name: 'Village', pop: 20, desc: 'Homes may become Timber Houses, workshops may expand and the manor may grow into a Manor House.' },
+  { name: 'Town', pop: 45, desc: 'Homes may become Townhouses, the manor a Stone Manor, and town charters may be granted.' },
+  { name: 'Borough', pop: 90, desc: 'Your lands prosper. The manor may rise into a Lord\'s Keep, and the lord may keep a retinue.' },
   { name: 'City', pop: 150, desc: 'Songs are sung of your town across the realm, and its manor may rise into a castle.' },
 ];
 

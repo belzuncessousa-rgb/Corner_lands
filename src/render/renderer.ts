@@ -2673,7 +2673,7 @@ export class Renderer {
         const x = i % W;
         const y = (i / W) | 0;
         if (s.terrain[i] === 1) {
-          if (h < 2) this.mistSpots.push(i);
+          if (h < 1) this.mistSpots.push(i);
         } else if (h === 0) {
           for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
             if (inBounds(s, x + dx, y + dy) && s.terrain[idx(s, x + dx, y + dy)] === 1) {
@@ -2690,8 +2690,9 @@ export class Renderer {
       cv.height = 64;
       const g = cv.getContext('2d')!;
       const grad = g.createRadialGradient(64, 32, 0, 64, 32, 64);
-      grad.addColorStop(0, 'rgba(240,244,246,0.55)');
-      grad.addColorStop(0.5, 'rgba(240,244,246,0.25)');
+      // Faint and wide, so it reads as haze rather than patches.
+      grad.addColorStop(0, 'rgba(240,244,246,0.3)');
+      grad.addColorStop(0.5, 'rgba(240,244,246,0.12)');
       grad.addColorStop(1, 'rgba(240,244,246,0)');
       g.setTransform(1, 0, 0, 0.5, 0, 16);
       g.fillStyle = grad;

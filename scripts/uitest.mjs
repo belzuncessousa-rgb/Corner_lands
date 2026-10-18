@@ -16,10 +16,14 @@ await page.fill('#seed', '4242');
 await page.click('text=Found the Settlement');
 await page.waitForTimeout(600);
 await page.evaluate(() => { const g = window.game; g.setSpeed(0); g.state.tier = 1; g.state.res.wood = 300; g.state.res.planks = 60; g.state.res.stone = 60; g.state.res.gold = 500; g.hud.update(); });
+// The test raises the town's size by hand: carry on past the banner it shows (it pauses the game and takes clicks).
+const closeBanners = async () => {
+  while (await page.$('.banner .carry-on')) await page.click('.banner .carry-on');
+};
 const tileXY = (x, y) => page.evaluate(([x, y]) => window.game.renderer.tileToScreen(x + 0.5, y + 0.5), [x, y]);
 /** Clicks so that a size x size building lands with its corner on (x, y). */
-const placeAt = async (x, y, size) => { const [sx, sy] = await page.evaluate(([x, y, n]) => window.game.renderer.tileToScreen(x + n / 2, y + n / 2), [x, y, size]); await page.mouse.move(sx, sy); await page.mouse.click(sx, sy); await page.waitForTimeout(150); };
-const clickTile = async (x, y) => { const [sx, sy] = await tileXY(x, y); await page.mouse.move(sx, sy); await page.mouse.click(sx, sy); await page.waitForTimeout(150); };
+const placeAt = async (x, y, size) => { await closeBanners(); const [sx, sy] = await page.evaluate(([x, y, n]) => window.game.renderer.tileToScreen(x + n / 2, y + n / 2), [x, y, size]); await page.mouse.move(sx, sy); await page.mouse.click(sx, sy); await page.waitForTimeout(150); };
+const clickTile = async (x, y) => { await closeBanners(); const [sx, sy] = await tileXY(x, y); await page.mouse.move(sx, sy); await page.mouse.click(sx, sy); await page.waitForTimeout(150); };
 const hall = await page.evaluate(() => { const h = window.game.state.buildings.find((b) => (b.type === 'townhall' || b.type === 'camp')); return { x: h.x, y: h.y }; });
 const pick = async (cat, type) => {
   if (!(await page.$(`#buildbar [data-type="${type}"]`))) await page.click(`[data-cat="${cat}"]`);

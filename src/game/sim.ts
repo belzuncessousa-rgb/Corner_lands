@@ -1,6 +1,5 @@
 import {
   BUILDINGS,
-  CARRY_LOAD,
   DAYS_PER_MONTH,
   DAYS_PER_YEAR,
   GATHER_REACH,
@@ -180,14 +179,21 @@ export function footprintClear(s: GameState, x: number, y: number, w: number, h:
   return null;
 }
 
+/**
+ * Every building can be raised from the start: the player chooses. Only
+ * decorations wait for the town's size (or a charter); improvements to
+ * homes, workshops and the manor still follow the town's size.
+ */
 export function isUnlocked(s: GameState, type: BuildingType): boolean {
   const d = BUILDINGS[type];
+  if (d.category !== 'decor') return true;
   return d.tier <= s.tier && (!d.charter || hasCharter(s, d.charter));
 }
 
 /** Why a building is locked, for menus. */
 export function lockReason(s: GameState, type: BuildingType): string | null {
   const d = BUILDINGS[type];
+  if (isUnlocked(s, type)) return null;
   if (d.tier > s.tier) return `Requires ${TIERS[d.tier].name}`;
   if (d.charter && !hasCharter(s, d.charter)) return `Requires the ${CHARTERS.find((c) => c.id === d.charter)?.name ?? d.charter} charter`;
   return null;
@@ -2440,6 +2446,13 @@ export function dailyProduction(s: GameState, rng: StateRng): void {
 
 /** Most builders that work one site at once. */
 export const MAX_BUILDERS = 4;
+/**
+ * What a builder carries to a site in one trip, and the time a trip takes
+ * beyond the walk (loading, stacking): materials leave storage a load at a
+ * time as they are fetched, over a few days, not all at once.
+ */
+export const BUILD_LOAD = 3;
+export const BUILD_TRIP_DAYS = 0.4;
 /** Share of a building-day of work one builder does per day. */
 export const LABOUR_PER_BUILDER = 2;
 
@@ -2475,7 +2488,7 @@ export function dailyConstruction(s: GameState): void {
       }
       // Each builder brings one load per round trip. Renovations keep their
       // own tally so they do not disturb production.
-      const carry = (n * CARRY_LOAD) / ((b.trip ?? 0) + 0.5);
+      const carry = (n * BUILD_LOAD) / ((b.trip ?? 0) + BUILD_TRIP_DAYS);
       let pool = (renovating ? (b.carry ?? 0) : b.work) + carry;
       let missing = '';
       // With no timber in store, a woodcutter's lodge is raised from trees
@@ -2498,7 +2511,7 @@ export function dailyConstruction(s: GameState): void {
         if ((b.need![id] ?? 0) > 0 && s.res[id] < 1) missing = GOODS[id].name.toLowerCase();
       }
       // Loads cannot pile up beyond a trip's worth while waiting for goods.
-      pool = Math.min(pool, n * CARRY_LOAD);
+      pool = Math.min(pool, n * BUILD_LOAD);
       if (!needsMaterials(b)) pool = 0;
       if (renovating) b.carry = pool;
       else b.work = pool;

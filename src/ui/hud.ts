@@ -694,9 +694,12 @@ export class Hud {
     const bar = this.el.clock.querySelector('.month-bar') as HTMLElement | null;
     if (bar) bar.style.width = `${progress}%`;
 
-    if (this.lastTier >= 0 && s.tier > this.lastTier && !g.demo) this.celebrate(s.tier);
-    if (s.pendingEvent && !g.demo && !this.modal) this.showEvent();
+    // Note the new size first: celebrating pauses the game, which updates the
+    // interface again, and must not celebrate twice.
+    const grew = this.lastTier >= 0 && s.tier > this.lastTier && !g.demo;
     this.lastTier = s.tier;
+    if (grew) this.celebrate(s.tier);
+    if (s.pendingEvent && !g.demo && !this.modal) this.showEvent();
     this.updateObjectives();
     if (this.buildBarState() !== this.buildBarKey) this.renderBuildBar();
     this.updateInspector();
@@ -1142,7 +1145,8 @@ export class Hud {
 
   private celebrate(tier: number): void {
     const t = TIERS[tier];
-    const unlocked = BUILD_ORDER.filter((b) => BUILDINGS[b].tier === tier && !BUILDINGS[b].charter);
+    // Only decorations wait for the town's size; everything else is open from the start.
+    const unlocked = BUILD_ORDER.filter((b) => BUILDINGS[b].category === 'decor' && BUILDINGS[b].tier === tier && !BUILDINGS[b].charter);
     const div = document.createElement('div');
     div.className = 'banner panel';
     div.innerHTML = `<div class="ornament">❦ ❦ ❦</div><h1>${t.name}</h1><p>${esc(t.desc)}</p>
