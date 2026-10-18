@@ -12,7 +12,6 @@ import {
   MONTH_NAMES,
   RESOURCE_INFO,
   SEASON_NAMES,
-  EXPORT_PER_MARKET,
   TAX_LEVELS,
   TIERS,
   TRADE_PRICES,
@@ -100,6 +99,8 @@ import {
   yearGoalMet,
   seatOf,
   yardTotal,
+  exportBudget,
+  surplusOf,
 } from '../game/sim';
 import type { Building, BuildingType, Category, Cost, GoodsGroup, Land, ResourceId } from '../game/types';
 import type { StorageKind } from '../game/data';
@@ -889,7 +890,7 @@ export class Hud {
         rows.push(`<div class="kv"><span>Stalls</span><span>${b.workers} of ${marketStalls(b)} open${!b.workers ? ' <span class="neg">· needs a stallholder</span>' : ''}</span></div>`);
         // The town's markets together: each open stall serves the nearest households.
         const served = marketServed(s);
-        const homes = s.buildings.filter((h) => h.residents > 0);
+        const homes = s.buildings.filter((h) => h.type === 'house' && h.residents > 0);
         const open = s.buildings.filter((m) => (m.type === 'market' || m.type === 'markethall') && m.build >= 1).reduce((n, m) => n + Math.min(m.workers, marketStalls(m)), 0);
         rows.push(
           `<div class="kv" data-tip="Anyone may shop at a market, but each open stall can serve only ${HOMES_PER_STALL} households: the homes nearest a market come first. Homes left out go without their goods (food still comes from the stores)."><span>All markets serve</span><span class="${served.size < homes.length ? 'neg' : ''}">${served.size} of ${homes.length} homes · room for ${open * HOMES_PER_STALL}</span></div>`,
@@ -999,10 +1000,10 @@ export class Hud {
       const list = goods
         .slice(0, 8)
         .map((r) => {
-          const surplus = Math.floor(s.res[r] - keepOf(s, r));
+          const surplus = surplusOf(s, r);
           const sell =
             market && TRADE_PRICES[r] && surplus >= 1
-              ? `<button data-action="store-sell" data-res="${r}" data-n="${surplus}" data-tip="Sell what is above the stock target (${keepOf(s, r)})">Sell ${surplus} <small>+${sellPrice(s, r, surplus)}c</small></button>`
+              ? `<button data-action="store-sell" data-res="${r}" data-n="${surplus}" data-tip="Sell what is above the stock target (${keepOf(s, r)}) and what building sites still need">Sell ${surplus} <small>+${sellPrice(s, r, surplus)}c</small></button>`
               : '';
           return `<div class="kv store-row"><span>${ICONS[r] ?? ''} ${GOODS[r].name}</span><span>${Math.floor(s.res[r])} ${sell}</span></div>`;
         })
@@ -2479,6 +2480,7 @@ export class Hud {
   private showTrade(): void {
     const s = this.game.state;
     const staffed = s.buildings.some((b) => (b.type === 'tradingpost' || b.type === 'dock') && b.build >= 1 && b.workers > 0);
+    const budget = exportBudget(s);
     // Every tradeable good, in tabs by kind.
     const tab = this.tradeTab;
     const tabs = (['food', 'materials', 'goods'] as const)
@@ -2503,7 +2505,7 @@ export class Hud {
     const wasOpen = this.modal && this.modal.querySelector('.trade');
     const last = s.report.trade ?? 0;
     const html = `<h2>Trading Post</h2>
-      <p>Gold: <b>${Math.floor(s.res.gold)}</b> ${ICONS.gold} · ${staffed ? `Merchants visit every month and buy up to ${EXPORT_PER_MARKET} goods per market${last ? ` (last month: +${last} gold)` : ''}.` : '<span class="neg">Staff the trading post so merchants will visit.</span>'}</p>
+      <p>Gold: <b>${Math.floor(s.res.gold)}</b> ${ICONS.gold} · ${staffed ? `Merchants visit every month and buy up to ${budget.base} goods${budget.crated ? `, and ${budget.crated} more packed in crates` : ''}${last ? ` (last month: +${last} gold)` : ''}.` : '<span class="neg">Staff a trading post or dock so merchants will visit.</span>'}</p>
       <div class="trade-tabs">${tabs}</div>
       <table class="trade">${rows}</table>
       <div class="row" style="justify-content:flex-end;margin-top:10px"><button class="primary" data-action="close-modal">Done</button></div>`;

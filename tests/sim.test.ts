@@ -1697,3 +1697,63 @@ describe('paths', () => {
     expect(p.filter((i) => s.trees[i]).length).toBeGreaterThan(0);
   });
 });
+
+describe('trade audit', () => {
+  const tradeTown = () => {
+    const s = generateWorld(31);
+    s.tier = 4;
+    s.res.gold = 100000;
+    const post = placeNearRoad(s, 'tradingpost');
+    post.build = 1;
+    post.need = undefined;
+    recompute(s);
+    return s;
+  };
+  /** Staff every finished trading post, dock and guildhall (after any recompute). */
+  const staff = (s: GameState) => {
+    for (const b of s.buildings) if (['tradingpost', 'dock', 'guildhall'].includes(b.type) && b.build >= 1) b.workers = 2;
+  };
+
+  it('buying always costs at least three times the best selling price, bonuses and all', async () => {
+    const { buyPrice, exportUnitPrice, sellPrice } = await import('../src/game/sim');
+    const s = tradeTown();
+    s.charters = ['trade1', 'trade2', 'trade3a'];
+    const guild = placeNearRoad(s, 'guildhall');
+    guild.build = 1;
+    guild.need = undefined;
+    recompute(s);
+    staff(s);
+    for (const id of ['jewellery', 'tools', 'wood', 'bread'] as const) {
+      expect(buyPrice(s, id, 100)).toBeGreaterThanOrEqual(3 * exportUnitPrice(s, id) * 100 - 1);
+      expect(buyPrice(s, id, 100)).toBeGreaterThanOrEqual(3 * sellPrice(s, id, 100));
+    }
+  });
+
+  it('merchants never buy what building sites are still owed', async () => {
+    const { exportGoods } = await import('../src/game/sim');
+    const s = tradeTown();
+    const site = placeNearRoad(s, 'church');
+    site.need = { planks: 50 };
+    s.res.planks = 60;
+    s.targets = { ...(s.targets ?? {}), planks: 0 };
+    s.sell = { planks: true };
+    staff(s);
+    exportGoods(s);
+    expect(s.res.planks).toBe(50);
+  });
+
+  it('crates carry ten more goods each, and only the extra goods use them up', async () => {
+    const { exportBudget, exportGoods } = await import('../src/game/sim');
+    const s = tradeTown();
+    s.targets = { ...(s.targets ?? {}), stone: 0, crates: 0 };
+    s.res.stone = 500;
+    s.res.crates = 1;
+    staff(s);
+    expect(exportBudget(s).crated).toBe(10);
+    s.sell = { stone: true };
+    const before = s.res.stone;
+    exportGoods(s);
+    expect(before - s.res.stone).toBe(exportBudget({ ...s, res: { ...s.res, crates: 0 } } as typeof s).base + 10);
+    expect(s.res.crates).toBe(0);
+  });
+});

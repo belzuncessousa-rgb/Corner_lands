@@ -519,16 +519,46 @@ export function hasBuilt(s: GameState, type: BuildingType): boolean {
   return s.buildings.some((b) => b.type === type && b.build >= 1);
 }
 
-/** Coins to buy n units at the market. */
+/** Coins to buy n units at the market: never under three times the best the town could get selling it. */
 export function buyPrice(s: GameState, id: ResourceId, n: number): number {
   // Boats bring goods in cheaper than carts.
   const dock = hasBuilt(s, 'dock') ? 0.85 : 1;
-  return Math.ceil(priceOf(s, id) * IMPORT_FACTOR * dock * n * (hasCharter(s, 'trade1') ? 0.85 : 1));
+  const unit = priceOf(s, id) * IMPORT_FACTOR * dock * (hasCharter(s, 'trade1') ? 0.85 : 1);
+  const floor = 3 * Math.max(priceOf(s, id) * SELL_FACTOR * (hasCharter(s, 'trade1') ? 1.2 : 1), exportUnitPrice(s, id));
+  return Math.ceil(Math.max(unit, floor) * n);
 }
 
 /** Coins earned selling n units at the market. */
 export function sellPrice(s: GameState, id: ResourceId, n: number): number {
   return Math.floor(priceOf(s, id) * SELL_FACTOR * n * (hasCharter(s, 'trade1') ? 1.2 : 1));
+}
+
+/** Coins merchants pay for one unit in their monthly visit, with every bonus the town has. */
+export function exportUnitPrice(s: GameState, id: ResourceId): number {
+  const docks = s.buildings.some((b) => b.type === 'dock' && b.build >= 1 && b.workers > 0);
+  const guild = s.buildings.some((b) => b.type === 'guildhall' && b.build >= 1 && b.workers > 0);
+  return priceOf(s, id) * EXPORT_FACTOR * (hasCharter(s, 'trade1') ? 1.2 : 1) * (hasCharter(s, 'trade3a') ? 1.3 : 1) * (guild ? 1.2 : 1) * (docks ? 1.15 : 1);
+}
+
+/** Units of a good free to sell: above its stock target and what building sites are still owed. */
+export function surplusOf(s: GameState, id: ResourceId): number {
+  return Math.max(0, Math.floor(s.res[id] - keepOf(s, id) - owedTo(s, id)));
+}
+
+/** Units each crate lets the merchants carry on top of their usual load. */
+export const UNITS_PER_CRATE = 10;
+
+/**
+ * Goods the merchants take each month: so many per staffed trading post and
+ * dock, more with charters and a high title, and ten more for every crate in
+ * store above its stock target, up to half as much again.
+ */
+export function exportBudget(s: GameState): { base: number; crated: number } {
+  const posts = s.buildings.filter((b) => b.type === 'tradingpost' && b.build >= 1 && b.workers > 0).length;
+  const docks = s.buildings.filter((b) => b.type === 'dock' && b.build >= 1 && b.workers > 0).length;
+  const base = Math.floor((posts * EXPORT_PER_MARKET + docks * EXPORT_PER_DOCK) * (hasCharter(s, 'trade2') ? 2 : 1) * ((s.title ?? 0) >= 3 ? 1.5 : 1));
+  const spare = Math.max(0, Math.floor(s.res.crates - keepOf(s, 'crates')));
+  return { base, crated: Math.min(Math.floor(base / 2), spare * UNITS_PER_CRATE) };
 }
 
 /** Whether the town can trade: a trading post or a dock. */
@@ -695,35 +725,31 @@ export function noteSeen(s: GameState): void {
   for (const id of RESOURCE_IDS) if (s.res[id] > 0 && !s.seen.includes(id)) s.seen.push(id);
 }
 
-/** Monthly visit of merchants buying surplus goods at staffed trading posts. */
+/** Monthly visit of merchants buying surplus goods at staffed trading posts and docks. */
 export function exportGoods(s: GameState): number {
-  const posts = s.buildings.filter((b) => b.type === 'tradingpost' && b.build >= 1 && b.workers > 0).length;
-  const docks = s.buildings.filter((b) => b.type === 'dock' && b.build >= 1 && b.workers > 0).length;
-  // Boats carry more than carts, and goods packed in crates travel better.
-  const crated = s.res.crates >= 1;
-  let budget = (posts * EXPORT_PER_MARKET + docks * EXPORT_PER_DOCK) * (hasCharter(s, 'trade2') ? 2 : 1) * ((s.title ?? 0) >= 3 ? 1.5 : 1) * (crated ? 1.5 : 1);
-  const dockPrice = docks ? 1.15 : 1;
-  const guild = s.buildings.some((b) => b.type === 'guildhall' && b.build >= 1 && b.workers > 0);
+  const { base, crated } = exportBudget(s);
+  let budget = base + crated;
   let gold = 0;
+  let shipped = 0;
   const sold: string[] = [];
   for (const k in s.sell ?? {}) {
     const id = k as ResourceId;
-    const price = priceOf(s, id) * (hasCharter(s, 'trade3a') ? 1.3 : 1) * (guild ? 1.2 : 1) * dockPrice;
+    const price = exportUnitPrice(s, id);
     if (!price || budget <= 0) continue;
-    const n = Math.min(budget, Math.floor(s.res[id] - keepOf(s, id)));
+    // Never what the building sites are still waiting for.
+    const n = Math.min(budget, surplusOf(s, id));
     if (n <= 0) continue;
     s.res[id] -= n;
     budget -= n;
-    const earned = Math.floor(n * price * EXPORT_FACTOR);
-    gold += earned;
+    shipped += n;
+    gold += n * price;
     sold.push(`${n} ${GOODS[id].name.toLowerCase()}`);
   }
+  gold = Math.floor(gold);
   s.res.gold += gold;
-  // A crate for every ten units shipped.
-  if (crated) {
-    const shipped = sold.reduce((n, t) => n + Number(t.split(' ')[0]), 0);
-    s.res.crates = Math.max(0, s.res.crates - Math.ceil(shipped / 10));
-  }
+  // The crates go with the goods carried beyond the usual load.
+  const extra = Math.max(0, shipped - base);
+  if (extra > 0) s.res.crates = Math.max(0, s.res.crates - Math.ceil(extra / UNITS_PER_CRATE));
   if (gold > 0) log(s, `Merchants bought ${sold.join(', ')} for ${gold} coins.`, 'info');
   return gold;
 }
@@ -824,7 +850,11 @@ export function resourceInRange(s: GameState, type: BuildingType, c: { x: number
 
 export function coveredBy(s: GameState, b: Building, type: BuildingType): boolean {
   // A market has no reach: its stalls serve the nearest homes, as many as they can.
-  if (type === 'market') return marketServed(s).has(b.id);
+  if (type === 'market') {
+    // The camp's and the manor's folk are fed from any open stall, without taking a household's place.
+    if (b.type !== 'house') return s.buildings.some((m) => isMarket(m) && m.build >= 1 && m.workers > 0);
+    return marketServed(s).has(b.id);
+  }
   const c = bCenter(b);
   for (const o of s.buildings) {
     // A cathedral serves as a church, with a far wider reach.
@@ -2682,12 +2712,13 @@ export function marketServed(s: GameState): Set<number> {
   const markets = s.buildings.filter((m) => isMarket(m) && m.build >= 1 && m.workers > 0);
   let stalls = 0;
   for (const m of markets) stalls += Math.min(m.workers, marketStalls(m));
-  const key = `${s.day}:${s.buildings.length}:${stalls}:${s.population}`;
+  const key = `${s.day}:${s.buildings.length}:${s.nextId}:${stalls}:${s.population}`;
   if (servedCache.key === key) return servedCache.set;
   const set = new Set<number>();
   if (stalls) {
+    // Homes only: the manor and the camp do not shop at the market.
     const homes = s.buildings
-      .filter((h) => h.residents > 0)
+      .filter((h) => h.type === 'house' && h.residents > 0)
       .map((h) => {
         const c = bCenter(h);
         let d = Infinity;

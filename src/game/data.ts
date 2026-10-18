@@ -65,7 +65,7 @@ export const GOODS: Record<ResourceId, GoodDef> = {
   tiles: good('Roof Tiles', 'materials', 6, 'Fired clay tiles. Townhouses want a tiled roof.', { keep: 80 }),
   ore: good('Bog Iron', 'materials', 3, 'Rusty lumps of iron ore dug from boggy ground, smelted in a bloomery.'),
   iron: good('Iron', 'materials', 9, 'Iron for the blacksmith.', { keep: 60 }),
-  crates: good('Crates', 'materials', 7, 'Nailed boxes from the cooper. Wine is packed in them, and trading posts and docks that have them ship more each month.', { keep: 40 }),
+  crates: good('Crates', 'materials', 7, 'Nailed boxes from the cooper. Wine is packed in them, and merchants carry ten more goods for every crate in store above its stock target, up to half as much again.', { keep: 40 }),
   silver: good('Silver', 'materials', 15, 'Precious ore turned up by deep miners, for the jeweller.', { keep: 40 }),
 
   bread: good('Bread', 'food', 3, 'Baked from flour. Filling: feeds one and a half.', { food: 1.5, foodGroup: 'grain' }),
@@ -655,7 +655,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   cooper: def({
     type: 'cooper',
     name: "Cooper's Workshop",
-    desc: 'Nails planks into crates. The winery packs its wine in them, and trading posts and docks with crates in store ship half as much again each month.',
+    desc: 'Nails planks into crates. The winery packs its wine in them, and merchants carry ten more goods away for every crate in store, up to half as much again.',
     category: 'industry',
     cost: { wood: 15, planks: 10 },
     buildDays: 10,
