@@ -1704,10 +1704,14 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       p.line([x0, y0, 1], [x1, y0, 1], '#6b4a2c', 1.6);
       p.line([x0, y0, 1], [x0, y1, 1], '#6b4a2c', 1.6);
       // The windlass across the pit, its rope and bucket.
-      p.line([0.55, 0.78, 0], [0.55, 0.78, 13], '#5e4129', 1.8);
-      p.line([1.15, 0.78, 0], [1.15, 0.78, 13], '#5e4129', 1.8);
-      p.line([0.5, 0.78, 13], [1.2, 0.78, 13], '#6b4a2c', 3);
-      p.line([1.15, 0.78, 13], [1.22, 0.85, 10], '#5e4129', 1.2);
+      // Its posts stand on firm ground either side of the pit.
+      for (const x of [0.16, 1.49]) {
+        p.line([x, 0.78, 0], [x, 0.78, 14], '#5e4129', 1.8);
+        p.line([x, 0.66, 0], [x, 0.78, 10], '#5e4129', 1);
+        p.line([x, 0.9, 0], [x, 0.78, 10], '#5e4129', 1);
+      }
+      p.line([0.12, 0.78, 13], [1.53, 0.78, 13], '#6b4a2c', 3);
+      p.line([1.53, 0.78, 13], [1.6, 0.86, 10], '#5e4129', 1.2);
       p.line([0.85, 0.78, 12], [0.85, 0.78, -2], '#c8b48c', 0.6);
       p.box(0.8, 0.73, 0.9, 0.83, -5, 4, '#6b4a2c');
       // Heaps of bog ore and spoil, and a barrow.
