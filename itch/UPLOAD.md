@@ -6,6 +6,7 @@
 |---|---|
 | `corner-lands-itch.zip` (repo root) | The game. Upload this. |
 | `cover.png` (630×500) | Cover image |
+| `banner.png`, `background.jpg`, `embed-bg.jpg` | Page theme (see *Theme the page*) |
 | `1-summer-town.png` … `5-charters.png` (1280×720) | Screenshots |
 
 To rebuild after changes: `npm run build:itch` makes a fresh `corner-lands-itch.zip`, and
@@ -48,6 +49,30 @@ To rebuild after changes: `npm run build:itch` makes a fresh `corner-lands-itch.
 
 Later updates: *Edit game → Uploads*, upload the new zip and delete the old one (or use
 "Replace"). Saves stay in players' browsers between versions, because the game loads old saves.
+
+## Theme the page
+
+After saving, open the page and click **Edit theme** (top of the page). Under **Images**:
+
+| Slot | File | Setting |
+|---|---|---|
+| **Banner** | `banner.png` (960×300, transparent) | It replaces the title text at the top. |
+| **Background** | `background.jpg` (2400×1350) | Repeat: *No repeat*; Position: *Center*, top; tick *Fixed* if offered. |
+| **Embed BG** | `embed-bg.jpg` (1280×720) | Shown behind the "Run game" button. |
+
+Suggested colours, to match the wooden boards:
+
+| Colour | Value |
+|---|---|
+| Background | `#2a1d12` |
+| Inner column | `#3b2a1a` |
+| Text | `#f2e2c0` |
+| Links | `#f2c46a` |
+| Buttons | `#8a5a32` |
+| Embed background | `#2a1d12` |
+
+Fonts: *Header* Cinzel if offered (otherwise any serif), *Body* a serif such as EB Garamond or Lora.
+Remake the pictures with `node scripts/itch-art.mjs` (game server running).
 
 ## Things good to know
 
