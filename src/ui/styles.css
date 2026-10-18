@@ -2052,3 +2052,100 @@ table.prod td.num {
 .art-slot.title-art.has-art {
   height: 190px;
 }
+
+/* The lord and the arms. */
+#lord-btn {
+  overflow: hidden;
+}
+#lord-btn canvas {
+  border-radius: 4px;
+  display: block;
+}
+#top #lord-btn {
+  padding: 2px;
+}
+.lord-edit {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.lord-previews {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lord-previews canvas {
+  border-radius: 6px;
+  border: 1.5px solid rgba(91, 58, 34, 0.35);
+  background: rgba(255, 250, 235, 0.55);
+  display: block;
+}
+.lord-opts {
+  flex: 1;
+  min-width: 0;
+}
+.lord-opts .sub {
+  margin: 4px 0 2px;
+  text-align: left;
+}
+.lord-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 5px 0;
+}
+.lord-row > label {
+  width: 64px;
+  font-weight: bold;
+}
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+.choices button {
+  padding: 2px 7px;
+  font-size: 0.9em;
+}
+.choices button.on {
+  border-color: #c89a38;
+  background: #fff8e0;
+  font-weight: bold;
+}
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+.swatch {
+  width: 20px;
+  height: 20px;
+  min-width: 0;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(40, 28, 16, 0.35);
+}
+.swatch.on {
+  border-color: #fff8e0;
+  box-shadow: 0 0 0 2px #c89a38;
+}
+.lord-pick .lord-mini canvas {
+  border-radius: 4px;
+  border: 1px solid rgba(91, 58, 34, 0.35);
+  display: block;
+}
+@media (max-width: 640px) {
+  .lord-edit {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .lord-previews {
+    flex-direction: row;
+    justify-content: center;
+  }
+  .lord-previews canvas {
+    width: 120px !important;
+    height: 120px !important;
+  }
+}

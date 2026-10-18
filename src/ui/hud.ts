@@ -1,4 +1,6 @@
 import { NEWS } from './news';
+import { CHARGES, DEFAULT_HERALDRY, DIVISIONS, type Heraldry, TINCTURES, paintArms } from '../render/heraldry';
+import { CLOTHS, DEFAULT_LORD, GARMENTS, HAIRS, HAIR_STYLES, HATS, type LordLook, SKINS, lordPortrait } from '../render/lord';
 import { placeName, townName, weeklySeed } from '../game/names';
 import { deleteSave, listSaves, type SaveInfo } from '../api';
 import {
@@ -201,6 +203,10 @@ export class Hud {
   private cardImgs = new Map<string, string>();
   minimap: Minimap;
   private lastTier = -1;
+  private lordKey = '';
+  /** The look and arms a new settlement starts with (the last ones chosen). */
+  private draftLord: LordLook = { ...DEFAULT_LORD };
+  private draftArms: Heraldry = { ...DEFAULT_HERALDRY };
 
   constructor(
     private game: Game,
@@ -213,6 +219,11 @@ export class Hud {
       this.tipsOn = localStorage.getItem('cornerlands.tipsOff') !== '1';
       this.musicOn = localStorage.getItem('cornerlands.music') !== '0';
       this.tipsSeen = new Set(JSON.parse(localStorage.getItem('cornerlands.tips') ?? '[]') as string[]);
+      const lord = JSON.parse(localStorage.getItem('cornerlands.lord') ?? 'null') as { look: LordLook; arms: Heraldry } | null;
+      if (lord) {
+        this.draftLord = { ...DEFAULT_LORD, ...lord.look };
+        this.draftArms = { ...DEFAULT_HERALDRY, ...lord.arms };
+      }
     } catch {
       /* ignore */
     }
@@ -223,6 +234,7 @@ export class Hud {
         <div class="stack">
           <div class="btnrow">
             <button id="menu-btn" class="panel icon-btn" data-action="menu" data-tip="Menu (Esc)">${CATEGORY_ICONS.menu}</button>
+            <button id="lord-btn" class="panel icon-btn" data-action="lord" data-tip="<b>Your Lord</b><br>Choose how your lord or lady looks, and the arms on your flags."></button>
             <button class="panel icon-btn" data-action="chronicle" data-tip="<b>Chronicle</b><br>Everything that has happened in your lands.">${CATEGORY_ICONS.scroll}</button>
             <button class="panel icon-btn" data-action="production" data-tip="<b>Production Book</b><br>Every trade, what it takes and what it makes.">${ICONS.books}</button>
             <button class="panel icon-btn" data-action="charters" data-tip="<b>Town Charters</b><br>Spend prestige to specialise your town.">${ICONS.prestige}</button>
@@ -675,6 +687,7 @@ export class Hud {
 
     this.renderTopbar();
     this.renderChipPanel();
+    this.renderLordButton();
 
     // Clock.
     const season = seasonOf(s.day);
@@ -1384,6 +1397,9 @@ export class Hud {
       case 'menu':
         this.showGameMenu();
         break;
+      case 'lord':
+        this.showLord();
+        break;
       case 'cat': {
         const c = t.dataset.cat as Category;
         this.category = this.category === c ? null : c;
@@ -1903,11 +1919,13 @@ export class Hud {
     m.querySelector('[data-m="help"]')!.addEventListener('click', () => this.showHelp(true));
   }
 
-  showNewGame(fromMain: boolean, presetSeed?: number, presetLand?: Land): void {
+  showNewGame(fromMain: boolean, presetSeed?: number, presetLand?: Land, preset?: { name: string; named: boolean; mode: string }): void {
     const seed = presetSeed ?? Math.floor(Math.random() * 999999);
+    const mode0 = preset?.mode ?? 'normal';
     const m = this.openModal(
       `<h2>New Settlement</h2>
-      <div class="row"><label>Name</label><input id="town" value="${esc(placeName(seed))}" maxlength="40"><button data-m="rename" data-tip="Another name">🎲</button></div>
+      <div class="row"><label>Name</label><input id="town" value="${esc(preset?.name ?? placeName(seed))}" maxlength="40"><button data-m="rename" data-tip="Another name">🎲</button></div>
+      <div class="row lord-pick"><label>Your lord</label><span class="lord-mini"></span><span class="lord-mini flag"></span><button data-m="lord">Choose looks &amp; arms…</button></div>
       <p>Every map is generated from a seed. Share a seed to play the same land, or take this week's seed, the same for everyone.</p>
       <div class="row"><label>Seed</label><input id="seed" value="${seed}" inputmode="numeric"><button data-m="dice" data-tip="Another land">🎲</button><button data-m="weekly" data-tip="The same land for everyone until Monday">Seed of the week</button></div>
       <div class="lands">${(Object.keys(LANDS) as Land[])
@@ -1915,9 +1933,9 @@ export class Hud {
         .join('')}</div>
       <div class="map-preview"><canvas width="300" height="160" aria-label="The land from above"></canvas><div class="map-facts"></div></div>
       <div class="modes">
-        <label class="mode"><input type="radio" name="mode" value="normal" checked><span><b>Normal</b><br><small>Hungry or unhappy villagers will leave.</small></span></label>
-        <label class="mode"><input type="radio" name="mode" value="relaxed"><span><b>Easy</b><br><small>Objectives to guide you, double starting supplies; nobody ever leaves in anger.</small></span></label>
-        <label class="mode"><input type="radio" name="mode" value="hardy"><span><b>Hardy</b><br><small>A scarcer start, bitter winters, choosier settlers.</small></span></label>
+        <label class="mode"><input type="radio" name="mode" value="normal" ${mode0 === 'normal' ? 'checked' : ''}><span><b>Normal</b><br><small>Hungry or unhappy villagers will leave.</small></span></label>
+        <label class="mode"><input type="radio" name="mode" value="relaxed" ${mode0 === 'relaxed' ? 'checked' : ''}><span><b>Easy</b><br><small>Objectives to guide you, double starting supplies; nobody ever leaves in anger.</small></span></label>
+        <label class="mode"><input type="radio" name="mode" value="hardy" ${mode0 === 'hardy' ? 'checked' : ''}><span><b>Hardy</b><br><small>A scarcer start, bitter winters, choosier settlers.</small></span></label>
       </div>
       <div class="ornament">❦</div>
       <div class="row" style="justify-content:flex-end">
@@ -1946,8 +1964,15 @@ export class Hud {
     preview();
     const town = m.querySelector('#town') as HTMLInputElement;
     // The name follows the seed until the player types their own.
-    let named = false;
+    let named = preset?.named ?? false;
     town.addEventListener('input', () => (named = true));
+    m.querySelector('.lord-mini')!.replaceChildren(lordPortrait(this.draftLord, 40, this.draftArms));
+    m.querySelector('.lord-mini.flag')!.replaceChildren(this.flagCanvas(this.draftArms, 40, 40));
+    const modeOf = () => (m.querySelector('input[name="mode"]:checked') as HTMLInputElement | null)?.value ?? 'normal';
+    m.querySelector('[data-m="lord"]')!.addEventListener('click', () => {
+      const back = { seed: seedOf(input.value.trim()), land: landOf(), preset: { name: town.value, named, mode: modeOf() } };
+      this.showLord(() => this.showNewGame(fromMain, back.seed, back.land, back.preset));
+    });
     const reseed = (n: number) => {
       input.value = String(n);
       if (!named) town.value = placeName(n);
@@ -1963,6 +1988,8 @@ export class Hud {
     m.querySelector('[data-m="go"]')!.addEventListener('click', () => {
       const mode = ((m.querySelector('input[name="mode"]:checked') as HTMLInputElement | null)?.value ?? 'normal') as 'normal' | 'relaxed' | 'hardy';
       this.game.newGame(seedOf(input.value.trim()), mode, town.value, landOf());
+      this.game.state.lord = { ...this.draftLord };
+      this.game.state.heraldry = { ...this.draftArms };
       this.closeModal(true);
       this.game.setSpeed(1);
     });
@@ -2048,6 +2075,156 @@ export class Hud {
       <div>Soil around it: ${soil < 0.4 ? 'poor' : soil < 0.7 ? 'fair' : 'rich'}</div>`;
   }
 
+  /** The portrait on the button at the top left, redrawn when the look or arms change. */
+  private renderLordButton(): void {
+    const s = this.game.state;
+    const look = s.lord ?? DEFAULT_LORD;
+    const arms = s.heraldry ?? DEFAULT_HERALDRY;
+    const key = JSON.stringify([look, arms]);
+    if (key === this.lordKey) return;
+    this.lordKey = key;
+    const btn = this.root.querySelector('#lord-btn');
+    if (!btn) return;
+    const cv = lordPortrait(look, 30, arms, true);
+    cv.className = 'lord-chip';
+    btn.replaceChildren(cv);
+  }
+
+  /** A flag of the arms on its pole, waving a little. */
+  private flagCanvas(arms: Heraldry, w: number, h: number): HTMLCanvasElement {
+    const cv = document.createElement('canvas');
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(w * dpr);
+    cv.height = Math.round(h * dpr);
+    cv.style.width = `${w}px`;
+    cv.style.height = `${h}px`;
+    const c = cv.getContext('2d');
+    if (!c) return cv;
+    c.scale(dpr, dpr);
+    const px = w * 0.1;
+    c.strokeStyle = '#5a3e26';
+    c.lineWidth = Math.max(2, w * 0.03);
+    c.beginPath();
+    c.moveTo(px, h * 0.04);
+    c.lineTo(px, h * 0.98);
+    c.stroke();
+    c.fillStyle = '#c8962a';
+    c.beginPath();
+    c.arc(px, h * 0.04, w * 0.03, 0, Math.PI * 2);
+    c.fill();
+    const fx = px + 1;
+    const fw = w * 0.84;
+    const fy = h * 0.08;
+    const fh = h * 0.56;
+    const wave = (t: number) => Math.sin(t * Math.PI * 2) * fh * 0.05;
+    c.save();
+    c.beginPath();
+    c.moveTo(fx, fy);
+    for (let t = 0; t <= 1.001; t += 0.05) c.lineTo(fx + fw * t, fy + wave(t) * t);
+    for (let t = 1; t >= -0.001; t -= 0.05) c.lineTo(fx + fw * t, fy + fh + wave(t) * t);
+    c.closePath();
+    c.clip();
+    paintArms(c, arms, fx, fy, fw, fh);
+    // Folds of the cloth.
+    for (let t = 0; t < 1; t += 0.02) {
+      c.fillStyle = `rgba(0,0,0,${Math.max(0, Math.sin(t * Math.PI * 2 + 1)) * 0.14 * t})`;
+      c.fillRect(fx + fw * t, fy - fh, fw * 0.021, fh * 3);
+    }
+    c.restore();
+    return cv;
+  }
+
+  /**
+   * Choose the lord's look and arms. With `after` (the new-settlement screen)
+   * it sets those the next settlement starts with, then goes back there;
+   * otherwise it changes this settlement's.
+   */
+  showLord(after?: () => void): void {
+    const s = this.game.state;
+    const look: LordLook = { ...(after ? this.draftLord : (s.lord ?? this.draftLord)) };
+    const arms: Heraldry = { ...(after ? this.draftArms : (s.heraldry ?? this.draftArms)) };
+    const m = this.openModal(
+      `<h2>Your Lord</h2>
+      <div class="lord-edit">
+        <div class="lord-previews"><div class="lord-portrait"></div><div class="lord-flag"></div></div>
+        <div class="lord-opts"></div>
+      </div>
+      <div class="row" style="justify-content:flex-end">
+        <button data-m="dice" data-tip="A look and arms at random">🎲 Surprise me</button>
+        <button class="primary" data-m="done">Done</button>
+      </div>`,
+      !after,
+    );
+    m.querySelector('.modal')!.classList.add('wide');
+    const opts = m.querySelector('.lord-opts') as HTMLElement;
+    const swatches = (k: string, list: string[], cur: string) =>
+      `<div class="swatches">${list.map((col) => `<button class="swatch ${col === cur ? 'on' : ''}" style="background:${col}" data-k="${k}" data-v="${col}" aria-label="${col}"></button>`).join('')}</div>`;
+    const choices = (k: string, list: { id: string; name: string }[], cur: string) =>
+      `<div class="choices">${list.map((o) => `<button class="${o.id === cur ? 'on' : ''}" data-k="${k}" data-v="${o.id}">${o.name}</button>`).join('')}</div>`;
+    const draw = () => {
+      m.querySelector('.lord-portrait')!.replaceChildren(lordPortrait(look, 150, look.garment === 'tunic' ? arms : undefined));
+      m.querySelector('.lord-flag')!.replaceChildren(this.flagCanvas(arms, 150, 150));
+      opts.innerHTML = `
+        <div class="sub">The lord</div>
+        <div class="lord-row"><label>Clothes</label>${choices('garment', GARMENTS, look.garment)}${swatches('cloth', CLOTHS, look.cloth)}</div>
+        <div class="lord-row"><label>Skin</label>${swatches('skin', SKINS, look.skin)}</div>
+        <div class="lord-row"><label>Hair</label>${choices('hairStyle', HAIR_STYLES, look.hairStyle)}${swatches('hair', HAIRS, look.hair)}</div>
+        <div class="lord-row"><label>Hat</label>${choices('hat', HATS, look.hat)}${look.hat !== 'none' && look.hat !== 'coronet' ? swatches('hatColor', CLOTHS, look.hatColor) : ''}</div>
+        <div class="sub">The arms <small>(flown on the manor and the castle)</small></div>
+        <div class="lord-row"><label>Field</label>${swatches('a.field', TINCTURES, arms.field)}</div>
+        <div class="lord-row"><label>Division</label>${choices('a.division', DIVISIONS, arms.division)}${arms.division !== 'plain' ? swatches('a.second', TINCTURES, arms.second) : ''}</div>
+        <div class="lord-row"><label>Charge</label>${choices('a.charge', CHARGES, arms.charge)}${arms.charge !== 'none' ? swatches('a.chargeColor', TINCTURES, arms.chargeColor) : ''}</div>`;
+    };
+    const apply = () => {
+      this.draftLord = { ...look };
+      this.draftArms = { ...arms };
+      try {
+        localStorage.setItem('cornerlands.lord', JSON.stringify({ look, arms }));
+      } catch {
+        /* ignore */
+      }
+      if (!after) {
+        s.lord = { ...look };
+        s.heraldry = { ...arms };
+      }
+    };
+    opts.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest('[data-k]') as HTMLElement | null;
+      if (!b) return;
+      const k = b.dataset.k!;
+      const v = b.dataset.v!;
+      if (k.startsWith('a.')) (arms as unknown as Record<string, string>)[k.slice(2)] = v;
+      else (look as unknown as Record<string, string>)[k] = v;
+      // A charge the same colour as its field would vanish: pick the second tincture instead.
+      if (k === 'a.field' && arms.chargeColor === v) arms.chargeColor = arms.second !== v ? arms.second : TINCTURES.find((t) => t !== v)!;
+      draw();
+      apply();
+    });
+    m.querySelector('[data-m="dice"]')!.addEventListener('click', () => {
+      const pick = <T,>(l: readonly T[]) => l[Math.floor(Math.random() * l.length)];
+      look.garment = pick(GARMENTS).id;
+      look.cloth = pick(CLOTHS);
+      look.skin = pick(SKINS);
+      look.hairStyle = pick(HAIR_STYLES).id;
+      look.hair = pick(HAIRS);
+      look.hat = pick(HATS).id;
+      look.hatColor = pick(CLOTHS);
+      arms.field = pick(TINCTURES);
+      arms.second = pick(TINCTURES.filter((t) => t !== arms.field));
+      arms.division = pick(DIVISIONS).id;
+      arms.charge = pick(CHARGES).id;
+      arms.chargeColor = pick(TINCTURES.filter((t) => t !== arms.field && (arms.division === 'plain' || t !== arms.second)));
+      draw();
+      apply();
+    });
+    m.querySelector('[data-m="done"]')!.addEventListener('click', () => {
+      apply();
+      if (after) after();
+      else this.closeModal();
+    });
+    draw();
+  }
+
   showGameMenu(): void {
     const m = this.openModal(
       `<h1>Corner Lands</h1>
@@ -2057,6 +2234,7 @@ export class Hud {
         <button data-m="save">Save Game</button>
         <button data-m="load">Load Game</button>
         <button data-m="new">New Settlement</button>
+        <button data-m="lord">Your Lord &amp; Arms</button>
         <button data-m="help">How to Play</button>
         <button data-m="sound">Sound: ${this.muted ? 'Off' : 'On'}</button>
         <button data-m="music" ${this.muted ? 'disabled' : ''}>Music: ${this.musicOn ? 'On' : 'Off'}</button>
@@ -2072,6 +2250,7 @@ export class Hud {
     m.querySelector('[data-m="save"]')!.addEventListener('click', () => this.showSave());
     m.querySelector('[data-m="load"]')!.addEventListener('click', () => this.showLoad(false));
     m.querySelector('[data-m="new"]')!.addEventListener('click', () => this.showNewGame(false));
+    m.querySelector('[data-m="lord"]')!.addEventListener('click', () => this.showLord());
     m.querySelector('[data-m="help"]')!.addEventListener('click', () => this.showHelp(false));
     m.querySelector('[data-m="pausebad"]')!.addEventListener('click', () => {
       this.pauseOnBad = !this.pauseOnBad;

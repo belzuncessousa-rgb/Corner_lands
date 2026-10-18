@@ -358,6 +358,10 @@ export interface GameState {
   roadWork?: number;
   /** Months in a row of hunger or deep gloom (villagers leave from the second). */
   gloom?: number;
+  /** The player's lord or lady, as they chose to look. */
+  lord?: import('../render/lord').LordLook;
+  /** The lord's arms, flown on the manor's and the castle's flags. */
+  heraldry?: import('../render/heraldry').Heraldry;
   /** Years that ended with no one having gone hungry. */
   fedYears?: number;
   /** The cathedral holds a relic (bought from a travelling friar). */

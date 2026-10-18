@@ -35,6 +35,7 @@ export function mix(a: string, b: string, t: number): string {
 }
 
 import { mulberry32 } from '../game/rng';
+import { HERALDRY, paintArms } from './heraldry';
 
 export type RoofKind = 'thatch' | 'shingle' | 'slate' | 'tile' | 'plank';
 
@@ -730,6 +731,25 @@ export class Pen {
     c.beginPath();
     c.ellipse(sx, sy - r * 0.9, r * 0.85, r * 0.7, 0, 0, Math.PI * 2);
     c.fill();
+  }
+
+  /** A flag bearing the lord's arms, on a pole h high from z. */
+  lordFlag(x: number, y: number, z: number, h: number): void {
+    this.line([x, y, z], [x, y, z + h], '#3b2a1a', 1.4);
+    const [sx, sy] = iso(x, y, z + h);
+    const c = this.ctx;
+    c.save();
+    c.beginPath();
+    c.moveTo(sx, sy);
+    c.quadraticCurveTo(sx + 8, sy + 1, sx + 15, sy + 3);
+    c.lineTo(sx + 14, sy + 10);
+    c.quadraticCurveTo(sx + 7, sy + 8, sx, sy + 9);
+    c.closePath();
+    c.clip();
+    // Skewed a little, as the cloth hangs.
+    c.transform(1, 3 / 15, 0, 1, 0, -(sx * 3) / 15);
+    paintArms(c, HERALDRY.current, sx, sy, 15, 8.5);
+    c.restore();
   }
 
   flag(x: number, y: number, z: number, h: number, color: string): void {

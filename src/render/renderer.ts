@@ -9,6 +9,7 @@ import { ICONS } from '../ui/icons';
 import type { Animal } from './wildlife';
 import { Pen, TH, TW, iso, mix } from './pen';
 import { mulberry32 } from '../game/rng';
+import { DEFAULT_HERALDRY, HERALDRY, heraldryKey } from './heraldry';
 import {
   type Sprite,
   type TreeKind,
@@ -161,7 +162,9 @@ export class Renderer {
 
   buildingSprite(type: BuildingType, level: number, season: Season, variant = 0): Sprite {
     const d = BUILDINGS[type];
-    return this.sprite(`b:${type}:${level}:${season}:${variant}`, () => buildingSprite(type, d.w, d.h, level, season, variant));
+    // The manor flies the lord's arms: a new design means a new picture.
+    const arms = type === 'townhall' ? `:${heraldryKey()}` : '';
+    return this.sprite(`b:${type}:${level}:${season}:${variant}${arms}`, () => buildingSprite(type, d.w, d.h, level, season, variant));
   }
 
   private lodCache = [new WeakMap<HTMLCanvasElement, HTMLCanvasElement>(), new WeakMap<HTMLCanvasElement, HTMLCanvasElement>()];
@@ -244,6 +247,7 @@ export class Renderer {
     const c = this.ctx;
     const season = seasonOf(s.day);
     const z = this.cam.zoom;
+    HERALDRY.current = s.heraldry ?? DEFAULT_HERALDRY;
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     c.fillStyle = season === 3 ? '#9fb0b8' : '#5f7d4a';
     c.fillRect(0, 0, this.width, this.height);
@@ -1895,9 +1899,11 @@ export class Renderer {
     p.line([x - 0.25, y + 0.25, 56], [x + 0.25, y - 0.25, 56], '#4a3020', 1.4);
     const sway = Math.sin(this.time * 1.3) * 1.5;
     // A long swallow-tailed banner: crimson field, gold band, a blue lozenge.
-    p.poly([[x - 0.22, y + 0.22, 55], [x + 0.22, y - 0.22, 55], [x + 0.22, y - 0.22, 26 + sway], [x, y, 31 + sway], [x - 0.22, y + 0.22, 26 + sway]], '#9a2a2a');
-    p.poly([[x - 0.22, y + 0.22, 47], [x + 0.22, y - 0.22, 47], [x + 0.22, y - 0.22, 43], [x - 0.22, y + 0.22, 43]], '#d8b84a');
-    p.poly([[x, y, 41], [x + 0.1, y - 0.1, 36], [x, y, 31], [x - 0.1, y + 0.1, 36]], '#2a4a8a');
+    // In the lord's colours: the field, a band of the second tincture, the charge's colour.
+    const arms = HERALDRY.current;
+    p.poly([[x - 0.22, y + 0.22, 55], [x + 0.22, y - 0.22, 55], [x + 0.22, y - 0.22, 26 + sway], [x, y, 31 + sway], [x - 0.22, y + 0.22, 26 + sway]], arms.field);
+    p.poly([[x - 0.22, y + 0.22, 47], [x + 0.22, y - 0.22, 47], [x + 0.22, y - 0.22, 43], [x - 0.22, y + 0.22, 43]], arms.second);
+    p.poly([[x, y, 41], [x + 0.1, y - 0.1, 36], [x, y, 31], [x - 0.1, y + 0.1, 36]], arms.chargeColor);
   }
 
 
@@ -2762,7 +2768,7 @@ export class Renderer {
       p.box(gate - 0.55, y1 - 0.3, gate - 0.3, y1 + 0.05, 0, 26, stone, undefined, 'stone');
       p.box(gate + 0.3, y1 - 0.3, gate + 0.55, y1 + 0.05, 0, 26, stone, undefined, 'stone');
       p.box(gate - 0.55, y1 - 0.3, gate + 0.55, y1 + 0.05, 18, 8, stone, undefined, 'stone');
-      p.flag(x1 - 0.22, y1 - 0.22, 50, 22, '#a8322d');
+      p.lordFlag(x1 - 0.22, y1 - 0.22, 50, 22);
     }
   }
 

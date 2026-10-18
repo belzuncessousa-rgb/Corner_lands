@@ -1,4 +1,5 @@
 import { mulberry32 } from '../game/rng';
+import { HERALDRY } from './heraldry';
 import { HOME_TRADES } from '../game/sim';
 import type { BuildingType, Season } from '../game/types';
 import { type Material, Pen, ROOF_COLORS, TH, TW, iso, mix, shade, type V3 } from './pen';
@@ -2870,10 +2871,10 @@ function drawManor(p: Pen, level: number, season: Season, smoke: V3[]): void {
       p.box(0.3 + i * 0.25, 0.92, 0.42 + i * 0.25, 1.0, towerH, 7, towerStone);
       p.box(1.12, 0.15 + i * 0.25, 1.2, 0.27 + i * 0.25, towerH, 7, towerStone);
     }
-    p.flag(0.75, 0.575, towerH, 26, '#a8322d');
+    p.lordFlag(0.75, 0.575, towerH, 26);
   } else {
     p.roofPyramid(0.3, 0.15, 1.2, 1.0, towerH, 26, 'slate');
-    p.flag(0.75, 0.575, towerH + 26, 20, '#a8322d');
+    p.lordFlag(0.75, 0.575, towerH + 26, 20);
   }
   if (level >= 2) {
     // East wing.
@@ -2902,8 +2903,9 @@ function drawManor(p: Pen, level: number, season: Season, smoke: V3[]): void {
   p.box(1.32, 2.25, 1.78, 2.5, 0, 3, '#9b9284');
   if (level >= 2) {
     // Banners either side of the door.
-    p.wallL(2.255, 1.18, 1.3, 8, 22, '#a8322d');
-    p.wallL(2.255, 1.8, 1.92, 8, 22, '#a8322d');
+    // Hangings in the lord's colours.
+    p.wallL(2.255, 1.18, 1.3, 8, 22, HERALDRY.current.field);
+    p.wallL(2.255, 1.8, 1.92, 8, 22, HERALDRY.current.field);
   }
   if (level >= 5) {
     // Castle: a crenellated curtain wall with corner towers rings the keep.
@@ -2934,8 +2936,8 @@ function drawManor(p: Pen, level: number, season: Season, smoke: V3[]): void {
       merlons(x + 0.3, y, x + 0.3, y + 0.35, 40);
       p.windowL(y + 0.35, x + 0.12, 26, 0.08, 6);
     }
-    p.flag(2.82, 2.82, 44, 22, '#2e5e9a');
-    p.flag(1.55, 2.82, 34, 18, '#a8322d');
+    p.lordFlag(2.82, 2.82, 44, 22);
+    p.lordFlag(1.55, 2.82, 34, 18);
   } else if (level >= 4) {
     // A curtain wall stub with a gate tower at the front corner.
     p.box(2.55, 2.45, 2.9, 2.85, 0, 34, '#9d978c');

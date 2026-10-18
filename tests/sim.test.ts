@@ -159,8 +159,12 @@ describe('simulation', () => {
     const s = generateWorld(9);
     placeNearRoad(s, 'house');
     run(s, 30);
+    s.lord = { skin: '#d2a47a', hair: '#c8963a', hairStyle: 'braid', hat: 'coronet', hatColor: '#2e5e9a', garment: 'dress', cloth: '#3d7a3a' };
+    s.heraldry = { field: '#2e5e9a', second: '#f2ece0', division: 'quarterly', charge: 'star', chargeColor: '#e8c040' };
     const copy = deserialize(serialize(s));
     expect(copy.day).toBe(s.day);
+    expect(copy.lord).toEqual(s.lord);
+    expect(copy.heraldry).toEqual(s.heraldry);
     expect(Array.from(copy.trees)).toEqual(Array.from(s.trees));
     expect(Array.from(copy.occ)).toEqual(Array.from(s.occ));
     expect(copy.fertility[100]).toBeCloseTo(s.fertility[100]);
