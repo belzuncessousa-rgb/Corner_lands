@@ -1,4 +1,5 @@
 import { NEWS } from './news';
+import { drawTapestry } from './tapestry';
 import { CHARGES, DEFAULT_HERALDRY, DIVISIONS, type Heraldry, TINCTURES, paintArms } from '../render/heraldry';
 import { CLOTHS, DEFAULT_LORD, GARMENTS, HAIRS, HAIR_STYLES, HATS, type LordLook, SKINS, lordPortrait } from '../render/lord';
 import { placeName, townName, weeklySeed } from '../game/names';
@@ -327,8 +328,8 @@ export class Hud {
       .join('');
     const tools = `<span class="divider"></span>
       <button data-action="road" class="tab ${tool.kind === 'road' && !tool.paved && !tool.cobbled && !tool.wall ? 'active' : ''}" data-tip="<b>Road</b> (R)<br>Click to start, click again to lay it. Roads speed up walking; buildings work without them.">${ICONS.road}<span>Road</span></button>
-      ${this.game.state.tier >= PAVING_TIER ? `<button data-action="road" data-paved="1" class="tab ${tool.kind === 'road' && tool.paved ? 'active' : ''}" data-tip="<b>Stone road</b> (T)<br>Gravel and broken stone: villagers walk a third faster than on dirt. 2 stone per tile; lay it over a dirt road to pave it.">${ICONS.paved}<span>Stone road</span></button>` : ''}
-      ${this.game.state.tier >= COBBLE_TIER ? `<button data-action="road" data-cobbled="1" class="tab ${tool.kind === 'road' && tool.cobbled ? 'active' : ''}" data-tip="<b>Cobbled street</b> (Y)<br>Setts of dressed stone, the quickest going in town. 1 dressed stone per tile; lay it over a road to cobble it.">${ICONS.paved}<span>Cobbled street</span></button>` : ''}
+      ${this.game.state.tier >= PAVING_TIER ? `<button data-action="road" data-paved="1" class="tab ${tool.kind === 'road' && tool.paved ? 'active' : ''}" data-tip="<b>Stone road</b> (T)<br>Gravel and broken stone: villagers walk a third faster than on dirt. 2 stone per tile; lay it over a dirt road to pave it.">${ICONS.paved}<span>Stone</span></button>` : ''}
+      ${this.game.state.tier >= COBBLE_TIER ? `<button data-action="road" data-cobbled="1" class="tab ${tool.kind === 'road' && tool.cobbled ? 'active' : ''}" data-tip="<b>Cobbled street</b> (Y)<br>Setts of dressed stone, the quickest going in town. 1 dressed stone per tile; lay it over a road to cobble it.">${ICONS.paved}<span>Cobbles</span></button>` : ''}
       <button data-action="grove" class="tab ${tool.kind === 'grove' ? 'active' : ''}" data-tip="<b>Protect woods</b> (P)<br>Mark a wood the woodcutters must leave standing: click one corner, then the other. Click twice inside one to lift it.">${ICONS.grove}<span>Protect</span></button>
       <button data-action="demolish" class="tab ${tool.kind === 'demolish' ? 'active' : ''}" data-tip="<b>Demolish</b> (X)<br>Remove buildings or roads. Finished buildings return half their cost.">${ICONS.demolish}<span>Demolish</span></button>`;
     let cards = '';
@@ -1762,58 +1763,46 @@ export class Hud {
   /** The charter tree: paths radiate from the Town Charter at the centre. */
   private showCharters(): void {
     const s = this.game.state;
-    const W = 620;
-    const cx = W / 2;
-    const cy = W / 2;
-    const nodes: string[] = [];
-    const lines: string[] = [];
-    const pos = new Map<string, [number, number]>();
-    PATHS.forEach((path, i) => {
-      const a = -Math.PI / 2 + (i * Math.PI * 2) / PATHS.length;
-      const at = (r: number, da = 0): [number, number] => [cx + Math.cos(a + da) * r, cy + Math.sin(a + da) * r];
-      for (const c of CHARTERS.filter((x) => x.path === path.id)) {
-        const p = c.rank === 3 ? at(250, c.id.endsWith('a') ? -0.16 : 0.16) : at(c.rank === 1 ? 105 : 180);
-        pos.set(c.id, p);
-        const prev = c.rank === 1 ? [cx, cy] : pos.get(CHARTERS.find((x) => x.path === c.path && x.rank === c.rank - 1)!.id)!;
-        const taken = hasCharter(s, c.id);
-        lines.push(`<line x1="${prev[0]}" y1="${prev[1]}" x2="${p[0]}" y2="${p[1]}" stroke="${taken ? path.color : '#b8a27a'}" stroke-width="${taken ? 4 : 2}" ${taken ? '' : 'stroke-dasharray="5 4"'}/>`);
-      }
-      const [lx, ly] = at(292);
-      const cos = Math.cos(a);
-      const anchor = cos > 0.3 ? 'start' : cos < -0.3 ? 'end' : 'middle';
-      nodes.push(`<text x="${lx}" y="${ly + (Math.sin(a) > 0.5 ? 8 : Math.sin(a) < -0.5 ? -8 : 0)}" class="path-label" text-anchor="${anchor}" dominant-baseline="middle" fill="${path.color}">${esc(path.name)}</text>`);
-    });
-    for (const c of CHARTERS) {
-      const [x, y] = pos.get(c.id)!;
-      const path = PATHS.find((p) => p.id === c.path)!;
+    const numeral = (c: (typeof CHARTERS)[number]) => (c.rank === 3 ? 'III' : 'I'.repeat(c.rank));
+    const node = (c: (typeof CHARTERS)[number]) => {
       const taken = hasCharter(s, c.id);
       const err = charterError(s, c.id);
       const open = !taken && !err;
       const reachable = !taken && (!err || /prestige/.test(err));
-      const fill = taken ? path.color : reachable ? '#f4e7c8' : '#d6ccb6';
-      const stroke = taken ? '#3b2a1a' : open ? '#c8a038' : reachable ? path.color : '#a89878';
-      const sel = this.charterSel === c.id;
-      nodes.push(`<g class="charter-node ${open ? 'open' : ''}" data-action="charter-sel" data-id="${c.id}">
-        <circle cx="${x}" cy="${y}" r="${sel ? 27 : 24}" fill="${fill}" stroke="${stroke}" stroke-width="${sel || open ? 3.5 : 2}"/>
-        <text x="${x}" y="${y + 1}" text-anchor="middle" dominant-baseline="middle" fill="${taken ? '#fff8e6' : '#3b2a1a'}" font-size="13" font-weight="700">${c.rank === 3 ? `III${c.id.slice(-1)}` : 'I'.repeat(c.rank)}</text>
-      </g>`);
-    }
+      const cls = taken ? 'taken' : open ? 'open' : reachable ? 'near' : 'locked';
+      return `<button class="t-node ${cls} ${this.charterSel === c.id ? 'sel' : ''}" data-action="charter-sel" data-id="${c.id}" data-tip="${esc(`<b>${c.name}</b><br>${c.desc}`)}"><b>${numeral(c)}</b><span>${esc(c.name)}</span></button>`;
+    };
+    const hangings = PATHS.map((path) => {
+      const mine = CHARTERS.filter((c) => c.path === path.id);
+      const r1 = mine.find((c) => c.rank === 1)!;
+      const r2 = mine.find((c) => c.rank === 2)!;
+      const r3 = mine.filter((c) => c.rank === 3);
+      const held = mine.filter((c) => hasCharter(s, c.id)).length;
+      return `<div class="tapestry ${held ? 'held' : ''}" style="--c:${path.color}">
+          <div class="t-rod"></div>
+          <div class="t-cloth">
+            <div class="t-title">${esc(path.name)}</div>
+            <canvas class="t-scene" data-path="${path.id}" data-color="${path.color}"></canvas>
+            <div class="t-nodes">${node(r1)}<i class="t-thread"></i>${node(r2)}<i class="t-thread"></i><div class="t-fork">${r3.map(node).join('')}</div></div>
+          </div>
+        </div>`;
+    }).join('');
     const taken = s.charters?.length ?? 0;
     const sel = this.charterSel ? CHARTERS.find((c) => c.id === this.charterSel) : null;
     let detail = `<h3>Town Charters</h3>
-      <p>The crown grants charters that shape what kind of town yours becomes. Each one costs prestige, and every charter makes the next dearer: go deep along one path, or take a little of several.</p>
+      <p>The crown grants charters that shape what kind of town yours becomes. Each costs prestige, and every one granted makes the next dearer: go deep along one path, or take a little of several. The last rank of each path forks: choose one of the two.</p>
       <div class="kv"><span>${ICONS.prestige} Prestige</span><b>${Math.floor(s.res.prestige)}</b></div>
       <div class="kv"><span>Next charter costs</span><b>${charterCost(s)}</b></div>
       <div class="kv"><span>Prestige a month</span><b>+${prestigeIncome(s).toFixed(1)}</b></div>
       <div class="kv"><span>Granted</span><b>${taken}</b></div>
-      ${s.tier < CHARTER_TIER ? `<p class="neg">Charters are granted once your settlement is a ${TIERS[CHARTER_TIER].name}. Prestige gathers meanwhile.</p>` : '<p class="note">Choose a circle to read its charter.</p>'}`;
+      ${s.tier < CHARTER_TIER ? `<p class="neg">Charters are granted once your settlement is a ${TIERS[CHARTER_TIER].name}. Prestige gathers meanwhile.</p>` : '<p class="note">Choose a medallion on a tapestry to read its charter.</p>'}`;
     if (sel) {
       const path = PATHS.find((p) => p.id === sel.path)!;
       const err = charterError(s, sel.id);
       const done = hasCharter(s, sel.id);
       const others = sel.excludes?.map((x) => CHARTERS.find((c) => c.id === x)!.name);
       detail = `<h3 style="color:${path.color}">${esc(sel.name)}</h3>
-        <div class="sub">${esc(path.name)} · rank ${sel.rank}</div>
+        <div class="sub">${esc(path.name)} · rank ${numeral(sel)}</div>
         <p>${esc(sel.desc)}</p>
         <p class="note"><b>Drawback of the path:</b> ${esc(path.malus)}</p>
         ${others?.length ? `<p class="note">Cannot be held alongside ${esc(others.join(' or '))}.</p>` : ''}
@@ -1823,18 +1812,19 @@ export class Hud {
         <p><a href="#" data-action="charter-sel" data-id="">← Back</a></p>`;
     }
     const html = `<div class="charters">
-        <svg viewBox="-110 -10 ${W + 220} ${W + 20}" class="charter-tree">
-          ${lines.join('')}
-          <circle cx="${cx}" cy="${cy}" r="42" fill="#7a2a2a" stroke="#c8a038" stroke-width="4"/>
-          <text x="${cx}" y="${cy - 6}" text-anchor="middle" fill="#f4e7c8" font-size="13" font-weight="700">TOWN</text>
-          <text x="${cx}" y="${cy + 11}" text-anchor="middle" fill="#f4e7c8" font-size="13" font-weight="700">CHARTER</text>
-          ${nodes.join('')}
-        </svg>
+        <div class="charter-hall">${hangings}</div>
         <div class="charter-detail">${detail}</div>
       </div>
       <div class="row" style="justify-content:flex-end;margin-top:8px"><button class="primary" data-action="close-modal">Close</button></div>`;
-    if (this.modal && this.modal.querySelector('.charters')) this.modal.querySelector('.modal')!.innerHTML = html;
-    else this.openModal(html).querySelector('.modal')!.classList.add('wide', 'charter-modal');
+    let root: HTMLElement;
+    if (this.modal && this.modal.querySelector('.charters')) {
+      root = this.modal.querySelector('.modal')!;
+      root.innerHTML = html;
+    } else {
+      root = this.openModal(html).querySelector('.modal')!;
+      root.classList.add('wide', 'charter-modal');
+    }
+    root.querySelectorAll<HTMLCanvasElement>('canvas.t-scene').forEach((cv) => drawTapestry(cv, cv.dataset.path!, cv.dataset.color!, 108, 82));
   }
 
   private openModal(html: string, closable = true): HTMLElement {

@@ -1384,10 +1384,17 @@ export function charterBonus(s: GameState, b: Building, id: ResourceId): number 
   let f = 1;
   const t = b.trade ?? b.type;
   if ((t === 'forager' || t === 'hunter') && hasCharter(s, 'nature1')) f *= 1.4;
+  if (t === 'hunter' && hasCharter(s, 'nature3b')) f *= 1.5;
+  if (t === 'woodcutter' && hasCharter(s, 'nature2')) f *= 1.2;
   if ((t === 'quarry' || t === 'mine') && onPath(s, 'nature')) f *= 0.8;
+  if ((t === 'bloomery' || t === 'smithy' || t === 'armoury') && hasCharter(s, 'metal1')) f *= 1.25;
+  if (t === 'jeweller' && hasCharter(s, 'metal3a')) f *= 2;
+  if (t === 'scriptorium' && id === 'books' && hasCharter(s, 'learning1')) f *= 1.5;
+  if ((t === 'windmill' || t === 'watermill' || t === 'bakery') && hasCharter(s, 'farm3a')) f *= 1.3;
+  if (t === 'tanner' && hasCharter(s, 'herd3a')) f *= 1.33;
   const converter = Object.keys(d.inputs).length > 0 || !!d.recipes?.some((r) => Object.keys(r.inputs).length > 0);
-  if (converter) f *= hasCharter(s, 'learning3a') && s.universityOk ? 1.3 : hasCharter(s, 'learning2') ? 1.1 : 1;
-  if ((id === 'cider' || id === 'wine') && hasCharter(s, 'orchard3a')) f *= 1.25;
+  if (converter && hasCharter(s, 'learning2')) f *= 1.1;
+  if ((id === 'cider' || id === 'wine') && hasCharter(s, 'orchard3a')) f *= 1.5;
   if (id === 'ale' && hasCharter(s, 'farm3b')) f *= 1.5;
   if (id === 'cheese' && hasCharter(s, 'herd3b')) f *= 1.5;
   if (id === 'weapons' && hasCharter(s, 'metal3b')) f *= 1.5;
@@ -1630,7 +1637,7 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
       if (t < 0) return b.type === 'quarry' ? 'No rock within reach' : 'No ore within reach';
       b.resDist = tileDist(s, b, t);
       // Deep shafts never exhaust a vein.
-      if (!(b.type === 'mine' && hasCharter(s, 'metal1'))) arr[t]--;
+      if (!(b.type === 'mine' && hasCharter(s, 'metal2'))) arr[t]--;
       // Precious veins: now and then a load of silver.
       if (b.type === 'mine' && hasCharter(s, 'metal2') && rng.next() < 0.3) b.output += produced(s, 'silver', 1);
       addOutput(s, b, d.outputs);
@@ -2866,7 +2873,7 @@ export function prestigeIncome(s: GameState): number {
     else if (b.type === 'belltower') n += 2;
     else if (b.type === 'manorgarden') n += 4;
     else if (b.type === 'watchtower') n += 0.5;
-    else if (b.type === 'university') n += s.universityOk ? 4 : 0;
+    else if (b.type === 'university') n += s.universityOk ? (hasCharter(s, 'learning3a') ? 6 : 4) : 0;
     else if (b.type === 'publicgarden') n += 0.5;
     else if (b.type === 'guildhall') n += 4;
     else if (b.type === 'maypole') n += 0.5;
@@ -2875,6 +2882,7 @@ export function prestigeIncome(s: GameState): number {
   }
   if (hasCharter(s, 'learning1')) n += 1;
   if (hasCharter(s, 'learning3b')) n += 2;
+  if (hasCharter(s, 'nature3a')) n += 1;
   if (hasCharter(s, 'metal3a')) n += 1 + s.buildings.filter((b) => b.type === 'jeweller' && b.build >= 1).length * 2;
   // Town walls: renown grows with every twenty sections, up to six a month.
   n += Math.min(6, walls / 20);
@@ -2910,7 +2918,7 @@ export const UNIVERSITY_BOOKS = 2;
 
 /** The university's learning: every workplace a little more productive while it is fed books. */
 export function learningYield(s: GameState): number {
-  return s.universityOk ? 1.05 : 1;
+  return s.universityOk ? (hasCharter(s, 'learning3a') ? 1.1 : 1.05) : 1;
 }
 
 /** Whether a watchman stands on a watch tower. */
@@ -2968,12 +2976,13 @@ function monthlyPrestige(s: GameState): void {
   payRetinue(s);
   // The university's masters need books to teach: two a month.
   const uni = s.buildings.some((b) => b.type === 'university' && b.build >= 1 && b.workers > 0);
-  s.universityOk = uni && s.res.books >= UNIVERSITY_BOOKS;
-  if (s.universityOk) s.res.books -= UNIVERSITY_BOOKS;
+  const books = hasCharter(s, 'learning3a') ? 1 : UNIVERSITY_BOOKS;
+  s.universityOk = uni && s.res.books >= books;
+  if (s.universityOk) s.res.books -= books;
   if (hasCharter(s, 'trade3b')) {
     let paved = 0;
     for (let i = 0; i < s.road.length; i++) if (s.road[i] >= 2) paved++;
-    s.res.gold += Math.floor(paved / 3);
+    s.res.gold += Math.floor(paved / 2);
   }
 }
 

@@ -36,39 +36,39 @@ export const PATHS: CharterPath[] = [
 ];
 
 export const CHARTERS: Charter[] = [
-  { id: 'metal1', path: 'metal', rank: 1, name: 'Deep Shafts', desc: 'Ore veins never run out.' },
-  { id: 'metal2', path: 'metal', rank: 2, name: 'Precious Veins', desc: 'Miners strike silver: now and then a load of silver ore comes up with the iron.', excludes: ['nature3a', 'nature3b'] },
-  { id: 'metal3a', path: 'metal', rank: 3, name: "Jewellers' Guild", desc: "Unlocks the Jeweller's Shop: silver into jewellery, the finest luxury. +1 prestige a month, +2 for each jeweller.", excludes: ['metal3b'] },
+  { id: 'metal1', path: 'metal', rank: 1, name: 'Master Smiths', desc: 'Bloomeries, blacksmiths and armouries work a quarter faster.' },
+  { id: 'metal2', path: 'metal', rank: 2, name: 'Deep Veins', desc: 'Bog iron never runs out, and now and then a load of silver comes up with it.', excludes: ['nature3a', 'nature3b'] },
+  { id: 'metal3a', path: 'metal', rank: 3, name: "Jewellers' Guild", desc: 'Jewellers work twice as fast. +1 prestige a month, and +2 for each jeweller.', excludes: ['metal3b'] },
   { id: 'metal3b', path: 'metal', rank: 3, name: "Armourers' Guild", desc: 'Armouries make half as many arms again, and merchants pay half again for them.', excludes: ['metal3a'] },
 
   { id: 'orchard1', path: 'orchard', rank: 1, name: 'Grafting', desc: 'Orchards and hives yield 30% more.' },
   { id: 'orchard2', path: 'orchard', rank: 2, name: 'Vines and Nurseries', desc: 'Orchards may be planted with vines for grapes, and young trees bear in a year instead of a year and a half.' },
-  { id: 'orchard3a', path: 'orchard', rank: 3, name: 'Vintners', desc: 'Unlocks the Winery: grapes into wine for taverns and Townhouses. Wine and cider are made and sold for a quarter to half more.', excludes: ['orchard3b'] },
-  { id: 'orchard3b', path: 'orchard', rank: 3, name: 'Meadmakers', desc: 'Hives give twice the honey; the brewhouse brews mead from it, a tavern drink and a luxury for Townhouses. Honey cakes cheer the town (+4 happiness).', excludes: ['orchard3a'] },
+  { id: 'orchard3a', path: 'orchard', rank: 3, name: 'Vintners', desc: 'Wineries and cider presses make half as much again, and wine and cider sell for half again.', excludes: ['orchard3b'] },
+  { id: 'orchard3b', path: 'orchard', rank: 3, name: 'Meadmakers', desc: 'Hives give twice the honey; the brewhouse brews mead from it, a tavern drink and a luxury. Honey cakes cheer the town (+4 happiness).', excludes: ['orchard3a'] },
 
-  { id: 'learning1', path: 'learning', rank: 1, name: 'Scriptorium', desc: 'Unlocks the Scriptorium: flax into paper, paper and leather into books, a luxury and a rich export. +1 prestige a month.' },
-  { id: 'learning2', path: 'learning', rank: 2, name: 'Guild Schools', desc: 'Apprentices learn their trade: workshops work 10% faster.' },
-  { id: 'learning3a', path: 'learning', rank: 3, name: 'University', desc: 'Masters and machines: workshops work 30% faster in every month the university gets a book and two wood parts.', excludes: ['learning3b'] },
+  { id: 'learning1', path: 'learning', rank: 1, name: 'Scribes', desc: 'Scriptoria copy half as many books again. +1 prestige a month.' },
+  { id: 'learning2', path: 'learning', rank: 2, name: 'Guild Schools', desc: 'Apprentices learn their trade: every workshop that turns one good into another works 10% faster.' },
+  { id: 'learning3a', path: 'learning', rank: 3, name: 'University Charter', desc: 'The University reads only one book a month, its learning makes every workplace 10% faster instead of 5%, and it brings 2 more prestige.', excludes: ['learning3b'] },
   { id: 'learning3b', path: 'learning', rank: 3, name: 'Cathedral School', desc: 'A choir and a library: +6 happiness, +2 prestige a month, and books fetch half again.', excludes: ['learning3a'] },
 
   { id: 'nature1', path: 'nature', rank: 1, name: 'Woodland Lore', desc: 'Foragers and hunters bring home 40% more.' },
-  { id: 'nature2', path: 'nature', rank: 2, name: 'Greenwood', desc: 'Forests regrow twice as fast; the people love their woods (+3 happiness).' },
-  { id: 'nature3a', path: 'nature', rank: 3, name: "Druids' Grove", desc: 'Old rites under the oaks: +6 happiness.', excludes: ['nature3b', 'metal2'] },
-  { id: 'nature3b', path: 'nature', rank: 3, name: 'Royal Hunt', desc: 'The king hunts in your woods: each hunting camp brings 1 prestige a month.', excludes: ['nature3a', 'metal2'] },
+  { id: 'nature2', path: 'nature', rank: 2, name: 'Greenwood', desc: 'Forests regrow twice as fast, woodcutters fell a fifth more, and the people love their woods (+3 happiness).' },
+  { id: 'nature3a', path: 'nature', rank: 3, name: "Druids' Grove", desc: 'Old rites under the oaks: +6 happiness, and herbs grow for the gathering (+1 prestige a month).', excludes: ['nature3b', 'metal2'] },
+  { id: 'nature3b', path: 'nature', rank: 3, name: 'Royal Hunt', desc: 'The king hunts in your woods: hunters bring half again, and each hunting camp brings 1 prestige a month.', excludes: ['nature3a', 'metal2'] },
 
-  { id: 'trade1', path: 'trade', rank: 1, name: 'Market Charter', desc: 'Buy 15% cheaper and sell 20% dearer at the market.' },
+  { id: 'trade1', path: 'trade', rank: 1, name: 'Market Charter', desc: 'Buy 15% cheaper and sell 20% dearer at the trading post and dock.' },
   { id: 'trade2', path: 'trade', rank: 2, name: 'Fair Town', desc: 'Merchants buy twice as much each month.' },
   { id: 'trade3a', path: 'trade', rank: 3, name: 'Merchant Guild', desc: 'Exports fetch 30% more.', excludes: ['trade3b'] },
-  { id: 'trade3b', path: 'trade', rank: 3, name: 'Toll Roads', desc: 'Travellers pay a toll: a coin a month for every three paved tiles.', excludes: ['trade3a'] },
+  { id: 'trade3b', path: 'trade', rank: 3, name: 'Toll Roads', desc: 'Travellers pay a toll: a coin a month for every two tiles of stone road or cobbled street.', excludes: ['trade3a'] },
 
   { id: 'farm1', path: 'farm', rank: 1, name: 'Three-Field Rotation', desc: 'Harvests are 20% larger.' },
   { id: 'farm2', path: 'farm', rank: 2, name: 'Heavy Plough', desc: 'Farmers tend half as many fields again.' },
-  { id: 'farm3a', path: 'farm', rank: 3, name: 'Breadbasket', desc: 'Granaries hold twice as much.', excludes: ['farm3b'] },
+  { id: 'farm3a', path: 'farm', rank: 3, name: 'Breadbasket', desc: 'Granaries hold twice as much, and mills and bakeries make 30% more.', excludes: ['farm3b'] },
   { id: 'farm3b', path: 'farm', rank: 3, name: "Brewers' Guild", desc: 'Brewhouses brew half as much ale again; ale fetches double.', excludes: ['farm3a'] },
 
   { id: 'herd1', path: 'herd', rank: 1, name: 'Good Husbandry', desc: 'Wool, milk and meat from herds are 30% more.' },
   { id: 'herd2', path: 'herd', rank: 2, name: 'Great Herds', desc: 'Pastures carry half as many animals again.' },
-  { id: 'herd3a', path: 'herd', rank: 3, name: "Butchers' Guild", desc: 'The autumn slaughter yields half as much meat again.', excludes: ['herd3b'] },
+  { id: 'herd3a', path: 'herd', rank: 3, name: "Butchers' Guild", desc: 'The autumn slaughter yields half as much meat again, and tanners work a third faster.', excludes: ['herd3b'] },
   { id: 'herd3b', path: 'herd', rank: 3, name: 'Fine Cheese', desc: 'Dairies make half as much cheese again; cheese fetches double.', excludes: ['herd3a'] },
 ];
 
