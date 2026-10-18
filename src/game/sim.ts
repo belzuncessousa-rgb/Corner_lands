@@ -7,8 +7,6 @@ import {
   OFFROAD_TILES_PER_DAY,
   RESOURCE_STORAGE,
   ROAD_TILES_PER_DAY,
-  STONE_ROAD_TILES_PER_DAY,
-  COBBLE_TILES_PER_DAY,
   YARD_STORE,
   STORAGE_CAPACITY,
   SILO_CAPACITY,
@@ -47,7 +45,7 @@ import {
   buildingName,
   marketStalls,
 } from './levels';
-import { Heap } from './path';
+import { Heap, tileCost } from './path';
 import { checkQuests } from './quests';
 import { StateRng } from './rng';
 import type { Building, BuildingType, Category, Cost, GameState, Herd, MessageKind, ResourceId, Season, Shoal } from './types';
@@ -877,11 +875,7 @@ export function reachableRoads(s: GameState): Uint8Array {
 
 /** Cost of stepping onto a tile, in road-tile units. */
 export function stepCost(s: GameState, i: number): number {
-  if (s.road[i] === 3) return ROAD_TILES_PER_DAY / COBBLE_TILES_PER_DAY;
-  if (s.road[i] === 2) return ROAD_TILES_PER_DAY / STONE_ROAD_TILES_PER_DAY;
-  if (s.road[i]) return 1;
-  const off = ROAD_TILES_PER_DAY / OFFROAD_TILES_PER_DAY;
-  return s.trees[i] ? off * 1.4 : off;
+  return tileCost(s, i);
 }
 
 const travelCache = new WeakMap<GameState, Float64Array>();
@@ -1571,7 +1565,8 @@ export function natureMonthly(s: GameState, rng: StateRng): void {
     }
     if (!winter) h.n = Math.min(h.max, h.n + (h.kind === 'deer' ? 1 : 2));
   }
-  for (const sh of s.shoals ?? []) sh.n = Math.min(sh.max, sh.n + (winter ? 1 : 3));
+  // A shoal comes back slowly: a catch a month, half that in winter.
+  for (const sh of s.shoals ?? []) sh.n = Math.min(sh.max, sh.n + (winter ? 0.5 : 1));
   // Mushrooms come up in late summer and autumn, a few in spring.
   const m = monthOf(s.day);
   if (s.mushroomsMax && (m >= 5 && m <= 8 || m === 2)) {

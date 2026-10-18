@@ -579,6 +579,15 @@ describe('labour', () => {
     const s = generateWorld(23);
     const f = placeNearRoad(s, 'forager');
     f.build = 1;
+    // A ring of mushrooms in a copse nearby (wild food is sparse near the start).
+    s.mushroomsMax = {};
+    s.mushrooms = {};
+    for (let k = 0; k < 4; k++) {
+      const i = idx(s, f.x + 4 + k, f.y + 4);
+      s.trees[i] = 2;
+      s.mushroomsMax[i] = 2;
+      s.mushrooms[i] = 2;
+    }
     s.day = DAYS_PER_MONTH * 8; // late autumn: no berries
     expect(chooseRecipe(s, f)?.id).toBe('mushrooms');
     f.recipe = 'herbs';
@@ -1615,5 +1624,76 @@ describe('new events', () => {
         for (const k of Object.keys(s.res)) expect(s.res[k as keyof typeof s.res], `${id} ${k}`).toBeGreaterThanOrEqual(0);
       }
     }
+  });
+});
+
+describe('paths', () => {
+  /** An empty meadow, with roads laid as given. */
+  const meadow = () => {
+    const s = generateWorld(5);
+    for (const a of [s.terrain, s.trees, s.road, s.rock, s.ore]) a.fill(0);
+    s.occ.fill(-1);
+    s.buildings = [];
+    return s;
+  };
+  const lay = (s: ReturnType<typeof meadow>, y: number, x0: number, x1: number, grade: number) => {
+    for (let x = x0; x <= x1; x++) s.road[y * s.width + x] = grade;
+  };
+  const time = async (s: ReturnType<typeof meadow>, path: number[], from: number) => {
+    const { tileCost } = await import('../src/game/path');
+    let t = 0;
+    let prev = from;
+    for (const i of path) {
+      const diag = i % s.width !== prev % s.width && Math.floor(i / s.width) !== Math.floor(prev / s.width);
+      t += (diag ? Math.SQRT2 : 1) * (tileCost(s, i) + tileCost(s, prev)) * 0.5;
+      prev = i;
+    }
+    return t;
+  };
+
+  it('take a road detour only when it is quicker than the straight walk', async () => {
+    const { findPath } = await import('../src/game/path');
+    // A road three tiles off the straight line is worth the detour...
+    let s = meadow();
+    lay(s, 23, 8, 52, 1);
+    let p = findPath(s, 10, 20, 50, 20)!;
+    expect(p.filter((i) => s.road[i]).length).toBeGreaterThan(25);
+    // ...one fifteen tiles off is not.
+    s = meadow();
+    lay(s, 35, 8, 52, 1);
+    p = findPath(s, 10, 20, 50, 20)!;
+    expect(p.filter((i) => s.road[i]).length).toBe(0);
+  });
+
+  it('prefer a cobbled street to a nearer dirt road, and find the quickest way', async () => {
+    const { findPath } = await import('../src/game/path');
+    const s = meadow();
+    lay(s, 21, 8, 52, 1);
+    lay(s, 24, 8, 52, 3);
+    const from = 20 * s.width + 10;
+    const p = findPath(s, 10, 20, 50, 20)!;
+    expect(p.filter((i) => s.road[i] === 3).length).toBeGreaterThan(25);
+    // No other route is quicker: compare with the dirt road.
+    const viaDirt = [...Array(1).keys()].flatMap(() => {
+      const out: number[] = [];
+      out.push(21 * s.width + 11);
+      for (let x = 12; x <= 49; x++) out.push(21 * s.width + x);
+      out.push(20 * s.width + 50);
+      return out;
+    });
+    expect(await time(s, p, from)).toBeLessThan(await time(s, viaDirt, from));
+  });
+
+  it('walk round a wood when that is quicker', async () => {
+    const { findPath } = await import('../src/game/path');
+    const s = meadow();
+    // A long, narrow wood across the way: slower to cross than to skirt.
+    for (let y = 18; y <= 22; y++) for (let x = 20; x <= 40; x++) s.trees[y * s.width + x] = 1;
+    let p = findPath(s, 10, 20, 50, 20)!;
+    expect(p.filter((i) => s.trees[i]).length).toBe(0);
+    // A tall one is quicker to push through than to walk all the way round.
+    for (let y = 5; y <= 35; y++) for (let x = 28; x <= 31; x++) s.trees[y * s.width + x] = 1;
+    p = findPath(s, 10, 20, 50, 20)!;
+    expect(p.filter((i) => s.trees[i]).length).toBeGreaterThan(0);
   });
 });

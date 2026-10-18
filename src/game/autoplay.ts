@@ -501,6 +501,8 @@ export function act(s: GameState, rand: () => number): void {
   // Grain piling up: more mills and ovens before anything else.
   if (s.tier >= 1 && s.res.grain > 60 && count(s, 'windmill') < Math.min(1 + Math.floor(s.res.grain / 60), 1 + count(s, 'farm'))) wants.push('windmill');
   if (s.tier >= 1 && s.res.flour > 20 && count(s, 'bakery') < 1 + count(s, 'windmill')) wants.push('bakery');
+  // Fish come in all year round, when the bushes are bare: one fisher at least.
+  if (food < pop * 8 && count(s, 'fisher') < 1) wants.push('fisher');
   if (food < pop * 8 && foodMakers < 1 + pop / 6) {
     if (s.tier >= 1 && count(s, 'farm') < 1 + Math.floor(pop / (idle > pop / 10 ? 25 : 40))) wants.push('farm');
     if (count(s, 'forager') < 2) wants.push('forager');

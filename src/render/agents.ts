@@ -1,5 +1,5 @@
 import { BUILDINGS, DAY_SECONDS, GATHER_REACH, GATHERERS, OFFROAD_TILES_PER_DAY, RESOURCE_STORAGE, ROAD_TILES_PER_DAY, STONE_ROAD_TILES_PER_DAY, COBBLE_TILES_PER_DAY, STORAGE_CAPACITY } from '../game/data';
-import { findPath } from '../game/path';
+import { findPath, WOODS_SLOWDOWN } from '../game/path';
 import { chooseRecipe, doorTile, forTilesInRadius, bCenter, isWinter, nearestHerd, needsMaterials, seatOf } from '../game/sim';
 
 /** The day of each month a merchant cart sets out from the trading post. */
@@ -307,7 +307,7 @@ export class AgentSystem {
     if (a.fadeIn < 1) a.fadeIn = Math.min(1, a.fadeIn + dt * 2);
     if (a.phase === 'walk') {
       const here = idx(s, Math.floor(a.x), Math.floor(a.y));
-      let move = dt * (s.road[here] === 3 ? COBBLE_SPEED : s.road[here] === 2 ? PAVED_SPEED : s.road[here] ? ROAD_SPEED : OFFROAD_SPEED) * (a.carry ? 0.85 : 1);
+      let move = dt * (s.road[here] === 3 ? COBBLE_SPEED : s.road[here] === 2 ? PAVED_SPEED : s.road[here] ? ROAD_SPEED : s.trees[here] ? OFFROAD_SPEED / WOODS_SLOWDOWN : OFFROAD_SPEED) * (a.carry ? 0.85 : 1);
       while (move > 0 && a.path.length) {
         const t = a.path[0];
         const tx = (t % s.width) + 0.5;

@@ -29,11 +29,11 @@ describe('balance', () => {
     for (let seed = 1; seed <= 6; seed++) {
       const rep = playBot(generateWorld(seed, { hardy: true }), 6, seed);
       console.log(`hardy seed ${seed}: village ${rep.villageYear?.toFixed(1)} town ${rep.townYear?.toFixed(1)} borough ${rep.boroughYear?.toFixed(1)}`);
-      // Hard, on a tight economy: every map grows into a Village, nearly all into a Town.
+      // Hard, on a tight economy and little wild food: every map grows into a Village, most into a Town.
       expect(rep.villageYear, `hardy seed ${seed}`).not.toBeNull();
       if (rep.townYear !== null) towns++;
     }
-    expect(towns).toBeGreaterThanOrEqual(5);
+    expect(towns).toBeGreaterThanOrEqual(4);
   });
 
   // Slow: run with SWEEP=1 after changing the economy or the autoplayer.

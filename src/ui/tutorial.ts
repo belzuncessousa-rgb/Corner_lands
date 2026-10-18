@@ -169,20 +169,17 @@ const START: Step[] = [
     },
   },
   {
-    say: 'A herd of deer. Hunters bring home meat and hides. Mind, the deer wander off if the woods about them are cut down, and a herd hunted too hard grows small and comes back only slowly.',
+    say: (g) =>
+      nearestHerd(g)?.h.kind === 'deer'
+        ? 'A herd of deer. Hunters bring home meat and hides. Mind, the deer wander off if the woods about them are cut down, and a herd hunted too hard grows small and comes back only slowly.'
+        : 'A warren of rabbits, for a hunter to snare. Deer roam the deep woods further off. Mind, game wanders off if the woods about it are cut down, and hunted too hard it grows few and comes back only slowly.',
     show: (g) => {
-      const camp = g.state.buildings.find((b) => b.type === 'camp');
-      const c = camp ? bCenter(camp) : { x: 0, y: 0 };
-      const herds = g.state.herds ?? [];
-      const hi = herds
-        .map((h, i) => ({ h, i }))
-        .filter((o) => o.h.kind === 'deer')
-        .sort((a, b) => Math.hypot(a.h.x - c.x, a.h.y - c.y) - Math.hypot(b.h.x - c.x, b.h.y - c.y))[0];
+      const hi = nearestHerd(g);
       if (!hi) return null;
-      // Light up the deer themselves, which graze about their herd's home.
-      const deer = g.wildlife.animals.filter((a) => a.herd === hi.i && !a.leaving);
-      const x = deer.length ? deer.reduce((t, a) => t + a.x, 0) / deer.length : hi.h.x;
-      const y = deer.length ? deer.reduce((t, a) => t + a.y, 0) / deer.length : hi.h.y;
+      // Light up the animals themselves, which graze about their herd's home.
+      const herd = g.wildlife.animals.filter((a) => a.herd === hi.i && !a.leaving);
+      const x = herd.length ? herd.reduce((t, a) => t + a.x, 0) / herd.length : hi.h.x;
+      const y = herd.length ? herd.reduce((t, a) => t + a.y, 0) / herd.length : hi.h.y;
       lookAt(g, x, y);
       return landSpot(g, x, y, 70);
     },
@@ -278,6 +275,15 @@ const MANOR: Step[] = [
     enter: (g) => g.setSpeed(0),
   },
 ];
+
+/** The herd nearest the camp, with its index. */
+function nearestHerd(g: Game): { h: NonNullable<GameState['herds']>[number]; i: number } | null {
+  const camp = g.state.buildings.find((b) => b.type === 'camp');
+  const c = camp ? bCenter(camp) : { x: 0, y: 0 };
+  const herds = (g.state.herds ?? []).map((h, i) => ({ h, i }));
+  herds.sort((a, b) => Math.hypot(a.h.x - c.x, a.h.y - c.y) - Math.hypot(b.h.x - c.x, b.h.y - c.y));
+  return herds[0] ?? null;
+}
 
 function roadsOf(s: GameState): number {
   let n = s.roadPlan?.length ?? 0;

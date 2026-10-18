@@ -1,4 +1,4 @@
-import { BUILDINGS } from './data';
+import { BUILDINGS, COBBLE_TILES_PER_DAY, OFFROAD_TILES_PER_DAY, ROAD_TILES_PER_DAY, STONE_ROAD_TILES_PER_DAY } from './data';
 import type { GameState } from './types';
 
 let gScore = new Float32Array(0);
@@ -60,6 +60,32 @@ export class Heap {
   }
 }
 
+/** Woods slow walkers off the road by this much more. */
+export const WOODS_SLOWDOWN = 1.4;
+
+/**
+ * Time to cross a tile, in dirt-road tiles: what walkers take, what the
+ * paths minimise and what the workplaces' travel times count.
+ */
+export function tileCost(s: GameState, i: number): number {
+  const r = s.road[i];
+  if (r === 3) return ROAD_TILES_PER_DAY / COBBLE_TILES_PER_DAY;
+  if (r === 2) return ROAD_TILES_PER_DAY / STONE_ROAD_TILES_PER_DAY;
+  if (r) return 1;
+  const off = ROAD_TILES_PER_DAY / OFFROAD_TILES_PER_DAY;
+  return s.trees[i] ? off * WOODS_SLOWDOWN : off;
+}
+
+/** The quickest going anywhere on the map, so A* never overestimates what is left. */
+function cheapestTile(s: GameState): number {
+  let best = 1;
+  for (let i = 0; i < s.road.length; i++) {
+    if (s.road[i] === 3) return ROAD_TILES_PER_DAY / COBBLE_TILES_PER_DAY;
+    if (s.road[i] === 2) best = ROAD_TILES_PER_DAY / STONE_ROAD_TILES_PER_DAY;
+  }
+  return best;
+}
+
 const DIRS: [number, number, number][] = [
   [1, 0, 1],
   [-1, 0, 1],
@@ -72,8 +98,8 @@ const DIRS: [number, number, number][] = [
 ];
 
 /**
- * A* over the tile grid. Buildings block movement except the ones listed in
- * `allowIds` (start/goal buildings). Roads are cheap, forests slow.
+ * A* over the tile grid for the quickest walk (time, not distance). Buildings
+ * block movement except the ones listed in `allowIds` (start/goal buildings).
  * Returns tile indices from start (exclusive) to goal (inclusive), or null.
  */
 export function findPath(
@@ -83,7 +109,7 @@ export function findPath(
   gx: number,
   gy: number,
   allowIds: number[] = [],
-  maxNodes = 6000,
+  maxNodes = 12000,
 ): number[] | null {
   const W = s.width;
   const H = s.height;
@@ -106,7 +132,8 @@ export function findPath(
     const o = s.occ[i];
     return o < 0 || zones.has(o) || allowIds.includes(o) || i === goal;
   };
-  const cost = (i: number) => (s.road[i] ? 1 : s.trees[i] ? 3 : 2.2);
+  const cost = (i: number) => tileCost(s, i);
+  const hMin = cheapestTile(s);
   const heap = new Heap();
   stamp[start] = curStamp;
   gScore[start] = 0;
@@ -144,7 +171,7 @@ export function findPath(
       closed[ni] = 0;
       gScore[ni] = g;
       fromArr[ni] = cur;
-      const h = Math.hypot(nx - gx, ny - gy);
+      const h = Math.hypot(nx - gx, ny - gy) * hMin;
       heap.push(ni, g + h);
     }
   }
