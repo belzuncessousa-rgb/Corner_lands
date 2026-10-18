@@ -332,31 +332,6 @@ function cornerEnds(mask: number, mids: [number, number, number][]): [[number, n
   return [ends[0], ends[1]];
 }
 
-/** Points along a road tile's centre line: a curve for corners, spokes otherwise. */
-function roadPoints(cx: number, cy: number, segs: [number, number, number][], corner: [[number, number], [number, number]] | null, step: number): [number, number, number, number][] {
-  // Each point carries the direction of travel there (ux, uy).
-  const out: [number, number, number, number][] = [];
-  if (corner) {
-    const [[ax, ay], [bx, by]] = corner;
-    const n = Math.max(4, Math.round((Math.hypot(ax - cx, ay - cy) + Math.hypot(bx - cx, by - cy)) / step));
-    for (let i = 0; i <= n; i++) {
-      const t = i / n;
-      const x = (1 - t) * (1 - t) * ax + 2 * (1 - t) * t * cx + t * t * bx;
-      const y = (1 - t) * (1 - t) * ay + 2 * (1 - t) * t * cy + t * t * by;
-      const dx = 2 * (1 - t) * (cx - ax) + 2 * t * (bx - cx);
-      const dy = 2 * (1 - t) * (cy - ay) + 2 * t * (by - cy);
-      const l = Math.hypot(dx, dy) || 1;
-      out.push([x, y, dx / l, dy / l]);
-    }
-    return out;
-  }
-  for (const [, mx, my] of segs) {
-    const len = Math.hypot(mx - cx, my - cy);
-    for (let t = 0; t <= len + 0.5; t += step) out.push([cx + ((mx - cx) * t) / len, cy + ((my - cy) * t) / len, (mx - cx) / len, (my - cy) / len]);
-  }
-  return out;
-}
-
 export function roadTile(season: Season, mask: number, layer: 'edge' | 'fill'): Sprite {
   return makeSprite(TW + 4, TH + 4, TW / 2 + 2, 2, (ctx) => {
     const cx = 0;
@@ -450,28 +425,56 @@ export function pavedTile(season: Season, mask: number, layer: 'edge' | 'fill'):
       draw(season === 3 ? '#a8a49c' : '#6e6658', 19);
       return;
     }
-    const mortar = season === 3 ? '#c4c0b8' : '#8a8274';
+    const mortar = season === 3 ? '#b4b0a8' : '#6e6658';
     draw(mortar, 15);
-    // Cobbles laid in courses across the road.
+    // Cobbles in courses over the whole tile, kept only where the road runs.
     const rand = mulberry32(mask * 17 + 3);
     const stones = ['#b4ada0', '#a39b8c', '#c2bbad', '#998f80', '#aca594'];
-    let row = 0;
-    for (const [bx, by, ux, uy] of roadPoints(cx, cy, segs, corner, 3.2)) {
-      // Perpendicular in iso screen space (across the road).
-      const px = -uy * 2;
-      const py = ux * 0.5;
-      for (let k = -2; k <= 2; k++) {
-        const off = k + (row % 2 ? 0.5 : 0);
-        if (Math.abs(off) > 2.2) continue;
-        const x = bx + px * off * 1.35;
-        const y = by + py * off * 1.35;
-        ctx.fillStyle = season === 3 && rand() < 0.4 ? '#e8ecf0' : stones[Math.floor(rand() * stones.length)];
-        ctx.beginPath();
-        ctx.ellipse(x, y, 1.9, 1.15, 0, 0, Math.PI * 2);
-        ctx.fill();
+    const t = document.createElement('canvas');
+    t.width = ctx.canvas.width;
+    t.height = ctx.canvas.height;
+    const tc = t.getContext('2d')!;
+    tc.setTransform(ctx.getTransform());
+    for (let gy = -2; gy <= TH + 2; gy += 2.4) {
+      const row = Math.round(gy / 2.4);
+      for (let gx = -TW / 2 - 2 + (row % 2 ? 2.1 : 0); gx <= TW / 2 + 2; gx += 4.2) {
+        const col = season === 3 && rand() < 0.4 ? '#e8ecf0' : stones[Math.floor(rand() * stones.length)];
+        const x = gx + (rand() - 0.5) * 0.6;
+        const y = gy + (rand() - 0.5) * 0.4;
+        tc.fillStyle = shade(col, 0.6);
+        tc.beginPath();
+        tc.ellipse(x + 0.2, y + 0.45, 2, 1.15, 0, 0, Math.PI * 2);
+        tc.fill();
+        tc.fillStyle = col;
+        tc.beginPath();
+        tc.ellipse(x, y, 1.9, 1.05, 0, 0, Math.PI * 2);
+        tc.fill();
+        tc.fillStyle = shade(col, 1.15);
+        tc.beginPath();
+        tc.ellipse(x - 0.5, y - 0.3, 0.9, 0.45, 0, 0, Math.PI * 2);
+        tc.fill();
       }
-      row++;
     }
+    // Keep the cobbles inside the road's line.
+    tc.globalCompositeOperation = 'destination-in';
+    tc.strokeStyle = '#000';
+    tc.lineWidth = 14;
+    tc.lineCap = 'round';
+    tc.beginPath();
+    if (corner) {
+      tc.moveTo(corner[0][0], corner[0][1]);
+      tc.quadraticCurveTo(cx, cy, corner[1][0], corner[1][1]);
+    } else {
+      for (const [, mx, my] of segs) {
+        tc.moveTo(cx, cy);
+        tc.lineTo(mx, my);
+      }
+    }
+    tc.stroke();
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(t, 0, 0);
+    ctx.restore();
     // A worn centre line where cartwheels run.
     ctx.globalAlpha = 0.18;
     draw('#4a4236', 3);
