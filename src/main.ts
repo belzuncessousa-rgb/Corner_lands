@@ -365,8 +365,8 @@ export class Game {
     x1 = Math.min(s.width, Math.ceil(x1) + 3);
     y1 = Math.min(s.height, Math.ceil(y1) + 3);
     if (x1 <= x0 || y1 <= y0) return;
-    const empty = !ov.tiles && !ov.range && !ov.coverage && !ov.curve && !ov.fertility && ov.selected === undefined && !ov.hover && !s.groves?.length;
-    const key = empty ? 'empty' : `${x0},${y0},${x1},${y1}:${s.buildings.length}:${s.groves?.length ?? 0}:${JSON.stringify(ov, (_k, v) => (typeof v === 'function' ? undefined : v))}`;
+    const empty = !ov.tiles && !ov.range && !ov.coverage && !ov.curve && !ov.fertility && ov.selected === undefined && !ov.hover && !s.groves?.length && !s.roadPlan?.length;
+    const key = empty ? 'empty' : `${x0},${y0},${x1},${y1}:${s.buildings.length}:${s.groves?.length ?? 0}:${s.roadPlan?.length ?? 0}:${Math.round((s.roadWork ?? 0) * 20)}:${JSON.stringify(ov, (_k, v) => (typeof v === 'function' ? undefined : v))}`;
     if (key === this.decalKey) return;
     this.decalKey = key;
     if (empty) {

@@ -397,7 +397,7 @@ export class Renderer {
       const d = Math.max(tx + ty, this.boost[ty * W + tx]);
       this.buckets[Math.min(nb - 1, d)].push(ai * 4 + 3);
     });
-    this.drawRoadPlan(s, visible);
+    if (!this.threeD) this.drawRoadPlan(s, visible);
     if (!this.light) this.drawPuddles(s, season, dt, visible);
     if (!this.light && season !== 3) {
       this.drawDucks(s, visible);
@@ -421,10 +421,15 @@ export class Renderer {
     }
 
     if (this.threeD) {
-      // Festivals, market days, lamplight and scaffolds over the 3D buildings.
+      // Life about the buildings, festivals, market days, lamplight and the
+      // bubbles over them, drawn over the 3D buildings.
       for (const b of s.buildings) {
         const [wx, wy] = iso(b.x + b.w / 2, b.y + b.h / 2);
-        if (visible(wx, wy)) this.drawExtras(s, b);
+        if (!visible(wx, wy)) continue;
+        const zone = BUILDINGS[b.type].zone;
+        if (!zone && b.type !== 'wall' && b.build >= 1) this.drawLife(s, b, season);
+        this.drawExtras(s, b);
+        if (!zone && b.type !== 'wall') this.drawMarkers(s, b);
       }
     }
     if (ov.ghost) this.drawGhost(s, ov.ghost, season);
@@ -1118,6 +1123,39 @@ export class Renderer {
       const [hx, hy] = iso(b.x + 1.0, b.y + 1.42, 34);
       drawSails(c, hx, hy, this.time * 0.9 + b.id, season);
     }
+    this.drawLife(s, b, season);
+    if (STORAGE_CAPACITY[b.type]) this.drawStock(s, b, season);
+    this.drawExtras(s, b);
+    if (selected) {
+      c.save();
+      c.globalCompositeOperation = 'lighter';
+      c.globalAlpha = 0.12 + 0.06 * Math.sin(this.time * 4);
+      c.drawImage(sp.canvas, wx - sp.ax, wy - sp.ay, sp.w, sp.h);
+      c.restore();
+    }
+    this.drawMarkers(s, b);
+  }
+
+  /** Bubbles over a building: covered by the reach shown, a problem, or ready to improve. */
+  drawMarkers(s: GameState, b: Building): void {
+    // While the reach overlay is on, homes show whether they are covered.
+    const covered = this.coverageHomes?.get(b.id);
+    if (covered !== undefined) {
+      this.drawMarker(b, covered ? '#3f7a34' : '#b8483a', covered ? '✓' : '✗');
+      return;
+    }
+    // Status markers.
+    if (!this.showMarkers) return;
+    if (hasProblem(b)) {
+      this.drawMarker(b, '#e0a030', '?', b.lack);
+    } else if ((b.type === 'house' || b.type === 'townhall') && this.canUpgrade(s, b)) {
+      this.drawMarker(b, b.type === 'townhall' ? '#c89a38' : '#4f8a3a', '↑');
+    }
+  }
+
+  /** Life about a building: hens, children, neighbours, a cat, hay, the oven's glow, a feast. */
+  drawLife(s: GameState, b: Building, season: Season): void {
+    const c = this.ctx;
     const yard = b.type === 'house' && !this.light && this.yardClear(s, b);
     if (yard && b.residents > 0 && season !== 3 && (b.id * 2654435761) % 3 === 0) this.drawChickens(b);
     if (b.type === 'farm' && b.build >= 1 && monthOf(s.day) >= 7) this.drawHayRick(b, season);
@@ -1140,30 +1178,7 @@ export class Renderer {
       c.fillStyle = `rgba(255,220,120,${f + 0.2})`;
       c.fillRect(ox - 1, oy - 2.5, 5, 2.2);
     }
-    if (STORAGE_CAPACITY[b.type]) this.drawStock(s, b, season);
     if (b.type === 'townhall' && s.feastDay !== undefined && s.day - s.feastDay < DAYS_PER_MONTH) this.drawFeast(b);
-    this.drawExtras(s, b);
-    if (selected) {
-      c.save();
-      c.globalCompositeOperation = 'lighter';
-      c.globalAlpha = 0.12 + 0.06 * Math.sin(this.time * 4);
-      c.drawImage(sp.canvas, wx - sp.ax, wy - sp.ay, sp.w, sp.h);
-      c.restore();
-    }
-    // While the reach overlay is on, homes show whether they are covered.
-    const covered = this.coverageHomes?.get(b.id);
-    if (covered !== undefined) {
-      this.drawMarker(b, covered ? '#3f7a34' : '#b8483a', covered ? '✓' : '✗');
-      return;
-    }
-    // Status markers.
-    if (!this.showMarkers) return;
-    if (hasProblem(b)) {
-      this.drawMarker(b, '#e0a030', '?', b.lack);
-    } else if ((b.type === 'house' || b.type === 'townhall') && this.canUpgrade(s, b)) {
-      this.drawMarker(b, b.type === 'townhall' ? '#c89a38' : '#4f8a3a', '↑');
-    }
-    void s;
   }
 
   /**
@@ -1900,6 +1915,7 @@ export class Renderer {
     this.ctx = ctx;
     Object.assign(PLAN, { on: true, x0, y0, p });
     try {
+      this.drawRoadPlan(s, () => true);
       this.drawGroundOverlays(s, ov);
     } finally {
       PLAN.on = false;
@@ -2059,7 +2075,7 @@ export class Renderer {
   /** A bobbing bubble over a building: a glyph, or the good it is waiting for. */
   private drawMarker(b: Building, color: string, glyph: string, good?: ResourceId): void {
     const c = this.ctx;
-    const [x, y] = iso(b.x + b.w / 2, b.y + b.h / 2, 46 + Math.sin(this.time * 3) * 3);
+    const [x, y] = iso(...onBuilding(b, BUILDINGS[b.type].w / 2, BUILDINGS[b.type].h / 2), 46 + Math.sin(this.time * 3) * 3);
     const icon = good ? goodIcon(good) : null;
     const r = icon ? 10 : 8;
     c.fillStyle = 'rgba(0,0,0,0.35)';
@@ -2874,54 +2890,9 @@ export class Renderer {
    * and corner towers and a gatehouse (Castle) along the front edges.
    */
   private drawManorGrounds(b: Building, season: Season, part: 'ground' | 'walls'): void {
-    const p = new Pen(this.ctx);
-    p.snow = season === 3;
-    const x0 = b.x;
-    const y0 = b.y;
-    const x1 = b.x + b.w;
-    const y1 = b.y + b.h;
-    if (part === 'ground') {
-      p.poly(
-        [
-          [x0 + 0.1, y0 + 0.1, 0],
-          [x1 - 0.1, y0 + 0.1, 0],
-          [x1 - 0.1, y1 - 0.1, 0],
-          [x0 + 0.1, y1 - 0.1, 0],
-        ],
-        season === 3 ? '#d8dcdc' : '#b8b0a0',
-      );
-      for (let x = x0 + 0.5; x < x1; x += 0.5) p.line([x, y0 + 0.1, 0], [x, y1 - 0.1, 0], 'rgba(90,80,65,0.15)', 0.5);
-      return;
-    }
-    const stone = b.level >= 4 ? '#9d978c' : '#a8a093';
-    const h = b.level >= 4 ? 16 : 7;
-    const t = 0.18;
-    // Front walls: along the far x edge and the far y edge, with a gate in the middle of the front.
-    const gate = (x0 + x1) / 2;
-    p.box(x1 - t, y0 + 0.1, x1, y1, 0, h, stone, undefined, 'stone');
-    p.box(x0 + 0.1, y1 - t, gate - 0.45, y1, 0, h, stone, undefined, 'stone');
-    p.box(gate + 0.45, y1 - t, x1, y1, 0, h, stone, undefined, 'stone');
-    if (b.level >= 4) {
-      // Crenels along the top.
-      for (let y = y0 + 0.2; y < y1 - 0.2; y += 0.3) p.box(x1 - t, y, x1, y + 0.15, h, 3, stone);
-      for (let x = x0 + 0.2; x < x1 - 0.2; x += 0.3) if (Math.abs(x + 0.07 - gate) > 0.5) p.box(x, y1 - t, x + 0.15, y1, h, 3, stone);
-    }
-    if (b.level >= 5) {
-      // Round-ish corner towers and a gatehouse.
-      for (const [tx, ty] of [
-        [x1 - 0.45, y0 + 0.05],
-        [x1 - 0.45, y1 - 0.45],
-        [x0 + 0.05, y1 - 0.45],
-      ] as const) {
-        p.box(tx, ty, tx + 0.45, ty + 0.45, 0, 34, stone, undefined, 'stone');
-        p.roofPyramid(tx - 0.03, ty - 0.03, tx + 0.48, ty + 0.48, 34, 16, 'slate');
-      }
-      p.box(gate - 0.55, y1 - 0.3, gate - 0.3, y1 + 0.05, 0, 26, stone, undefined, 'stone');
-      p.box(gate + 0.3, y1 - 0.3, gate + 0.55, y1 + 0.05, 0, 26, stone, undefined, 'stone');
-      p.box(gate - 0.55, y1 - 0.3, gate + 0.55, y1 + 0.05, 18, 8, stone, undefined, 'stone');
-      p.flag(x1 - 0.22, y1 - 0.22, 50, 22, '#a8322d');
-    }
+    manorGrounds(new Pen(this.ctx), b, season, part);
   }
+
 
   /** Market stalls by tile, rebuilt each frame. */
   private stallTiles = new Map<number, { b: Building; k: number; open: boolean }>();
@@ -3217,6 +3188,55 @@ export function stockSpots(s: GameState, b: Building): { id: ResourceId; x: numb
   return out;
 }
 
+/** The manor's grounds from the Stone Manor on: the yard, then the walls, towers and gatehouse. */
+export function manorGrounds(p: Pen, b: Building, season: Season, part: 'ground' | 'walls'): void {
+  p.snow = season === 3;
+  const x0 = b.x;
+  const y0 = b.y;
+  const x1 = b.x + b.w;
+  const y1 = b.y + b.h;
+  if (part === 'ground') {
+    p.poly(
+      [
+        [x0 + 0.1, y0 + 0.1, 0],
+        [x1 - 0.1, y0 + 0.1, 0],
+        [x1 - 0.1, y1 - 0.1, 0],
+        [x0 + 0.1, y1 - 0.1, 0],
+      ],
+      season === 3 ? '#d8dcdc' : '#b8b0a0',
+    );
+    for (let x = x0 + 0.5; x < x1; x += 0.5) p.line([x, y0 + 0.1, 0], [x, y1 - 0.1, 0], 'rgba(90,80,65,0.15)', 0.5);
+    return;
+  }
+  const stone = b.level >= 4 ? '#9d978c' : '#a8a093';
+  const h = b.level >= 4 ? 16 : 7;
+  const t = 0.18;
+  // Front walls: along the far x edge and the far y edge, with a gate in the middle of the front.
+  const gate = (x0 + x1) / 2;
+  p.box(x1 - t, y0 + 0.1, x1, y1, 0, h, stone, undefined, 'stone');
+  p.box(x0 + 0.1, y1 - t, gate - 0.45, y1, 0, h, stone, undefined, 'stone');
+  p.box(gate + 0.45, y1 - t, x1, y1, 0, h, stone, undefined, 'stone');
+  if (b.level >= 4) {
+    // Crenels along the top.
+    for (let y = y0 + 0.2; y < y1 - 0.2; y += 0.3) p.box(x1 - t, y, x1, y + 0.15, h, 3, stone);
+    for (let x = x0 + 0.2; x < x1 - 0.2; x += 0.3) if (Math.abs(x + 0.07 - gate) > 0.5) p.box(x, y1 - t, x + 0.15, y1, h, 3, stone);
+  }
+  if (b.level >= 5) {
+    // Round-ish corner towers and a gatehouse.
+    for (const [tx, ty] of [
+      [x1 - 0.45, y0 + 0.05],
+      [x1 - 0.45, y1 - 0.45],
+      [x0 + 0.05, y1 - 0.45],
+    ] as const) {
+      p.box(tx, ty, tx + 0.45, ty + 0.45, 0, 34, stone, undefined, 'stone');
+      p.roofPyramid(tx - 0.03, ty - 0.03, tx + 0.48, ty + 0.48, 34, 16, 'slate');
+    }
+    p.box(gate - 0.55, y1 - 0.3, gate - 0.3, y1 + 0.05, 0, 26, stone, undefined, 'stone');
+    p.box(gate + 0.3, y1 - 0.3, gate + 0.55, y1 + 0.05, 0, 26, stone, undefined, 'stone');
+    p.box(gate - 0.55, y1 - 0.3, gate + 0.55, y1 + 0.05, 18, 8, stone, undefined, 'stone');
+    p.flag(x1 - 0.22, y1 - 0.22, 50, 22, '#a8322d');
+  }
+}
 /** The tiles a market's stalls stand on: every other tile, spread evenly over the square (or shape). */
 export function stallSpots(b: Building, W: number): number[] {
   const slots = marketStalls(b);

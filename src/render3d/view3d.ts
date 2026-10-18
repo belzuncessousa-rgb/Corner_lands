@@ -3,7 +3,7 @@ import { BUILDINGS, STORAGE_CAPACITY } from '../game/data';
 import { hasCharter } from '../game/charters';
 import { monthOf, orchardMaturity, seasonOf } from '../game/sim';
 import type { Building, GameState, Season } from '../game/types';
-import { TREE_SLOTS, drawGood, stockSpots, variantOf } from '../render/renderer';
+import { TREE_SLOTS, drawGood, manorGrounds, stockSpots, variantOf } from '../render/renderer';
 import { bushSprite, fruitTreeSprite, rockSprite, treeSprite, wallMaterial } from '../render/sprites';
 import type { Sprite, TreeKind } from '../render/sprites';
 import { buildingModel, groundTexture, prepareGround, wallsModel } from './scene3d';
@@ -469,11 +469,21 @@ export class View3D {
       const d = BUILDINGS[b.type];
       if (d.zone || b.type === 'wall') continue;
       seen.add(b.id);
-      const key = `${b.type}:${b.level}:${season}:${variantOf(s, b)}:${b.build >= 1 ? 1 : Math.ceil(b.build * 6)}:${b.x}:${b.y}:${b.rot ?? ''}`;
+      const key = `${b.type}:${b.level}:${season}:${variantOf(s, b)}:${b.build >= 1 ? 1 : Math.ceil(b.build * 6)}:${b.x}:${b.y}:${b.w}:${b.rot ?? ''}`;
       const cur = this.buildings.get(b.id);
       if (cur?.key === key) continue;
       if (cur) this.scene.remove(cur.obj);
-      const obj = placedModel(b.type, b.level, season, variantOf(s, b), b);
+      let obj = placedModel(b.type, b.level, season, variantOf(s, b), b);
+      if (b.type === 'townhall' && b.w > 3 && b.build >= 1) {
+        // The manor's walled grounds, from the Stone Manor on.
+        const p = new Pen3D();
+        p.matFor = wallMaterial;
+        manorGrounds(p, b, season, 'ground');
+        manorGrounds(p, b, season, 'walls');
+        const g = new THREE.Group();
+        g.add(obj, p.build());
+        obj = g;
+      }
       if (b.type === 'windmill' && b.build >= 1) {
         // Sails on the hub at the front, as in the flat drawing (pen 1.0, 1.42, 34).
         const sails = millSails(season);
