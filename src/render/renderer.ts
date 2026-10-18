@@ -2992,7 +2992,7 @@ function variantOf(s: GameState, b: Building): number {
   if (b.type !== 'house') return 0;
   const trade = b.trade ? HOME_TRADES.indexOf(b.trade) + 1 : 0;
   // Colours, yard, craft and the shape of the house, which the id picks.
-  const forms = HOUSE_FORMS[Math.min(3, b.level)] ?? 5;
+  const forms = HOUSE_FORMS[Math.min(4, b.level)] ?? 5;
   const form = (((b.id * 2654435761) >>> 0) >>> 7) % forms;
   return ((b.id * 7 + b.x) % 4) + 4 * Math.max(0, YARD_CODES.indexOf(b.yard ?? null)) + 16 * trade + 128 * form;
 }

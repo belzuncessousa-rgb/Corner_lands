@@ -1,7 +1,9 @@
 import { BUILDINGS, TIERS } from './data';
 import {
   coveredBy,
+  hasLuxury,
   hasSupply,
+  LUXURIES,
   HOME_TRADE_COST,
   HOME_TRADE_DAYS,
   log,
@@ -32,6 +34,7 @@ export const HOUSE_LEVELS: HouseLevel[] = [
   { name: 'Cottage', housing: 5, tax: 1 },
   { name: 'Timber House', housing: 7, tax: 1.5, cost: { planks: 12, wood: 6 }, tier: 1 },
   { name: 'Townhouse', housing: 9, tax: 2, cost: { planks: 20, tiles: 15, stone: 10, tools: 3 }, tier: 2 },
+  { name: "Merchant's House", housing: 11, tax: 3, cost: { dressedstone: 15, tiles: 20, planks: 20, tools: 4, gold: 60 }, tier: 3 },
 ];
 
 export const MANOR_LEVELS: { name: string; cost?: Cost; days?: number }[] = [
@@ -113,6 +116,10 @@ export function houseNeeds(s: GameState, b: Building, level: number): Need[] {
     out.push({ label: 'Three food groups', met: s.report.variety >= 3 });
     out.push({ label: 'Boots', met: hasSupply(s, b, 'boots') });
     out.push({ label: 'Medicine', met: hasSupply(s, b, 'medicine') });
+  }
+  if (level >= 4) {
+    out.push({ label: 'Fine pottery', met: hasSupply(s, b, 'pottery') });
+    out.push({ label: 'A luxury: wine, mead, books or jewellery', met: hasLuxury(s, b) || LUXURIES.some((id) => s.res[id] >= 1) });
   }
   return out;
 }

@@ -604,7 +604,7 @@ export function serveAle(s: GameState): void {
 }
 
 /** Goods each home level uses up, one every three months. */
-export const HOUSE_GOODS: Record<number, ResourceId[]> = { 2: ['clothes'], 3: ['clothes', 'boots', 'medicine'] };
+export const HOUSE_GOODS: Record<number, ResourceId[]> = { 2: ['clothes'], 3: ['clothes', 'boots', 'medicine'], 4: ['clothes', 'boots', 'medicine', 'pottery'] };
 const SUPPLY_DAYS = DAYS_PER_MONTH * 3;
 
 /** Whether a home has (or could get from store) a good it needs. */
@@ -632,7 +632,7 @@ function supplyHomes(s: GameState): void {
         (b.supply ??= {})[lux] = s.day + SUPPLY_DAYS;
       }
     }
-    for (const id of HOUSE_GOODS[Math.min(3, b.level)] ?? []) {
+    for (const id of HOUSE_GOODS[Math.min(4, b.level)] ?? []) {
       b.supply ??= {};
       if ((b.supply[id] ?? -1) > s.day) continue;
       if (s.res[id] >= 1) {
@@ -2870,7 +2870,7 @@ export function prestigeIncome(s: GameState): number {
     else if (b.type === 'publicgarden') n += 0.5;
     else if (b.type === 'guildhall') n += 4;
     else if (b.type === 'maypole') n += 0.5;
-    else if (b.type === 'house' && b.level >= 3) n += 0.2;
+    else if (b.type === 'house' && b.level >= 3) n += b.level >= 4 ? 0.5 : 0.2;
     else if (b.type === 'hunter' && hasCharter(s, 'nature3b')) n += 1;
   }
   if (hasCharter(s, 'learning1')) n += 1;

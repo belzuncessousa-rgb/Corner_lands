@@ -517,7 +517,7 @@ export class Hud {
       <div class="bar"><i style="width:${s.happiness}%;background-position:${-220 + s.happiness * 2.2}px 0"></i></div>
       ${factors || '<i>No villagers yet</i>'}
       ${talk ? `<div class="sub">Town talk</div>${talk}` : ''}
-      ${needs ? `<div class="sub">Needs of Timber Houses and Townhouses</div>${needs}` : ''}
+      ${needs ? `<div class="sub">Needs of the finer homes</div>${needs}` : ''}
       <div class="kv" data-tip="Happy villagers work a little harder: from -10% at 20% happiness to +10% at 80%."><span>Pace of work</span><span class="${moodYield(s) >= 1 ? 'pos' : 'neg'}">${moodYield(s) >= 1 ? '+' : ''}${Math.round((moodYield(s) - 1) * 100)}%</span></div>
       <p class="note">Above 50% settlers arrive, if there are homes and two months of food in store; below 30% families leave.${s.happinessTarget !== s.happiness ? ` Heading towards ${s.happinessTarget}%.` : ''}</p>`;
   }

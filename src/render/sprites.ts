@@ -3376,7 +3376,7 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
 export const YARD_CODES: (string | null)[] = [null, 'veg', 'hens', 'bees'];
 
 /** How many house shapes there are for each level (the rest of a variant is colours, yard and craft). */
-export const HOUSE_FORMS = [0, 5, 5, 3];
+export const HOUSE_FORMS = [0, 5, 5, 3, 3];
 
 /** Splits a house variant: colours, yard extension, home craft and shape. */
 function homeParts(variant: number) {
@@ -3391,6 +3391,7 @@ function homeParts(variant: number) {
 /** Where a lit window sits on a home's front, for the evening glow. */
 export function homeWindow(level: number, variant: number): [number, number, number] {
   const { form } = homeParts(variant);
+  if (level >= 4) return [0.6, 1.5, 16];
   if (level >= 3) return [0.55, form === 1 ? 1.3 : 1.25, 16];
   if (level === 2) return [0.5, form === 1 ? 1.2 : 1.15, 17];
   return [0.5, form === 1 ? 1.15 : 1.05, 7];
@@ -3406,10 +3407,11 @@ function drawHome(p: Pen, level: number, variant: number, season: Season, smoke:
   const winter = season === 3;
   // The trodden yard and the path from the door to the gate.
   p.poly([[0.12, 0.12, 0], [1.9, 0.12, 0], [1.9, 1.9, 0], [0.12, 1.9, 0]], winter ? 'rgba(235,240,240,0.35)' : 'rgba(150,130,80,0.18)');
-  const doorX = level >= 3 ? 0.95 : 0.85;
+  const doorX = level >= 4 ? 0.8 : level >= 3 ? 0.95 : 0.85;
   p.poly([[doorX - 0.1, 1.0, 0], [doorX + 0.12, 1.0, 0], [doorX + 0.16, 1.95, 0], [doorX - 0.14, 1.95, 0]], winter ? '#dfe3e2' : '#b8a27a');
   p.roofTint = hv.tint;
-  if (level >= 3) drawTownhouse(p, form, hv, season, smoke);
+  if (level >= 4) drawMerchantHouse(p, form, hv, season, smoke);
+  else if (level >= 3) drawTownhouse(p, form, hv, season, smoke);
   else if (level === 2) drawTimberHouse(p, form, hv, season, smoke);
   else drawCottage(p, form, hv, season, smoke);
   p.roofTint = null;
@@ -3714,6 +3716,100 @@ function drawTownhouse(p: Pen, form: number, hv: HouseLook, season: Season, smok
       smoke.push(p.chimney(1.25, 0.7, 43, 15, '#8f8476'));
     }
   }
+}
+
+/**
+ * A Merchant's House: tall and narrow-fronted like the guild houses of a
+ * great market square, four storeys under a gable to the street, finished
+ * in stone and painted plaster with gilded details. Three shapes: a
+ * stepped gable, a curving bell gable, and a pair of narrow houses.
+ */
+function drawMerchantHouse(p: Pen, form: number, hv: HouseLook, season: Season, smoke: V3[]): void {
+  const winter = season === 3;
+  // Painted fronts: cream, brick red, ochre, slate blue, white, sage.
+  const palettes = ['#e8d8b0', '#b8644a', '#d8a848', '#8aa0b8', '#f2ece0', '#a8b890'];
+  const pal = Math.max(0, HOUSE_VARIANTS.indexOf(hv)) + form * 2;
+  const face = palettes[pal % palettes.length];
+  const gold = '#d8b04a';
+  // One tall house: x0..x1 wide along the street, y0..y1 deep, its front at y1.
+  const tall = (x0: number, x1: number, y0: number, y1: number, col: string, gable: 'step' | 'bell', storeys: number) => {
+    const fh = 11;
+    const top = fh * storeys;
+    p.shadow(x0, y0, x1, y1);
+    p.box(x0, y0, x1, y1, 0, fh, '#b6ae9f', undefined, 'stone');
+    p.box(x0, y0, x1, y1, fh, top - fh, col, undefined, 'plaster');
+    // Each storey: a band and its windows, the ground floor a shopfront.
+    const w = x1 - x0;
+    const n = w > 0.9 ? 3 : 2;
+    for (let k = 1; k < storeys; k++) {
+      const z = k * fh;
+      p.wallL(y1 + 0.002, x0, x1, z - 0.5, z + 0.8, gold);
+      for (let j = 0; j < n; j++) {
+        const wx = x0 + (w / n) * (j + 0.5) - 0.07;
+        p.windowL(y1, wx, z + 3, 0.14, 6, winter && (j + k) % 3 === 0);
+        p.wallL(y1 + 0.003, wx - 0.02, wx + 0.16, z + 9.2, z + 10, '#f2ece0');
+      }
+    }
+    for (let k = 1; k < storeys; k++) p.windowR(x1, y0 + (y1 - y0) * 0.45, k * fh + 3, 0.14, 6);
+    // Shopfront: a wide window and the door.
+    p.wallL(y1 + 0.002, x0 + 0.06, x0 + w * 0.48, 2, 8, '#3a2a1e');
+    p.wallL(y1 + 0.003, x0 + 0.08, x0 + w * 0.46, 2.5, 7.5, winter ? '#e0b04e' : '#4a4858');
+    p.wallL(y1 + 0.002, x0 + w * 0.6, x0 + w * 0.6 + 0.18, 0, 9, '#4a2f1b');
+    p.wallL(y1 + 0.003, x0 + w * 0.58, x0 + w * 0.62 + 0.18, 9, 10.5, gold);
+    // The roof runs back from the gable, and the gable rises in front of it.
+    const rh = 22 + w * 6;
+    p.roofY(x0, y0, x1, y1, top, rh, 'slate', col, 0.04);
+    const xm = (x0 + x1) / 2;
+    const pts: V3[] = [[x0, y1 + 0.004, top]];
+    if (gable === 'step') {
+      const steps = 4;
+      for (let k = 0; k < steps; k++) {
+        const xa = x0 + (k * (xm - x0)) / steps;
+        const za = top + ((k + 1) * rh) / steps + 2;
+        pts.push([xa, y1 + 0.004, za], [xa + (xm - x0) / steps, y1 + 0.004, za]);
+      }
+      pts.push([xm, y1 + 0.004, top + rh + 6]);
+      for (let k = steps - 1; k >= 0; k--) {
+        const xb = x1 - (k * (x1 - xm)) / steps;
+        const za = top + ((k + 1) * rh) / steps + 2;
+        pts.push([xb - (x1 - xm) / steps, y1 + 0.004, za], [xb, y1 + 0.004, za]);
+      }
+    } else {
+      // A curving bell gable with scrolls at its shoulders.
+      for (let t = 0; t <= 1.0001; t += 0.1) {
+        const xx = x0 + (xm - x0) * t;
+        const zz = top + rh * (t < 0.5 ? 0.35 * Math.sin(t * Math.PI) : 0.35 + 0.65 * Math.sin((t - 0.5) * Math.PI));
+        pts.push([xx, y1 + 0.004, zz + 3]);
+      }
+      for (let t = 1; t >= -0.0001; t -= 0.1) {
+        const xx = x1 - (x1 - xm) * t;
+        const zz = top + rh * (t < 0.5 ? 0.35 * Math.sin(t * Math.PI) : 0.35 + 0.65 * Math.sin((t - 0.5) * Math.PI));
+        pts.push([xx, y1 + 0.004, zz + 3]);
+      }
+    }
+    pts.push([x1, y1 + 0.004, top]);
+    p.poly(pts, shade(col, 1.02), shade(col, 0.6));
+    // A round window and a gilded finial in the gable.
+    p.circle(xm, y1 + 0.006, top + rh * 0.45, 2.6, '#3a3a52');
+    p.circle(xm, y1 + 0.007, top + rh * 0.45, 1.8, winter ? '#e0b04e' : '#5a6a9a');
+    p.circle(xm, y1 + 0.006, top + rh + (gable === 'step' ? 9 : 6), 1.8, gold);
+    smoke.push(p.chimney(x0 + 0.1, y0 + 0.25, top + 6, 12, '#8f8476'));
+  };
+  switch (form % 3) {
+    case 1:
+      tall(0.25, 1.4, 0.15, 1.45, face, 'bell', 4);
+      break;
+    case 2:
+      // Two narrow houses side by side, one a storey taller.
+      tall(0.15, 0.85, 0.15, 1.45, face, 'step', 4);
+      tall(0.85, 1.55, 0.2, 1.45, palettes[(pal + 3) % palettes.length], 'bell', 5);
+      break;
+    default:
+      tall(0.2, 1.45, 0.15, 1.45, face, 'step', 4);
+  }
+  // Pennant from the shop's sign-iron.
+  p.line([1.5, 1.45, 14], [1.68, 1.55, 14], '#2a2018', 1.2);
+  p.wallR(1.64, 1.48, 1.64, 7, 13.5, HERALDRY.current.field);
 }
 
 /** The yard extension a household keeps: vegetable beds, hens or bees. */

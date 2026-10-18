@@ -83,7 +83,7 @@ export function deserialize(json: string): GameState {
   const hall = s.buildings.find((b) => b.type === 'townhall');
   if (hall) hall.level = Math.max(hall.level, s.tier + 1);
   for (const b of s.buildings) {
-    if (b.type === 'house' && b.level >= 2) b.level = Math.min(b.level, 3);
+    if (b.type === 'house' && b.level >= 2) b.level = Math.min(b.level, 4);
     // The manor now stops at the Stone Manor (4x4): keeps and castles step down.
     if (b.type === 'townhall' && (b.level > 3 || (b.upgrading ?? 0) > 3)) {
       if (b.upgrading) {

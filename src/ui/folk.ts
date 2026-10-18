@@ -100,6 +100,8 @@ export const WISHES: Record<string, string> = {
   'A church nearby': 'The church is so far that we miss mass.',
   Boots: 'My boots let in the rain.',
   Medicine: 'My mother coughs, and there is no medicine to be had.',
+  'Fine pottery': 'We dine off wooden trenchers like peasants. Where is the glazed ware?',
+  'A luxury: wine, mead, books or jewellery': 'A house like ours deserves a little luxury: a good wine, a book, a brooch.',
 };
 
 /** A passing thought, from what their home lacks or what cheers the town. */
