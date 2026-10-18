@@ -7,7 +7,7 @@ import { idx, inBounds } from '../game/world';
 import type { Agent } from './agents';
 import { ICONS } from '../ui/icons';
 import type { Animal } from './wildlife';
-import { Pen, TH, TW, iso, mix } from './pen';
+import { Pen, TH, TW, iso, mix, shade } from './pen';
 import { mulberry32 } from '../game/rng';
 import { DEFAULT_HERALDRY, HERALDRY, heraldryKey } from './heraldry';
 import {
@@ -633,71 +633,32 @@ export class Renderer {
     }
   }
 
-  private drawField(p: Pen, b: Building, season: Season, month: number): void {
-    const x0 = b.x;
-    const y0 = b.y;
-    const x1 = b.x + b.w;
-    const soil = season === 3 ? '#cfd4d4' : '#7a5a3a';
-    // A grassy headland around an irregular, round-cornered plot.
-    p.poly(organicOutline(b, 0.02, 0.1, b.id), season === 3 ? 'rgba(225,230,230,0.6)' : 'rgba(110,140,60,0.45)');
-    p.poly(organicOutline(b, 0.12, 0.12, b.id + 7), soil, '#5e4129', 1);
+  /** Each field's picture, redrawn only when its crop moves on to another stage. */
+  private fieldCache = new Map<number, { key: string; sp: Sprite }>();
+
+  private drawField(_p: Pen, b: Building, season: Season, month: number): void {
     const crop = b.recipe ?? 'wheat';
-    const ripe: Record<string, string> = { wheat: '#d8b44a', barley: '#e0cc84', oats: '#d4c070', flax: '#9a8a5a' };
-    const young: Record<string, string> = { wheat: '#5e9a34', barley: '#7aa83e', oats: '#88b04a', flax: '#5a8a4a' };
-    let color: string | null = null;
-    let height = 0;
-    if (month <= 5 && b.growth > 0) {
-      color = b.growth < 0.5 ? '#7aa83e' : young[crop];
-      height = 2 + b.growth * 6;
-      if (crop === 'flax' && month >= 3 && b.growth > 0.5) color = '#6a8ad8';
-    } else if (month === 6 && b.growth > 0) {
-      color = ripe[crop];
-      height = 8;
-    } else if (month >= 7 && month <= 8) {
-      color = '#b89a5a';
-      height = 1.2;
+    // The crop's stage: bare, sprouting, young, tall, ripe, stooked or stubble.
+    let stage = 'bare';
+    if (month <= 5 && b.growth > 0) stage = b.growth < 0.2 ? 'sprout' : b.growth < 0.5 ? 'young' : b.growth < 0.8 ? 'tall' : 'full';
+    else if (month === 6 && b.growth > 0) stage = 'ripe';
+    else if (month === 7) stage = 'stooks';
+    else if (month === 8) stage = 'stubble';
+    if (crop === 'flax' && stage === 'full' && month >= 3) stage = 'flower';
+    const key = `${b.x},${b.y},${b.w},${b.h},${crop},${stage},${season}`;
+    let hit = this.fieldCache.get(b.id);
+    if (!hit || hit.key !== key) {
+      const local = { ...b, x: 0, y: 0 };
+      const m = 4;
+      const top = 30;
+      const sp = makeSprite((b.w + b.h) * (TW / 2) + m * 2, (b.w + b.h) * (TH / 2) + top + m, b.h * (TW / 2) + m, top, (ctx) => {
+        drawFieldPicture(new Pen(ctx), local, crop, stage, season);
+      });
+      hit = { key, sp };
+      this.fieldCache.set(b.id, hit);
     }
-    const rows = Math.round(b.h * 4);
-    for (let r = 0; r < rows; r++) {
-      const y = y0 + (r + 0.5) / 4;
-      // Rows near the rounded corners are shorter, so they stay inside the plot.
-      const edge = Math.min(r + 0.5, rows - r - 0.5) / 4;
-      const cut = edge < 0.45 ? 0.45 - edge : 0;
-      const a = x0 + 0.25 + cut;
-      const z = x1 - 0.25 - cut;
-      p.line([a, y, 0], [z, y, 0], season === 3 ? '#b8bebe' : '#5e4129', 1.4);
-      if (color) {
-        p.line([a, y - 0.05, height * 0.5], [z, y - 0.05, height * 0.5], color, height + 1.5);
-        p.line([a, y - 0.08, height], [z, y - 0.08, height], shadeCrop(color), 1.2);
-      }
-    }
-    if (month === 7 && season !== 3) {
-      // Sheaves stooked to dry in rows after the harvest.
-      for (let yy = y0 + 0.6; yy < y0 + b.h - 0.3; yy += 1.2) {
-        for (let xx = x0 + 0.6; xx < x0 + b.w - 0.3; xx += 1.1) {
-          const [sx, sy] = iso(xx + ((b.id + Math.floor(yy)) % 2) * 0.3, yy);
-          const c = p.ctx;
-          c.fillStyle = 'rgba(30,20,10,0.2)';
-          c.beginPath();
-          c.ellipse(sx, sy, 4, 1.6, 0, 0, Math.PI * 2);
-          c.fill();
-          c.fillStyle = '#c8a040';
-          c.beginPath();
-          c.moveTo(sx - 3.5, sy);
-          c.lineTo(sx, sy - 9);
-          c.lineTo(sx + 3.5, sy);
-          c.closePath();
-          c.fill();
-          c.fillStyle = '#e0c060';
-          c.beginPath();
-          c.moveTo(sx - 1, sy);
-          c.lineTo(sx, sy - 9);
-          c.lineTo(sx + 2.5, sy);
-          c.closePath();
-          c.fill();
-        }
-      }
-    }
+    const [wx, wy] = iso(b.x, b.y);
+    this.blit(hit.sp, wx, wy);
   }
 
   private drawPasture(p: Pen, s: GameState, b: Building, season: Season, herds: Map<number, number>): void {
@@ -3314,8 +3275,130 @@ const GOOD_COLORS: Partial<Record<ResourceId, string>> = {
   boots: '#6a3e22',
 };
 
-function shadeCrop(c: string): string {
-  return c === '#d8b44a' ? '#e8c860' : c === '#b89a5a' ? '#a08850' : '#8ac04e';
+/**
+ * A field as it stands: a headland round a ploughed plot, and the crop in
+ * rows of stalks: shoots, green blades, ears that turn gold, stooks after
+ * the harvest and stubble after that.
+ */
+function drawFieldPicture(p: Pen, b: Building, crop: string, stage: string, season: Season): void {
+  const winter = season === 3;
+  const soil = winter ? '#cfd4d4' : '#7a5a3a';
+  p.poly(organicOutline(b, 0.02, 0.1, b.id), winter ? 'rgba(225,230,230,0.6)' : 'rgba(110,140,60,0.45)');
+  p.poly(organicOutline(b, 0.12, 0.12, b.id + 7), soil, '#5e4129', 1);
+  const c = p.ctx;
+  const rand = (k: number) => fract(Math.sin(b.id * 91.7 + k * 12.9898) * 43758.5453);
+  const rowsPerTile = 4;
+  const rows = Math.round(b.h * rowsPerTile);
+  const green = crop === 'barley' ? '#7aa83e' : crop === 'flax' ? '#5a8a4a' : '#5e9a34';
+  const gold = crop === 'barley' ? '#e0cc84' : crop === 'flax' ? '#b8a060' : '#d8b44a';
+  const tall: Record<string, number> = { sprout: 2.5, young: 5, tall: 8, full: 11, flower: 11, ripe: 12, stubble: 1.6 };
+  const h = tall[stage] ?? 0;
+  let k = 0;
+  for (let r = 0; r < rows; r++) {
+    const y = (r + 0.5) / rowsPerTile;
+    const edge = Math.min(r + 0.5, rows - r - 0.5) / rowsPerTile;
+    const cut = edge < 0.45 ? 0.45 - edge : 0;
+    const a = 0.25 + cut;
+    const z = b.w - 0.25 - cut;
+    // The furrow, darker, and a ridge of turned earth.
+    p.line([a, y + 0.06, 0], [z, y + 0.06, 0], winter ? '#b8bebe' : '#5e4129', 1.2);
+    p.line([a, y - 0.04, 0], [z, y - 0.04, 0], winter ? '#dde2e2' : '#8a6a46', 0.8);
+    if (!h || winter) continue;
+    for (let x = a; x < z; x += 0.055) {
+      k++;
+      const jx = x + (rand(k) - 0.5) * 0.03;
+      const hh = h * (0.8 + rand(k + 7) * 0.4);
+      const lean = (rand(k + 3) - 0.5) * (stage === 'ripe' ? 2.2 : 1.4);
+      const [sx, sy] = iso(jx, y);
+      if (stage === 'stubble') {
+        c.strokeStyle = '#c8a860';
+        c.lineWidth = 0.6;
+        c.beginPath();
+        c.moveTo(sx, sy);
+        c.lineTo(sx + lean * 0.3, sy - hh);
+        c.stroke();
+        continue;
+      }
+      const col = stage === 'ripe' ? gold : stage === 'tall' || stage === 'full' || stage === 'flower' ? green : '#7ab04a';
+      if (stage === 'sprout' || stage === 'young') {
+        // A tuft of blades.
+        c.strokeStyle = rand(k + 5) < 0.5 ? col : shade(col, 1.15);
+        c.lineWidth = 0.7;
+        c.beginPath();
+        c.moveTo(sx, sy);
+        c.lineTo(sx - 1 + lean * 0.5, sy - hh);
+        c.moveTo(sx, sy);
+        c.lineTo(sx + 1 + lean * 0.5, sy - hh * 0.85);
+        c.stroke();
+        continue;
+      }
+      // A stalk with its ear.
+      c.strokeStyle = stage === 'ripe' ? shade(gold, 0.85) : shade(col, 0.9);
+      c.lineWidth = 0.6;
+      c.beginPath();
+      c.moveTo(sx, sy);
+      c.quadraticCurveTo(sx + lean * 0.3, sy - hh * 0.6, sx + lean, sy - hh);
+      c.stroke();
+      const ex = sx + lean;
+      const ey = sy - hh;
+      if (stage === 'flower') {
+        c.fillStyle = rand(k + 9) < 0.6 ? '#7a9ae0' : '#9ab0f0';
+        c.beginPath();
+        c.arc(ex, ey, 1.1, 0, Math.PI * 2);
+        c.fill();
+        continue;
+      }
+      const ear = stage === 'ripe' ? (rand(k + 11) < 0.5 ? gold : shade(gold, 1.12)) : stage === 'full' ? shade(green, 1.1) : col;
+      c.fillStyle = ear;
+      c.beginPath();
+      if (crop === 'barley' && stage === 'ripe') {
+        // Barley's ears nod over, with long whiskers.
+        c.ellipse(ex + 0.8, ey + 0.8, 0.9, 2.2, -0.6, 0, Math.PI * 2);
+        c.fill();
+        c.strokeStyle = shade(gold, 1.15);
+        c.lineWidth = 0.35;
+        c.beginPath();
+        c.moveTo(ex + 1.2, ey + 2.2);
+        c.lineTo(ex + 3, ey + 2.4);
+        c.stroke();
+      } else if (stage === 'full' || stage === 'ripe') {
+        c.ellipse(ex, ey, 0.85, 2.1, lean * 0.1, 0, Math.PI * 2);
+        c.fill();
+      }
+    }
+  }
+  if (stage === 'stooks' && !winter) {
+    // Sheaves stooked to dry in rows after the harvest.
+    for (let yy = 0.6; yy < b.h - 0.3; yy += 1.2) {
+      for (let xx = 0.6; xx < b.w - 0.3; xx += 1.1) {
+        const [sx, sy] = iso(xx + ((b.id + Math.floor(yy)) % 2) * 0.3, yy);
+        c.fillStyle = 'rgba(30,20,10,0.2)';
+        c.beginPath();
+        c.ellipse(sx, sy, 4, 1.6, 0, 0, Math.PI * 2);
+        c.fill();
+        c.fillStyle = '#c8a040';
+        c.beginPath();
+        c.moveTo(sx - 3.5, sy);
+        c.lineTo(sx, sy - 9);
+        c.lineTo(sx + 3.5, sy);
+        c.closePath();
+        c.fill();
+        c.fillStyle = '#e0c060';
+        c.beginPath();
+        c.moveTo(sx - 1, sy);
+        c.lineTo(sx, sy - 9);
+        c.lineTo(sx + 2.5, sy);
+        c.closePath();
+        c.fill();
+        c.strokeStyle = '#8a6a30';
+        c.lineWidth = 0.6;
+        c.beginPath();
+        c.moveTo(sx - 1.6, sy - 4);
+        c.lineTo(sx + 1.8, sy - 4);
+        c.stroke();
+      }
+    }
+  }
 }
 
 /**
