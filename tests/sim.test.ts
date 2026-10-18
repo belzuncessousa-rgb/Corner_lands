@@ -1840,3 +1840,32 @@ describe('construction audit', () => {
     expect(s.res.wood).toBe(0);
   });
 });
+
+describe('people audit', () => {
+  it('two taverns over the same homes pour once for them', async () => {
+    const { serveAle } = await import('../src/game/sim');
+    const s = generateWorld(51);
+    const home = placeNearRoad(s, 'house');
+    home.build = 1;
+    const t1 = placeNearRoad(s, 'tavern');
+    const t2 = placeNearRoad(s, 'tavern');
+    for (const t of [t1, t2]) {
+      t.build = 1;
+      t.workers = 1;
+    }
+    s.res.ale = 10;
+    // The home between the two, within reach of both.
+    home.x = Math.round((t1.x + t2.x) / 2);
+    home.y = Math.round((t1.y + t2.y) / 2);
+    for (const b of s.buildings) b.residents = b === home ? 5 : 0;
+    serveAle(s);
+    expect(s.res.ale).toBe(9);
+  });
+
+  it('villagers taste every kind of food in store, so variety counts', async () => {
+    const { eatFood } = await import('../src/game/sim');
+    const s = generateWorld(52);
+    for (const id of ['bread', 'meat', 'berries', 'cheese'] as const) s.res[id] = 20;
+    expect(eatFood(s, 5).groups).toBe(4);
+  });
+});

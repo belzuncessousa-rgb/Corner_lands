@@ -238,6 +238,8 @@ export interface MonthReport {
   shortage: number;
   variety: number;
   cold: boolean;
+  /** Share of the hearths left unheated last winter month. */
+  coldShare?: number;
   taxes: number;
   arrived: number;
   left: number;

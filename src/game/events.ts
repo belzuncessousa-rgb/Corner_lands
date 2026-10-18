@@ -159,7 +159,7 @@ export function holdFair(s: GameState): string | null {
   if (err) return err;
   s.res.gold -= fairCost(s);
   s.res.prestige += fairPrestige(s);
-  addMood(s, 'The great fair', 8, 4);
+  addMood(s, 'The great fair', 8, 3);
   s.fairs = (s.fairs ?? 0) + 1;
   s.lastFair = Math.floor(s.day / DAYS_PER_YEAR);
   return null;
@@ -368,11 +368,11 @@ export const EVENTS: DecisionEvent[] = [
       },
       {
         label: 'Pray for deliverance',
-        detail: 'About one in ten is lost.',
+        detail: 'About one in ten is lost; happiness −6 for a season.',
         apply: (st) => {
           const n = Math.max(1, Math.round(st.population * 0.1));
           st.population -= n;
-          addMood(st, 'The fever', -6, 4);
+          addMood(st, 'The fever', -6, 3);
           return { text: `The bells rang day and night. ${n} villagers were buried before the fever broke.`, kind: 'bad' };
         },
       },

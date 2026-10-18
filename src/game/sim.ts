@@ -626,15 +626,25 @@ export const TAVERN_DRINKS: ResourceId[] = ['ale', 'cider', 'mead', 'wine'];
 
 /** Taverns pour ale, cider, mead or wine: a cask a month for every eight villagers they serve. */
 export function serveAle(s: GameState): void {
-  for (const t of s.buildings) {
-    if (t.type !== 'tavern' || t.build < 1 || t.workers === 0) continue;
-    const c = bCenter(t);
-    let served = 0;
-    for (const h of s.buildings) {
-      if (h.residents === 0) continue;
-      const hc = bCenter(h);
-      if (Math.hypot(hc.x - c.x, hc.y - c.y) <= BUILDINGS.tavern.radius) served += h.residents;
+  // Each home drinks at its nearest open tavern only, so overlapping taverns do not pour twice.
+  const taverns = s.buildings.filter((t) => t.type === 'tavern' && t.build >= 1 && t.workers > 0);
+  const regulars = new Map<number, number>();
+  for (const h of s.buildings) {
+    if (h.residents === 0) continue;
+    const hc = bCenter(h);
+    let best: Building | null = null;
+    let bd = Infinity;
+    for (const t of taverns) {
+      const d = Math.hypot(bCenter(t).x - hc.x, bCenter(t).y - hc.y);
+      if (d <= BUILDINGS.tavern.radius && d < bd) {
+        bd = d;
+        best = t;
+      }
     }
+    if (best) regulars.set(best.id, (regulars.get(best.id) ?? 0) + h.residents);
+  }
+  for (const t of taverns) {
+    const served = regulars.get(t.id) ?? 0;
     let casks = Math.ceil(served / 8);
     const poured: string[] = [];
     for (const d of TAVERN_DRINKS) {
@@ -663,7 +673,8 @@ const SUPPLY_DAYS = DAYS_PER_MONTH * 2;
 
 /** Whether a home has (or could get from store) a good it needs. */
 export function hasSupply(s: GameState, b: Building, id: ResourceId): boolean {
-  return (b.supply?.[id] ?? -1) > s.day || s.res[id] >= 1;
+  // Bought at the market: a home it does not serve cannot get any, however much is in store.
+  return (b.supply?.[id] ?? -1) > s.day || (s.res[id] >= 1 && coveredBy(s, b, 'market'));
 }
 
 /** Luxuries Townhouses enjoy (one at a time): they lift spirits and taxes. */
@@ -1155,7 +1166,7 @@ export function recompute(s: GameState): void {
     // Market vendors are how food reaches the table: staffed with the food
     // makers. Haulers keep every workplace's yard from filling: staffed with
     // raw materials.
-    (b.type === 'market' ? 0.45 : b.type === 'storehouse' || b.type === 'granary' ? 1.05 : CATEGORY_PRIORITY[workDef(b).category]) +
+    (isMarket(b) ? 0.45 : b.type === 'storehouse' || b.type === 'granary' ? 1.05 : CATEGORY_PRIORITY[workDef(b).category]) +
     (TYPE_PRIORITY[b.type] ?? 0) +
     (isBlocked(b) ? 10 : 0);
   // `cap` limits a job to some of the building's places, `more` adds to those already filled.
@@ -1180,7 +1191,8 @@ export function recompute(s: GameState): void {
         jobs.push({ b, site: false, p: (2 - (b.priority ?? 1)) * 100 + CATEGORY_PRIORITY.civic + 0.5, more: true });
       } else {
         // Families working a craft from home always tend to it first.
-        jobs.push({ b, site: false, p: b.trade ? -1 : prio(b) });
+        // A family craft comes first within its priority band; the player's priority still rules.
+        jobs.push({ b, site: false, p: b.trade ? (2 - (b.priority ?? 1)) * 100 - 1 : prio(b) });
       }
     }
   }
@@ -1302,7 +1314,8 @@ function recipeUrgent(s: GameState, r: Recipe): boolean {
   const m = monthOf(s.day);
   if (m < 5 || m > 10) return false;
   const homes = s.buildings.filter((b) => b.residents > 0).length;
-  return s.res.firewood < homes * 3;
+  // Enough for a winter: three months of bundles (two a month in hardy winters).
+  return s.res.firewood < homes * 3 * winterBundles(s);
 }
 
 function recipeInMonth(r: Recipe, month: number): boolean {
@@ -2363,7 +2376,7 @@ function stepByre(s: GameState, b: Building): void {
   }
   b.herd = herdTotal(b);
   const pastures = zonesOf(s, b);
-  const winter = monthOf(s.day) >= 10;
+  const winter = seasonOf(s.day) === 3;
   const a = animalsOf(b);
   const list = ANIMAL_KINDS.filter((k) => (a[k] ?? 0) > 0)
     .map((k) => `${a[k]} ${a[k] === 1 ? HERDS[k].name : HERDS[k].plural}`)
@@ -2868,6 +2881,18 @@ export function marketReach(s: GameState): number {
 export function eatFood(s: GameState, mouths: number): { hungry: number; groups: number; pottage: number } {
   let need = mouths;
   const groups = new Set<string>();
+  // A taste of every kind of food in the stores first, so a varied larder is eaten as one.
+  const firstOfGroup = new Map<string, ResourceId>();
+  for (const f of FOOD_IDS) {
+    const g = GOODS[f].foodGroup ?? f;
+    if (!firstOfGroup.has(g) && s.res[f] >= 1) firstOfGroup.set(g, f);
+  }
+  for (const [g, f] of firstOfGroup) {
+    if (need <= 0.001) break;
+    s.res[f] -= 1;
+    need -= GOODS[f].food ?? 1;
+    groups.add(g);
+  }
   while (need > 0.001) {
     let ate = false;
     for (const f of FOOD_IDS) {
@@ -2931,15 +2956,19 @@ export function monthly(s: GameState, rng: StateRng): void {
   // Heating in winter: each household burns a bundle of split firewood, or
   // twice as much raw timber (two bundles in hardy winters).
   report.cold = false;
+  report.coldShare = 0;
   if (Math.floor(prevMonth / 3) === 3) {
     let homes = s.buildings.filter((b) => b.residents > 0).length * winterBundles(s);
     const split = Math.min(homes, Math.floor(s.res.firewood));
     s.res.firewood -= split;
     homes -= split;
-    if (s.res.wood >= homes * 2) {
-      s.res.wood -= homes * 2;
-    } else {
-      s.res.wood = 0;
+    const logs = Math.min(homes, Math.floor(s.res.wood / 2));
+    s.res.wood -= logs * 2;
+    homes -= logs;
+    // Some hearths stay cold: the town counts as cold when more than a few do.
+    const all = s.buildings.filter((b) => b.residents > 0).length * winterBundles(s);
+    report.coldShare = all ? homes / all : 0;
+    if (homes > 0 && report.coldShare > 0.15) {
       report.cold = true;
       log(s, 'Not enough firewood! Families are freezing.', 'bad');
     }
@@ -3191,7 +3220,7 @@ export function updateHappiness(s: GameState): void {
     if (variety) factors.push({ label: `Food variety (${r.variety} food groups)`, value: variety });
     if (r.shortage > 0) factors.push({ label: 'Hunger', value: -Math.round(15 + 30 * (r.shortage / s.population)) });
   }
-  if (r.cold) factors.push({ label: 'No firewood', value: -20 });
+  if (r.cold) factors.push({ label: 'No firewood', value: -Math.round(20 * Math.min(1, (r.coldShare ?? 1) * 1.5)) });
   const tax = TAX_LEVELS[s.taxLevel];
   if (tax.happiness) factors.push({ label: `${tax.name} taxes`, value: tax.happiness });
 
@@ -3261,7 +3290,9 @@ export function updateHappiness(s: GameState): void {
   const target = Math.max(0, Math.min(100, factors.reduce((a, f) => a + f.value, 0)));
   s.happinessFactors = factors.filter((f) => f.value !== 0);
   s.happinessTarget = target;
-  s.happiness = Math.round(s.happiness + (target - s.happiness) * 0.5);
+  // Halfway to the target each month, at least a point, and never past it.
+  const gap = target - s.happiness;
+  s.happiness = Math.round(s.happiness + (gap === 0 ? 0 : Math.sign(gap) * Math.min(Math.abs(gap), Math.max(1, Math.round(Math.abs(gap) / 2)))));
 }
 
 function migrate(s: GameState, rng: StateRng): void {

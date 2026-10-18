@@ -591,7 +591,7 @@ export class Hud {
       <div class="sub">Taxes</div>
       <div class="tax">${TAX_LEVELS.map(
         (t, i) =>
-          `<button data-action="tax" data-level="${i}" class="${s.taxLevel === i ? 'active' : ''}" data-tip="<b>${t.name} taxes</b><br>${t.perHead} coins per villager per month.<br>Happiness ${t.happiness >= 0 ? '+' : ''}${t.happiness}">${t.name}</button>`,
+          `<button data-action="tax" data-level="${i}" class="${s.taxLevel === i ? 'active' : ''}" data-tip="<b>${t.name} taxes</b><br>${t.perHead} coins per villager per month, more from finer homes (up to three times from a merchant's house).<br>Happiness ${t.happiness >= 0 ? '+' : ''}${t.happiness}">${t.name}</button>`,
       ).join('')}</div>
       <div class="kv" style="margin-top:8px"><span>${ICONS.prestige} Prestige</span><b>${Math.floor(s.res.prestige)}</b></div>
       <p class="note">${esc(GOODS.prestige.desc)}</p>
