@@ -71,6 +71,7 @@ import {
   bCenter,
   coveredBy,
   PAVING_TIER,
+  COBBLE_TIER,
   setWorkers,
   setPriority,
   setRecipe,
@@ -324,8 +325,9 @@ export class Hud {
       )
       .join('');
     const tools = `<span class="divider"></span>
-      <button data-action="road" class="tab ${tool.kind === 'road' && !tool.paved ? 'active' : ''}" data-tip="<b>Road</b> (R)<br>Click to start, click again to lay it. Roads speed up walking; buildings work without them.">${ICONS.road}<span>Road</span></button>
-      ${this.game.state.tier >= PAVING_TIER ? `<button data-action="road" data-paved="1" class="tab ${tool.kind === 'road' && tool.paved ? 'active' : ''}" data-tip="<b>Stone road</b> (T)<br>Villagers walk a third faster than on dirt. 2 stone per tile; lay it over a dirt road to pave it.">${ICONS.paved}<span>Stone road</span></button>` : ''}
+      <button data-action="road" class="tab ${tool.kind === 'road' && !tool.paved && !tool.cobbled && !tool.wall ? 'active' : ''}" data-tip="<b>Road</b> (R)<br>Click to start, click again to lay it. Roads speed up walking; buildings work without them.">${ICONS.road}<span>Road</span></button>
+      ${this.game.state.tier >= PAVING_TIER ? `<button data-action="road" data-paved="1" class="tab ${tool.kind === 'road' && tool.paved ? 'active' : ''}" data-tip="<b>Stone road</b> (T)<br>Gravel and broken stone: villagers walk a third faster than on dirt. 2 stone per tile; lay it over a dirt road to pave it.">${ICONS.paved}<span>Stone road</span></button>` : ''}
+      ${this.game.state.tier >= COBBLE_TIER ? `<button data-action="road" data-cobbled="1" class="tab ${tool.kind === 'road' && tool.cobbled ? 'active' : ''}" data-tip="<b>Cobbled street</b> (Y)<br>Setts of dressed stone, the quickest going in town. 1 dressed stone per tile; lay it over a road to cobble it.">${ICONS.paved}<span>Cobbled street</span></button>` : ''}
       <button data-action="grove" class="tab ${tool.kind === 'grove' ? 'active' : ''}" data-tip="<b>Protect woods</b> (P)<br>Mark a wood the woodcutters must leave standing: click one corner, then the other. Click twice inside one to lift it.">${ICONS.grove}<span>Protect</span></button>
       <button data-action="demolish" class="tab ${tool.kind === 'demolish' ? 'active' : ''}" data-tip="<b>Demolish</b> (X)<br>Remove buildings or roads. Finished buildings return half their cost.">${ICONS.demolish}<span>Demolish</span></button>`;
     let cards = '';
@@ -370,7 +372,7 @@ export class Hud {
     return [
       this.category ?? '',
       t.kind,
-      t.kind === 'build' || t.kind === 'zone' ? t.type : t.kind === 'road' && t.paved ? 'paved' : '',
+      t.kind === 'build' || t.kind === 'zone' ? t.type : t.kind === 'road' && t.cobbled ? 'cobbled' : t.kind === 'road' && t.paved ? 'paved' : '',
       s.tier,
       s.charters?.length ?? 0,
       ...BUILD_ORDER.map((b) => (canAfford(s, BUILDINGS[b].cost) ? 1 : 0)),
@@ -1413,7 +1415,9 @@ export class Hud {
       case 'road': {
         this.category = null;
         const paved = !!t.dataset.paved;
-        g.setTool(g.tool.kind === 'road' && !!g.tool.paved === paved ? { kind: 'select' } : { kind: 'road', paved });
+        const cobbled = !!t.dataset.cobbled;
+        const same = g.tool.kind === 'road' && !g.tool.wall && !!g.tool.paved === paved && !!g.tool.cobbled === cobbled;
+        g.setTool(same ? { kind: 'select' } : { kind: 'road', paved, cobbled });
         break;
       }
       case 'grove':
@@ -2071,7 +2075,7 @@ export class Hud {
     const soil = fertile / Math.max(1, near);
     box.querySelector('.map-facts')!.innerHTML = `
       <div>Forest ${pct(forest, W * H)}% · water ${pct(water, W * H)}%</div>
-      <div>Near the manor: ${rock ? 'rock' : '<span class="neg">no rock</span>'}, ${ore ? 'iron ore' : 'no ore'}</div>
+      <div>Near the manor: ${rock ? 'rock' : '<span class="neg">no rock</span>'}, ${ore ? 'bog iron' : 'no bog iron'}</div>
       <div>Soil around it: ${soil < 0.4 ? 'poor' : soil < 0.7 ? 'fair' : 'rich'}</div>`;
   }
 
@@ -2419,7 +2423,7 @@ export class Hud {
         <p><b>Gatherers</b> walk to the nearest trees, rocks, berries, game or fish, so place them close. Goods pile up in each workplace's yard until haulers from a Storehouse or Granary fetch them.</p>
         <p><b>Fields, pastures and orchards</b> (Farming) are drawn: click one corner, then the opposite one, near a Farmstead, Animal Farm or Orchard Keeper's Lodge. Choose each field's crop in the panel, and build a Silo to keep the grain; animals are bought at the Animal Farm once you have a Trading Post, and share its pasture room.</p>
         <p><b>Trading Post:</b> merchants come here to buy your surplus, and coins buy what you lack.</p>
-        <p><b>Roads</b> are optional but villagers walk faster on them, faster still on paved stone (T). Click to start, click again to plan it, keep clicking to continue; the road is laid a few tiles each day.</p>
+        <p><b>Roads</b> are optional but villagers walk faster on them, faster on stone roads (T), and fastest on cobbled streets of dressed stone (Y) once you are a Town. Click to start, click again to plan it, keep clicking to continue; the road is laid a few tiles each day.</p>
         <p><b>The top bar</b> shows happiness, villagers, food, materials, goods and the treasury. Hover a chip for the details, click to pin it: set how much of each good to keep and whether merchants may buy the surplus. Workers rest when their goods reach the target.</p>
         <p><b>Workers:</b> select a workplace to choose how many villagers work there, its priority and its product. Seasonal work frees hands in the off season. Hover the villagers chip to see who is idle and where hands are short.</p>
         <p><b>The Manor</b> is optional: build it for feasts, festivals and prestige, and renovate it as the town grows into a Manor House and then a Stone Manor, which lets you lay out a manor garden, watch towers and the town walls.</p>
@@ -2429,7 +2433,7 @@ export class Hud {
         <p><b>Prestige</b> comes from a fine manor, a church and monuments. From Town on, spend it on <b>charters</b> (crown button) to specialise your town.</p>
         <p>Your <b>steward</b> warns you when things go wrong; the <b>Chronicle</b> (scroll button) keeps the full story.</p>
         <div class="ornament">❦</div>
-        <p><b>Keys</b>: <kbd>Left-drag</kbd> / <kbd>WASD</kbd> / arrows pan · <kbd>Wheel</kbd> / <kbd>+</kbd><kbd>-</kbd> / pinch zoom · <kbd>R</kbd> road (click, click) · <kbd>T</kbd> paved road · <kbd>X</kbd> / <kbd>Del</kbd> demolish · <kbd>P</kbd> protect a wood · <kbd>U</kbd> photo mode (hide the interface) · <kbd>V</kbd> reach of wells, markets, taverns, churches · ${BUILD_ORDER.filter((b) => BUILDINGS[b].hotkey)
+        <p><b>Keys</b>: <kbd>Left-drag</kbd> / <kbd>WASD</kbd> / arrows pan · <kbd>Wheel</kbd> / <kbd>+</kbd><kbd>-</kbd> / pinch zoom · <kbd>R</kbd> road (click, click) · <kbd>T</kbd> stone road · <kbd>Y</kbd> cobbled street · <kbd>X</kbd> / <kbd>Del</kbd> demolish · <kbd>P</kbd> protect a wood · <kbd>U</kbd> photo mode (hide the interface) · <kbd>V</kbd> reach of wells, markets, taverns, churches · ${BUILD_ORDER.filter((b) => BUILDINGS[b].hotkey)
           .map((b) => `<kbd>${BUILDINGS[b].hotkey!.toUpperCase()}</kbd> ${BUILDINGS[b].name.toLowerCase()}`)
           .join(' · ')} · <kbd>Space</kbd> pause · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> speed</p>
         <p><b>Playing with friends:</b> found the same land with the seed of the week, download your town from Save Game for a friend to open, and compare <b>scores</b> on the load cards: villagers and rank, the lord's title, great works, works of art, milestones and every year in which no one went hungry.</p>

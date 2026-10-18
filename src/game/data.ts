@@ -6,6 +6,8 @@ export const DAY_SECONDS = 22.5;
 
 /** Walking speed in tiles per game day: paved roads, dirt roads, open country. */
 export const STONE_ROAD_TILES_PER_DAY = 30;
+/** Cobbled streets of dressed stone are the quickest going of all. */
+export const COBBLE_TILES_PER_DAY = 36;
 export const ROAD_TILES_PER_DAY = 22;
 export const OFFROAD_TILES_PER_DAY = 12;
 /**
@@ -61,7 +63,7 @@ export const GOODS: Record<ResourceId, GoodDef> = {
   dressedstone: good('Dressed Stone', 'materials', 8, 'Squared blocks for manors, churches and keeps.', { keep: 80 }),
   clay: good('Clay', 'materials', 1, 'Dug from riverbanks, fired into tiles.'),
   tiles: good('Roof Tiles', 'materials', 6, 'Fired clay tiles. Townhouses want a tiled roof.', { keep: 80 }),
-  ore: good('Iron Ore', 'materials', 3, 'Rock rich in iron, smelted in a bloomery.'),
+  ore: good('Bog Iron', 'materials', 3, 'Rusty lumps of iron ore dug from boggy ground, smelted in a bloomery.'),
   iron: good('Iron', 'materials', 6, 'Iron for the blacksmith.', { keep: 60 }),
   silver: good('Silver', 'materials', 15, 'Precious ore turned up by deep miners, for the jeweller.', { keep: 40 }),
 
@@ -547,8 +549,8 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   }),
   mine: def({
     type: 'mine',
-    name: 'Iron Mine',
-    desc: 'Digs iron ore from nearby deposits, for a bloomery to smelt.',
+    name: 'Bog Iron Pit',
+    desc: 'Digs bog iron from the rusty, marshy ground nearby, for a bloomery to smelt.',
     category: 'resources',
     cost: { wood: 30, planks: 10 },
     buildDays: 14,
@@ -625,7 +627,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   bloomery: def({
     type: 'bloomery',
     name: 'Bloomery',
-    desc: 'Smelts iron ore into iron in a clay furnace fed with firewood, lit once there is ore for two smeltings.',
+    desc: 'Smelts bog iron into iron in a clay furnace fed with firewood, lit once there is ore for two smeltings.',
     category: 'industry',
     cost: { stone: 20, wood: 10 },
     workers: 2,
@@ -850,11 +852,11 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     name: 'Manor Garden',
     desc: "The lord's pleasure garden, once the Stone Manor stands: clipped hedges, flower beds, a fountain and a pavilion. It costs a fortune in coin, makes a wide area lovelier and brings prestige every month. One per town.",
     category: 'decor',
-    w: 5,
-    h: 4,
-    cost: { stone: 30, planks: 15, gold: 600 },
-    buildDays: 30,
-    radius: 12,
+    w: 10,
+    h: 10,
+    cost: { stone: 60, planks: 30, gold: 900 },
+    buildDays: 40,
+    radius: 16,
     beauty: 6,
   }),
   maypole: def({

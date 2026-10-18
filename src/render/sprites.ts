@@ -332,6 +332,30 @@ function cornerEnds(mask: number, mids: [number, number, number][]): [[number, n
   return [ends[0], ends[1]];
 }
 
+function roadPoints(cx: number, cy: number, segs: [number, number, number][], corner: [[number, number], [number, number]] | null, step: number): [number, number, number, number][] {
+  // Each point carries the direction of travel there (ux, uy).
+  const out: [number, number, number, number][] = [];
+  if (corner) {
+    const [[ax, ay], [bx, by]] = corner;
+    const n = Math.max(4, Math.round((Math.hypot(ax - cx, ay - cy) + Math.hypot(bx - cx, by - cy)) / step));
+    for (let i = 0; i <= n; i++) {
+      const t = i / n;
+      const x = (1 - t) * (1 - t) * ax + 2 * (1 - t) * t * cx + t * t * bx;
+      const y = (1 - t) * (1 - t) * ay + 2 * (1 - t) * t * cy + t * t * by;
+      const dx = 2 * (1 - t) * (cx - ax) + 2 * t * (bx - cx);
+      const dy = 2 * (1 - t) * (cy - ay) + 2 * t * (by - cy);
+      const l = Math.hypot(dx, dy) || 1;
+      out.push([x, y, dx / l, dy / l]);
+    }
+    return out;
+  }
+  for (const [, mx, my] of segs) {
+    const len = Math.hypot(mx - cx, my - cy);
+    for (let t = 0; t <= len + 0.5; t += step) out.push([cx + ((mx - cx) * t) / len, cy + ((my - cy) * t) / len, (mx - cx) / len, (my - cy) / len]);
+  }
+  return out;
+}
+
 export function roadTile(season: Season, mask: number, layer: 'edge' | 'fill'): Sprite {
   return makeSprite(TW + 4, TH + 4, TW / 2 + 2, 2, (ctx) => {
     const cx = 0;
@@ -392,6 +416,70 @@ export function roadTile(season: Season, mask: number, layer: 'edge' | 'fill'): 
 
 /** Cobbled stone road; mask bits like roadTile. */
 export function pavedTile(season: Season, mask: number, layer: 'edge' | 'fill'): Sprite {
+  return makeSprite(TW + 4, TH + 4, TW / 2 + 2, 2, (ctx) => {
+    const cx = 0;
+    const cy = TH / 2;
+    const mids: [number, number, number][] = [
+      [1, TW / 4, (TH * 3) / 4],
+      [2, -TW / 4, (TH * 3) / 4],
+      [4, -TW / 4, TH / 4],
+      [8, TW / 4, TH / 4],
+    ];
+    let segs = mids.filter(([bit]) => mask & bit);
+    if (!segs.length) segs = [mids[0], mids[2]];
+    const corner = cornerEnds(mask, mids);
+    const draw = (color: string, width: number) => {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      if (corner) {
+        ctx.moveTo(corner[0][0], corner[0][1]);
+        ctx.quadraticCurveTo(cx, cy, corner[1][0], corner[1][1]);
+      } else {
+        for (const [, mx, my] of segs) {
+          ctx.moveTo(cx, cy);
+          ctx.lineTo(mx, my);
+        }
+      }
+      ctx.stroke();
+    };
+    if (layer === 'edge') {
+      // Kerb stones and a strip of trodden earth.
+      draw(season === 3 ? '#a8a49c' : '#6e6658', 19);
+      return;
+    }
+    const mortar = season === 3 ? '#c4c0b8' : '#8a8274';
+    draw(mortar, 15);
+    // Cobbles laid in courses across the road.
+    const rand = mulberry32(mask * 17 + 3);
+    const stones = ['#b4ada0', '#a39b8c', '#c2bbad', '#998f80', '#aca594'];
+    let row = 0;
+    for (const [bx, by, ux, uy] of roadPoints(cx, cy, segs, corner, 3.2)) {
+      // Perpendicular in iso screen space (across the road).
+      const px = -uy * 2;
+      const py = ux * 0.5;
+      for (let k = -2; k <= 2; k++) {
+        const off = k + (row % 2 ? 0.5 : 0);
+        if (Math.abs(off) > 2.2) continue;
+        const x = bx + px * off * 1.35;
+        const y = by + py * off * 1.35;
+        ctx.fillStyle = season === 3 && rand() < 0.4 ? '#e8ecf0' : stones[Math.floor(rand() * stones.length)];
+        ctx.beginPath();
+        ctx.ellipse(x, y, 1.9, 1.15, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      row++;
+    }
+    // A worn centre line where cartwheels run.
+    ctx.globalAlpha = 0.18;
+    draw('#4a4236', 3);
+    ctx.globalAlpha = 1;
+  });
+}
+
+/** Cobbled street (dressed stone): rounded setts over the whole roadway. */
+export function cobbleTile(season: Season, mask: number, layer: 'edge' | 'fill'): Sprite {
   return makeSprite(TW + 4, TH + 4, TW / 2 + 2, 2, (ctx) => {
     const cx = 0;
     const cy = TH / 2;
@@ -665,6 +753,74 @@ export function treeSprite(kind: TreeKind, season: Season, variant: number): Spr
     if (season === 0 && variant % 3 === 0) {
       ctx.fillStyle = '#f6d6e4';
       for (let i = 0; i < 12; i++) ctx.fillRect((rand() - 0.5) * 24 * scale, -24 * scale - rand() * 26 * scale, 2, 2);
+    }
+  });
+}
+
+/** Bog iron in the ground: a rust-stained, boggy patch with pools and reeds. */
+export function bogSprite(variant: number, season: Season): Sprite {
+  const rand = mulberry32(variant * 53 + 11);
+  return makeSprite(70, 40, 35, 22, (ctx) => {
+    const winter = season === 3;
+    // Soft-edged wet ground fading into the grass.
+    const g = ctx.createRadialGradient(0, 0, 4, 0, 0, 28);
+    g.addColorStop(0, winter ? '#d0d6d4' : 'rgba(96,70,44,0.95)');
+    g.addColorStop(0.7, winter ? 'rgba(208,214,212,0.7)' : 'rgba(110,84,50,0.75)');
+    g.addColorStop(1, 'rgba(110,84,50,0)');
+    ctx.save();
+    ctx.scale(1, 0.48);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(0, 0, 29, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    // Rust stains and ochre crusts.
+    for (let k = 0; k < 6; k++) {
+      ctx.fillStyle = winter ? '#c8b8a8' : k % 2 ? 'rgba(168,94,48,0.55)' : 'rgba(190,120,60,0.45)';
+      ctx.beginPath();
+      ctx.ellipse((rand() - 0.5) * 34, (rand() - 0.5) * 14, 3 + rand() * 4, 1.5 + rand() * 1.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // A pool of rusty water with an oily sheen.
+    const px = (rand() - 0.5) * 16;
+    const py = (rand() - 0.5) * 6;
+    ctx.fillStyle = winter ? '#e8f0f2' : '#7a5034';
+    ctx.beginPath();
+    ctx.ellipse(px, py, 9, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = winter ? '#f4f8fa' : 'rgba(200,140,80,0.6)';
+    ctx.beginPath();
+    ctx.ellipse(px - 1, py - 0.6, 6, 2.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    if (!winter) {
+      ctx.strokeStyle = 'rgba(160,190,220,0.6)';
+      ctx.lineWidth = 0.6;
+      ctx.beginPath();
+      ctx.ellipse(px + 1, py - 0.4, 3, 1, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    // Lumps of ore showing, and tufts of reed and rush.
+    for (let k = 0; k < 3; k++) {
+      const x = (rand() - 0.5) * 34;
+      const y = (rand() - 0.5) * 10;
+      ctx.fillStyle = '#7a4a34';
+      ctx.beginPath();
+      ctx.ellipse(x, y - 1, 3, 2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#c0703a';
+      ctx.fillRect(x - 1, y - 2.4, 1.4, 1);
+    }
+    ctx.strokeStyle = winter ? '#a8b0a0' : '#6a8a3a';
+    ctx.lineWidth = 0.8;
+    for (let k = 0; k < 9; k++) {
+      const x = (rand() - 0.5) * 50;
+      const y = (rand() - 0.5) * 18;
+      for (const d of [-1.5, 0, 1.5]) {
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + d, y - 6 - rand() * 4);
+        ctx.stroke();
+      }
     }
   });
 }
@@ -1057,12 +1213,12 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
         [0.3, 0.75],
         [1.2, 0.75],
       ]) p.line([x, y, 0], [x, y, 11], '#5e4129', 1.6);
-      p.roofX(0.3, 0.3, 1.2, 0.75, 11, 7, 'thatch', WOOD, 0.08);
       // Clay cakes drying on a plank rack under the thatch.
       p.box(0.38, 0.42, 1.12, 0.63, 4, 1.2, '#8a6440');
       p.line([0.4, 0.6, 0], [0.4, 0.6, 4], '#5e4129', 1);
       p.line([1.1, 0.6, 0], [1.1, 0.6, 4], '#5e4129', 1);
       for (let i = 0; i < 5; i++) p.box(0.42 + i * 0.14, 0.46, 0.53 + i * 0.14, 0.58, 5.2, 1.6, i % 2 ? '#b8785a' : '#a86a4c');
+      p.roofX(0.3, 0.3, 1.2, 0.75, 11, 7, 'thatch', WOOD, 0.08);
       break;
     }
     case 'kiln': {
@@ -1111,8 +1267,8 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       c.fillRect(kx + 1, ky + 1, 10, 3);
       smoke.push([0.9, 0.9, 38]);
       // Stacks of finished tiles and firewood.
-      tileStack(p, 1.35, 1.25, 4);
       tileStack(p, 1.4, 0.8, 3);
+      tileStack(p, 1.35, 1.25, 4);
       p.logPile(0.4, 1.7, 2);
       break;
     }
@@ -1507,68 +1663,75 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       break;
     }
     case 'mine': {
-      // An adit driven into a rocky knoll: a timbered mouth, rails out to
-      // a spoil heap of rusty ore, and a windlass shed.
-      const ROCK = '#8a8378';
-      const turf = season === 3 ? '#e8edef' : '#7d8a52';
-      // A rounded knoll over the back of the plot.
-      {
-        const c = p.ctx;
-        const [lx, ly] = iso(0.0, 1.45, 0);
-        const [rx, ry] = iso(1.95, 0.0, 0);
-        const [fx, fy] = iso(1.35, 1.35, 0);
-        const [px, py] = iso(0.55, 0.55, 28);
-        const g = c.createLinearGradient(lx, 0, rx, 0);
-        g.addColorStop(0, shade(ROCK, 1.05));
-        g.addColorStop(1, shade(ROCK, 0.7));
-        c.fillStyle = g;
-        c.beginPath();
-        c.moveTo(lx, ly);
-        c.bezierCurveTo(lx + 2, ly - 28, px - 30, py, px, py);
-        c.bezierCurveTo(px + 34, py + 2, rx - 6, ry - 20, rx, ry);
-        c.quadraticCurveTo(fx + 8, fy + 2, fx, fy);
-        c.quadraticCurveTo(fx - 30, fy + 2, lx, ly);
-        c.fill();
-        // Strata in the rock face.
-        c.save();
-        c.clip();
-        c.strokeStyle = 'rgba(60,50,40,0.22)';
-        c.lineWidth = 0.8;
-        for (let k = 0; k < 4; k++) {
-          c.beginPath();
-          c.moveTo(lx - 4, ly - 6 - k * 7);
-          c.quadraticCurveTo(px, py + 30 - k * 6, rx + 4, ry - 4 - k * 6);
-          c.stroke();
-        }
-        c.restore();
-        // Turf over the crown.
-        c.fillStyle = turf;
-        c.beginPath();
-        c.moveTo(lx + 8, ly - 22);
-        c.bezierCurveTo(lx + 12, ly - 38, px - 26, py - 1, px, py);
-        c.bezierCurveTo(px + 30, py + 2, rx - 14, ry - 26, rx - 6, ry - 14);
-        c.quadraticCurveTo(px + 10, py + 26, lx + 8, ly - 22);
-        c.fill();
+      // A bog-iron pit dug down into flat, wet ground: timbered edges, a
+      // ladder down the cut face, a windlass to haul the ore up, rusty water
+      // in the bottom and heaps of ore and spoil beside it.
+      const c = p.ctx;
+      const x0 = 0.25;
+      const y0 = 0.25;
+      const x1 = 1.4;
+      const y1 = 1.3;
+      const D = -16;
+      // Trampled mud round the pit.
+      p.poly([[0.1, 0.1, 0], [1.9, 0.1, 0], [1.9, 1.9, 0], [0.1, 1.9, 0]], season === 3 ? 'rgba(220,226,226,0.6)' : 'rgba(110,80,50,0.35)');
+      c.save();
+      p.path([[x0, y0, 0], [x1, y0, 0], [x1, y1, 0], [x0, y1, 0]]);
+      c.clip();
+      // The pit floor with its puddle, then the cut faces at the back and side.
+      p.poly([[x0, y0, D], [x1, y0, D], [x1, y1, D], [x0, y1, D]], '#3a2a1e');
+      p.poly([[x0 + 0.3, y0 + 0.3, D], [x1 - 0.15, y0 + 0.3, D], [x1 - 0.15, y1 - 0.1, D], [x0 + 0.3, y1 - 0.1, D]], season === 3 ? '#c8d4d8' : '#8a5a34');
+      p.poly([[x0 + 0.35, y0 + 0.35, D], [x1 - 0.25, y0 + 0.35, D], [x1 - 0.25, y1 - 0.2, D], [x0 + 0.35, y1 - 0.2, D]], season === 3 ? '#dfe8ec' : 'rgba(200,120,60,0.55)');
+      p.poly([[x0, y0, 0], [x1, y0, 0], [x1, y0, D], [x0, y0, D]], '#7a5236');
+      p.poly([[x0, y0, 0], [x0, y1, 0], [x0, y1, D], [x0, y0, D]], '#6a4630');
+      // Bands of rusty ore in the cut, and shoring planks.
+      for (const z of [-4, -9, -13]) {
+        p.line([x0, y0 + 0.002, z], [x1, y0 + 0.002, z], z === -9 ? '#c0703a' : '#5a3a26', z === -9 ? 2 : 0.8);
+        p.line([x0 + 0.002, y0, z], [x0 + 0.002, y1, z], z === -9 ? '#a85e30' : '#4a3020', z === -9 ? 2 : 0.8);
       }
-      for (const [x, y, z, r] of [[0.3, 0.95, 10, 6], [1.45, 0.45, 12, 5], [1.65, 0.85, 4, 6]] as const) rockLump(p, x, y, r, ROCK, 4, z);
-      for (const [x, y, r] of [[0.3, 1.45, 5], [1.7, 1.35, 5]] as const) rockLump(p, x, y, r, ROCK, 6);
-      // Timbered mouth.
-      p.wallL(1.31, 0.75, 1.2, 0, 13, '#1a1512');
-      p.wallL(1.305, 0.68, 1.27, 13, 15.5, '#3a2c20');
-      p.line([0.72, 1.32, 0], [0.72, 1.32, 15], BEAM, 2.6);
-      p.line([1.23, 1.32, 0], [1.23, 1.32, 15], BEAM, 2.6);
-      p.line([0.64, 1.32, 15.5], [1.31, 1.32, 15.5], BEAM, 2.8);
-      // A lantern by the mouth.
-      p.circle(1.29, 1.33, 11, 1.4, '#f2c25a');
-      // Rails and a cart of ore.
-      for (let k = 0; k < 5; k++) p.line([0.8, 1.38 + k * 0.13, 0], [1.15, 1.38 + k * 0.13, 0], '#6b4a2e', 1.2);
-      p.line([0.86, 1.3, 0.5], [0.86, 1.95, 0.5], '#5a5450', 0.9);
-      p.line([1.09, 1.3, 0.5], [1.09, 1.95, 0.5], '#5a5450', 0.9);
-      p.box(0.8, 1.55, 1.15, 1.85, 2.5, 6, '#6b4a2e');
-      for (const t of [1.6, 1.8]) p.circle(0.83, t, 2.5, 1.6, '#3a2c20');
-      oreHeap(p, 0.97, 1.7, 3);
-      // Spoil heap of ore to the side.
-      oreHeap(p, 1.55, 1.65, 6);
+      for (const x of [0.5, 0.95, 1.3]) p.line([x, y0 + 0.004, 0], [x, y0 + 0.004, D], '#5e4129', 1.6);
+      // A ladder down the back face.
+      p.line([1.1, y0 + 0.02, 3], [1.1, y0 + 0.25, D], '#8a6440', 1);
+      p.line([1.22, y0 + 0.02, 3], [1.22, y0 + 0.25, D], '#8a6440', 1);
+      for (let k = 1; k < 7; k++) {
+        const t = k / 7;
+        p.line([1.1, y0 + 0.02 + 0.23 * t, 3 + (D - 3) * t], [1.22, y0 + 0.02 + 0.23 * t, 3 + (D - 3) * t], '#8a6440', 0.8);
+      }
+      oreHeap(p, 0.6, 0.8, 3);
+      c.restore();
+      // Timber kerb round the edge.
+      p.box(x0 - 0.05, y1, x1 + 0.05, y1 + 0.06, 0, 2, '#6b4a2c');
+      p.box(x1, y0 - 0.05, x1 + 0.06, y1 + 0.05, 0, 2, '#6b4a2c');
+      p.line([x0, y0, 1], [x1, y0, 1], '#6b4a2c', 1.6);
+      p.line([x0, y0, 1], [x0, y1, 1], '#6b4a2c', 1.6);
+      // The windlass across the pit, its rope and bucket.
+      p.line([0.55, 0.78, 0], [0.55, 0.78, 13], '#5e4129', 1.8);
+      p.line([1.15, 0.78, 0], [1.15, 0.78, 13], '#5e4129', 1.8);
+      p.line([0.5, 0.78, 13], [1.2, 0.78, 13], '#6b4a2c', 3);
+      p.line([1.15, 0.78, 13], [1.22, 0.85, 10], '#5e4129', 1.2);
+      p.line([0.85, 0.78, 12], [0.85, 0.78, -2], '#c8b48c', 0.6);
+      p.box(0.8, 0.73, 0.9, 0.83, -5, 4, '#6b4a2c');
+      // Heaps of bog ore and spoil, and a barrow.
+      oreHeap(p, 1.65, 0.55, 6);
+      oreHeap(p, 1.7, 1.15, 5);
+      const [hx, hy] = iso(0.55, 1.65, 0);
+      c.fillStyle = season === 3 ? '#e8ecee' : '#7a5a3a';
+      c.beginPath();
+      c.moveTo(hx - 14, hy);
+      c.quadraticCurveTo(hx, hy - 14, hx + 14, hy);
+      c.quadraticCurveTo(hx, hy + 5, hx - 14, hy);
+      c.fill();
+      p.box(1.0, 1.55, 1.25, 1.75, 3, 3, '#8a6236');
+      p.circle(1.28, 1.65, 2.5, 2, '#4a3020');
+      p.line([1.0, 1.6, 4], [0.85, 1.6, 2], '#6b4a2e', 1);
+      p.line([1.0, 1.72, 4], [0.85, 1.72, 2], '#6b4a2e', 1);
+      oreHeap(p, 1.12, 1.62, 2);
+      // Reeds at the wet edge.
+      if (season !== 3) {
+        for (const [rx, ry] of [[0.2, 1.45], [0.3, 1.5], [1.85, 1.75], [1.75, 1.85]] as const) {
+          p.line([rx, ry, 0], [rx - 0.02, ry, 9], '#6a8a3a', 0.8);
+          p.line([rx, ry, 0], [rx + 0.03, ry, 8], '#7a9a44', 0.8);
+        }
+      }
       break;
     }
     case 'forager': {
@@ -2402,115 +2565,193 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       break;
     }
     case 'manorgarden': {
+      // The lord's pleasure garden on 10x10: a hedged enclosure with an avenue
+      // of trees, walks crossing at a great fountain, four knot gardens, a
+      // rose tunnel, a pavilion over a lily pond, topiary and statues.
+      const N = 10;
       const winter = season === 3;
       const lawn = winter ? '#e2e7e6' : season === 2 ? '#8a9a48' : '#6fa043';
       const gravel = winter ? '#d4d8d6' : '#d2c39c';
       const hedge = winter ? '#8a9a86' : '#3d6b30';
       const flowers = winter ? [] : season === 2 ? ['#d8903a', '#b8503a', '#e0c040', '#9a3a2a'] : ['#e84a6a', '#f2d34a', '#b97ae0', '#f4f0e0', '#e86a3a', '#f07ab0'];
-      p.poly([[0.05, 0.05, 0], [4.95, 0.05, 0], [4.95, 3.95, 0], [0.05, 3.95, 0]], lawn);
-      // Gravel walks: round the edge and across the middle, meeting at the fountain.
-      const walk = (x0: number, y0: number, x1: number, y1: number) => p.poly([[x0, y0, 0], [x1, y0, 0], [x1, y1, 0], [x0, y1, 0]], gravel);
-      walk(0.15, 1.85, 4.85, 2.15);
-      walk(2.35, 0.15, 2.65, 3.85);
-      walk(0.15, 3.6, 4.85, 3.85);
-      walk(4.6, 0.15, 4.85, 3.85);
-      // Four parterres: box-edged beds of flowers.
       const rand = mulberry32(31);
-      for (const [x0, y0, x1, y1] of [
-        [0.35, 0.35, 2.15, 1.65],
-        [2.85, 0.35, 4.4, 1.65],
-        [0.35, 2.35, 2.15, 3.4],
-        [2.85, 2.35, 4.4, 3.4],
-      ]) {
-        p.box(x0, y0, x1, y0 + 0.08, 0, 3, hedge);
-        p.box(x0, y0, x0 + 0.08, y1, 0, 3, hedge);
+      const rect = (x0: number, y0: number, x1: number, y1: number, col: string) => p.poly([[x0, y0, 0], [x1, y0, 0], [x1, y1, 0], [x0, y1, 0]], col);
+      rect(0.05, 0.05, N - 0.05, N - 0.05, lawn);
+      // Walks: round the inside of the hedge, and the two great walks crossing.
+      rect(0.5, 0.5, N - 0.5, 0.95, gravel);
+      rect(0.5, 0.5, 0.95, N - 0.5, gravel);
+      rect(N - 0.95, 0.5, N - 0.5, N - 0.5, gravel);
+      rect(0.5, N - 0.95, N - 0.5, N - 0.5, gravel);
+      rect(4.6, 0.5, 5.4, N - 0.2, gravel);
+      rect(0.5, 4.6, N - 0.5, 5.4, gravel);
+      const yew = (x: number, y: number, h = 20) => {
+        const [tx, ty] = iso(x, y, 0);
+        const c = p.ctx;
+        c.fillStyle = 'rgba(30,30,10,0.2)';
+        c.beginPath();
+        c.ellipse(tx + 2, ty, 5, 2, 0, 0, Math.PI * 2);
+        c.fill();
+        c.fillStyle = winter ? '#9aa894' : '#2f5a28';
+        c.beginPath();
+        c.moveTo(tx - 4.5, ty - 1);
+        c.quadraticCurveTo(tx, ty + 2, tx + 4.5, ty - 1);
+        c.lineTo(tx, ty - h);
+        c.closePath();
+        c.fill();
+        c.fillStyle = 'rgba(255,255,255,0.12)';
+        c.beginPath();
+        c.moveTo(tx - 4.5, ty - 1);
+        c.lineTo(tx, ty - h);
+        c.lineTo(tx - 1, ty);
+        c.closePath();
+        c.fill();
+      };
+      const tree = (x: number, y: number, crown: string) => {
+        p.line([x, y, 0], [x, y, 16], '#5a3e26', 2.2);
+        if (winter) return;
+        p.circle(x + 0.05, y + 0.05, 19, 9, shade(crown, 0.8));
+        p.circle(x - 0.04, y, 21, 8, crown);
+        p.circle(x + 0.07, y - 0.06, 25, 5.5, shade(crown, 1.1));
+      };
+      const statue = (x: number, y: number) => {
+        p.box(x - 0.12, y - 0.12, x + 0.12, y + 0.12, 0, 7, '#c8c2b6', undefined, 'stone');
+        p.box(x - 0.05, y - 0.04, x + 0.05, y + 0.04, 7, 12, '#e0dad0');
+        p.circle(x, y, 21, 2.2, '#e0dad0');
+      };
+      // A knot garden: box hedges in a square with a cross and diagonals, flowers between.
+      const knot = (x0: number, y0: number, x1: number, y1: number) => {
+        const mx = (x0 + x1) / 2;
+        const my = (y0 + y1) / 2;
         if (flowers.length) {
-          for (let k = 0; k < 26; k++) {
-            const x = x0 + 0.18 + rand() * (x1 - x0 - 0.3);
-            const y = y0 + 0.18 + rand() * (y1 - y0 - 0.3);
+          for (let k = 0; k < 120; k++) {
+            const x = x0 + 0.15 + rand() * (x1 - x0 - 0.3);
+            const y = y0 + 0.15 + rand() * (y1 - y0 - 0.3);
             p.bush(x, y, 1.9, '#4a7a34');
             p.circle(x, y, 2.6, 1.3, flowers[k % flowers.length]);
           }
         }
-        // A clipped yew cone at the outer corner.
-        const cx = x0 < 2 ? x0 + 0.2 : x1 - 0.2;
-        const cy = y0 < 2 ? y0 + 0.2 : y1 - 0.2;
-        const [tx, ty] = iso(cx, cy, 0);
-        p.ctx.fillStyle = winter ? '#9aa894' : '#2f5a28';
-        p.ctx.beginPath();
-        p.ctx.moveTo(tx - 4.5, ty - 1);
-        p.ctx.quadraticCurveTo(tx, ty + 2, tx + 4.5, ty - 1);
-        p.ctx.lineTo(tx, ty - 20);
-        p.ctx.closePath();
-        p.ctx.fill();
-        p.ctx.fillStyle = 'rgba(255,255,255,0.12)';
-        p.ctx.beginPath();
-        p.ctx.moveTo(tx - 4.5, ty - 1);
-        p.ctx.lineTo(tx, ty - 20);
-        p.ctx.lineTo(tx - 1, ty);
-        p.ctx.closePath();
-        p.ctx.fill();
-        p.box(x1 - 0.08, y0, x1, y1, 0, 3, hedge);
-        p.box(x0, y1 - 0.08, x1, y1, 0, 3, hedge);
+        p.box(x0, y0, x1, y0 + 0.1, 0, 3, hedge);
+        p.box(x0, y0, x0 + 0.1, y1, 0, 3, hedge);
+        p.box(mx - 0.05, y0, mx + 0.05, y1, 0, 3, hedge);
+        p.box(x0, my - 0.05, x1, my + 0.05, 0, 3, hedge);
+        p.box(x1 - 0.1, y0, x1, y1, 0, 3, hedge);
+        p.box(x0, y1 - 0.1, x1, y1, 0, 3, hedge);
+        yew(mx, my, 16);
+      };
+      // Back left: a lily pond with a pavilion beside it.
+      {
+        const [px, py] = iso(2.6, 2.6, 0);
+        const c = p.ctx;
+        c.fillStyle = '#a49c8e';
+        c.beginPath();
+        c.ellipse(px, py, 58, 29, 0, 0, Math.PI * 2);
+        c.fill();
+        c.fillStyle = winter ? '#dfe8ec' : '#5f9ab8';
+        c.beginPath();
+        c.ellipse(px, py - 1, 53, 26, 0, 0, Math.PI * 2);
+        c.fill();
+        if (!winter) {
+          for (const [dx, dy] of [[-20, 4], [10, -8], [24, 6], [-6, 12]]) {
+            c.fillStyle = '#4f8a3a';
+            c.beginPath();
+            c.ellipse(px + dx, py + dy, 5, 2.4, 0, 0, Math.PI * 2);
+            c.fill();
+            c.fillStyle = '#f2c8d8';
+            c.beginPath();
+            c.arc(px + dx + 1, py + dy - 1, 1.3, 0, Math.PI * 2);
+            c.fill();
+          }
+        }
+        const x0 = 1.2;
+        const y0 = 1.2;
+        p.box(x0, y0, x0 + 1.0, y0 + 1.0, 0, 3, '#c8c2b6', '#d8d2c6');
+        for (const [x, y] of [[x0 + 0.1, y0 + 0.1], [x0 + 0.9, y0 + 0.1], [x0 + 0.9, y0 + 0.9], [x0 + 0.1, y0 + 0.9]]) p.box(x - 0.04, y - 0.04, x + 0.04, y + 0.04, 3, 24, '#e8e0d0');
+        p.roofPyramid(x0 - 0.04, y0 - 0.04, x0 + 1.04, y0 + 1.04, 27, 18, 'slate', 0.08);
+        p.circle(x0 + 0.5, y0 + 0.5, 46, 1.8, '#c8962a');
       }
-      // The fountain: a round stone basin with a jet.
-      const [fx, fy] = iso(2.5, 2.0, 0);
-      const c = p.ctx;
-      c.fillStyle = '#a49c8e';
-      c.beginPath();
-      c.ellipse(fx, fy - 2, 22, 11, 0, 0, Math.PI * 2);
-      c.fill();
-      c.fillStyle = '#8a8274';
-      c.fillRect(fx - 22, fy - 2, 44, 3);
-      c.beginPath();
-      c.ellipse(fx, fy + 1, 22, 11, 0, 0, Math.PI);
-      c.fill();
-      c.fillStyle = winter ? '#dfe8ec' : '#5f9ab8';
-      c.beginPath();
-      c.ellipse(fx, fy - 2.5, 18, 8.6, 0, 0, Math.PI * 2);
-      c.fill();
-      c.fillStyle = '#b6ae9f';
-      c.fillRect(fx - 2, fy - 16, 4, 14);
-      c.beginPath();
-      c.ellipse(fx, fy - 16, 7, 3, 0, 0, Math.PI * 2);
-      c.fill();
-      if (!winter) {
-        c.strokeStyle = 'rgba(220,240,250,0.8)';
-        c.lineWidth = 1;
-        for (const d of [-1, 1]) {
+      // Back right: a knot garden. Front left: another, and front right a third.
+      knot(5.8, 1.3, 8.7, 4.2);
+      knot(1.3, 5.8, 4.2, 8.7);
+      knot(5.8, 5.8, 8.7, 8.7);
+      // A rose tunnel of arches along the back walk of the right garden.
+      for (let k = 0; k < 9; k++) {
+        const x = 5.7 + k * 0.38;
+        p.line([x, 0.55, 0], [x, 0.55, 18], '#e8e0d0', 1.4);
+        p.line([x, 0.9, 0], [x, 0.9, 18], '#e8e0d0', 1.4);
+        p.line([x, 0.55, 18], [x, 0.9, 18], '#e8e0d0', 1.4);
+        if (!winter) {
+          p.circle(x, 0.6, 15, 2.6, k % 2 ? '#4a7a34' : '#5a8a3e');
+          p.circle(x, 0.88, 14, 2.4, '#4a7a34');
+          p.circle(x + 0.05, 0.7, 18.5, 1.8, k % 3 ? '#c8486a' : '#f07ab0');
+          p.circle(x - 0.05, 0.85, 16, 1.6, '#e84a6a');
+        }
+      }
+      // The great fountain where the walks cross: two basins and a jet.
+      {
+        const [fx, fy] = iso(5.0, 5.0, 0);
+        const c = p.ctx;
+        c.fillStyle = '#a49c8e';
+        c.beginPath();
+        c.ellipse(fx, fy - 3, 44, 22, 0, 0, Math.PI * 2);
+        c.fill();
+        c.fillStyle = '#8a8274';
+        c.fillRect(fx - 44, fy - 3, 88, 4);
+        c.beginPath();
+        c.ellipse(fx, fy + 1, 44, 22, 0, 0, Math.PI);
+        c.fill();
+        c.fillStyle = winter ? '#dfe8ec' : '#5f9ab8';
+        c.beginPath();
+        c.ellipse(fx, fy - 3.5, 39, 19, 0, 0, Math.PI * 2);
+        c.fill();
+        c.fillStyle = '#b6ae9f';
+        c.fillRect(fx - 3, fy - 26, 6, 23);
+        c.beginPath();
+        c.ellipse(fx, fy - 26, 14, 6, 0, 0, Math.PI * 2);
+        c.fill();
+        c.fillStyle = winter ? '#dfe8ec' : '#7ab0c8';
+        c.beginPath();
+        c.ellipse(fx, fy - 27, 11, 4.4, 0, 0, Math.PI * 2);
+        c.fill();
+        c.fillStyle = '#b6ae9f';
+        c.fillRect(fx - 1.5, fy - 38, 3, 11);
+        if (!winter) {
+          c.strokeStyle = 'rgba(220,240,250,0.85)';
+          c.lineWidth = 1.2;
+          for (const d of [-1, 1]) {
+            c.beginPath();
+            c.moveTo(fx, fy - 44);
+            c.quadraticCurveTo(fx + d * 9, fy - 50, fx + d * 13, fy - 28);
+            c.stroke();
+            c.beginPath();
+            c.moveTo(fx + d * 9, fy - 27);
+            c.quadraticCurveTo(fx + d * 18, fy - 30, fx + d * 24, fy - 6);
+            c.stroke();
+          }
           c.beginPath();
-          c.moveTo(fx, fy - 22);
-          c.quadraticCurveTo(fx + d * 6, fy - 26, fx + d * 9, fy - 15);
+          c.moveTo(fx, fy - 38);
+          c.lineTo(fx, fy - 46);
           c.stroke();
         }
-        c.beginPath();
-        c.moveTo(fx, fy - 16);
-        c.lineTo(fx, fy - 23);
-        c.stroke();
       }
-      // A pavilion at the far corner, and a rose pergola along the back walk.
-      const px0 = 0.25;
-      const py0 = 0.2;
-      for (let k = 0; k < 6; k++) {
-        const x = 2.85 + k * 0.3;
-        p.line([x, 0.12, 0], [x, 0.12, 16], '#e8e0d0', 1.4);
-      }
-      p.line([2.85, 0.12, 16], [4.35, 0.12, 16], '#e8e0d0', 1.4);
-      if (!winter) for (let k = 0; k < 10; k++) p.circle(2.85 + k * 0.16, 0.12, 14 + (k % 3), 2.2, k % 2 ? '#c8486a' : '#4a7a34');
-      p.box(px0, py0, px0 + 0.75, py0 + 0.75, 0, 2, '#c8c2b6');
-      for (const [x, y] of [[px0 + 0.08, py0 + 0.08], [px0 + 0.67, py0 + 0.08], [px0 + 0.67, py0 + 0.67], [px0 + 0.08, py0 + 0.67]]) p.box(x - 0.03, y - 0.03, x + 0.03, y + 0.03, 2, 20, '#e8e0d0');
-      p.roofPyramid(px0 - 0.02, py0 - 0.02, px0 + 0.77, py0 + 0.77, 22, 14, 'slate', 0.06);
-      p.circle(px0 + 0.375, py0 + 0.375, 37, 1.4, '#c8962a');
-      // Two ornamental trees at the front corners.
-      // Ornamental trees: blossom in spring, gold in autumn.
+      // Statues at the ends of the walks and yews flanking them.
+      for (const [x, y] of [[5.0, 2.3], [2.3, 5.0], [7.7, 5.0], [5.0, 7.7]] as const) statue(x, y);
+      for (const [x, y] of [[4.4, 4.4], [5.6, 4.4], [4.4, 5.6], [5.6, 5.6]] as const) yew(x, y, 18);
+      // An avenue of ornamental trees down the two far walks, and the corners.
       const crown = winter ? '#9aa894' : season === 0 ? '#f0c4d4' : season === 2 ? '#d0803a' : '#4f8a3a';
-      for (const [x, y] of [[4.75, 3.75], [0.3, 3.75], [4.75, 0.3], [0.2, 1.75], [4.75, 1.75]]) {
-        p.line([x, y, 0], [x, y, 14], '#5a3e26', 2.2);
-        if (winter) continue;
-        p.circle(x + 0.04, y + 0.04, 17, 8, shade(crown, 0.8));
-        p.circle(x - 0.03, y, 19, 7, crown);
-        p.circle(x + 0.06, y - 0.05, 22, 5, shade(crown, 1.1));
+      for (let k = 1; k < 10; k += 2) {
+        if (k !== 5) tree(0.3, k, crown);
       }
+      for (let k = 3; k < 10; k += 2) if (k !== 5) tree(k, 0.3, crown);
+      // The hedge round it all, open where the great walk meets the street.
+      p.box(N - 0.3, 0.1, N - 0.1, 4.5, 0, 7, hedge);
+      p.box(N - 0.3, 5.5, N - 0.1, N - 0.1, 0, 7, hedge);
+      p.box(0.1, N - 0.3, 4.5, N - 0.1, 0, 7, hedge);
+      p.box(5.5, N - 0.3, N - 0.1, N - 0.1, 0, 7, hedge);
+      for (const [x, y] of [[4.5, N - 0.2], [5.5, N - 0.2], [N - 0.2, 4.5], [N - 0.2, 5.5]] as const) {
+        p.box(x - 0.14, y - 0.14, x + 0.14, y + 0.14, 0, 14, '#c8c2b6', undefined, 'stone');
+        p.circle(x, y, 17, 2.4, '#d8d2c6');
+      }
+      for (const [x, y] of [[1.2, 7.3], [2.8, 9.0], [9.0, 2.8], [7.3, 1.2]] as const) if (!winter) p.bush(x, y, 5, '#557a38');
       break;
     }
     case 'garden': {
@@ -2699,7 +2940,7 @@ function drawHome(p: Pen, level: number, variant: number, season: Season, smoke:
   else if (level === 2) drawTimberHouse(p, form, hv, season, smoke);
   else drawCottage(p, form, hv, season, smoke);
   p.roofTint = null;
-  if (trade) drawTradeAnnex(p, trade, level, season, smoke);
+  if (trade) drawTradeAnnex(p, trade, season, smoke);
   if (yard) drawYardPlot(p, yard, !!trade, season);
   else drawGardenBits(p, hv, !!trade, doorX, season);
   // Wattle fence along the street and the side, with a gate at the path.
@@ -2808,12 +3049,15 @@ function drawCottage(p: Pen, form: number, hv: HouseLook, season: Season, smoke:
 function drawTimberHouse(p: Pen, form: number, hv: HouseLook, season: Season, smoke: V3[]): void {
   const winter = season === 3;
   const W = hv.wall;
-  const roof = hv.roof2;
+  // Thatch or shingles: tiled roofs are for the Townhouses.
+  const roof = form % 5 === 0 || form % 5 === 3 ? 'thatch' : 'shingle';
   switch (form % 5) {
     case 1: {
       // Gable to the street, the upper floor jettied out over the door.
       p.shadow(0.3, 0.2, 1.3, 1.2);
-      p.box(0.32, 0.22, 1.28, 1.12, 0, 11, STONE);
+      p.box(0.32, 0.22, 1.28, 1.12, 0, 2, STONE);
+      p.box(0.32, 0.22, 1.28, 1.12, 2, 9, W);
+      p.timber(0.32, 0.22, 1.28, 1.12, 2, 9, BEAM);
       p.box(0.29, 0.19, 1.31, 1.2, 11, 15, W);
       p.timber(0.29, 0.19, 1.31, 1.2, 11, 15, BEAM);
       p.doorL(1.12, 0.72, 0.18, 10);
@@ -2829,7 +3073,9 @@ function drawTimberHouse(p: Pen, form: number, hv: HouseLook, season: Season, sm
     case 2: {
       // An L: the main range and a short cross wing at the side.
       p.shadow(0.2, 0.2, 1.55, 1.2);
-      p.box(0.22, 0.3, 1.1, 1.1, 0, 11, STONE);
+      p.box(0.22, 0.3, 1.1, 1.1, 0, 2, STONE);
+      p.box(0.22, 0.3, 1.1, 1.1, 2, 9, W);
+      p.timber(0.22, 0.3, 1.1, 1.1, 2, 9, BEAM);
       p.box(0.2, 0.28, 1.1, 1.14, 11, 14, W);
       p.timber(0.2, 0.28, 1.1, 1.14, 11, 14, BEAM);
       p.doorL(1.1, 0.62, 0.18, 10);
@@ -2838,7 +3084,9 @@ function drawTimberHouse(p: Pen, form: number, hv: HouseLook, season: Season, sm
       p.windowL(1.14, 0.8, 16, 0.13, 6);
       drawHouseExtra(p, hv.extra, season, 1.1, [0.32], 4, [0.62, 0.18]);
       p.roofX(0.2, 0.28, 1.1, 1.14, 25, 16, roof, W, 0.1);
-      p.box(1.1, 0.2, 1.55, 1.2, 0, 11, STONE);
+      p.box(1.1, 0.2, 1.55, 1.2, 0, 2, STONE);
+      p.box(1.1, 0.2, 1.55, 1.2, 2, 9, W);
+      p.timber(1.1, 0.2, 1.55, 1.2, 2, 9, BEAM);
       p.box(1.08, 0.18, 1.57, 1.22, 11, 14, W);
       p.timber(1.08, 0.18, 1.57, 1.22, 11, 14, BEAM);
       p.windowL(1.2, 1.22, 4, 0.14, 5);
@@ -2868,7 +3116,9 @@ function drawTimberHouse(p: Pen, form: number, hv: HouseLook, season: Season, sm
     case 4: {
       // Stone below, timber above, and a dormer in the roof.
       p.shadow(0.25, 0.25, 1.4, 1.15);
-      p.box(0.27, 0.27, 1.38, 1.1, 0, 12, '#a49c8e', undefined, 'rubble');
+      p.box(0.27, 0.27, 1.38, 1.1, 0, 2, STONE);
+      p.box(0.27, 0.27, 1.38, 1.1, 2, 10, W);
+      p.timber(0.27, 0.27, 1.38, 1.1, 2, 10, BEAM);
       p.box(0.24, 0.24, 1.41, 1.14, 12, 12, W);
       p.timber(0.24, 0.24, 1.41, 1.14, 12, 12, BEAM);
       p.doorL(1.1, 0.75, 0.18, 10);
@@ -2887,7 +3137,9 @@ function drawTimberHouse(p: Pen, form: number, hv: HouseLook, season: Season, sm
     default: {
       // Stone ground floor and a jettied timber storey.
       p.shadow(0.2, 0.25, 1.4, 1.15);
-      p.box(0.25, 0.3, 1.38, 1.1, 0, 11, STONE);
+      p.box(0.25, 0.3, 1.38, 1.1, 0, 2, STONE);
+      p.box(0.25, 0.3, 1.38, 1.1, 2, 9, W);
+      p.timber(0.25, 0.3, 1.38, 1.1, 2, 9, BEAM);
       p.box(0.2, 0.25, 1.42, 1.15, 11, 15, W);
       p.timber(0.2, 0.25, 1.42, 1.15, 11, 15, BEAM);
       p.doorL(1.1, 0.75, 0.18, 10);
@@ -3138,17 +3390,12 @@ function drawGardenBits(p: Pen, hv: HouseLook, trade: boolean, doorX: number, se
 }
 
 /** The workshop a craftsman's family builds on: each craft its own. */
-function drawTradeAnnex(p: Pen, trade: BuildingType, level: number, season: Season, smoke: V3[]): void {
+function drawTradeAnnex(p: Pen, trade: BuildingType, season: Season, smoke: V3[]): void {
   const winter = season === 3;
   const x0 = 1.42;
   const x1 = 1.88;
   const y0 = 0.25;
   const y1 = 1.15;
-  // The hanging sign by the door.
-  const front = level >= 3 ? 1.3 : level === 2 ? 1.15 : 1.08;
-  p.line([0.22, front, 20], [0.22, front + 0.16, 20], '#3b2a1a', 1.2);
-  p.wallL(front + 0.1, 0.12, 0.32, 12, 19, '#e8d8b0');
-  p.wallL(front + 0.101, 0.14, 0.3, 13, 18, TRADE_COLORS[trade] ?? '#8a3b2e');
   const shed = (h: number, wall: string, roof: 'shingle' | 'tile' | 'slate' | 'thatch' = 'shingle', mat?: Material) => {
     p.box(x0, y0, x1, y1, 0, h, wall, undefined, mat);
     p.poly([[x0 - 0.04, y0 - 0.04, h + 6], [x0 - 0.04, y1 + 0.04, h + 6], [x1 + 0.05, y1 + 0.04, h - 1], [x1 + 0.05, y0 - 0.04, h - 1]], p.snow ? '#eef2f4' : shade(ROOF_COLORS[roof], 0.92), shade(ROOF_COLORS[roof], 0.5));
@@ -3260,16 +3507,6 @@ function drawTradeAnnex(p: Pen, trade: BuildingType, level: number, season: Seas
 function hvWallFor(trade: BuildingType): string {
   return trade === 'weaver' ? '#e6d6b8' : trade === 'tailor' ? '#efe3c8' : '#e8dcc4';
 }
-
-const TRADE_COLORS: Partial<Record<BuildingType, string>> = {
-  bakery: '#c8904a',
-  brewhouse: '#a87a3a',
-  dairy: '#e8c850',
-  weaver: '#4a6a9a',
-  tailor: '#8a3b2e',
-  tanner: '#6a3e22',
-  apothecary: '#3a7a5a',
-};
 
 /** A grazing sheep at a screen point; `f` is the facing (1 or -1). */
 export function drawSheep(c: CanvasRenderingContext2D, x: number, y: number, f: number, white = '#f2ece0'): void {
@@ -3621,10 +3858,10 @@ function drawManor(p: Pen, level: number, season: Season, smoke: V3[]): void {
   const ST = '#b6ae9f';
   p.shadow(0.35, 0.3, 3.65, 3.2);
   // Gravel path to the door, and clipped box hedges either side.
-  p.poly([[1.75, 2.95, 0], [2.25, 2.95, 0], [2.3, 3.95, 0], [1.7, 3.95, 0]], winter ? '#d4d8d6' : '#c8b896');
+  p.poly([[1.6, 2.95, 0], [2.06, 2.95, 0], [2.11, 3.95, 0], [1.55, 3.95, 0]], winter ? '#d4d8d6' : '#c8b896');
   for (const y of [3.25, 3.7]) {
-    p.bush(1.45, y, 4.5, '#557a38');
-    p.bush(2.55, y, 4.5, '#557a38');
+    p.bush(1.3, y, 4.5, '#557a38');
+    p.bush(2.36, y, 4.5, '#557a38');
   }
   // Tower at the back left, a storey above the rest.
   p.box(0.35, 0.3, 1.25, 1.2, 0, 66, ST, undefined, 'stone');

@@ -511,6 +511,24 @@ describe('levels', () => {
     expect(back.buildings.find((b) => b.type === 'church')!.level).toBe(2);
   });
 
+  it('cobbled streets need a Town and dressed stone, and are the quickest going', async () => {
+    const { buildRoad, roadError, stepCost } = await import('../src/game/sim');
+    const s = generateWorld(19);
+    const h = hall(s);
+    const x = h.x - 3;
+    const y = h.y + 6;
+    s.res.dressedstone = 10;
+    expect(roadError(s, x, y, 3)).toMatch(/Town/);
+    s.tier = 2;
+    expect(buildRoad(s, x, y, 2)).toBe(true);
+    expect(buildRoad(s, x, y, 3)).toBe(true);
+    expect(s.res.dressedstone).toBe(9);
+    const i = y * s.width + x;
+    expect(s.road[i]).toBe(3);
+    s.road[i + 1] = 2;
+    expect(stepCost(s, i)).toBeLessThan(stepCost(s, i + 1));
+  });
+
   it('workplaces are not expanded', async () => {
     const { upgradePlan, workersOf } = await import('../src/game/levels');
     const s = generateWorld(16);

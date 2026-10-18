@@ -27,7 +27,9 @@ import {
   HOUSE_FORMS,
   homeWindow,
   pavedTile,
+  cobbleTile,
   rockSprite,
+  bogSprite,
   stallSprite,
   treeSprite,
   waterTile,
@@ -308,6 +310,8 @@ export class Renderer {
           const sp =
             s.terrain[i] === 1
               ? this.sprite(`br:${season}:${mask}:${layer}`, () => bridgeTile(season, mask, layer))
+              : s.road[i] === 3
+                ? this.sprite(`rc:${season}:${mask}:${layer}`, () => cobbleTile(season, mask, layer))
               : s.road[i] === 2
                 ? this.sprite(`rp:${season}:${mask}:${layer}`, () => pavedTile(season, mask, layer))
                 : this.sprite(`r:${season}:${mask}:${layer}`, () => roadTile(season, mask, layer));
@@ -937,7 +941,9 @@ export class Renderer {
     if (s.rock[i] || s.ore[i]) {
       const ore = s.ore[i] > 0;
       const rv = v % 4;
-      const sp = this.sprite(`k:${ore}:${rv}:${season === 3}`, () => rockSprite(ore, rv, season === 3 ? 3 : 0));
+      const sp = ore
+        ? this.sprite(`bog:${rv}:${season === 3}`, () => bogSprite(rv, season === 3 ? 3 : 0))
+        : this.sprite(`k:${rv}:${season === 3}`, () => rockSprite(false, rv, season === 3 ? 3 : 0));
       const [wx, wy] = iso(x + 0.5, y + 0.5);
       this.blit(sp, wx, wy);
     }
@@ -1582,7 +1588,7 @@ export class Renderer {
     c.lineWidth = 1.2;
     for (let k = 0; k < plan.length; k++) {
       const i = plan[k] >> 2;
-      const paved = (plan[k] & 3) === 2;
+      const paved = (plan[k] & 3) >= 2;
       const x = i % W;
       const y = (i / W) | 0;
       const [cx, cy] = iso(x + 0.5, y + 0.5);

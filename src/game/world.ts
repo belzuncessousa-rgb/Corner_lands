@@ -201,7 +201,12 @@ export function generateWorld(seed: number, opts: { relaxed?: boolean; hardy?: b
       }
     }
   }
-  const depositNear = (arr: Uint8Array, minD: number, maxD: number, r: number, amount: number, sameShore = false) => {
+  // Bog iron lies in wet ground: near water where there is any.
+  const nearWater = (x: number, y: number) => {
+    for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) if (inBounds(s, x + dx, y + dy) && s.terrain[idx(s, x + dx, y + dy)] === 1) return true;
+    return false;
+  };
+  const depositNear = (arr: Uint8Array, minD: number, maxD: number, r: number, amount: number, sameShore = false, wet = false) => {
     for (let tries = 0; tries < 300; tries++) {
       const a = rand() * Math.PI * 2;
       const d = minD + rand() * (maxD - minD);
@@ -210,6 +215,7 @@ export function generateWorld(seed: number, opts: { relaxed?: boolean; hardy?: b
       if (!inBounds(s, x, y) || s.terrain[idx(s, x, y)] !== 0) continue;
       // The first outcrop must be on the settlers' side of any river.
       if (sameShore && tries < 250 && !dry[idx(s, x, y)]) continue;
+      if (wet && tries < 250 && !nearWater(x, y)) continue;
       placeDeposit(arr, x, y, r, amount);
       return;
     }
@@ -218,8 +224,8 @@ export function generateWorld(seed: number, opts: { relaxed?: boolean; hardy?: b
   depositNear(s.rock, 8, 13, 2, 40, true);
   const outcrops = land === 'hills' ? 9 : land === 'valley' ? 2 : 4;
   for (let k = 0; k < outcrops; k++) depositNear(s.rock, 16, 40, 1 + Math.floor(rand() * 2), 45);
-  depositNear(s.ore, 14, 22, 1, 30);
-  for (let k = 0; k < (land === 'hills' ? 4 : 2); k++) depositNear(s.ore, 20, 40, 1, 35);
+  depositNear(s.ore, 14, 22, 1, 30, false, true);
+  for (let k = 0; k < (land === 'hills' ? 4 : 2); k++) depositNear(s.ore, 20, 40, 1, 35, false, true);
 
   seedNature(s, site, rand);
 
@@ -419,7 +425,7 @@ export function removeBuilding(s: GameState, b: Building): void {
   s.dirty = true;
 }
 
-/** Lays (1 = dirt, 2 = paved) or clears a road tile. */
+/** Lays (1 = dirt, 2 = stone, 3 = cobbled) or clears a road tile. */
 export function setRoad(s: GameState, x: number, y: number, on: boolean, kind = 1): void {
   const i = idx(s, x, y);
   s.road[i] = on ? kind : 0;

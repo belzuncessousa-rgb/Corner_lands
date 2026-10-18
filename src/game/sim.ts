@@ -8,6 +8,7 @@ import {
   RESOURCE_STORAGE,
   ROAD_TILES_PER_DAY,
   STONE_ROAD_TILES_PER_DAY,
+  COBBLE_TILES_PER_DAY,
   YARD_STORE,
   STORAGE_CAPACITY,
   SILO_CAPACITY,
@@ -172,7 +173,8 @@ export function footprintClear(s: GameState, x: number, y: number, w: number, h:
       if (s.terrain[i] === 1) return 'Cannot build on water';
       if (s.occ[i] >= 0) return 'Space is occupied';
       if (s.road[i]) return 'A road is in the way';
-      if (s.rock[i] || s.ore[i]) return 'Rocky ground';
+      if (s.rock[i]) return 'Rocky ground';
+      if (s.ore[i]) return 'Boggy ground';
     }
   }
   return null;
@@ -351,17 +353,35 @@ export function isBridge(s: GameState, x: number, y: number): boolean {
 export const PAVING_COST: Cost = { stone: 2 };
 /** Settlement rank needed to pave roads (none: stone is its own price). */
 export const PAVING_TIER = 0;
+/** Dressed stone for each tile of cobbled street, and the rank it waits for. */
+export const COBBLE_COST: Cost = { dressedstone: 1 };
+export const COBBLE_TIER = 2;
 
-export function roadError(s: GameState, x: number, y: number, paved = false): string | null {
+/** Road grades: 1 dirt, 2 stone (gravel and stone), 3 cobbled street. */
+export type RoadGrade = 1 | 2 | 3;
+export function gradeOf(paved: boolean | RoadGrade): RoadGrade {
+  return paved === true ? 2 : paved === false ? 1 : paved;
+}
+
+export function roadError(s: GameState, x: number, y: number, paved: boolean | RoadGrade = false): string | null {
   if (!inBounds(s, x, y)) return 'Outside the map';
+  const grade = gradeOf(paved);
   const i = idx(s, x, y);
   const planned = plannedRoad(s, i);
-  if (planned && (paved ? planned === 2 : true)) return 'Already planned';
+  if (planned && (grade > 1 ? planned >= grade : true)) return 'Already planned';
   if (s.occ[i] >= 0) return 'Occupied';
-  if (s.rock[i] || s.ore[i]) return 'Rocky ground';
-  if (paved) {
+  if (s.rock[i]) return 'Rocky ground';
+  if (s.ore[i]) return 'Boggy ground';
+  if (grade === 3) {
+    if (s.tier < COBBLE_TIER) return `Requires ${TIERS[COBBLE_TIER].name}`;
+    if (s.road[i] === 3) return 'Already cobbled';
+    if (s.terrain[i] === 1) return s.road[i] ? 'Bridges stay timber' : 'Cannot cobble water';
+    if (!canAfford(s, COBBLE_COST)) return 'Not enough dressed stone';
+    return null;
+  }
+  if (grade === 2) {
     if (s.tier < PAVING_TIER) return `Requires ${TIERS[PAVING_TIER].name}`;
-    if (s.road[i] === 2) return 'Already paved';
+    if (s.road[i] >= 2) return 'Already paved';
     if (s.terrain[i] === 1) return s.road[i] ? 'Bridges stay timber' : 'Cannot pave water';
     if (!canAfford(s, PAVING_COST)) return 'Not enough stone';
     return null;
@@ -372,11 +392,13 @@ export function roadError(s: GameState, x: number, y: number, paved = false): st
 }
 
 /** Lays a dirt road, or paves one (also laying it where there was none). */
-export function buildRoad(s: GameState, x: number, y: number, paved = false): boolean {
+export function buildRoad(s: GameState, x: number, y: number, paved: boolean | RoadGrade = false): boolean {
   if (roadError(s, x, y, paved)) return false;
-  if (paved) pay(s, PAVING_COST);
+  const grade = gradeOf(paved);
+  if (grade === 3) pay(s, COBBLE_COST);
+  else if (grade === 2) pay(s, PAVING_COST);
   else if (isBridge(s, x, y)) pay(s, BRIDGE_COST);
-  setRoad(s, x, y, true, paved ? 2 : 1);
+  setRoad(s, x, y, true, grade);
   return true;
 }
 
@@ -407,7 +429,8 @@ export function plannedRoad(s: GameState, i: number): number {
 }
 
 function refundRoad(s: GameState, i: number, kind: number): void {
-  if (kind === 2) refund(s, PAVING_COST, 1);
+  if (kind === 3) refund(s, COBBLE_COST, 1);
+  else if (kind === 2) refund(s, PAVING_COST, 1);
   else if (s.terrain[i] === 1) refund(s, BRIDGE_COST, 1);
 }
 
@@ -415,12 +438,14 @@ function refundRoad(s: GameState, i: number, kind: number): void {
  * Plans a road tile for the villagers to lay: it is paid for now and laid in
  * a moment, in the order drawn (see layRoads).
  */
-export function planRoad(s: GameState, x: number, y: number, paved = false): boolean {
+export function planRoad(s: GameState, x: number, y: number, paved: boolean | RoadGrade = false): boolean {
   if (roadError(s, x, y, paved)) return false;
-  if (paved) pay(s, PAVING_COST);
+  const grade = gradeOf(paved);
+  if (grade === 3) pay(s, COBBLE_COST);
+  else if (grade === 2) pay(s, PAVING_COST);
   else if (isBridge(s, x, y)) pay(s, BRIDGE_COST);
   const i = idx(s, x, y);
-  (s.roadPlan ??= []).push(i * 4 + (paved ? 2 : 1));
+  (s.roadPlan ??= []).push(i * 4 + grade);
   return true;
 }
 
@@ -436,7 +461,7 @@ export function layRoads(s: GameState, days: number): number {
     const c: number = s.roadPlan[0];
     const i = c >> 2;
     const kind = c & 3;
-    const need = 1 / (kind === 2 ? PAVE_LAY_PER_DAY : ROAD_LAY_PER_DAY);
+    const need = 1 / (kind >= 2 ? PAVE_LAY_PER_DAY : ROAD_LAY_PER_DAY);
     if (work < need) break;
     work -= need;
     s.roadPlan.shift();
@@ -832,6 +857,7 @@ export function reachableRoads(s: GameState): Uint8Array {
 
 /** Cost of stepping onto a tile, in road-tile units. */
 export function stepCost(s: GameState, i: number): number {
+  if (s.road[i] === 3) return ROAD_TILES_PER_DAY / COBBLE_TILES_PER_DAY;
   if (s.road[i] === 2) return ROAD_TILES_PER_DAY / STONE_ROAD_TILES_PER_DAY;
   if (s.road[i]) return 1;
   const off = ROAD_TILES_PER_DAY / OFFROAD_TILES_PER_DAY;
@@ -2901,7 +2927,7 @@ function monthlyPrestige(s: GameState): void {
   }
   if (hasCharter(s, 'trade3b')) {
     let paved = 0;
-    for (let i = 0; i < s.road.length; i++) if (s.road[i] === 2) paved++;
+    for (let i = 0; i < s.road.length; i++) if (s.road[i] >= 2) paved++;
     s.res.gold += Math.floor(paved / 3);
   }
 }

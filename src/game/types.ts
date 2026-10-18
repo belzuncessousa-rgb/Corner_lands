@@ -354,7 +354,7 @@ export interface GameState {
   mushrooms?: Record<number, number>;
   /** Tile -> most mushrooms that tile grows. */
   mushroomsMax?: Record<number, number>;
-  /** Road tiles drawn by the player and not laid yet: tile index * 4 + kind (1 dirt, 2 paved), in order. */
+  /** Road tiles drawn by the player and not laid yet: tile index * 4 + kind (1 dirt, 2 stone, 3 cobbled), in order. */
   roadPlan?: number[];
   /** Progress towards laying the next planned road tile (in tiles). */
   roadWork?: number;

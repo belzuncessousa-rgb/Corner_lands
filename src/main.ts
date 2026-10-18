@@ -38,6 +38,8 @@ import {
   footprintClear,
   PAVING_COST,
   PAVING_TIER,
+  COBBLE_COST,
+  COBBLE_TIER,
   stepDay,
   updateHappiness,
   yearOf,
@@ -61,7 +63,7 @@ import { Hud } from './ui/hud';
 export type Tool =
   | { kind: 'select' }
   | { kind: 'build'; type: BuildingType }
-  | { kind: 'road'; paved?: boolean; wall?: boolean }
+  | { kind: 'road'; paved?: boolean; cobbled?: boolean; wall?: boolean }
   | { kind: 'zone'; type: BuildingType }
   | { kind: 'demolish' }
   | { kind: 'grove' };
@@ -527,14 +529,25 @@ export class Game {
         !!err,
       );
     } else if (tool.kind === 'road') {
-      const paved = !!tool.paved;
+      const grade = tool.cobbled ? 3 : tool.paved ? 2 : 1;
+      const paved = grade === 2;
       const tiles = this.roadTiles(tx, ty);
-      const done = (t: { x: number; y: number }) => s.road[idx(s, t.x, t.y)] === (paved ? 2 : 1) || (!paved && s.road[idx(s, t.x, t.y)] > 0);
-      ov.tiles = tiles.map((t) => ({ ...t, ok: !roadError(s, t.x, t.y, paved) || done(t) }));
+      const done = (t: { x: number; y: number }) => s.road[idx(s, t.x, t.y)] >= grade;
+      ov.tiles = tiles.map((t) => ({ ...t, ok: !roadError(s, t.x, t.y, grade) || done(t) }));
       ov.tileColor = 'road';
       const fresh = tiles.filter((t) => !done(t));
-      const n = fresh.filter((t) => !roadError(s, t.x, t.y, paved)).length;
-      if (paved) {
+      const n = fresh.filter((t) => !roadError(s, t.x, t.y, grade)).length;
+      if (grade === 3) {
+        const ds = n * (COBBLE_COST.dressedstone ?? 0);
+        this.hud.setHint(
+          s.tier < COBBLE_TIER
+            ? 'Cobbled streets wait until you are a Town'
+            : this.roadAnchor
+              ? `Cobbled street: ${n} tiles · ${ds} dressed stone · click to lay it, keep clicking to continue · right-click to finish`
+              : 'Click where the cobbled street starts · cobbling a road upgrades it · 1 dressed stone per tile',
+          s.tier < COBBLE_TIER || fresh.length * (COBBLE_COST.dressedstone ?? 0) > s.res.dressedstone,
+        );
+      } else if (paved) {
         const stone = n * (PAVING_COST.stone ?? 0);
         this.hud.setHint(
           s.tier < PAVING_TIER
@@ -839,8 +852,8 @@ export class Game {
       if (placed) this.hud.sound('stone');
       return;
     }
-    const paved = this.tool.kind === 'road' && !!this.tool.paved;
-    for (const t of this.roadTiles(tx, ty)) if (planRoad(s, t.x, t.y, paved)) n++;
+    const grade = this.tool.kind === 'road' ? (this.tool.cobbled ? 3 : this.tool.paved ? 2 : 1) : 1;
+    for (const t of this.roadTiles(tx, ty)) if (planRoad(s, t.x, t.y, grade)) n++;
     if (n) {
       recompute(s);
       this.hud.sound('road');
@@ -1014,6 +1027,8 @@ export class Game {
         this.setTool({ kind: 'road' });
       } else if (k === 't') {
         this.setTool({ kind: 'road', paved: true });
+      } else if (k === 'y') {
+        this.setTool({ kind: 'road', cobbled: true });
       } else if (k === 'v') {
         this.cycleCoverage();
       } else if (k === 'u') {
