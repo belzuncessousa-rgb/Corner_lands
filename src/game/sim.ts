@@ -43,6 +43,7 @@ import {
   type Need,
   workersOf,
   buildingName,
+  marketStalls,
 } from './levels';
 import { Heap } from './path';
 import { checkQuests } from './quests';
@@ -764,6 +765,8 @@ export function resourceInRange(s: GameState, type: BuildingType, c: { x: number
 }
 
 export function coveredBy(s: GameState, b: Building, type: BuildingType): boolean {
+  // A market has no reach: its stalls serve the nearest homes, as many as they can.
+  if (type === 'market') return marketServed(s).has(b.id);
   const c = bCenter(b);
   for (const o of s.buildings) {
     // A cathedral serves as a church, with a far wider reach.
@@ -2586,10 +2589,43 @@ export function errandShare(s: GameState): number {
   return Math.min(MAX_ERRANDS, days / (people * DAYS_PER_MONTH));
 }
 
-/** A new town's first months, when villagers live off the cart they came with. */
+/** A new town's first months, when villagers make do with what the cart brought. */
 export const MARKET_GRACE_DAYS = DAYS_PER_MONTH * 2;
 
-/** Villagers who can fetch food at a staffed market (everyone in a new town's first months). */
+/** Households one staffed market stall can serve. */
+export const HOMES_PER_STALL = 10;
+
+let servedCache: { key: string; set: Set<number> } = { key: '', set: new Set() };
+
+/**
+ * The homes the markets serve. A market has no reach: anyone may walk to it,
+ * but each staffed stall can serve only so many households, and the homes
+ * nearest a market come first.
+ */
+export function marketServed(s: GameState): Set<number> {
+  const markets = s.buildings.filter((m) => m.type === 'market' && m.build >= 1 && m.workers > 0);
+  let stalls = 0;
+  for (const m of markets) stalls += Math.min(m.workers, marketStalls(m));
+  const key = `${s.day}:${s.buildings.length}:${stalls}:${s.population}`;
+  if (servedCache.key === key) return servedCache.set;
+  const set = new Set<number>();
+  if (stalls) {
+    const homes = s.buildings
+      .filter((h) => h.residents > 0)
+      .map((h) => {
+        const c = bCenter(h);
+        let d = Infinity;
+        for (const m of markets) d = Math.min(d, Math.hypot(bCenter(m).x - c.x, bCenter(m).y - c.y));
+        return { h, d };
+      })
+      .sort((a, b) => a.d - b.d);
+    for (const { h } of homes.slice(0, stalls * HOMES_PER_STALL)) set.add(h.id);
+  }
+  servedCache = { key, set };
+  return set;
+}
+
+/** Villagers the markets serve (everyone in a new town's first months). */
 export function marketReach(s: GameState): number {
   if (s.day <= MARKET_GRACE_DAYS) return s.population;
   let n = 0;
@@ -2644,20 +2680,20 @@ export function monthly(s: GameState, rng: StateRng): void {
   }
 
   // Eating: each villager needs one unit of nourishment a month. Villagers
-  // take a little of every food in turn; richer foods go further. Food is
-  // fetched at a market: households out of reach of one go without.
+  // take a little of every food in turn; richer foods go further. Food comes
+  // from the town's stores; a market is where households buy their goods, so
+  // homes it cannot serve go without those, not without food.
   const reach = marketReach(s);
-  const eaten = eatFood(s, reach);
+  const eaten = eatFood(s, s.population);
   const unserved = s.population - reach;
-  report.eaten = reach - eaten.hungry;
-  report.shortage = eaten.hungry + unserved;
+  report.eaten = s.population - eaten.hungry;
+  report.shortage = eaten.hungry;
   report.unserved = unserved;
   report.variety = eaten.groups;
   report.pottage = eaten.pottage;
   report.errands = errandShare(s);
   const need = report.shortage;
-  if (unserved > 0) log(s, `${unserved} villagers live out of reach of a staffed market and went without food.`, 'bad');
-  else if (need > 0) log(s, `Food shortage! ${need} villagers went hungry.`, 'bad');
+  if (need > 0) log(s, `Food shortage! ${need} villagers went hungry.`, 'bad');
   if (s.year) s.year.hungry = (s.year.hungry ?? 0) + need;
 
   // Heating in winter: each household burns a bundle of split firewood, or
@@ -2928,7 +2964,9 @@ export function updateHappiness(s: GameState): void {
   const homeless = Math.max(0, s.population - residents);
   if (residents > 0) {
     if (well) factors.push({ label: 'Wells nearby', value: Math.round((8 * well) / residents) });
-    if (market) factors.push({ label: 'Market nearby', value: Math.round((10 * market) / residents) });
+    if (market) factors.push({ label: 'Served by a market', value: Math.round((10 * market) / residents) });
+    // Homes the markets cannot serve go without their goods: a slow grumble, not hunger.
+    if (s.day > MARKET_GRACE_DAYS && market < residents) factors.push({ label: 'No market to shop at', value: -Math.round((10 * (residents - market)) / residents) });
     if (church) factors.push({ label: 'Church nearby', value: Math.round((15 * church) / residents) });
     if (tavern) factors.push({ label: 'Tavern nearby', value: Math.round((8 * tavern) / residents) });
     if (upgraded) factors.push({ label: 'Fine houses', value: Math.round((6 * upgraded) / residents) });
@@ -2975,7 +3013,11 @@ function migrate(s: GameState, rng: StateRng): void {
     if (s.year) s.year.left += n;
     log(s, `${n} homeless villagers left the settlement.`, 'bad');
   }
-  if ((s.happiness < 30 || r.shortage > 0) && s.population > 2 && !s.relaxed) {
+  // Hard times are borne for a while: villagers only start to leave after a
+  // second month of hunger or deep gloom in a row.
+  const hard = s.happiness < 30 || r.shortage > 0;
+  s.gloom = hard ? (s.gloom ?? 0) + 1 : 0;
+  if (hard && s.gloom >= 2 && s.population > 2 && !s.relaxed) {
     // Half of those who went hungry give up, up to an eighth of the town; a
     // gloomy town loses a few more.
     const hungry = r.shortage > 0 ? Math.min(r.shortage * 0.5, s.population * 0.12) : 0;
@@ -3027,14 +3069,6 @@ export function settlerBlocker(s: GameState): string | null {
     return `The larders look thin: settlers want ${settlerMonths(s)} months of food for everyone`;
   }
   return null;
-}
-
-/** The day of each month (0-based) when the market squares fill. */
-export const MARKET_DAY = 4;
-
-/** Whether today is market day at a market: staffed, built, and not deep winter. */
-export function isMarketDay(s: GameState, b: Building): boolean {
-  return b.type === 'market' && b.build >= 1 && b.workers > 0 && s.day % DAYS_PER_MONTH === MARKET_DAY && seasonOf(s.day) !== 3;
 }
 
 /** Largest protected wood, tiles a side. */

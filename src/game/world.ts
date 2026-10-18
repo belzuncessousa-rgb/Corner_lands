@@ -340,11 +340,11 @@ export function seedNature(s: GameState, site: { x: number; y: number }, rand: (
   s.herds = [];
   // Deer keep to glades in the woods: open ground with forest all about.
   const woods = (x: number, y: number) => free(idx(s, x, y)) && s.trees[idx(s, x, y)] <= 1 && trees(x, y, 4) >= 30;
-  for (let k = 0; k < 6; k++) {
+  for (let k = 0; k < 3; k++) {
     const p = spot(k === 0 ? 9 : 16, k === 0 ? 18 : 45, woods);
     if (p) s.herds.push({ kind: 'deer', x: p.x + 0.5, y: p.y + 0.5, n: 6, max: 8 });
   }
-  for (let k = 0; k < 6; k++) {
+  for (let k = 0; k < 3; k++) {
     const p = spot(k === 0 ? 7 : 14, k === 0 ? 15 : 45, edge);
     if (p) s.herds.push({ kind: 'rabbit', x: p.x + 0.5, y: p.y + 0.5, n: 10, max: 14 });
   }

@@ -1,6 +1,9 @@
 import { BUILDINGS, DAY_SECONDS, GATHER_REACH, GATHERERS, OFFROAD_TILES_PER_DAY, RESOURCE_STORAGE, ROAD_TILES_PER_DAY, STONE_ROAD_TILES_PER_DAY, STORAGE_CAPACITY } from '../game/data';
 import { findPath } from '../game/path';
-import { chooseRecipe, doorTile, forTilesInRadius, bCenter, isMarketDay, isWinter, MARKET_DAY, nearestHerd, needsMaterials, seatOf } from '../game/sim';
+import { chooseRecipe, doorTile, forTilesInRadius, bCenter, isWinter, nearestHerd, needsMaterials, seatOf } from '../game/sim';
+
+/** The day of each month a merchant cart sets out from the trading post. */
+const CART_DAY = 4;
 import type { Building, GameState, ResourceId } from '../game/types';
 import { getBuilding, idx, inBounds } from '../game/world';
 
@@ -75,9 +78,9 @@ export class AgentSystem {
   /** `dayFrac` is how far through the day it is (0 at dawn, 1 at the next). */
   update(s: GameState, dt: number, dayFrac = 0.5): void {
     this.evening = dayFrac > 0.8 && dayFrac < 0.97;
-    // Each month, on market day, a merchant cart visits markets that export goods.
-    // The first market day seen after a load sends no cart; later ones do.
-    const marketDay = s.day % 10 === MARKET_DAY ? s.day : null;
+    // Once a month a merchant cart visits trading posts that sell goods.
+    // The first such day seen after a load sends no cart; later ones do.
+    const marketDay = s.day % 10 === CART_DAY ? s.day : null;
     if (marketDay !== null && this.lastCartDay !== null && marketDay !== this.lastCartDay && dt > 0) {
       for (const m of s.buildings) {
         if (m.type === 'tradingpost' && m.build >= 1 && Object.keys(s.sell ?? {}).length) this.sendCart(s, m);
@@ -488,15 +491,11 @@ export class AgentSystem {
       });
       // Sometimes visit a gathering place: market, well, church or maypole.
       const spots = s.buildings.filter((b) => GATHERING.has(b.type) && b.build >= 1);
-      // On market day most of the idle head for the market square.
-      const fair = spots.filter((b) => isMarketDay(s, b) && Math.hypot(bCenter(b).x - c.x, bCenter(b).y - c.y) < 24);
-      if (spots.length && Math.random() < (fair.length ? 0.75 : 0.35)) {
-        const near = fair.length
-          ? fair
-          : spots.filter((b) => {
-              const bc = bCenter(b);
-              return Math.hypot(bc.x - c.x, bc.y - c.y) < 18;
-            });
+      if (spots.length && Math.random() < 0.35) {
+        const near = spots.filter((b) => {
+          const bc = bCenter(b);
+          return Math.hypot(bc.x - c.x, bc.y - c.y) < 18;
+        });
         const spot = near[Math.floor(Math.random() * near.length)];
         if (spot) {
           if (home) {

@@ -622,7 +622,8 @@ describe('fields, herds, orchards and backyards', () => {
     // No breeding; wool in spring, milk from the cows.
     expect(byre.herd).toBe(13);
     expect(s.res.wool).toBeGreaterThan(0);
-    expect(s.res.milk).toBeGreaterThan(0);
+    // Milk is made (and may already have been drunk: food comes from the stores).
+    expect((s.made?.milk ?? 0) + (s.making?.milk ?? 0)).toBeGreaterThan(0);
     const pork = s.res.pork;
     expect(slaughterAnimal(s, byre, 'pigs')).toBeNull();
     expect(s.res.pork).toBeGreaterThan(pork);

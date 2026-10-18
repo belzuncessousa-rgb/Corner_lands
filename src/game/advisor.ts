@@ -77,7 +77,7 @@ const ADVICE: Advice[] = [
   {
     id: 'unserved',
     when: (s) => (s.report.unserved ?? 0) > 0,
-    text: (s) => `Steward: ${s.report.unserved} villagers live out of reach of a staffed market and went without. Lay out a Marketplace near their homes, or see that its stalls have vendors.`,
+    text: (s) => `Steward: ${s.report.unserved} villagers have no market stall to buy their goods at. Each open stall serves ten households: lay out another Marketplace, a bigger one, or see that the stalls have vendors.`,
   },
   {
     id: 'errands',

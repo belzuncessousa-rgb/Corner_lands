@@ -762,16 +762,17 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   market: def({
     type: 'market',
     name: 'Marketplace',
-    desc: 'A square for stalls, free to lay out: click one corner, then the other. A vendor for each stall stocks it from the storehouse and granary; households nearby fetch their food and goods here, and cannot get them anywhere else.',
+    desc: 'A square for stalls, free to lay out: click one corner, then the other. A vendor for each stall stocks it from the storehouse and granary, and each open stall serves ten households with their goods, the nearest homes first. Food comes from the stores either way.',
     category: 'civic',
     w: 3,
     h: 3,
     cost: {},
     buildDays: 0,
     workers: 2,
-    radius: 11,
+    // No reach: its stalls serve the nearest homes, as many as they can (see marketServed).
+    radius: 0,
     tier: 0,
-    zone: { owner: 'market', min: 3, max: 8 },
+    zone: { owner: 'market', min: 2, max: 8 },
   }),
   tradingpost: def({
     type: 'tradingpost',

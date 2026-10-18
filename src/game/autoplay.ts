@@ -508,7 +508,7 @@ export function act(s: GameState, rand: () => number): void {
   }
   // A Village of thirty wants its first tavern to grow into a Town, short of hands or not.
   if (s.tier >= 1 && pop >= 30 && count(s, 'tavern') < 1) wants.unshift('tavern');
-  // Homes out of reach of a market go hungry: a square near them, at once.
+  // Homes no market can serve go without their goods: another square near them.
   {
     const lone = s.buildings.find((h) => h.residents > 0 && !coveredBy(s, h, 'market'));
     if (lone && drawMarket(s, bCenter(lone))) return;

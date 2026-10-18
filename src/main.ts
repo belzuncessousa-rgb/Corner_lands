@@ -79,6 +79,8 @@ const COVERAGE_TYPES: BuildingType[] = ['well', 'market', 'tavern', 'church'];
 const MOUSE_SLOP = 6;
 const TOUCH_SLOP = 14;
 /** Holding a finger this long acts as a right-click. */
+/** Game days in one turn of day and night (two a month). */
+const DAYS_PER_CYCLE = 5;
 const LONG_PRESS_MS = 500;
 
 export class Game {
@@ -266,6 +268,14 @@ export class Game {
     this.afterLoad();
   }
 
+  /**
+   * The time of day, 0 at dawn to 1 at the next: one turn of day and night
+   * spans DAYS_PER_CYCLE game days, so a month sees two.
+   */
+  private clock(): number {
+    return ((this.state.day % DAYS_PER_CYCLE) + this.simAcc / DAY_SECONDS) / DAYS_PER_CYCLE;
+  }
+
   /** Photo mode: the interface, markers and selection are hidden for a clean view. */
   photo = false;
 
@@ -350,10 +360,10 @@ export class Game {
         this.onNewMonth();
       }
     }
-    this.agents.update(this.state, gameDt, this.simAcc / DAY_SECONDS);
+    this.agents.update(this.state, gameDt, this.clock());
     this.wildlife.update(this.state, gameDt);
     // Dusk only at normal speed: faster, the days would flicker.
-    this.renderer.setDayTime(this.simAcc / DAY_SECONDS, !this.demo && this.speed <= 1, dt);
+    this.renderer.setDayTime(this.clock(), !this.demo && this.speed <= 1, dt);
     this.renderer.render(this.state, this.agents.agents, this.overlay(), running ? dt : 0, this.wildlife.animals);
     this.hud.minimap.update(dt);
     this.hud.tickAudio(dt, running);
@@ -393,7 +403,8 @@ export class Game {
       const circles = s.buildings
         .filter((b) => (b.type === type || (type === 'church' && b.type === 'cathedral')) && b.build >= 1)
         .filter((b) => BUILDINGS[b.type].workers === 0 || (b.workers > 0 && !hasProblem(b)))
-        .map((b) => ({ cx: bCenter(b).x, cy: bCenter(b).y, r: BUILDINGS[b.type].radius }));
+        .map((b) => ({ cx: bCenter(b).x, cy: bCenter(b).y, r: BUILDINGS[b.type].radius }))
+        .filter((c) => c.r > 0);
       const homes = new Map<number, boolean>();
       for (const b of s.buildings) if (b.type === 'house' && b.build >= 1) homes.set(b.id, coveredBy(s, b, type));
       ov.coverage = { circles, homes };
@@ -453,7 +464,7 @@ export class Game {
       const near = selfTended ? true : s.buildings.find((o) => o.type === owner && o.build >= 1 && Math.hypot(bCenter(o).x - (x0 + w / 2), bCenter(o).y - (y0 + h / 2)) <= BUILDINGS[owner].radius + Math.max(w, h) / 2);
       const any = selfTended ? undefined : s.buildings.find((o) => o.type === owner);
       if (selfTended) {
-        ov.range = { cx: x0 + w / 2, cy: y0 + h / 2, r: d.radius, highlight: rangeHighlighter(s, tool.type) };
+        if (d.radius) ov.range = { cx: x0 + w / 2, cy: y0 + h / 2, r: d.radius, highlight: rangeHighlighter(s, tool.type) };
       } else if (near || any) {
         const c = bCenter((near as Building | undefined) ?? any!);
         ov.range = { cx: c.x, cy: c.y, r: BUILDINGS[owner].radius };

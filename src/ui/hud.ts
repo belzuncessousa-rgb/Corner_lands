@@ -16,7 +16,6 @@ import {
   GROUP_NAMES,
   RESOURCE_STORAGE,
   STORAGE_CAPACITY,
-  DAYS_PER_MONTH,
   YARD_STORE,
 } from '../game/data';
 import { commission, commissionError, COMMISSIONS, nextTitle, takeTitle, titleError, TITLES, fairCost, fairError, fairPrestige, FAIR_TIER, feastCost, feastError, FESTIVALS, festivalError, getEvent, holdFair, holdFeast, holdFestival, resolveEvent } from '../game/events';
@@ -32,6 +31,8 @@ import {
   log,
   monthOf,
   nextTierRequirements,
+  marketServed,
+  HOMES_PER_STALL,
   siloCap,
   siloHeld,
   recompute,
@@ -89,8 +90,6 @@ import {
   dismissRetinue,
   raiseRetinue,
   retinueError,
-  isMarketDay,
-  MARKET_DAY,
   yearGoal,
   yearGoalMet,
   seatOf,
@@ -865,22 +864,14 @@ export class Hud {
       }
       rows.push(...this.zoneRows(b));
       if (b.type === 'market' && b.build >= 1) {
-        const left = (MARKET_DAY - (s.day % DAYS_PER_MONTH) + DAYS_PER_MONTH) % DAYS_PER_MONTH;
-        const when = isMarketDay(s, b) ? '<span class="pos">Today!</span>' : !b.workers ? '<span class="neg">Needs a stallholder</span>' : left === 0 ? 'Not in winter' : `In ${left} day${left > 1 ? 's' : ''}`;
-        rows.push(`<div class="kv"><span>Stalls</span><span>${b.workers} of ${marketStalls(b)} open</span></div>`);
-        let homes = 0;
-        let fed = 0;
-        for (const h of s.buildings) {
-          if (!h.residents || !housingOf(h)) continue;
-          const hc = bCenter(h);
-          const mc = bCenter(b);
-          if (Math.hypot(hc.x - mc.x, hc.y - mc.y) <= BUILDINGS.market.radius) {
-            homes++;
-            fed += h.residents;
-          }
-        }
-        rows.push(`<div class="kv" data-tip="Households within reach fetch their food and goods here. Those out of reach of every market go without."><span>Serves</span><span>${homes} home${homes === 1 ? '' : 's'} · ${fed} villagers</span></div>`);
-        rows.push(`<div class="kv" data-tip="Once a month the square fills with townsfolk."><span>Market day</span><span>${when}</span></div>`);
+        rows.push(`<div class="kv"><span>Stalls</span><span>${b.workers} of ${marketStalls(b)} open${!b.workers ? ' <span class="neg">· needs a stallholder</span>' : ''}</span></div>`);
+        // The town's markets together: each open stall serves the nearest households.
+        const served = marketServed(s);
+        const homes = s.buildings.filter((h) => h.residents > 0);
+        const open = s.buildings.filter((m) => m.type === 'market' && m.build >= 1).reduce((n, m) => n + Math.min(m.workers, marketStalls(m)), 0);
+        rows.push(
+          `<div class="kv" data-tip="Anyone may shop at a market, but each open stall can serve only ${HOMES_PER_STALL} households: the homes nearest a market come first. Homes left out go without their goods (food still comes from the stores)."><span>All markets serve</span><span class="${served.size < homes.length ? 'neg' : ''}">${served.size} of ${homes.length} homes · room for ${open * HOMES_PER_STALL}</span></div>`,
+        );
       }
       rows.push(...this.storeRows(b));
       if (b.type === 'townhall') {
@@ -2241,7 +2232,7 @@ export class Hud {
       <div class="help">
         <p><b>Grow your settlement</b> from a settlers' camp into a City. The town climbs the ranks by itself once it is big enough and has what each rank needs (open the rank pill, top left, to see what the next one needs).</p>
         <p><b>Building:</b> pick a category at the bottom, then a building, then click the map. Builders carry the materials over from storage, one load per trip, and then raise the walls. Plans can wait for materials. Buildings you cannot build yet stay hidden.</p>
-        <p><b>Markets</b> (Civic) are free and drawn like fields. Families fetch their food and goods from a staffed market within reach; homes out of reach go hungry, however full the stores.</p>
+        <p><b>Markets</b> (Civic) are free and drawn like fields. Each open stall serves ten households with their goods, the nearest homes first; homes left out go without their goods and grumble. Food comes from the stores either way.</p>
         <p><b>Gatherers</b> walk to the nearest trees, rocks, berries, game or fish, so place them close. Goods pile up in each workplace's yard until haulers from a Storehouse or Granary fetch them.</p>
         <p><b>Fields, pastures and orchards</b> (Farming) are drawn: click one corner, then the opposite one, near a Farmstead, Animal Farm or Orchard Keeper's Lodge. Choose each field's crop in the panel, and build a Silo to keep the grain; animals are bought at the Animal Farm once you have a Trading Post, and share its pasture room.</p>
         <p><b>Trading Post:</b> merchants come here to buy your surplus, and coins buy what you lack.</p>

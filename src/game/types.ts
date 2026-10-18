@@ -228,7 +228,7 @@ export interface MonthReport {
   trade?: number;
   /** Villagers fed on pottage (grain or oats boiled whole) last month. */
   pottage?: number;
-  /** Villagers out of reach of a staffed market last month. */
+  /** Villagers no market stall could serve last month. */
   unserved?: number;
   /** Share of working time spent on errands (market, well, church, tavern). */
   errands?: number;
@@ -356,6 +356,8 @@ export interface GameState {
   roadPlan?: number[];
   /** Progress towards laying the next planned road tile (in tiles). */
   roadWork?: number;
+  /** Months in a row of hunger or deep gloom (villagers leave from the second). */
+  gloom?: number;
   /** Years that ended with no one having gone hungry. */
   fedYears?: number;
   /** The cathedral holds a relic (bought from a travelling friar). */
