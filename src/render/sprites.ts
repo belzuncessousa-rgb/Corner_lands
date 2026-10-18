@@ -678,7 +678,7 @@ export function rockSprite(ore: boolean, variant: number, season: Season): Sprit
       ctx.beginPath();
       ctx.ellipse(x + 3, y + 2, r * 1.1, r * 0.5, 0, 0, Math.PI * 2);
       ctx.fill();
-      const base = ore ? '#6e6258' : '#9d9a92';
+      const base = ore ? '#7a5240' : '#9d9a92';
       ctx.fillStyle = shade(base, 0.8);
       ctx.beginPath();
       ctx.moveTo(x - r, y);
@@ -698,8 +698,11 @@ export function rockSprite(ore: boolean, variant: number, season: Season): Sprit
       ctx.closePath();
       ctx.fill();
       if (ore) {
-        ctx.fillStyle = '#b4652e';
-        for (let i = 0; i < 3; i++) ctx.fillRect(x + (rand() - 0.6) * r, y - rand() * r, 2.4, 1.6);
+        // Rust-red streaks and ochre stains of the iron in the rock.
+        ctx.fillStyle = '#c0703a';
+        for (let i = 0; i < 4; i++) ctx.fillRect(x + (rand() - 0.6) * r, y - rand() * r, 2.6, 1.4);
+        ctx.fillStyle = '#d8a050';
+        ctx.fillRect(x + (rand() - 0.5) * r * 0.8, y - r * 0.6, 1.6, 1.2);
       }
       if (season === 3) {
         ctx.fillStyle = '#f2f6f8';
@@ -843,15 +846,7 @@ function drawHouseExtra(p: Pen, extra: HouseExtra, season: Season, front: number
 
 function drawBuilding(p: Pen, type: BuildingType, level: number, season: Season, variant = 0): V3[] {
   const smoke: V3[] = [];
-  // Expanded workshops get fired-clay roofs and a guild banner.
-  const expanded = level >= 2 && type !== 'house' && type !== 'townhall';
-  if (expanded) p.roofTint = { color: '#a4523a', t: 0.55 };
-  const out = drawBuildingBody(p, type, level, season, variant, smoke);
-  if (expanded) {
-    p.roofTint = null;
-    p.flag(0.12, 0.12, 0, 34, '#2e5e9a');
-  }
-  return out;
+  return drawBuildingBody(p, type, level, season, variant, smoke);
 }
 
 function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Season, variant: number, smoke: V3[]): V3[] {
@@ -1058,7 +1053,7 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       p.line([0.4, 1.7, 0], [0.4, 1.7, 9], '#5e4129', 1);
       p.line([1.0, 1.7, 0], [1.0, 1.7, 9], '#5e4129', 1);
       p.line([0.4, 1.7, 9], [1.0, 1.7, 9], '#5e4129', 1);
-      for (let x = 0.47; x < 1.0; x += 0.1) p.wallL(1.701, x, x + 0.06, 3, 9, '#f4ecd8');
+      for (let k = 0; k < 5; k++) p.wallL(1.701, 0.45 + k * 0.105, 0.51 + k * 0.105, 3, 8.6, '#f4ecd8');
       break;
     }
     case 'armoury': {
@@ -1114,13 +1109,36 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
         season === 3 ? '#b4aca4' : '#6e4428',
       );
       p.line([0.55, 1.3, 0], [0.75, 1.15, 9], '#6b4a2e', 1.2);
-      for (const [x, y] of [
-        [1.5, 1.2],
-        [1.65, 1.5],
-      ]) {
-        p.ellipse(x, y, 9, 5, 2, '#9a5a34');
-        p.ellipse(x - 0.03, y - 0.03, 6, 3, 4, '#b0643a');
+      // A heap of wet clay with a spade stuck in it.
+      for (const [x, y, r] of [
+        [1.55, 1.25, 11],
+        [1.7, 1.55, 8],
+      ] as const) {
+        const [hx, hy] = iso(x, y, 0);
+        const c = p.ctx;
+        c.fillStyle = 'rgba(40,24,12,0.25)';
+        c.beginPath();
+        c.ellipse(hx + 2, hy + 1, r * 1.1, r * 0.45, 0, 0, Math.PI * 2);
+        c.fill();
+        const g = c.createLinearGradient(hx - r, 0, hx + r, 0);
+        g.addColorStop(0, '#a8644a');
+        g.addColorStop(1, '#7a4430');
+        c.fillStyle = g;
+        c.beginPath();
+        c.moveTo(hx - r, hy);
+        c.quadraticCurveTo(hx - r * 0.5, hy - r * 0.95, hx, hy - r * 0.9);
+        c.quadraticCurveTo(hx + r * 0.6, hy - r * 0.85, hx + r, hy);
+        c.quadraticCurveTo(hx, hy + r * 0.35, hx - r, hy);
+        c.fill();
+        c.strokeStyle = 'rgba(255,230,210,0.35)';
+        c.lineWidth = 0.8;
+        c.beginPath();
+        c.moveTo(hx - r * 0.6, hy - r * 0.5);
+        c.quadraticCurveTo(hx - r * 0.2, hy - r * 0.85, hx + r * 0.2, hy - r * 0.8);
+        c.stroke();
       }
+      p.line([1.6, 1.25, 7], [1.62, 1.22, 18], '#6b4a2e', 1.2);
+      p.poly([[1.56, 1.25, 2], [1.66, 1.25, 2], [1.66, 1.25, 8], [1.56, 1.25, 8]], '#7a7e84');
       for (const [x, y] of [
         [0.3, 0.3],
         [1.2, 0.3],
@@ -1128,7 +1146,11 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
         [1.2, 0.75],
       ]) p.line([x, y, 0], [x, y, 11], '#5e4129', 1.6);
       p.roofX(0.3, 0.3, 1.2, 0.75, 11, 7, 'thatch', WOOD, 0.08);
-      for (let i = 0; i < 3; i++) p.box(0.4 + i * 0.25, 0.45, 0.55 + i * 0.25, 0.6, 0, 3, '#b0643a');
+      // Clay cakes drying on a plank rack under the thatch.
+      p.box(0.38, 0.42, 1.12, 0.63, 4, 1.2, '#8a6440');
+      p.line([0.4, 0.6, 0], [0.4, 0.6, 4], '#5e4129', 1);
+      p.line([1.1, 0.6, 0], [1.1, 0.6, 4], '#5e4129', 1);
+      for (let i = 0; i < 5; i++) p.box(0.42 + i * 0.14, 0.46, 0.53 + i * 0.14, 0.58, 5.2, 1.6, i % 2 ? '#b8785a' : '#a86a4c');
       break;
     }
     case 'kiln': {
@@ -1141,17 +1163,34 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       c.ellipse(kx, ky - 4, 26, 13, 0, 0, Math.PI);
       c.ellipse(kx, ky - 4, 26, 30, 0, Math.PI, 0);
       c.fill();
-      c.strokeStyle = 'rgba(70,36,24,0.5)';
-      c.lineWidth = 0.6;
-      for (let r = 6; r < 34; r += 4) {
-        c.beginPath();
-        c.ellipse(kx, ky - 4, Math.sqrt(Math.max(0, 26 * 26 * (1 - (r * r) / (30 * 30)))), 2, 0, 0, Math.PI);
-        c.stroke();
-      }
-      c.fillStyle = '#b06848';
+      // Courses of brick round the dome, with staggered joints.
+      c.save();
       c.beginPath();
-      c.ellipse(kx - 8, ky - 22, 9, 8, 0, 0, Math.PI * 2);
-      c.fill();
+      c.ellipse(kx, ky - 4, 26, 13, 0, 0, Math.PI);
+      c.ellipse(kx, ky - 4, 26, 30, 0, Math.PI, 0);
+      c.clip();
+      const shadeG = c.createLinearGradient(kx - 26, 0, kx + 26, 0);
+      shadeG.addColorStop(0, 'rgba(255,220,190,0.12)');
+      shadeG.addColorStop(1, 'rgba(40,10,0,0.3)');
+      c.fillStyle = shadeG;
+      c.fillRect(kx - 27, ky - 36, 54, 50);
+      c.strokeStyle = 'rgba(70,30,18,0.55)';
+      c.lineWidth = 0.7;
+      for (let k = 0; k < 9; k++) {
+        const h = k * 3.6;
+        const w = 26 * Math.sqrt(Math.max(0, 1 - (h * h) / (30 * 30)));
+        c.beginPath();
+        c.ellipse(kx, ky - 4 - h, w, Math.max(1, w * 0.45), 0, 0, Math.PI);
+        c.stroke();
+        for (let j = -3; j <= 3; j++) {
+          const jx = kx + ((j + (k % 2) * 0.5) * w) / 3.6;
+          c.beginPath();
+          c.moveTo(jx, ky - 4 - h + Math.max(1, w * 0.45) * Math.sqrt(Math.max(0, 1 - ((jx - kx) / Math.max(1, w)) ** 2)));
+          c.lineTo(jx, ky - 4 - h - 3.6 + Math.max(1, w * 0.45) * Math.sqrt(Math.max(0, 1 - ((jx - kx) / Math.max(1, w)) ** 2)));
+          c.stroke();
+        }
+      }
+      c.restore();
       c.fillStyle = '#2a1a10';
       c.beginPath();
       c.ellipse(kx + 6, ky + 4, 7, 6, 0, Math.PI, 0);
@@ -1160,8 +1199,8 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       c.fillRect(kx + 1, ky + 1, 10, 3);
       smoke.push([0.9, 0.9, 38]);
       // Stacks of finished tiles and firewood.
-      for (let i = 0; i < 4; i++) p.box(1.35, 1.25, 1.75, 1.5, i * 2, 1.8, i % 2 ? '#b8483a' : '#a4402f');
-      for (let i = 0; i < 3; i++) p.box(1.35, 0.85, 1.75, 1.1, i * 2, 1.8, i % 2 ? '#b8483a' : '#a4402f');
+      tileStack(p, 1.35, 1.25, 4);
+      tileStack(p, 1.4, 0.8, 3);
       p.logPile(0.4, 1.7, 2);
       break;
     }
@@ -1173,15 +1212,13 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
         [0.3, 0.95],
         [1.5, 0.95],
       ]) p.line([x, y, 0], [x, y, 14], '#5e4129', 2);
-      p.roofX(0.3, 0.3, 1.5, 0.95, 14, 9, 'shingle', WOOD, 0.08);
-      // A block on the banker, finished blocks and rubble.
+      // A block on the banker under the roof, finished blocks and rubble outside.
       p.box(0.7, 0.55, 1.0, 0.8, 0, 6, '#7b5a36');
-      p.box(0.72, 0.57, 0.98, 0.78, 6, 6, '#cac4b6');
-      for (let i = 0; i < 2; i++) {
-        for (let j = 0; j < 2; j++) p.box(0.35 + i * 0.22, 1.2 + j * 0.2, 0.53 + i * 0.22, 1.36 + j * 0.2, 0, 6, '#cac4b6');
-      }
-      p.box(0.4, 1.25, 0.58, 1.41, 6, 6, '#d4cec0');
-      p.stonePile(1.25, 1.35, 5);
+      p.box(0.72, 0.57, 0.98, 0.78, 6, 5, '#cac4b6');
+      p.roofX(0.3, 0.3, 1.5, 0.95, 14, 9, 'shingle', WOOD, 0.08);
+      cutBlocks(p, 0.35, 1.25, 3);
+      cutBlocks(p, 0.45, 1.6, 2);
+      for (const [x, y, r] of [[1.35, 1.35, 4.5], [1.55, 1.45, 4], [1.4, 1.6, 3.5]] as const) rockLump(p, x, y, r, '#a8a49a', 7);
       p.line([1.05, 1.6, 0], [1.2, 1.7, 8], '#6b4a2e', 1.3);
       break;
     }
@@ -1190,7 +1227,6 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       p.box(0.3, 0.35, 1.45, 1.35, 0, 16, WOOD);
       p.timber(0.3, 0.35, 1.45, 1.35, 0, 16, BEAM);
       p.wallL(1.352, 0.5, 1.1, 0, 12, '#3a2a1e');
-      p.box(0.6, 1.2, 1.0, 1.33, 0, 5, '#8a6236');
       p.roofX(0.3, 0.35, 1.45, 1.35, 16, 15, 'shingle', WOOD, 0.12);
       smoke.push(p.chimney(1.15, 0.7, 24, 9));
       // A cartwheel and a stack of beams.
@@ -1209,7 +1245,7 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
         c.lineTo(wx + Math.cos(a) * 6, wy + Math.sin(a) * 7);
         c.stroke();
       }
-      for (let i = 0; i < 3; i++) p.box(0.4, 1.55, 1.3, 1.68, i * 2.2, 2, i % 2 ? '#c8a46c' : '#b8945c');
+      for (let i = 0; i < 3; i++) p.box(0.45, 1.6, 1.25, 1.75, i * 2.2, 2, i % 2 ? '#c8a46c' : '#b8945c');
       break;
     }
     case 'bloomery': {
@@ -1238,11 +1274,11 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       c.ellipse(fx, fy - 3, 3.5, 3, 0, 0, Math.PI * 2);
       c.fill();
       smoke.push([0.85, 0.75, 30]);
+      // Bellows by the furnace.
+      p.box(1.05, 0.62, 1.28, 0.82, 0, 5, '#6b4a2e');
+      p.line([1.05, 0.72, 4], [0.95, 0.75, 3], '#4a3020', 1.2);
       p.roofX(0.3, 0.3, 1.4, 1.2, 18, 8, 'plank', WOOD, 0.08);
-      // Bellows.
-      p.box(1.1, 0.65, 1.3, 0.85, 2, 4, '#6b4a2e');
-      p.stonePile(1.55, 1.3, 4);
-      p.ellipse(1.6, 1.35, 4, 2, 6, '#b4652e');
+      oreHeap(p, 1.6, 1.35, 5);
       p.logPile(0.45, 1.6, 2);
       break;
     }
@@ -1316,6 +1352,7 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
         [0.3, 0.9],
         [1.4, 0.9],
       ]) p.line([x, y, 0], [x, y, 13], '#5e4129', 2);
+      p.barrel(0.6, 0.6);
       p.roofX(0.3, 0.3, 1.4, 0.9, 13, 7, 'plank', WOOD, 0.08);
       // Tanning pits in the yard.
       for (const [x, y, c] of [
@@ -1349,7 +1386,6 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
         p.line([1.45, y + 0.12, 0], [1.45, y + 0.12, 14], '#5e4129', 1.2);
         p.wallR(1.45, y - 0.1, y + 0.1, 3, 13, y > 1.3 ? '#b88a5a' : '#9a6a40');
       }
-      p.barrel(0.6, 0.6);
       break;
     }
     case 'weaver': {
@@ -1535,77 +1571,92 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       break;
     }
     case 'quarry': {
-      p.shadow(0.2, 0.2, 1.4, 1.0);
-      // Lean-to shed on posts.
-      for (const [x, y] of [
-        [0.3, 0.3],
-        [1.3, 0.3],
-        [0.3, 1.0],
-        [1.3, 1.0],
-      ]) {
-        p.line([x, y, 0], [x, y, 14], '#5e4129', 2);
-      }
-      p.stonePile(0.5, 0.45, 4);
-      p.roofX(0.3, 0.3, 1.3, 1.0, 14, 8, 'plank', WOOD, 0.08);
-      p.stonePile(1.4, 1.3, 6);
-      p.stonePile(0.4, 1.4, 3);
-      // A big rough block being worked.
-      p.box(1.0, 1.25, 1.3, 1.5, 0, 9, '#b4b0a6');
-      p.line([0.9, 1.6, 0], [1.1, 1.75, 9], '#6b4a2e', 1.4);
+      // A stepped face cut into the rock, a derrick to lift the blocks,
+      // cut stone stacked to go and the rubble of the work.
+      const ROCK = '#9a968c';
+      // The outcrop being worked, and the pale ledge cut out of it.
+      for (const [x, y, r] of [[0.35, 0.3, 15], [0.95, 0.15, 17], [1.55, 0.3, 15], [0.2, 0.75, 11], [1.8, 0.75, 10]] as const) rockLump(p, x, y, r, ROCK, 2);
+      p.box(0.45, 0.45, 1.45, 0.75, 0, 9, '#b8b2a6', '#c4beb2');
+      for (let k = 0; k < 5; k++) p.wallL(0.752, 0.5 + k * 0.19, 0.56 + k * 0.19, 2, 7, 'rgba(60,55,45,0.2)');
+      p.box(0.6, 0.75, 1.3, 0.95, 0, 4, '#b8b2a6', '#c4beb2');
+      // Rubble on the floor of the cut.
+      for (const [x, y, r] of [[1.55, 1.0, 4], [1.7, 1.1, 3], [0.35, 1.1, 3.5]] as const) rockLump(p, x, y, r, ROCK, 5);
+      // Derrick: two legs and a jib with a block on the rope.
+      p.line([1.35, 1.0, 0], [1.5, 1.15, 30], '#5e4129', 1.6);
+      p.line([1.7, 1.25, 0], [1.5, 1.15, 30], '#5e4129', 1.6);
+      p.line([1.5, 1.15, 30], [1.15, 0.85, 26], '#5e4129', 1.4);
+      p.line([1.17, 0.87, 26], [1.17, 0.87, 15], '#c8b48c', 0.6);
+      p.box(1.08, 0.8, 1.26, 0.94, 10, 5, '#cfc8b8');
+      cutBlocks(p, 0.45, 1.45, 3);
+      cutBlocks(p, 1.25, 1.6, 2);
+      // A pick leaning on the stack.
+      p.line([1.05, 1.62, 0], [1.08, 1.6, 10], '#6b4a2e', 1.1);
+      p.line([1.0, 1.6, 10], [1.16, 1.62, 9], '#6a6e74', 1.2);
       break;
     }
     case 'mine': {
-      // Earth mound with a timbered entrance.
-      p.poly(
-        [
-          [0.1, 0.1, 0],
-          [1.7, 0.1, 0],
-          [1.5, 0.6, 26],
-          [0.3, 0.6, 26],
-        ],
-        '#7b6a54',
-      );
-      p.poly(
-        [
-          [0.1, 1.2, 0],
-          [0.1, 0.1, 0],
-          [0.3, 0.6, 26],
-          [0.3, 1.0, 24],
-        ],
-        '#6e5f4a',
-      );
-      p.poly(
-        [
-          [0.3, 0.6, 26],
-          [1.5, 0.6, 26],
-          [1.6, 1.1, 16],
-          [0.3, 1.0, 24],
-        ],
-        season === 3 ? '#e8edef' : '#7d8a52',
-      );
-      p.poly(
-        [
-          [0.1, 1.2, 0],
-          [1.7, 1.25, 0],
-          [1.6, 1.1, 16],
-          [0.3, 1.0, 24],
-        ],
-        '#8a765c',
-      );
-      // Entrance.
-      p.wallL(1.21, 0.65, 1.15, 0, 13, '#1f1a16');
-      p.line([0.62, 1.22, 0], [0.62, 1.22, 14], BEAM, 2.4);
-      p.line([1.18, 1.22, 0], [1.18, 1.22, 14], BEAM, 2.4);
-      p.line([0.55, 1.22, 14], [1.25, 1.22, 14], BEAM, 2.6);
-      // Rails and a cart with ore.
-      p.line([0.8, 1.25, 0], [0.8, 1.95, 0], '#5a5048', 1);
-      p.line([1.0, 1.25, 0], [1.0, 1.95, 0], '#5a5048', 1);
-      p.box(0.75, 1.55, 1.05, 1.85, 2, 6, '#6b4a2e');
-      p.stonePile(1.35, 1.45, 3);
-      p.ctx.fillStyle = '#b4652e';
-      const [ox, oy] = iso(0.9, 1.7, 9);
-      p.ctx.fillRect(ox - 4, oy - 2, 3, 2);
-      p.ctx.fillRect(ox + 1, oy - 1, 3, 2);
+      // An adit driven into a rocky knoll: a timbered mouth, rails out to
+      // a spoil heap of rusty ore, and a windlass shed.
+      const ROCK = '#8a8378';
+      const turf = season === 3 ? '#e8edef' : '#7d8a52';
+      // A rounded knoll over the back of the plot.
+      {
+        const c = p.ctx;
+        const [lx, ly] = iso(0.0, 1.45, 0);
+        const [rx, ry] = iso(1.95, 0.0, 0);
+        const [fx, fy] = iso(1.35, 1.35, 0);
+        const [px, py] = iso(0.55, 0.55, 28);
+        const g = c.createLinearGradient(lx, 0, rx, 0);
+        g.addColorStop(0, shade(ROCK, 1.05));
+        g.addColorStop(1, shade(ROCK, 0.7));
+        c.fillStyle = g;
+        c.beginPath();
+        c.moveTo(lx, ly);
+        c.bezierCurveTo(lx + 2, ly - 28, px - 30, py, px, py);
+        c.bezierCurveTo(px + 34, py + 2, rx - 6, ry - 20, rx, ry);
+        c.quadraticCurveTo(fx + 8, fy + 2, fx, fy);
+        c.quadraticCurveTo(fx - 30, fy + 2, lx, ly);
+        c.fill();
+        // Strata in the rock face.
+        c.save();
+        c.clip();
+        c.strokeStyle = 'rgba(60,50,40,0.22)';
+        c.lineWidth = 0.8;
+        for (let k = 0; k < 4; k++) {
+          c.beginPath();
+          c.moveTo(lx - 4, ly - 6 - k * 7);
+          c.quadraticCurveTo(px, py + 30 - k * 6, rx + 4, ry - 4 - k * 6);
+          c.stroke();
+        }
+        c.restore();
+        // Turf over the crown.
+        c.fillStyle = turf;
+        c.beginPath();
+        c.moveTo(lx + 8, ly - 22);
+        c.bezierCurveTo(lx + 12, ly - 38, px - 26, py - 1, px, py);
+        c.bezierCurveTo(px + 30, py + 2, rx - 14, ry - 26, rx - 6, ry - 14);
+        c.quadraticCurveTo(px + 10, py + 26, lx + 8, ly - 22);
+        c.fill();
+      }
+      for (const [x, y, z, r] of [[0.3, 0.95, 10, 6], [1.45, 0.45, 12, 5], [1.65, 0.85, 4, 6]] as const) rockLump(p, x, y, r, ROCK, 4, z);
+      for (const [x, y, r] of [[0.3, 1.45, 5], [1.7, 1.35, 5]] as const) rockLump(p, x, y, r, ROCK, 6);
+      // Timbered mouth.
+      p.wallL(1.31, 0.75, 1.2, 0, 13, '#1a1512');
+      p.wallL(1.305, 0.68, 1.27, 13, 15.5, '#3a2c20');
+      p.line([0.72, 1.32, 0], [0.72, 1.32, 15], BEAM, 2.6);
+      p.line([1.23, 1.32, 0], [1.23, 1.32, 15], BEAM, 2.6);
+      p.line([0.64, 1.32, 15.5], [1.31, 1.32, 15.5], BEAM, 2.8);
+      // A lantern by the mouth.
+      p.circle(1.29, 1.33, 11, 1.4, '#f2c25a');
+      // Rails and a cart of ore.
+      for (let k = 0; k < 5; k++) p.line([0.8, 1.38 + k * 0.13, 0], [1.15, 1.38 + k * 0.13, 0], '#6b4a2e', 1.2);
+      p.line([0.86, 1.3, 0.5], [0.86, 1.95, 0.5], '#5a5450', 0.9);
+      p.line([1.09, 1.3, 0.5], [1.09, 1.95, 0.5], '#5a5450', 0.9);
+      p.box(0.8, 1.55, 1.15, 1.85, 2.5, 6, '#6b4a2e');
+      for (const t of [1.6, 1.8]) p.circle(0.83, t, 2.5, 1.6, '#3a2c20');
+      oreHeap(p, 0.97, 1.7, 3);
+      // Spoil heap of ore to the side.
+      oreHeap(p, 1.55, 1.65, 6);
       break;
     }
     case 'forager': {
@@ -1731,6 +1782,8 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       p.doorL(1.3, 0.75, 0.18, 11);
       p.windowL(1.3, 0.45, 7, 0.14, 5, true);
       p.roofX(0.3, 0.3, 1.4, 1.3, 18, 14, 'tile', PLASTER, 0.12);
+      // The oven's flue runs up the gable wall, above the eaves.
+      smoke.push(p.chimney(1.4, 0.62, 0, 34, '#9b8a78'));
       // Domed oven on the side.
       const [ox, oy] = iso(1.6, 0.85, 0);
       p.ctx.fillStyle = '#b39a80';
@@ -1749,7 +1802,6 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       p.ctx.fill();
       p.ctx.fillStyle = '#f08a2a';
       p.ctx.fillRect(ox - 1, oy - 2, 5, 2);
-      smoke.push(p.chimney(1.55, 0.75, 9, 14, '#9b8a78'));
       p.sack(0.5, 1.6);
       p.sack(0.7, 1.7);
       p.crate(1.0, 1.55);
@@ -1758,20 +1810,20 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
     case 'sawmill': {
       p.shadow(0.2, 0.3, 1.6, 1.3);
       for (const [x, y] of [
-        [0.3, 0.4],
-        [1.5, 0.4],
-        [0.3, 1.2],
-        [1.5, 1.2],
+        [0.3, 0.2],
+        [1.5, 0.2],
+        [0.3, 0.95],
+        [1.5, 0.95],
       ]) {
         p.line([x, y, 0], [x, y, 16], '#5e4129', 2.2);
       }
       // Sawhorse and log inside.
-      p.box(0.6, 0.7, 1.3, 0.85, 0, 7, '#7b5a36');
-      p.line([0.55, 0.78, 10], [1.35, 0.78, 10], '#8a6236', 5);
-      p.roofX(0.3, 0.4, 1.5, 1.2, 16, 12, 'shingle', WOOD, 0.1);
-      // Plank stack.
-      for (let i = 0; i < 4; i++) p.box(0.4, 1.45, 1.2, 1.7, i * 2.4, 2.2, i % 2 ? '#d7b47c' : '#c8a46c');
-      p.logPile(1.55, 1.5, 2);
+      p.box(0.6, 0.5, 1.3, 0.65, 0, 7, '#7b5a36');
+      p.line([0.55, 0.58, 10], [1.35, 0.58, 10], '#8a6236', 5);
+      p.roofX(0.3, 0.2, 1.5, 0.95, 16, 12, 'shingle', WOOD, 0.1);
+      // Planks stacked out in front, clear of the posts, and logs waiting.
+      for (let i = 0; i < 3; i++) p.box(0.45, 1.4, 1.15, 1.62, i * 2.4, 2.2, i % 2 ? '#d7b47c' : '#c8a46c');
+      p.logPile(1.45, 1.75, 2);
       break;
     }
     case 'smithy': {
@@ -1869,81 +1921,40 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       break;
     }
     case 'camp': {
-      // Three canvas tents round a fire, the cart they came with, and their goods.
-      p.poly(
-        [
-          [0.15, 0.15, 0],
-          [2.85, 0.15, 0],
-          [2.85, 2.85, 0],
-          [0.15, 2.85, 0],
-        ],
-        season === 3 ? '#d6dbd9' : '#a89a72',
-      );
+      // Three canvas tents round a fire; the wood, stone and food they keep
+      // are drawn live beside them.
       const tent = (x: number, y: number, cloth: string) => {
+        const c0 = p.snow ? '#eef2f4' : cloth;
         p.shadow(x - 0.05, y - 0.05, x + 0.85, y + 0.75);
-        // A ridge tent: two sloping sides and a dark mouth at the front.
-        p.poly(
-          [
-            [x, y + 0.7, 0],
-            [x + 0.8, y + 0.7, 0],
-            [x + 0.8, y + 0.35, 16],
-            [x, y + 0.35, 16],
-          ],
-          p.snow ? '#eef2f4' : shade(cloth, 1),
-          shade(cloth, 0.6),
-        );
-        p.poly(
-          [
-            [x, y, 0],
-            [x + 0.8, y, 0],
-            [x + 0.8, y + 0.35, 16],
-            [x, y + 0.35, 16],
-          ],
-          p.snow ? '#dfe5e8' : shade(cloth, 0.82),
-          shade(cloth, 0.55),
-        );
-        p.poly(
-          [
-            [x + 0.8, y, 0],
-            [x + 0.8, y + 0.7, 0],
-            [x + 0.8, y + 0.35, 16],
-          ],
-          shade(cloth, 0.7),
-          shade(cloth, 0.5),
-        );
-        p.poly(
-          [
-            [x + 0.8, y + 0.2, 0],
-            [x + 0.8, y + 0.5, 0],
-            [x + 0.8, y + 0.35, 9],
-          ],
-          '#3a2c20',
-        );
+        // Back slope, then the side facing us and the open front.
+        p.poly([[x, y, 0], [x + 0.8, y, 0], [x + 0.8, y + 0.35, 17], [x, y + 0.35, 17]], shade(c0, 0.8), shade(cloth, 0.5));
+        p.poly([[x, y + 0.7, 0], [x + 0.8, y + 0.7, 0], [x + 0.8, y + 0.35, 17], [x, y + 0.35, 17]], shade(c0, 1), shade(cloth, 0.55));
+        // Seams down the canvas.
+        for (const t of [0.27, 0.54]) p.line([x + 0.8 * t, y + 0.7, 0], [x + 0.8 * t, y + 0.35, 17], shade(cloth, 0.78), 0.6);
+        p.poly([[x + 0.8, y, 0], [x + 0.8, y + 0.7, 0], [x + 0.8, y + 0.35, 17]], shade(cloth, 0.68), shade(cloth, 0.5));
+        // The flaps tied back from a dark doorway.
+        p.poly([[x + 0.8, y + 0.2, 0], [x + 0.8, y + 0.5, 0], [x + 0.8, y + 0.35, 11]], '#3a2c20');
+        p.poly([[x + 0.8, y + 0.5, 0], [x + 0.86, y + 0.62, 0], [x + 0.8, y + 0.35, 11]], shade(cloth, 0.9));
+        // Ridge pole ends and guy ropes to pegs.
+        p.line([x + 0.8, y + 0.35, 0], [x + 0.8, y + 0.35, 20], '#5e4129', 1.1);
+        p.line([x - 0.02, y + 0.35, 0], [x - 0.02, y + 0.35, 19], '#5e4129', 1.1);
+        p.line([x + 0.8, y + 0.35, 19], [x + 1.0, y + 0.35, 0], '#8a7a60', 0.5);
+        p.line([x + 0.4, y + 0.7, 8], [x + 0.4, y + 0.9, 0], '#8a7a60', 0.5);
       };
-      tent(0.3, 0.25, '#d8cfb8');
-      tent(1.6, 0.3, '#c8b48c');
-      tent(0.35, 1.5, '#e0d6c0');
-      // The cart, unhitched.
-      p.box(1.7, 1.65, 2.55, 2.15, 4, 5, '#8a6440');
-      p.box(1.75, 1.7, 2.5, 2.1, 9, 3, '#c8a46c');
-      p.sack(1.95, 1.85);
-      p.sack(2.2, 1.9, '#c8b48c');
-      p.line([1.7, 1.9, 6], [1.3, 1.9, 2], '#5e4129', 1.4);
-      for (const y of [1.62, 2.18] as const) {
-        const [wx, wy] = iso(2.1, y, 4);
-        p.ctx.strokeStyle = '#4a3020';
-        p.ctx.lineWidth = 1.2;
-        p.ctx.beginPath();
-        p.ctx.ellipse(wx, wy, 4, 5, 0, 0, Math.PI * 2);
-        p.ctx.stroke();
-      }
-      // A fire ring between the tents (its smoke rises live).
-      for (let k = 0; k < 7; k++) p.circle(1.35 + Math.cos(k) * 0.16, 1.2 + Math.sin(k) * 0.16, 0, 1.4, '#8a8478');
-      p.circle(1.35, 1.2, 1, 2.2, season === 3 ? '#8a7060' : '#e8742a');
-      smoke.push([1.35, 1.2, 4]);
-      p.barrel(2.45, 0.95);
-      p.crate(0.55, 2.45);
-      p.logPile(2.55, 2.45, 2);
+      tent(0.25, 0.2, '#d8cfb8');
+      tent(1.55, 0.25, '#c8b48c');
+      tent(0.3, 1.45, '#e0d6c0');
+      // A fire ring between the tents (its smoke rises live), a log to sit on.
+      for (let k = 0; k < 8; k++) p.circle(1.45 + Math.cos(k * 0.785) * 0.17, 1.3 + Math.sin(k * 0.785) * 0.17, 0, 1.5, '#8a8478');
+      p.circle(1.45, 1.3, 1, 2.4, season === 3 ? '#8a7060' : '#e8742a');
+      p.circle(1.45, 1.3, 2, 1.2, season === 3 ? '#6a5a50' : '#f8c040');
+      p.line([1.25, 1.62, 2], [1.7, 1.62, 2], '#6b4626', 4);
+      // A tripod and pot over the fire.
+      p.line([1.33, 1.2, 0], [1.45, 1.3, 14], '#4a3020', 0.9);
+      p.line([1.57, 1.22, 0], [1.45, 1.3, 14], '#4a3020', 0.9);
+      p.line([1.45, 1.44, 0], [1.45, 1.3, 14], '#4a3020', 0.9);
+      p.circle(1.45, 1.3, 6, 2.2, '#3a3430');
+      smoke.push([1.45, 1.3, 4]);
       break;
     }
     case 'tradingpost': {
@@ -1989,12 +2000,12 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
         p.snow ? '#eef2f4' : '#8a5a3a',
         '#4a3020',
       );
-      p.barrel(2.45, 0.7);
-      p.barrel(2.65, 0.95);
-      p.crate(2.35, 1.3);
-      p.sack(0.5, 1.45);
-      p.sack(0.75, 1.55);
-      p.crate(1.6, 1.45);
+      // Bales and crates on the forecourt, ready for the carts.
+      bale(p, 0.45, 1.4, '#d8c8a0');
+      bale(p, 0.5, 1.62, '#c8b48c');
+      p.crate(1.55, 1.42, 0.18);
+      p.crate(1.78, 1.5, 0.15);
+      p.crate(2.35, 1.35, 0.16);
       p.flag(2.85, 1.85, 0, 30, '#c8962a');
       break;
     }
@@ -2024,31 +2035,39 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       break;
     }
     case 'granary': {
-      p.poly(
-        [
-          [0.15, 1.45, 0],
-          [2.85, 1.45, 0],
-          [2.85, 2.9, 0],
-          [0.15, 2.9, 0],
-        ],
-        season === 3 ? '#d4d8d6' : '#b09c70',
-      );
-      p.fence([0.15, 2.92], [1.1, 2.92], '#8a6a44');
-      p.fence([1.9, 2.92], [2.85, 2.92], '#8a6a44');
-      p.shadow(0.4, 0.3, 2.6, 1.35);
-      // Raised on staddle stones to keep the rats out.
-      for (const x of [0.5, 1.5, 2.5]) {
-        for (const y of [0.4, 1.25]) {
-          p.box(x - 0.06, y - 0.06, x + 0.06, y + 0.06, 0, 5, '#9a9288');
-          p.ellipse(x, y, 6, 4, 1.5, '#a8a093');
+      // A square granary raised on staddle stones to keep the rats out, its
+      // door reached by detached stone steps, a hoist for the sacks.
+      const BOARD = '#b88a52';
+      p.shadow(0.25, 0.25, 1.75, 1.75);
+      for (const x of [0.38, 1.0, 1.62]) {
+        for (const y of [0.38, 1.0, 1.62]) {
+          p.box(x - 0.05, y - 0.05, x + 0.05, y + 0.05, 0, 5, '#9a9288');
+          p.ellipse(x, y, 6, 4.5, 1.8, '#aaa296');
         }
       }
-      p.box(0.4, 0.3, 2.6, 1.35, 6, 18, '#b88a52');
-      for (let x = 0.5; x < 2.6; x += 0.12) p.line([x, 1.35, 6], [x, 1.35, 24], '#8a6236', 0.5);
-      for (let y = 0.4; y < 1.35; y += 0.12) p.line([2.6, y, 6], [2.6, y, 24], '#7a5230', 0.5);
-      p.wallL(1.352, 1.3, 1.7, 6, 19, '#5b3a22');
-      p.box(1.35, 1.35, 1.65, 1.6, 0, 6, '#7b5a36');
-      p.roofX(0.4, 0.3, 2.6, 1.35, 24, 20, 'thatch', '#b88a52', 0.16);
+      p.box(0.25, 0.25, 1.75, 1.75, 7, 2, '#6b4a2c');
+      p.box(0.28, 0.28, 1.72, 1.72, 9, 20, BOARD);
+      // Weatherboards and corner posts.
+      for (let z = 12; z < 29; z += 2.6) {
+        p.line([0.28, 1.72, z], [1.72, 1.72, z], '#8a6236', 0.55);
+        p.line([1.72, 0.28, z], [1.72, 1.72, z], '#7a5230', 0.55);
+      }
+      for (const t of [0.28, 1.0, 1.72]) {
+        p.line([t, 1.72, 9], [t, 1.72, 29], '#5a3a22', 1.4);
+        p.line([1.72, t, 9], [1.72, t, 29], '#4e3220', 1.4);
+      }
+      // Loft door on the front, steps leading up beside it (with a gap).
+      p.wallL(1.722, 0.62, 0.92, 9, 23, '#5b3a22');
+      p.line([0.77, 1.724, 9], [0.77, 1.724, 23], '#3d2614', 0.7);
+      for (let k = 0; k < 3; k++) p.box(0.58, 1.86 + k * 0.1, 0.96, 1.96 + k * 0.1, 0, 7.5 - k * 2.4, '#a8a093');
+      // Vents high on the right side.
+      for (const y of [0.55, 1.25]) p.wallR(1.722, y, y + 0.18, 22, 25, '#3a2a1c');
+      p.roofX(0.28, 0.28, 1.72, 1.72, 29, 30, 'thatch', BOARD, 0.2);
+      // A hatch in the gable, and the hoist beam over it with its rope.
+      p.wallR(1.724, 0.88, 1.12, 33, 41, '#4a3020');
+      p.line([1.72, 1.0, 47], [2.02, 1.0, 47], '#5a3a22', 2);
+      p.line([1.99, 1.0, 47], [1.99, 1.0, 30], '#c8b48c', 0.6);
+      p.line([1.96, 1.0, 30], [2.02, 1.0, 30], '#5a3a22', 1);
       break;
     }
     case 'silo': {
@@ -2268,8 +2287,8 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       const dark = '#a69d8c';
       p.shadow(0.35, 0.35, 1.65, 1.65);
       // A broad base, the shaft, and the open belfry under a slate spire.
-      p.box(0.4, 0.4, 1.6, 1.6, 0, 14, dark);
-      p.box(0.55, 0.55, 1.45, 1.45, 14, 70, stone);
+      p.box(0.4, 0.4, 1.6, 1.6, 0, 14, dark, undefined, 'stone');
+      p.box(0.55, 0.55, 1.45, 1.45, 14, 70, stone, undefined, 'stone');
       p.wallL(1.452, 0.85, 1.15, 0, 18, '#4a2f1b');
       for (const z of [30, 52]) {
         p.wallL(1.452, 0.92, 1.08, z, z + 9, '#3a3a52');
@@ -2297,7 +2316,7 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       const BEAM = '#5a3a22';
       p.shadow(0.2, 0.2, 3.85, 3.85);
       // An arcaded stone ground floor where the merchants meet.
-      p.box(0.3, 0.3, 3.7, 3.7, 0, 20, stone);
+      p.box(0.3, 0.3, 3.7, 3.7, 0, 20, stone, undefined, 'stone');
       for (const x of [0.6, 1.3, 2.0, 2.7]) {
         p.wallL(3.702, x, x + 0.45, 0, 15, '#3a2a1e');
         p.wallR(3.702, x, x + 0.45, 0, 15, '#3a2a1e');
@@ -2331,6 +2350,145 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       for (const [x, col] of [[0.7, '#9a2a2a'], [3.3, '#2a4a8a']] as [number, string][]) {
         p.line([x, 3.8, 20], [x, 3.8, 92], '#4a3a2a', 1.2);
         p.wallL(3.802, x, x + 0.25, 80, 92, col);
+      }
+      break;
+    }
+    case 'watchtower': {
+      // A square stone tower with a timber gallery and a shingled cap.
+      const ST = '#a8a093';
+      p.shadow(0.18, 0.18, 0.82, 0.82);
+      p.box(0.2, 0.2, 0.8, 0.8, 0, 6, '#9b9284', undefined, 'stone');
+      p.box(0.24, 0.24, 0.76, 0.76, 6, 52, ST, undefined, 'stone');
+      p.doorL(0.76, 0.4, 0.18, 11);
+      p.windowL(0.76, 0.43, 26, 0.12, 6);
+      p.windowR(0.76, 0.45, 38, 0.1, 6);
+      // Gallery on beams, open between the posts.
+      for (const t of [0.3, 0.5, 0.7]) {
+        p.line([t, 0.82, 52], [t, 0.82, 56], BEAM, 1.2);
+        p.line([0.82, t, 52], [0.82, t, 56], BEAM, 1.2);
+      }
+      p.box(0.14, 0.14, 0.86, 0.86, 56, 2, WOOD);
+      for (const t of [0.14, 0.38, 0.62, 0.86]) {
+        p.line([t, 0.86, 58], [t, 0.86, 68], BEAM, 1.3);
+        p.line([0.86, t, 58], [0.86, t, 68], BEAM, 1.3);
+      }
+      p.line([0.14, 0.86, 62], [0.86, 0.86, 62], BEAM, 1.1);
+      p.line([0.86, 0.14, 62], [0.86, 0.86, 62], BEAM, 1.1);
+      p.roofPyramid(0.14, 0.14, 0.86, 0.86, 68, 18, 'shingle', 0.06);
+      // A brazier glows at the rail.
+      p.circle(0.7, 0.84, 63.5, 1.4, '#e8892a');
+      p.lordFlag(0.5, 0.5, 86, 16);
+      break;
+    }
+    case 'manorgarden': {
+      const winter = season === 3;
+      const lawn = winter ? '#e2e7e6' : season === 2 ? '#8a9a48' : '#6fa043';
+      const gravel = winter ? '#d4d8d6' : '#d2c39c';
+      const hedge = winter ? '#8a9a86' : '#3d6b30';
+      const flowers = winter ? [] : season === 2 ? ['#d8903a', '#b8503a', '#e0c040', '#9a3a2a'] : ['#e84a6a', '#f2d34a', '#b97ae0', '#f4f0e0', '#e86a3a', '#f07ab0'];
+      p.poly([[0.05, 0.05, 0], [4.95, 0.05, 0], [4.95, 3.95, 0], [0.05, 3.95, 0]], lawn);
+      // Gravel walks: round the edge and across the middle, meeting at the fountain.
+      const walk = (x0: number, y0: number, x1: number, y1: number) => p.poly([[x0, y0, 0], [x1, y0, 0], [x1, y1, 0], [x0, y1, 0]], gravel);
+      walk(0.15, 1.85, 4.85, 2.15);
+      walk(2.35, 0.15, 2.65, 3.85);
+      walk(0.15, 3.6, 4.85, 3.85);
+      walk(4.6, 0.15, 4.85, 3.85);
+      // Four parterres: box-edged beds of flowers.
+      const rand = mulberry32(31);
+      for (const [x0, y0, x1, y1] of [
+        [0.35, 0.35, 2.15, 1.65],
+        [2.85, 0.35, 4.4, 1.65],
+        [0.35, 2.35, 2.15, 3.4],
+        [2.85, 2.35, 4.4, 3.4],
+      ]) {
+        p.box(x0, y0, x1, y0 + 0.08, 0, 3, hedge);
+        p.box(x0, y0, x0 + 0.08, y1, 0, 3, hedge);
+        if (flowers.length) {
+          for (let k = 0; k < 26; k++) {
+            const x = x0 + 0.18 + rand() * (x1 - x0 - 0.3);
+            const y = y0 + 0.18 + rand() * (y1 - y0 - 0.3);
+            p.bush(x, y, 1.9, '#4a7a34');
+            p.circle(x, y, 2.6, 1.3, flowers[k % flowers.length]);
+          }
+        }
+        // A clipped yew cone at the outer corner.
+        const cx = x0 < 2 ? x0 + 0.2 : x1 - 0.2;
+        const cy = y0 < 2 ? y0 + 0.2 : y1 - 0.2;
+        const [tx, ty] = iso(cx, cy, 0);
+        p.ctx.fillStyle = winter ? '#9aa894' : '#2f5a28';
+        p.ctx.beginPath();
+        p.ctx.moveTo(tx - 4.5, ty - 1);
+        p.ctx.quadraticCurveTo(tx, ty + 2, tx + 4.5, ty - 1);
+        p.ctx.lineTo(tx, ty - 20);
+        p.ctx.closePath();
+        p.ctx.fill();
+        p.ctx.fillStyle = 'rgba(255,255,255,0.12)';
+        p.ctx.beginPath();
+        p.ctx.moveTo(tx - 4.5, ty - 1);
+        p.ctx.lineTo(tx, ty - 20);
+        p.ctx.lineTo(tx - 1, ty);
+        p.ctx.closePath();
+        p.ctx.fill();
+        p.box(x1 - 0.08, y0, x1, y1, 0, 3, hedge);
+        p.box(x0, y1 - 0.08, x1, y1, 0, 3, hedge);
+      }
+      // The fountain: a round stone basin with a jet.
+      const [fx, fy] = iso(2.5, 2.0, 0);
+      const c = p.ctx;
+      c.fillStyle = '#a49c8e';
+      c.beginPath();
+      c.ellipse(fx, fy - 2, 22, 11, 0, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = '#8a8274';
+      c.fillRect(fx - 22, fy - 2, 44, 3);
+      c.beginPath();
+      c.ellipse(fx, fy + 1, 22, 11, 0, 0, Math.PI);
+      c.fill();
+      c.fillStyle = winter ? '#dfe8ec' : '#5f9ab8';
+      c.beginPath();
+      c.ellipse(fx, fy - 2.5, 18, 8.6, 0, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = '#b6ae9f';
+      c.fillRect(fx - 2, fy - 16, 4, 14);
+      c.beginPath();
+      c.ellipse(fx, fy - 16, 7, 3, 0, 0, Math.PI * 2);
+      c.fill();
+      if (!winter) {
+        c.strokeStyle = 'rgba(220,240,250,0.8)';
+        c.lineWidth = 1;
+        for (const d of [-1, 1]) {
+          c.beginPath();
+          c.moveTo(fx, fy - 22);
+          c.quadraticCurveTo(fx + d * 6, fy - 26, fx + d * 9, fy - 15);
+          c.stroke();
+        }
+        c.beginPath();
+        c.moveTo(fx, fy - 16);
+        c.lineTo(fx, fy - 23);
+        c.stroke();
+      }
+      // A pavilion at the far corner, and a rose pergola along the back walk.
+      const px0 = 0.25;
+      const py0 = 0.2;
+      for (let k = 0; k < 6; k++) {
+        const x = 2.85 + k * 0.3;
+        p.line([x, 0.12, 0], [x, 0.12, 16], '#e8e0d0', 1.4);
+      }
+      p.line([2.85, 0.12, 16], [4.35, 0.12, 16], '#e8e0d0', 1.4);
+      if (!winter) for (let k = 0; k < 10; k++) p.circle(2.85 + k * 0.16, 0.12, 14 + (k % 3), 2.2, k % 2 ? '#c8486a' : '#4a7a34');
+      p.box(px0, py0, px0 + 0.75, py0 + 0.75, 0, 2, '#c8c2b6');
+      for (const [x, y] of [[px0 + 0.08, py0 + 0.08], [px0 + 0.67, py0 + 0.08], [px0 + 0.67, py0 + 0.67], [px0 + 0.08, py0 + 0.67]]) p.box(x - 0.03, y - 0.03, x + 0.03, y + 0.03, 2, 20, '#e8e0d0');
+      p.roofPyramid(px0 - 0.02, py0 - 0.02, px0 + 0.77, py0 + 0.77, 22, 14, 'slate', 0.06);
+      p.circle(px0 + 0.375, py0 + 0.375, 37, 1.4, '#c8962a');
+      // Two ornamental trees at the front corners.
+      // Ornamental trees: blossom in spring, gold in autumn.
+      const crown = winter ? '#9aa894' : season === 0 ? '#f0c4d4' : season === 2 ? '#d0803a' : '#4f8a3a';
+      for (const [x, y] of [[4.75, 3.75], [0.3, 3.75], [4.75, 0.3], [0.2, 1.75], [4.75, 1.75]]) {
+        p.line([x, y, 0], [x, y, 14], '#5a3e26', 2.2);
+        if (winter) continue;
+        p.circle(x + 0.04, y + 0.04, 17, 8, shade(crown, 0.8));
+        p.circle(x - 0.03, y, 19, 7, crown);
+        p.circle(x + 0.06, y - 0.05, 22, 5, shade(crown, 1.1));
       }
       break;
     }
@@ -2377,8 +2535,6 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       p.box(0.66, 0.78, 0.86, 0.86, 3, 1.5, '#8a6236');
       p.line([0.68, 0.84, 0], [0.68, 0.84, 3], '#5e4129', 1);
       p.line([0.84, 0.84, 0], [0.84, 0.84, 3], '#5e4129', 1);
-      p.fence([0.08, 0.95], [0.4, 0.95], '#e8e0d0');
-      p.fence([0.6, 0.95], [0.92, 0.95], '#e8e0d0');
       break;
     }
     case 'maypole': {
@@ -2437,9 +2593,9 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
         p.line([0.15, 0.15 + i * 0.42, 0], [1.85, 0.15 + i * 0.42, 0], 'rgba(90,80,60,0.3)', 0.6);
         p.line([0.15 + i * 0.42, 0.15, 0], [0.15 + i * 0.42, 1.85, 0], 'rgba(90,80,60,0.3)', 0.6);
       }
-      p.box(0.55, 0.55, 1.45, 1.45, 0, 6, '#a8a093');
-      p.box(0.7, 0.7, 1.3, 1.3, 6, 16, '#b8b0a2');
-      p.box(0.62, 0.62, 1.38, 1.38, 22, 3, '#a8a093');
+      p.box(0.55, 0.55, 1.45, 1.45, 0, 6, '#a8a093', undefined, 'stone');
+      p.box(0.7, 0.7, 1.3, 1.3, 6, 16, '#b8b0a2', undefined, 'stone');
+      p.box(0.62, 0.62, 1.38, 1.38, 22, 3, '#a8a093', undefined, 'stone');
       // The lord: legs, cloak, head and raised sword.
       const st = '#c8c2b6';
       p.box(0.9, 0.95, 0.98, 1.03, 25, 12, st);
@@ -2708,39 +2864,51 @@ export function stallSprite(kind: number, season: Season, open: boolean): Sprite
     const p = new Pen(ctx);
     p.snow = season === 3;
     const st = STALLS[kind % STALLS.length];
-    const x = 0.12;
-    const y = 0.2;
-    for (const [px, py] of [
-      [x, y],
-      [x + 0.76, y],
-      [x, y + 0.6],
-      [x + 0.76, y + 0.6],
-    ]) {
-      p.line([px, py, 0], [px, py, open ? 15 : 9], '#5e4129', 1.4);
+    // A small trestle stall: back posts, the counter and its wares, the
+    // striped awning, and the front posts drawn last so they hold it up.
+    const x = 0.2;
+    const y = 0.25;
+    const w = 0.6;
+    const d = 0.45;
+    const top = open ? 15 : 8;
+    const front = open ? 11.5 : 8;
+    p.line([x, y, 0], [x, y, top], '#5e4129', 1.3);
+    p.line([x + w, y, 0], [x + w, y, top], '#5e4129', 1.3);
+    p.box(x + 0.04, y + d * 0.45, x + w - 0.04, y + d - 0.02, 0, 6, '#8a6440');
+    if (open) {
+      st.goods.forEach((g, i) => {
+        const [gx, gy] = iso(x + 0.1 + i * 0.17, y + d * 0.7, 6.5);
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.ellipse(gx, gy, 3, 1.7, 0, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      const stripes = 5;
+      for (let i = 0; i < stripes; i++) {
+        const x0 = x - 0.02 + (i * (w + 0.04)) / stripes;
+        const x1 = x0 + (w + 0.04) / stripes;
+        p.poly(
+          [
+            [x0, y - 0.02, top],
+            [x1, y - 0.02, top],
+            [x1, y + d + 0.03, front],
+            [x0, y + d + 0.03, front],
+          ],
+          p.snow ? (i % 2 ? '#f2f5f6' : '#e2e7e9') : i % 2 ? '#f1e8d6' : st.color,
+        );
+      }
+      // A scalloped valance along the front edge.
+      for (let i = 0; i < stripes; i++) {
+        const xm = x - 0.02 + ((i + 0.5) * (w + 0.04)) / stripes;
+        const [vx, vy] = iso(xm, y + d + 0.03, front);
+        ctx.fillStyle = p.snow ? '#e2e7e9' : i % 2 ? '#e6dcc8' : shade(st.color, 0.85);
+        ctx.beginPath();
+        ctx.ellipse(vx, vy, 3.6, 2, 0, 0, Math.PI);
+        ctx.fill();
+      }
     }
-    p.box(x + 0.05, y + 0.35, x + 0.72, y + 0.6, 0, 7, '#8a6440');
-    if (!open) return;
-    st.goods.forEach((g, i) => {
-      const [gx, gy] = iso(x + 0.15 + i * 0.2, y + 0.47, 8);
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.ellipse(gx, gy, 3.5, 2, 0, 0, Math.PI * 2);
-      ctx.fill();
-    });
-    const stripes = 6;
-    for (let i = 0; i < stripes; i++) {
-      const x0 = x - 0.05 + (i * 0.88) / stripes;
-      const x1 = x0 + 0.88 / stripes;
-      p.poly(
-        [
-          [x0, y - 0.05, 18],
-          [x1, y - 0.05, 18],
-          [x1, y + 0.7, 13],
-          [x0, y + 0.7, 13],
-        ],
-        p.snow ? (i % 2 ? '#f2f5f6' : '#e2e7e9') : i % 2 ? '#f1e8d6' : st.color,
-      );
-    }
+    p.line([x, y + d, 0], [x, y + d, front], '#5e4129', 1.3);
+    p.line([x + w, y + d, 0], [x + w, y + d, front], '#5e4129', 1.3);
   });
 }
 
@@ -2802,6 +2970,92 @@ export function fruitTreeSprite(fruit: string, season: Season, stage: number, fr
   });
 }
 
+/** A rough, faceted lump of rock (or ore) standing at (x, y), r pixels across. */
+export function rockLump(p: Pen, x: number, y: number, r: number, base: string, seed = 1, z = 0): void {
+  const rand = mulberry32(seed * 977 + Math.round(x * 100) * 13 + Math.round(y * 100));
+  const [sx, sy] = iso(x, y, z);
+  const c = p.ctx;
+  const k = [0.9 + rand() * 0.2, 1 + rand() * 0.3, 1.1 + rand() * 0.3, 0.8 + rand() * 0.3];
+  c.fillStyle = 'rgba(30,30,20,0.22)';
+  c.beginPath();
+  c.ellipse(sx + r * 0.25, sy + r * 0.1, r * 1.05, r * 0.45, 0, 0, Math.PI * 2);
+  c.fill();
+  c.fillStyle = shade(base, 0.78);
+  c.beginPath();
+  c.moveTo(sx - r, sy);
+  c.lineTo(sx - r * 0.6, sy - r * k[0]);
+  c.lineTo(sx + r * 0.25, sy - r * k[2]);
+  c.lineTo(sx + r, sy - r * 0.35 * k[1]);
+  c.lineTo(sx + r * 0.8, sy + r * 0.3);
+  c.lineTo(sx - r * 0.5, sy + r * 0.35);
+  c.closePath();
+  c.fill();
+  c.fillStyle = shade(base, 1.08);
+  c.beginPath();
+  c.moveTo(sx - r, sy);
+  c.lineTo(sx - r * 0.6, sy - r * k[0]);
+  c.lineTo(sx + r * 0.25, sy - r * k[2]);
+  c.lineTo(sx + r * 0.05, sy - r * 0.25 * k[3]);
+  c.closePath();
+  c.fill();
+  c.strokeStyle = shade(base, 0.55);
+  c.lineWidth = 0.5;
+  c.beginPath();
+  c.moveTo(sx + r * 0.25, sy - r * k[2]);
+  c.lineTo(sx + r * 0.05, sy - r * 0.25 * k[3]);
+  c.lineTo(sx + r * 0.8, sy + r * 0.3);
+  c.stroke();
+}
+
+/** A heap of rusty iron ore lumps. */
+export function oreHeap(p: Pen, x: number, y: number, n = 5): void {
+  const spots: [number, number, number][] = [[-0.1, 0.02, 4.5], [0.08, -0.04, 4], [0.0, 0.1, 4.2], [0.14, 0.1, 3.5], [-0.12, 0.14, 3.4], [0.02, 0.0, 3.2]];
+  for (let i = 0; i < Math.min(n, spots.length); i++) {
+    const [dx, dy, r] = spots[i];
+    rockLump(p, x + dx, y + dy, r, i % 2 ? '#7a4a34' : '#8a5236', i + 3, i === 5 ? 4 : 0);
+    const [sx, sy] = iso(x + dx, y + dy, 0);
+    p.ctx.fillStyle = '#c8783a';
+    p.ctx.fillRect(sx - r * 0.4, sy - r * 0.7, 1.4, 1);
+  }
+}
+
+/** Squared, freshly cut blocks of pale stone, stacked. */
+/** Curved roof tiles stacked on a pallet, their rounded ends towards us. */
+function tileStack(p: Pen, x: number, y: number, rows = 3): void {
+  p.box(x, y, x + 0.42, y + 0.26, 0, 1.6, '#7b5a36');
+  for (let r = 0; r < rows; r++) {
+    const z = 1.6 + r * 2.4;
+    p.box(x + 0.01, y + 0.01, x + 0.41, y + 0.25, z, 2.4, r % 2 ? '#b8583a' : '#ac4e32');
+    for (let k = 0; k < 5; k++) {
+      const [tx, ty] = iso(x + 0.05 + k * 0.08, y + 0.25, z + 1.2);
+      p.ctx.strokeStyle = 'rgba(80,30,18,0.65)';
+      p.ctx.lineWidth = 0.6;
+      p.ctx.beginPath();
+      p.ctx.ellipse(tx, ty, 2.2, 1.4, 0, Math.PI, 0);
+      p.ctx.stroke();
+    }
+  }
+}
+
+/** A corded bale of wool or cloth. */
+function bale(p: Pen, x: number, y: number, color: string): void {
+  p.box(x, y, x + 0.26, y + 0.18, 0, 8, color);
+  for (const t of [0.07, 0.19]) {
+    p.line([x + t, y + 0.18, 0], [x + t, y + 0.18, 8], '#7a5a3a', 0.7);
+    p.line([x + 0.26, y + t * 0.75, 0], [x + 0.26, y + t * 0.75, 8], '#6a4a2a', 0.7);
+  }
+}
+
+function cutBlocks(p: Pen, x: number, y: number, n = 3): void {
+  const col = '#cfc8b8';
+  const slots: [number, number, number][] = [[0, 0, 0], [0.26, 0, 0], [0.13, 0.01, 5]];
+  for (let i = 0; i < Math.min(n, slots.length); i++) {
+    const [dx, dy, z] = slots[i];
+    p.box(x + dx, y + dy, x + dx + 0.24, y + dy + 0.15, z, 5, col);
+    p.line([x + dx + 0.05, y + dy + 0.15, z + 2], [x + dx + 0.19, y + dy + 0.15, z + 2], 'rgba(90,80,60,0.35)', 0.5);
+  }
+}
+
 function drawHouseProp(p: Pen, prop: 'logs' | 'hive' | 'cart' | 'well', season: Season): void {
   switch (prop) {
     case 'logs':
@@ -2849,100 +3103,118 @@ function drawHouseProp(p: Pen, prop: 'logs' | 'hive' | 'cart' | 'well', season: 
 
 /** The manor grows with the settlement: hall, manor house, stone manor, keep. */
 function drawManor(p: Pen, level: number, season: Season, smoke: V3[]): void {
-  p.shadow(0.3, 0.2, 2.7, 2.6);
-  p.poly(
-    [
-      [0.2, 0.15, 0],
-      [2.85, 0.15, 0],
-      [2.85, 2.85, 0],
-      [0.2, 2.85, 0],
-    ],
-    level >= 3 ? '#b4ad9e' : '#b9ad94',
-  );
-  const towerH = level >= 5 ? 96 : level >= 4 ? 78 : level >= 3 ? 64 : 54;
-  const towerStone = level >= 4 ? '#9d978c' : STONE;
-  // Tower at the back.
-  p.box(0.3, 0.15, 1.2, 1.0, 0, towerH, towerStone);
-  p.windowL(1.0, 0.68, towerH - 18, 0.12, 8, season === 3);
-  p.windowR(1.2, 0.5, towerH - 18, 0.12, 8);
-  if (level >= 4) {
-    // Crenellations instead of a roof.
-    for (let i = 0; i < 4; i++) {
-      p.box(0.3 + i * 0.25, 0.92, 0.42 + i * 0.25, 1.0, towerH, 7, towerStone);
-      p.box(1.12, 0.15 + i * 0.25, 1.2, 0.27 + i * 0.25, towerH, 7, towerStone);
+  const winter = season === 3;
+  const arms = HERALDRY.current;
+  if (level <= 1) {
+    // Manor Hall: one long timber hall on a stone footing, a porch and a lean-to.
+    p.shadow(0.35, 0.7, 2.7, 2.15);
+    p.box(0.4, 0.75, 2.6, 2.05, 0, 4, STONE);
+    p.box(0.4, 0.75, 2.6, 2.05, 4, 16, PLASTER);
+    p.timber(0.4, 0.75, 2.6, 2.05, 4, 16, BEAM);
+    for (const x of [0.65, 1.0, 1.95, 2.3]) p.windowL(2.05, x, 9, 0.13, 6, winter && x === 0.65);
+    p.windowR(2.6, 1.25, 9, 0.14, 6);
+    // Lean-to store against the right gable.
+    p.box(2.6, 1.05, 2.92, 1.85, 0, 11, WOOD);
+    p.roofY(2.6, 1.05, 2.92, 1.85, 11, 4, 'shingle', WOOD, 0.06);
+    p.roofX(0.4, 0.75, 2.6, 2.05, 20, 26, 'shingle', PLASTER, 0.12);
+    smoke.push(p.chimney(1.8, 1.35, 30, 14, '#8d8274'));
+    // A gabled porch over the door.
+    p.box(1.3, 2.05, 1.72, 2.4, 0, 1.5, '#9b9284');
+    p.line([1.33, 2.38, 1.5], [1.33, 2.38, 13], BEAM, 1.4);
+    p.line([1.69, 2.38, 1.5], [1.69, 2.38, 13], BEAM, 1.4);
+    p.wallL(2.052, 1.4, 1.62, 1.5, 13, '#5b3a22');
+    p.roofY(1.28, 2.0, 1.74, 2.42, 13, 7, 'shingle', PLASTER, 0.04);
+    p.wallL(2.055, 1.0, 1.1, 10, 19, arms.field);
+    p.wallL(2.055, 1.92, 2.02, 10, 19, arms.field);
+    p.logPile(0.35, 2.45, 2);
+    p.lordFlag(2.85, 2.35, 0, 30);
+    return;
+  }
+  if (level === 2) {
+    // Manor House: two storeys, stone below and timber-framed above, jettied
+    // out a little, with a cross wing of the same height.
+    p.shadow(0.35, 0.3, 2.75, 2.3);
+    // Main range on the left, ridge along x, reaching to the wing.
+    p.box(0.35, 0.75, 2.0, 2.05, 0, 14, STONE);
+    p.box(0.32, 0.72, 2.0, 2.09, 14, 15, PLASTER);
+    p.timber(0.32, 0.72, 2.0, 2.09, 14, 15, BEAM);
+    for (const x of [0.55, 0.9, 1.6]) p.windowL(2.05, x, 5, 0.14, 6, winter && x === 0.55);
+    for (const x of [0.5, 0.85, 1.2, 1.6]) p.windowL(2.09, x, 19, 0.14, 7);
+    p.roofX(0.32, 0.72, 2.0, 2.09, 29, 24, 'tile', PLASTER, 0.1);
+    // Cross wing on the right, ridge front to back.
+    p.box(2.0, 0.3, 2.8, 2.3, 0, 14, STONE);
+    p.box(1.97, 0.27, 2.83, 2.33, 14, 15, PLASTER);
+    p.timber(1.97, 0.27, 2.83, 2.33, 14, 15, BEAM);
+    for (const y of [0.55, 1.15, 1.75]) {
+      p.windowR(2.8, y, 5, 0.14, 6);
+      p.windowR(2.83, y, 19, 0.14, 7, winter && y === 1.15);
     }
-    p.lordFlag(0.75, 0.575, towerH, 26);
-  } else {
-    p.roofPyramid(0.3, 0.15, 1.2, 1.0, towerH, 26, 'slate');
-    p.lordFlag(0.75, 0.575, towerH + 26, 20);
+    p.windowL(2.3, 2.3, 5, 0.14, 6);
+    p.windowL(2.33, 2.3, 19, 0.14, 7);
+    p.roofY(1.97, 0.27, 2.83, 2.33, 29, 22, 'tile', PLASTER, 0.1);
+    smoke.push(p.chimney(0.75, 1.3, 40, 18, '#8d8274'));
+    smoke.push(p.chimney(2.35, 0.7, 40, 16, '#8d8274'));
+    // Door with a stone step and the lord's hangings.
+    p.wallL(2.052, 1.2, 1.45, 0, 12, '#5b3a22');
+    p.line([1.325, 2.054, 0], [1.325, 2.054, 12], '#3d2614', 0.8);
+    p.box(1.15, 2.05, 1.5, 2.25, 0, 2, '#9b9284');
+    p.wallL(2.095, 1.05, 1.13, 15, 26, arms.field);
+    p.wallL(2.095, 1.52, 1.6, 15, 26, arms.field);
+    p.lordFlag(2.4, 1.3, 51, 22);
+    p.bush(0.5, 2.3, 4, '#5a7a3a');
+    p.bush(0.85, 2.35, 3.5, '#4f6f34');
+    return;
   }
-  if (level >= 2) {
-    // East wing.
-    p.box(1.95, 0.3, 2.75, 0.95, 0, level >= 3 ? 10 : 5, STONE);
-    p.box(1.95, 0.3, 2.75, 0.95, level >= 3 ? 10 : 5, 18, PLASTER);
-    p.timber(1.95, 0.3, 2.75, 0.95, level >= 3 ? 10 : 5, 18, BEAM);
-    p.windowR(2.75, 0.5, 12, 0.14, 7, season === 3);
-    p.roofY(1.95, 0.3, 2.75, 0.95, level >= 3 ? 28 : 23, 18, level >= 3 ? 'slate' : 'shingle', PLASTER, 0.08);
+  // Stone Manor: three storeys of dressed stone, a matching wing and a
+  // corner tower, on grounds of 4x4.
+  const ST = '#b6ae9f';
+  p.shadow(0.35, 0.3, 3.65, 3.2);
+  // Gravel path to the door, and clipped box hedges either side.
+  p.poly([[1.75, 2.95, 0], [2.25, 2.95, 0], [2.3, 3.95, 0], [1.7, 3.95, 0]], winter ? '#d4d8d6' : '#c8b896');
+  for (const y of [3.25, 3.7]) {
+    p.bush(1.45, y, 4.5, '#557a38');
+    p.bush(2.55, y, 4.5, '#557a38');
   }
-  // Main hall.
-  const base = level >= 3 ? 14 : 6;
-  const wallH = level >= 3 ? 20 : 24;
-  p.box(0.5, 0.75, 2.6, 2.25, 0, base, STONE);
-  p.box(0.5, 0.75, 2.6, 2.25, base, wallH, level >= 4 ? '#c8c0b0' : PLASTER);
-  if (level < 4) p.timber(0.5, 0.75, 2.6, 2.25, base, wallH, BEAM);
-  for (const x of [0.7, 1.05, 1.95, 2.3]) p.windowL(2.25, x, base + 6, 0.14, 8, season === 3);
-  if (level >= 3) for (const x of [0.7, 1.05, 1.95, 2.3]) p.windowL(2.25, x, 3, 0.12, 6);
-  p.windowR(2.6, 1.0, base + 6, 0.14, 8);
-  p.windowR(2.6, 1.7, base + 6, 0.14, 8);
-  p.wallL(2.252, 1.38, 1.72, 0, 16, '#5b3a22');
-  p.line([1.55, 2.253, 0], [1.55, 2.253, 16], '#3d2614', 0.8);
-  const roofZ = base + wallH;
-  p.roofX(0.5, 0.75, 2.6, 2.25, roofZ, 28, 'slate', PLASTER, 0.12);
-  smoke.push(p.chimney(2.15, 1.65, roofZ + 4, 18, '#8d8274'));
-  if (level >= 3) smoke.push(p.chimney(0.8, 1.65, roofZ + 4, 18, '#8d8274'));
-  p.box(1.32, 2.25, 1.78, 2.5, 0, 3, '#9b9284');
-  if (level >= 2) {
-    // Banners either side of the door.
-    // Hangings in the lord's colours.
-    p.wallL(2.255, 1.18, 1.3, 8, 22, HERALDRY.current.field);
-    p.wallL(2.255, 1.8, 1.92, 8, 22, HERALDRY.current.field);
+  // Tower at the back left, a storey above the rest.
+  p.box(0.35, 0.3, 1.25, 1.2, 0, 66, ST, undefined, 'stone');
+  for (const z of [10, 26, 42]) p.windowR(1.25, 0.6, z, 0.14, 8);
+  p.windowL(1.2, 0.65, 54, 0.14, 7);
+  for (let i = 0; i < 4; i++) {
+    p.box(0.35 + i * 0.25, 1.12, 0.47 + i * 0.25, 1.2, 66, 6, ST);
+    p.box(1.17, 0.3 + i * 0.25, 1.25, 0.42 + i * 0.25, 66, 6, ST);
   }
-  if (level >= 5) {
-    // Castle: a crenellated curtain wall with corner towers rings the keep.
-    const w = '#a49c8e';
-    const merlons = (x0: number, y0: number, x1: number, y1: number, z: number) => {
-      const n = Math.max(2, Math.round(Math.max(x1 - x0, y1 - y0) / 0.16));
-      for (let i = 0; i < n; i += 2) {
-        const t0 = i / n;
-        const t1 = (i + 1) / n;
-        p.box(x0 + (x1 - x0) * t0, y0 + (y1 - y0) * t0, x0 + (x1 - x0) * t1 + (x1 === x0 ? 0.06 : 0), y0 + (y1 - y0) * t1 + (y1 === y0 ? 0.06 : 0), z, 4, w);
-      }
-    };
-    p.box(0.08, 2.78, 2.6, 2.9, 0, 18, w);
-    merlons(0.08, 2.78, 2.6, 2.78, 18);
-    p.box(2.78, 0.1, 2.9, 2.6, 0, 18, w);
-    merlons(2.78, 0.1, 2.78, 2.6, 18);
-    // Gatehouse in the front wall.
-    p.box(1.25, 2.7, 1.85, 2.95, 0, 30, w);
-    p.wallL(2.952, 1.42, 1.68, 0, 14, '#2a2522');
-    merlons(1.25, 2.7, 1.85, 2.7, 30);
-    for (const [x, y] of [
-      [0.0, 2.65],
-      [2.65, 2.65],
-      [2.65, 0.0],
-    ]) {
-      p.box(x, y, x + 0.35, y + 0.35, 0, 40, w);
-      merlons(x, y + 0.3, x + 0.35, y + 0.3, 40);
-      merlons(x + 0.3, y, x + 0.3, y + 0.35, 40);
-      p.windowL(y + 0.35, x + 0.12, 26, 0.08, 6);
-    }
-    p.lordFlag(2.82, 2.82, 44, 22);
-    p.lordFlag(1.55, 2.82, 34, 18);
-  } else if (level >= 4) {
-    // A curtain wall stub with a gate tower at the front corner.
-    p.box(2.55, 2.45, 2.9, 2.85, 0, 34, '#9d978c');
-    for (let i = 0; i < 2; i++) p.box(2.55 + i * 0.2, 2.77, 2.67 + i * 0.2, 2.85, 34, 6, '#9d978c');
+  p.lordFlag(0.8, 0.75, 66, 26);
+  // Main range, ridge along x.
+  p.box(0.6, 1.2, 2.65, 2.9, 0, 42, ST, undefined, 'stone');
+  for (const x of [0.8, 1.2, 2.2]) p.windowL(2.9, x, 5, 0.16, 8, winter && x === 0.8);
+  for (const z of [19, 33]) for (const x of [0.8, 1.2, 1.7, 2.2]) p.windowL(2.9, x, z, 0.16, 8);
+  // String courses between the floors.
+  for (const z of [15, 29]) {
+    p.wallL(2.903, 0.6, 2.65, z, z + 1.2, 'rgba(70,60,50,0.35)');
+    p.wallR(3.603, 0.4, 2.9, z, z + 1.2, 'rgba(70,60,50,0.3)');
+    p.wallL(2.903, 2.65, 3.6, z, z + 1.2, 'rgba(70,60,50,0.35)');
   }
+  p.roofX(0.6, 1.2, 2.65, 2.9, 42, 28, 'slate', ST, 0.1);
+  // Dormers on the front slope.
+  for (const x of [1.0, 1.9]) {
+    p.box(x, 2.35, x + 0.3, 2.6, 46, 9, ST);
+    p.windowL(2.6, x + 0.08, 48, 0.14, 5);
+    p.roofY(x - 0.02, 2.33, x + 0.32, 2.62, 55, 6, 'slate', ST, 0.03);
+  }
+  // Wing on the right, ridge front to back.
+  p.box(2.65, 0.4, 3.6, 2.9, 0, 42, ST, undefined, 'stone');
+  for (const y of [0.7, 1.3, 1.9, 2.5]) for (const z of [5, 19, 33]) p.windowR(3.6, y, z, 0.15, 8, winter && z === 5 && y === 1.9);
+  for (const z of [5, 19, 33]) p.windowL(2.9, 3.05, z, 0.16, 8);
+  p.roofY(2.65, 0.4, 3.6, 2.9, 42, 26, 'slate', ST, 0.1);
+  smoke.push(p.chimney(0.95, 1.85, 58, 20, '#8d8274'));
+  smoke.push(p.chimney(3.1, 0.75, 58, 18, '#8d8274'));
+  // Arched door under a carved hood, with hangings.
+  p.wallL(2.902, 1.68, 1.98, 0, 14, '#4a2f1b');
+  p.line([1.83, 2.904, 0], [1.83, 2.904, 14], '#2e1d10', 0.8);
+  p.box(1.6, 2.9, 2.06, 3.0, 14, 2, '#9b9284');
+  p.box(1.55, 2.9, 2.1, 3.15, 0, 2, '#9b9284');
+  p.wallL(2.905, 1.48, 1.57, 17, 28, arms.field);
+  p.wallL(2.905, 2.09, 2.18, 17, 28, arms.field);
 }
 
 /** Ground tile for building yards drawn under some buildings. */

@@ -694,17 +694,46 @@ export class Pen {
     this.line([x, y + s, 0], [x + s, y + s, s * 40], '#6e5030', 0.6);
   }
 
+  /** A filled sack standing upright, tied at the neck. */
   sack(x: number, y: number, color = '#d8c79c'): void {
     const [sx, sy] = iso(x, y, 0);
     const c = this.ctx;
-    c.fillStyle = color;
+    c.fillStyle = 'rgba(30,24,12,0.2)';
     c.beginPath();
-    c.ellipse(sx, sy - 3.5, 3.5, 4, 0, 0, Math.PI * 2);
+    c.ellipse(sx + 0.8, sy - 0.3, 4.4, 1.6, 0, 0, Math.PI * 2);
     c.fill();
-    c.fillStyle = shade(color, 0.7);
+    const g = c.createLinearGradient(sx - 4, 0, sx + 4, 0);
+    g.addColorStop(0, shade(color, 1.04));
+    g.addColorStop(0.55, shade(color, 0.92));
+    g.addColorStop(1, shade(color, 0.68));
+    c.fillStyle = g;
     c.beginPath();
-    c.ellipse(sx + 1, sy - 2.5, 2, 2.5, 0, 0, Math.PI * 2);
+    c.moveTo(sx - 1.3, sy - 8.6);
+    c.bezierCurveTo(sx - 4.6, sy - 7, sx - 4.8, sy - 1.6, sx - 3.2, sy - 0.6);
+    c.quadraticCurveTo(sx, sy + 0.6, sx + 3.2, sy - 0.6);
+    c.bezierCurveTo(sx + 4.8, sy - 1.6, sx + 4.6, sy - 7, sx + 1.3, sy - 8.6);
+    c.closePath();
     c.fill();
+    c.strokeStyle = shade(color, 0.55);
+    c.lineWidth = 0.5;
+    c.stroke();
+    // The gathered mouth above the tie.
+    c.fillStyle = shade(color, 0.85);
+    c.beginPath();
+    c.moveTo(sx - 1.3, sy - 8.6);
+    c.lineTo(sx - 2.2, sy - 10.6);
+    c.lineTo(sx - 0.4, sy - 9.8);
+    c.lineTo(sx + 0.6, sy - 10.9);
+    c.lineTo(sx + 2, sy - 10.2);
+    c.lineTo(sx + 1.3, sy - 8.6);
+    c.closePath();
+    c.fill();
+    c.strokeStyle = '#6a4a2a';
+    c.lineWidth = 0.9;
+    c.beginPath();
+    c.moveTo(sx - 1.5, sy - 8.7);
+    c.lineTo(sx + 1.5, sy - 8.5);
+    c.stroke();
   }
 
   fence(a: [number, number], b: [number, number], color = '#7b5a36'): void {

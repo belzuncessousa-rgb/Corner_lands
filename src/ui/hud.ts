@@ -2170,7 +2170,7 @@ export class Hud {
         <div class="lord-row"><label>Skin</label>${swatches('skin', SKINS, look.skin)}</div>
         <div class="lord-row"><label>Hair</label>${choices('hairStyle', HAIR_STYLES, look.hairStyle)}${swatches('hair', HAIRS, look.hair)}</div>
         <div class="lord-row"><label>Hat</label>${choices('hat', HATS, look.hat)}${look.hat !== 'none' && look.hat !== 'coronet' ? swatches('hatColor', CLOTHS, look.hatColor) : ''}</div>
-        <div class="sub">The arms <small>(flown on the manor and the castle)</small></div>
+        <div class="sub">The arms <small>(flown on the manor)</small></div>
         <div class="lord-row"><label>Field</label>${swatches('a.field', TINCTURES, arms.field)}</div>
         <div class="lord-row"><label>Division</label>${choices('a.division', DIVISIONS, arms.division)}${arms.division !== 'plain' ? swatches('a.second', TINCTURES, arms.second) : ''}</div>
         <div class="lord-row"><label>Charge</label>${choices('a.charge', CHARGES, arms.charge)}${arms.charge !== 'none' ? swatches('a.chargeColor', TINCTURES, arms.chargeColor) : ''}</div>`;
@@ -2422,7 +2422,7 @@ export class Hud {
         <p><b>Roads</b> are optional but villagers walk faster on them, faster still on paved stone (T). Click to start, click again to plan it, keep clicking to continue; the road is laid a few tiles each day.</p>
         <p><b>The top bar</b> shows happiness, villagers, food, materials, goods and the treasury. Hover a chip for the details, click to pin it: set how much of each good to keep and whether merchants may buy the surplus. Workers rest when their goods reach the target.</p>
         <p><b>Workers:</b> select a workplace to choose how many villagers work there, its priority and its product. Seasonal work frees hands in the off season. Hover the villagers chip to see who is idle and where hands are short.</p>
-        <p><b>The Manor</b> is optional: build it for feasts, festivals and prestige, and renovate it as the town grows until it becomes a castle.</p>
+        <p><b>The Manor</b> is optional: build it for feasts, festivals and prestige, and renovate it as the town grows into a Manor House and then a Stone Manor, which lets you lay out a manor garden, watch towers and the town walls.</p>
         <p><b>Retinue</b>: a Borough can raise men-at-arms at the manor for prestige and arms. Paid 10 coins a month, they ride out against wolves and bandits.</p>
         <p><b>Harvest feast</b>: once each autumn, select the manor to call a feast. A meal for everyone and drink for every eight cheer the town for half a year and bring prestige.</p>
         <p><b>Homes</b> eat one food a month each; several food groups (grain, meat, produce, dairy) cheer them. When every food is gone they boil stored wheat into pottage, which is only half as filling. Each winter month a home burns firewood. Finer homes need clothes, a tavern, boots and medicine, and enjoy luxuries. A family may set up a craft at home: the workshop costs materials and takes days to build, and the craft stays for good.</p>
@@ -2615,8 +2615,7 @@ function upgradeName(b: Building): string {
   if (b.craftTo) return `a ${BUILDINGS[b.craftTo].name}`;
   const to = b.upgrading ?? b.level + 1;
   if (b.type === 'house') return HOUSE_LEVELS[to]?.name ?? '';
-  if (b.type === 'townhall') return MANOR_LEVELS[to]?.name ?? '';
-  return `Expanded ${BUILDINGS[b.type].name}`;
+  return MANOR_LEVELS[to]?.name ?? '';
 }
 
 // ------------------------------------------------------------------ charts

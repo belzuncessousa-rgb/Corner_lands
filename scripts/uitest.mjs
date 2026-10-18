@@ -212,9 +212,9 @@ await page.keyboard.press('v');
 const reach = await page.evaluate(() => window.game.coverage);
 await page.keyboard.press('Escape');
 check('reach overlay toggles', reach === 'well' && (await page.evaluate(() => window.game.coverage)) === null);
-// Town walls (City): laid like a road from the Civic menu.
+// Town walls (once the manor is a Stone Manor): laid like a road from the Civic menu.
 {
-  await page.evaluate(() => { const s = window.game.state; s.tier = 4; s.res.stone += 200; s.res.dressedstone += 100; s.res.gold += 500; window.game.hud.update(); });
+  await page.evaluate(() => { const s = window.game.state; s.tier = 4; const m = s.buildings.find((b) => b.type === 'townhall'); m.build = 1; m.level = 3; s.res.stone += 200; s.res.dressedstone += 100; s.res.gold += 500; window.game.hud.update(); });
   await page.evaluate(() => document.querySelectorAll('.banner').forEach((e) => e.remove()));
   await pick('civic', 'wall');
   const wy = hall.y - 6;

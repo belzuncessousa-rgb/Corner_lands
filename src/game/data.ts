@@ -103,7 +103,7 @@ export const GOODS: Record<ResourceId, GoodDef> = {
   paper: good('Paper', 'goods', 6, 'Pressed from flax at the scriptorium.', { keep: 40 }),
   books: good('Books', 'goods', 40, 'Copied and bound at the scriptorium. A luxury for Townhouses; universities need them.', { keep: 20 }),
   jewellery: good('Jewellery', 'goods', 60, 'Rings and brooches of silver. The finest luxury.', { keep: 20 }),
-  weapons: good('Arms', 'goods', 20, "Bows, pikes and armour. The castle's garrison needs them; merchants pay well.", { keep: 30 }),
+  weapons: good('Arms', 'goods', 20, "Bows, pikes and armour. The lord's retinue needs them; merchants pay well.", { keep: 30 }),
 
   gold: good('Coins', 'currency', 0, 'Collected from taxes and trade.'),
   prestige: good('Prestige', 'currency', 0, 'The renown of your house. Earned from a fine manor and a thriving town; spent on charters, titles (Baron, Earl, Duke) and works of art.'),
@@ -127,7 +127,6 @@ export const RESOURCE_STORAGE: Record<ResourceId, StorageKind | null> = Object.f
 
 /** Storage capacity each building provides. */
 export const STORAGE_CAPACITY: Partial<Record<BuildingType, Partial<Record<StorageKind, number>>>> = {
-  townhall: { materials: 150, food: 120 },
   camp: { materials: 150, food: 120 },
   storehouse: { materials: 300 },
   granary: { food: 300 },
@@ -241,7 +240,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   townhall: def({
     type: 'townhall',
     name: 'Manor',
-    desc: "The lord's seat, built where you choose (one to a town). Feasts and festivals are held here; it stores goods, brings a little prestige each month, and grows from hall to castle, needing more room at each step.",
+    desc: "The lord's seat, built where you choose (one to a town). Feasts and festivals are held here, and it brings a little prestige each month. It grows from a timber hall to a Manor House and a Stone Manor, which lets the lord raise a manor garden, watch towers and the town walls.",
     category: 'civic',
     w: 3,
     h: 3,
@@ -685,7 +684,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   armoury: def({
     type: 'armoury',
     name: 'Armoury',
-    desc: "Fletchers and armourers make bows from planks and armour from iron and leather. The castle's garrison needs arms.",
+    desc: "Fletchers and armourers make bows from planks and armour from iron and leather. The lord's retinue needs arms.",
     category: 'industry',
     cost: { stone: 25, planks: 15 },
     buildDays: 14,
@@ -724,10 +723,10 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   granary: def({
     type: 'granary',
     name: 'Granary',
-    desc: 'Stores 300 food and grain: bread, meat, fish, fruit, cheese, wheat, barley, flour. Its haulers fetch food from the workplaces, so the workers there need not walk to storage.',
+    desc: 'A square granary raised on stones, shut tight against rats and damp. Stores 300 food and grain: bread, meat, fish, fruit, cheese, wheat, barley, flour. Its haulers fetch food from the workplaces, so the workers there need not walk to storage.',
     category: 'civic',
-    w: 3,
-    h: 3,
+    w: 2,
+    h: 2,
     cost: { wood: 30 },
     buildDays: 12,
     workers: 2,
@@ -813,7 +812,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   wall: def({
     type: 'wall',
     name: 'Town Wall',
-    desc: "A City's great work, laid section by section like a road (click, click). Where it crosses a road a gate tower rises. Walls bring prestige, and a long circuit makes the town feel safe and keeps wolves and bandits out.",
+    desc: "Stone walls laid section by section like a road (click, click), once the lord has a Stone Manor. Where they cross a road a gate tower rises. Walls bring prestige, and a long circuit makes the town feel safe and keeps wolves and bandits out.",
     category: 'civic',
     w: 1,
     h: 1,
@@ -821,7 +820,18 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     buildDays: 3,
     workers: 0,
     radius: 0,
-    tier: 4,
+  }),
+  watchtower: def({
+    type: 'watchtower',
+    name: 'Watch Tower',
+    desc: "A stone tower where a watchman keeps an eye on the roads, once the lord has a Stone Manor. With a watch kept, wolves and bandits are seen coming and turned away; homes nearby feel safer, and it brings a little prestige.",
+    category: 'civic',
+    w: 1,
+    h: 1,
+    cost: { stone: 20, planks: 10, gold: 40 },
+    buildDays: 12,
+    workers: 1,
+    radius: 10,
   }),
   garden: def({
     type: 'garden',
@@ -834,6 +844,18 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     buildDays: 4,
     radius: 5,
     beauty: 3,
+  }),
+  manorgarden: def({
+    type: 'manorgarden',
+    name: 'Manor Garden',
+    desc: "The lord's pleasure garden, once the Stone Manor stands: clipped hedges, flower beds, a fountain and a pavilion. It costs a fortune in coin, makes a wide area lovelier and brings prestige every month. One per town.",
+    category: 'decor',
+    w: 5,
+    h: 4,
+    cost: { stone: 30, planks: 15, gold: 600 },
+    buildDays: 30,
+    radius: 12,
+    beauty: 6,
   }),
   maypole: def({
     type: 'maypole',
@@ -947,10 +969,12 @@ export const BUILD_ORDER: BuildingType[] = [
   'cathedral',
   'guildhall',
   'wall',
+  'watchtower',
   'garden',
   'maypole',
   'statue',
   'belltower',
+  'manorgarden',
 ];
 
 export const CATEGORY_NAMES: Record<Category, string> = {
@@ -966,10 +990,10 @@ export const CATEGORY_NAMES: Record<Category, string> = {
 
 export const TIERS = [
   { name: 'Hamlet', pop: 0, desc: 'A handful of families clearing the land.' },
-  { name: 'Village', pop: 20, desc: 'Homes may become Timber Houses, workshops may expand and the manor may grow into a Manor House.' },
+  { name: 'Village', pop: 20, desc: 'Homes may become Timber Houses and the manor may grow into a Manor House.' },
   { name: 'Town', pop: 45, desc: 'Homes may become Townhouses, the manor a Stone Manor, and town charters may be granted.' },
-  { name: 'Borough', pop: 90, desc: 'Your lands prosper. The manor may rise into a Lord\'s Keep, and the lord may keep a retinue.' },
-  { name: 'City', pop: 150, desc: 'Songs are sung of your town across the realm, and its manor may rise into a castle.' },
+  { name: 'Borough', pop: 90, desc: 'Your lands prosper, and the lord may keep a retinue.' },
+  { name: 'City', pop: 150, desc: 'Songs are sung of your town across the realm.' },
 ];
 
 export const TAX_LEVELS = [

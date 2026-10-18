@@ -221,9 +221,8 @@ export class Game {
     // Deeds for the load cards: the lord's title, great works and milestones.
     const deeds: string[] = [];
     if (s.title) deeds.push(TITLES[s.title].name);
-    for (const t of ['castle', 'cathedral', 'guildhall', 'belltower'] as const) {
-      const done = t === 'castle' ? s.tier >= TIERS.length - 1 : s.buildings.some((b) => b.type === t && b.build >= 1);
-      if (done) deeds.push(t === 'castle' ? 'Castle' : BUILDINGS[t].name);
+    for (const t of ['manorgarden', 'cathedral', 'guildhall', 'belltower'] as const) {
+      if (s.buildings.some((b) => b.type === t && b.build >= 1)) deeds.push(BUILDINGS[t].name);
     }
     const miles = (s.milestones ?? []).length;
     if (miles) deeds.push(`${miles} milestone${miles > 1 ? 's' : ''}`);

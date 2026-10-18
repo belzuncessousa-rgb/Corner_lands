@@ -74,6 +74,30 @@ export function deserialize(json: string): GameState {
   if (hall) hall.level = Math.max(hall.level, s.tier + 1);
   for (const b of s.buildings) {
     if (b.type === 'house' && b.level >= 2) b.level = Math.min(b.level, 3);
+    // The manor now stops at the Stone Manor (4x4): keeps and castles step down.
+    if (b.type === 'townhall' && (b.level > 3 || (b.upgrading ?? 0) > 3)) {
+      if (b.upgrading) {
+        b.upgrading = undefined;
+        b.upProgress = undefined;
+        b.need = undefined;
+      }
+      b.level = Math.min(b.level, 3);
+      if (b.w > 4) {
+        for (let y = b.y; y < b.y + b.h; y++)
+          for (let x = b.x; x < b.x + b.w; x++) if (x >= b.x + 4 || y >= b.y + 4) s.occ[y * s.width + x] = -1;
+        b.w = 4;
+        b.h = 4;
+      }
+    }
+    // Workplaces are no longer expanded.
+    if (b.type !== 'house' && b.type !== 'townhall' && b.type !== 'market') {
+      if (b.level > 1) b.level = 1;
+      if (b.upgrading && !b.craftTo) {
+        b.upgrading = undefined;
+        b.upProgress = undefined;
+        b.need = undefined;
+      }
+    }
   }
   // Farms used to be 4x4 with their own field; they are now a farmstead
   // with fields drawn beside it.

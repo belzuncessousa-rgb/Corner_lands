@@ -9,13 +9,12 @@ import {
   needsMaterials,
   recompute,
 } from './sim';
-import type { Building, BuildingType, Cost, GameState } from './types';
+import type { Building, Cost, GameState } from './types';
 import { idx, inBounds } from './world';
 
 /**
- * Building levels: houses grow as their needs are met, the manor grows with
- * the settlement (and with it the settlement's rank), and workplaces can be
- * expanded once to take more workers.
+ * Building levels: houses grow as their needs are met, and the manor grows
+ * with the settlement.
  */
 
 export interface HouseLevel {
@@ -40,14 +39,15 @@ export const MANOR_LEVELS: { name: string; cost?: Cost; days?: number }[] = [
   { name: 'Manor Hall' },
   { name: 'Manor House', cost: { wood: 40, stone: 20, gold: 50 }, days: 20 },
   { name: 'Stone Manor', cost: { planks: 40, dressedstone: 40, stone: 20, gold: 150 }, days: 30 },
-  { name: "Lord's Keep", cost: { dressedstone: 80, stone: 40, planks: 60, tools: 15, gold: 400 }, days: 40 },
-  { name: 'Castle', cost: { dressedstone: 160, stone: 80, planks: 60, tools: 25, weapons: 20, gold: 800, prestige: 150 }, days: 60 },
 ];
 
+/** The manor's last step: once it stands, the lord may build what befits it. */
+export const STONE_MANOR = 3;
+
 /** The manor's grounds at each level: it needs more room as it grows. */
-export const MANOR_SIZE = [0, 3, 3, 4, 4, 5];
+export const MANOR_SIZE = [0, 3, 3, 4];
 /** The town size each manor level waits for. */
-export const MANOR_TIER = [0, 1, 1, 2, 3, 4];
+export const MANOR_TIER = [0, 1, 1, 2];
 
 /** Whether the ground the manor would grow onto is clear. */
 export function roomToGrow(s: GameState, b: Building, size: number): boolean {
@@ -62,40 +62,6 @@ export function roomToGrow(s: GameState, b: Building, size: number): boolean {
   return true;
 }
 
-/** Extra storage each manor level above the first provides. */
-export const MANOR_STORAGE_PER_LEVEL = { materials: 60, food: 50 };
-
-export const WORKPLACE_UPGRADE: Cost = { planks: 15, wood: 10 };
-export const UPGRADABLE_WORK: BuildingType[] = [
-  'woodcutter',
-  'forester',
-  'quarry',
-  'mine',
-  'forager',
-  'hunter',
-  'fisher',
-  'farm',
-  'bakery',
-  'windmill',
-  'brewhouse',
-  'dairy',
-  'tanner',
-  'weaver',
-  'tailor',
-  'apothecary',
-  'byre',
-  'orchardist',
-  'sawmill',
-  'smithy',
-  'claypit',
-  'kiln',
-  'stonemason',
-  'carpenter',
-  'bloomery',
-  'tavern',
-];
-
-/** Worker slots, including the expansion of a level 2 workplace. */
 /** Stalls a marketplace has room for: one for every six tiles, up to six. */
 export function marketStalls(b: Building): number {
   return Math.max(1, Math.min(6, Math.floor((b.w * b.h) / 6)));
@@ -106,15 +72,13 @@ export function workersOf(b: Building): number {
   if (b.type === 'market') return marketStalls(b);
   // A family craft is worked by as many of the household as the workshop needs.
   if (b.trade) return Math.min(BUILDINGS[b.trade].workers, b.residents);
-  const base = BUILDINGS[b.type].workers;
-  return b.level >= 2 && UPGRADABLE_WORK.includes(b.type) ? base + Math.ceil(base / 2) : base;
+  return BUILDINGS[b.type].workers;
 }
 
 export function buildingName(b: Building): string {
   if (b.type === 'house') return HOUSE_LEVELS[b.level]?.name || 'Cottage';
   if (b.type === 'townhall') return MANOR_LEVELS[b.level]?.name || 'Manor Hall';
-  const name = BUILDINGS[b.type].name;
-  return b.level >= 2 ? `${name} (expanded)` : name;
+  return BUILDINGS[b.type].name;
 }
 
 export interface Need {
@@ -173,15 +137,6 @@ export function upgradePlan(s: GameState, b: Building): UpgradePlan | null {
     if (size > b.w) reqs.push({ label: `Clear ground to grow to ${size}×${size}`, met: roomToGrow(s, b, size) });
     return { to, name: next.name, cost: next.cost, days: next.days ?? 20, reqs };
   }
-  if (UPGRADABLE_WORK.includes(b.type) && b.level < 2) {
-    return {
-      to: 2,
-      name: `Expanded ${BUILDINGS[b.type].name}`,
-      cost: WORKPLACE_UPGRADE,
-      days: 8,
-      reqs: [{ label: `Settlement is a ${TIERS[1].name}`, met: s.tier >= 1 }],
-    };
-  }
   return null;
 }
 
@@ -215,16 +170,14 @@ export function startUpgrade(s: GameState, b: Building): boolean {
 export function upgradeDays(b: Building): number {
   if (b.craftTo) return HOME_TRADE_DAYS;
   if (b.type === 'townhall') return MANOR_LEVELS[b.upgrading ?? 2]?.days ?? 20;
-  if (b.type === 'house') return 6 + (b.upgrading ?? 2) * 3;
-  return 8;
+  return 6 + (b.upgrading ?? 2) * 3;
 }
 
 /** Cost of the renovation in progress (for showing delivered materials). */
 export function upgradeCost(b: Building): Cost {
   if (b.craftTo) return HOME_TRADE_COST;
   if (b.type === 'townhall') return MANOR_LEVELS[b.upgrading ?? 2]?.cost ?? {};
-  if (b.type === 'house') return HOUSE_LEVELS[b.upgrading ?? 2]?.cost ?? {};
-  return WORKPLACE_UPGRADE;
+  return HOUSE_LEVELS[b.upgrading ?? 2]?.cost ?? {};
 }
 
 /** Called when a renovation finishes. */

@@ -1,6 +1,6 @@
 import { DAYS_PER_MONTH, DAYS_PER_YEAR } from './data';
 import type { StateRng } from './rng';
-import { checkMilestones, log, store, totalHousing, wallSections, WALL_SAFE } from './sim';
+import { checkMilestones, log, store, totalHousing, wallSections, watchKept, WALL_SAFE } from './sim';
 import type { BuildingType, GameState, MessageKind, ResourceId } from './types';
 import { FOOD_IDS } from './data';
 
@@ -461,6 +461,15 @@ export const EVENTS: DecisionEvent[] = [
             },
           ]
         : []),
+      ...(wallSections(s) < WALL_SAFE && watchKept(s)
+        ? [
+            {
+              label: 'Sound the watch',
+              detail: 'The watchmen saw them coming. Nothing is lost.',
+              apply: () => ({ text: 'A horn from the watch tower, torches on the road, and whatever lurked out there thought better of it.', kind: 'good' as MessageKind }),
+            },
+          ]
+        : []),
       ...(s.retinue
         ? [
             {
@@ -699,6 +708,15 @@ export const EVENTS: DecisionEvent[] = [
               label: 'Shut the gates',
               detail: 'The town walls keep them out. Nothing is lost.',
               apply: () => ({ text: 'The watch shut the gates at dusk. Whatever prowled outside went hungry.', kind: 'good' as MessageKind }),
+            },
+          ]
+        : []),
+      ...(wallSections(s) < WALL_SAFE && watchKept(s)
+        ? [
+            {
+              label: 'Sound the watch',
+              detail: 'The watchmen saw them coming. Nothing is lost.',
+              apply: () => ({ text: 'A horn from the watch tower, torches on the road, and whatever lurked out there thought better of it.', kind: 'good' as MessageKind }),
             },
           ]
         : []),

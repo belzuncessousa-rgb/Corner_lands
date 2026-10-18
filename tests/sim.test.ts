@@ -477,14 +477,29 @@ describe('levels', () => {
     expect(houseNeeds(s, house, 2).filter((n) => !n.met).length).toBeGreaterThan(0);
   });
 
-  it('expanded workplaces take more workers', async () => {
-    const { workersOf } = await import('../src/game/levels');
+  it('the manor stops at the Stone Manor, which opens the garden, watch towers and walls', async () => {
+    const { upgradePlan } = await import('../src/game/levels');
+    const { isUnlocked, lockReason } = await import('../src/game/sim');
+    const s = generateWorld(17);
+    s.tier = 4;
+    const m = placeNearRoad(s, 'townhall');
+    m.build = 1;
+    m.level = 2;
+    expect(isUnlocked(s, 'manorgarden')).toBe(false);
+    expect(lockReason(s, 'watchtower')).toMatch(/Stone Manor/);
+    expect(upgradePlan(s, m)?.name).toBe('Stone Manor');
+    m.level = 3;
+    expect(upgradePlan(s, m)).toBeNull();
+    for (const t of ['manorgarden', 'watchtower', 'wall'] as const) expect(isUnlocked(s, t)).toBe(true);
+  });
+
+  it('workplaces are not expanded', async () => {
+    const { upgradePlan, workersOf } = await import('../src/game/levels');
     const s = generateWorld(16);
     const wc = placeNearRoad(s, 'woodcutter');
     wc.build = 1;
     expect(workersOf(wc)).toBe(3);
-    wc.level = 2;
-    expect(workersOf(wc)).toBe(5);
+    expect(upgradePlan(s, wc)).toBeNull();
   });
 });
 
@@ -1226,6 +1241,11 @@ describe('town walls', () => {
     s.tier = 4;
     s.res.gold = 9999;
     const h = hall(s);
+    // Town walls wait for a Stone Manor.
+    expect(placeOrder(s, 'wall', h.x - 10, h.y)).toBeFalsy();
+    const manor = placeNearRoad(s, 'townhall');
+    manor.build = 1;
+    manor.level = 3;
     const base = prestigeIncome(s);
     let n = 0;
     for (let y = h.y - 12; y < h.y + 14 && n < WALL_SAFE; y++) {

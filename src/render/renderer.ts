@@ -1,7 +1,7 @@
 import { BUILDINGS, DAYS_PER_MONTH, DAYS_PER_YEAR, RESOURCE_STORAGE, STORAGE_CAPACITY, type StorageKind } from '../game/data';
-import { marketStalls, upgradeBlocker } from '../game/levels';
+import { MANOR_SIZE, marketStalls, upgradeBlocker } from '../game/levels';
 import { hasCharter } from '../game/charters';
-import { ANIMAL_KINDS, HOME_TRADES, animalsOf, deliveredTo, hasProblem, herdTotal, monthOf, nearestShoal, orchardMaturity, seasonOf, seatOf, storageCap } from '../game/sim';
+import { ANIMAL_KINDS, HOME_TRADES, animalsOf, deliveredTo, hasProblem, herdTotal, monthOf, nearestShoal, orchardMaturity, seasonOf, seatOf, storageCap, stored } from '../game/sim';
 import type { Building, BuildingType, GameState, ResourceId, Season } from '../game/types';
 import { idx, inBounds } from '../game/world';
 import type { Agent } from './agents';
@@ -11,6 +11,7 @@ import { Pen, TH, TW, iso, mix } from './pen';
 import { mulberry32 } from '../game/rng';
 import { DEFAULT_HERALDRY, HERALDRY, heraldryKey } from './heraldry';
 import {
+  oreHeap,
   type Sprite,
   type TreeKind,
   bridgeTile,
@@ -164,7 +165,9 @@ export class Renderer {
     const d = BUILDINGS[type];
     // The manor flies the lord's arms: a new design means a new picture.
     const arms = type === 'townhall' ? `:${heraldryKey()}` : '';
-    return this.sprite(`b:${type}:${level}:${season}:${variant}${arms}`, () => buildingSprite(type, d.w, d.h, level, season, variant));
+    // The manor's grounds grow with it.
+    const size = type === 'townhall' ? (MANOR_SIZE[level] ?? d.w) : 0;
+    return this.sprite(`b:${type}:${level}:${season}:${variant}${arms}`, () => buildingSprite(type, size || d.w, size || d.h, level, season, variant));
   }
 
   private lodCache = [new WeakMap<HTMLCanvasElement, HTMLCanvasElement>(), new WeakMap<HTMLCanvasElement, HTMLCanvasElement>()];
@@ -1087,10 +1090,7 @@ export class Renderer {
       this.drawWall(s, b);
       return;
     }
-    const grounds = b.type === 'townhall' && b.w > 3;
-    if (grounds) this.drawManorGrounds(b, season, 'ground');
     this.blit(sp, wx, wy);
-    if (grounds) this.drawManorGrounds(b, season, 'walls');
     if (turning) {
       const [hx, hy] = iso(b.x + 1.0, b.y + 1.42, 34);
       drawSails(c, hx, hy, this.time * 0.9 + b.id, season);
@@ -1117,7 +1117,8 @@ export class Renderer {
       c.fillStyle = `rgba(255,220,120,${f + 0.2})`;
       c.fillRect(ox - 1, oy - 2.5, 5, 2.2);
     }
-    if (STORAGE_CAPACITY[b.type]) this.drawStock(s, b, season);
+    // The granary is shut up tight: only storehouse and camp show their stock.
+    if (STORAGE_CAPACITY[b.type] && b.type !== 'granary') this.drawStock(s, b, season);
     if (b.type === 'townhall' && s.feastDay !== undefined && s.day - s.feastDay < DAYS_PER_MONTH) this.drawFeast(b);
     const fest = s.festivalDay && s.day - s.festivalDay.day < DAYS_PER_MONTH ? s.festivalDay.id : null;
     if (fest === 'mayday' && b.type === 'maypole') this.drawMayDance(b);
@@ -1190,20 +1191,20 @@ export class Renderer {
     };
     const gate = at(1, 0).road || at(-1, 0).road || at(0, 1).road || at(0, -1).road;
     // Arms reach towards neighbours further back first, so nearer ones overlap.
-    if (at(-1, 0).wall) p.box(x - 0.5, y + 0.36, x + 0.5, y + 0.64, 0, H, stone, top);
-    if (at(0, -1).wall) p.box(x + 0.36, y - 0.5, x + 0.64, y + 0.5, 0, H, stone, top);
+    if (at(-1, 0).wall) p.box(x - 0.5, y + 0.36, x + 0.5, y + 0.64, 0, H, stone, top, 'stone');
+    if (at(0, -1).wall) p.box(x + 0.36, y - 0.5, x + 0.64, y + 0.5, 0, H, stone, top, 'stone');
     if (gate) {
-      p.box(x + 0.14, y + 0.14, x + 0.86, y + 0.86, 0, H * 2, '#aaa190', top);
+      p.box(x + 0.14, y + 0.14, x + 0.86, y + 0.86, 0, H * 2, '#aaa190', top, 'stone');
       p.wallL(y + 0.862, x + 0.38, x + 0.62, H * 1.3, H * 1.6, '#2a2522');
       p.wallR(x + 0.862, y + 0.38, y + 0.62, H * 1.3, H * 1.6, '#221e1b');
       p.roofPyramid(x + 0.14, y + 0.14, x + 0.86, y + 0.86, H * 2, 18, 'slate');
     } else if ((x + y) % 6 === 0) {
       // A postern: a small arched door through the wall for folk on foot.
-      p.box(x + 0.28, y + 0.28, x + 0.72, y + 0.72, 0, H + 8, '#aaa190', top);
+      p.box(x + 0.28, y + 0.28, x + 0.72, y + 0.72, 0, H + 8, '#aaa190', top, 'stone');
       p.wallL(y + 0.722, x + 0.42, x + 0.58, 0, 12, '#4a2f1b');
       p.wallR(x + 0.722, y + 0.42, y + 0.58, 0, 12, '#3e2716');
     } else {
-      p.box(x + 0.32, y + 0.32, x + 0.68, y + 0.68, 0, H + 4, stone, top);
+      p.box(x + 0.32, y + 0.32, x + 0.68, y + 0.68, 0, H + 4, stone, top, 'stone');
       // Crenellations along the top.
       for (const [cx, cy] of [
         [0.36, 0.36],
@@ -1211,7 +1212,7 @@ export class Renderer {
         [0.36, 0.56],
         [0.56, 0.56],
       ]) {
-        p.box(x + cx, y + cy, x + cx + 0.08, y + cy + 0.08, H + 4, 4, stone, top);
+        p.box(x + cx, y + cy, x + cx + 0.08, y + cy + 0.08, H + 4, 4, stone, top, 'stone');
       }
     }
   }
@@ -1943,7 +1944,19 @@ export class Renderer {
   private drawStock(s: GameState, b: Building, season: Season): void {
     const p = new Pen(this.ctx);
     p.snow = season === 3;
-    const kinds: StorageKind[] = b.type === 'storehouse' ? ['materials'] : b.type === 'granary' ? ['food'] : ['materials', 'food'];
+    if (b.type === 'camp') {
+      // The settlers' things: logs, stone and sacks of food beside the tents.
+      const fill = (kind: StorageKind) => Math.min(1, stored(s, kind) / Math.max(1, storageCap(s, kind)));
+      const wood = s.res.wood + s.res.planks;
+      const stone = s.res.stone;
+      if (wood >= 1) p.logPile(b.x + 2.25, b.y + 1.85, Math.min(4, 1 + Math.ceil(fill('materials') * 3)));
+      if (wood >= 40) p.logPile(b.x + 2.3, b.y + 2.5, 2);
+      if (stone >= 1) p.stonePile(b.x + 1.45, b.y + 2.35, Math.min(6, 2 + Math.ceil((stone / 40) * 4)));
+      const sacks = Math.ceil(fill('food') * 5);
+      for (let k = 0; k < sacks; k++) p.sack(b.x + 2.35 + (k % 3) * 0.17, b.y + 0.9 + Math.floor(k / 3) * 0.2 + (k % 2) * 0.04, k % 2 ? '#cdbb8e' : '#d8c79c');
+      return;
+    }
+    const kinds: StorageKind[] = b.type === 'storehouse' ? ['materials'] : ['food'];
     const slots: [number, number][] =
       b.type === 'townhall'
         ? [
@@ -2717,61 +2730,6 @@ export class Renderer {
     c.globalAlpha = 1;
   }
 
-  /**
-   * A grown manor's grounds, beyond the hall in the back corner: a paved
-   * courtyard, then a garden wall (Stone Manor), a curtain wall (Lord's Keep)
-   * and corner towers and a gatehouse (Castle) along the front edges.
-   */
-  private drawManorGrounds(b: Building, season: Season, part: 'ground' | 'walls'): void {
-    const p = new Pen(this.ctx);
-    p.snow = season === 3;
-    const x0 = b.x;
-    const y0 = b.y;
-    const x1 = b.x + b.w;
-    const y1 = b.y + b.h;
-    if (part === 'ground') {
-      p.poly(
-        [
-          [x0 + 0.1, y0 + 0.1, 0],
-          [x1 - 0.1, y0 + 0.1, 0],
-          [x1 - 0.1, y1 - 0.1, 0],
-          [x0 + 0.1, y1 - 0.1, 0],
-        ],
-        season === 3 ? '#d8dcdc' : '#b8b0a0',
-      );
-      for (let x = x0 + 0.5; x < x1; x += 0.5) p.line([x, y0 + 0.1, 0], [x, y1 - 0.1, 0], 'rgba(90,80,65,0.15)', 0.5);
-      return;
-    }
-    const stone = b.level >= 4 ? '#9d978c' : '#a8a093';
-    const h = b.level >= 4 ? 16 : 7;
-    const t = 0.18;
-    // Front walls: along the far x edge and the far y edge, with a gate in the middle of the front.
-    const gate = (x0 + x1) / 2;
-    p.box(x1 - t, y0 + 0.1, x1, y1, 0, h, stone, undefined, 'stone');
-    p.box(x0 + 0.1, y1 - t, gate - 0.45, y1, 0, h, stone, undefined, 'stone');
-    p.box(gate + 0.45, y1 - t, x1, y1, 0, h, stone, undefined, 'stone');
-    if (b.level >= 4) {
-      // Crenels along the top.
-      for (let y = y0 + 0.2; y < y1 - 0.2; y += 0.3) p.box(x1 - t, y, x1, y + 0.15, h, 3, stone);
-      for (let x = x0 + 0.2; x < x1 - 0.2; x += 0.3) if (Math.abs(x + 0.07 - gate) > 0.5) p.box(x, y1 - t, x + 0.15, y1, h, 3, stone);
-    }
-    if (b.level >= 5) {
-      // Round-ish corner towers and a gatehouse.
-      for (const [tx, ty] of [
-        [x1 - 0.45, y0 + 0.05],
-        [x1 - 0.45, y1 - 0.45],
-        [x0 + 0.05, y1 - 0.45],
-      ] as const) {
-        p.box(tx, ty, tx + 0.45, ty + 0.45, 0, 34, stone, undefined, 'stone');
-        p.roofPyramid(tx - 0.03, ty - 0.03, tx + 0.48, ty + 0.48, 34, 16, 'slate');
-      }
-      p.box(gate - 0.55, y1 - 0.3, gate - 0.3, y1 + 0.05, 0, 26, stone, undefined, 'stone');
-      p.box(gate + 0.3, y1 - 0.3, gate + 0.55, y1 + 0.05, 0, 26, stone, undefined, 'stone');
-      p.box(gate - 0.55, y1 - 0.3, gate + 0.55, y1 + 0.05, 18, 8, stone, undefined, 'stone');
-      p.lordFlag(x1 - 0.22, y1 - 0.22, 50, 22);
-    }
-  }
-
   /** Market stalls by tile, rebuilt each frame. */
   private stallTiles = new Map<number, { b: Building; k: number; open: boolean }>();
 
@@ -3114,8 +3072,7 @@ function drawGood(p: Pen, id: ResourceId, x: number, y: number): void {
       p.box(x - 0.08, y - 0.06, x + 0.08, y + 0.06, 5, 5, '#d4cec0');
       break;
     case 'ore':
-      p.stonePile(x - 0.15, y - 0.15, 4);
-      p.ellipse(x, y, 4, 2, 6, '#b4652e');
+      oreHeap(p, x, y, 6);
       break;
     case 'clay':
       p.ellipse(x, y, 10, 5, 2, '#9a5a34');

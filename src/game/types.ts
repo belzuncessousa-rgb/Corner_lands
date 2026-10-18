@@ -114,7 +114,9 @@ export type BuildingType =
   | 'tavern'
   | 'garden'
   | 'maypole'
-  | 'statue';
+  | 'statue'
+  | 'manorgarden'
+  | 'watchtower';
 
 export type Category = 'housing' | 'resources' | 'farming' | 'food' | 'industry' | 'civic' | 'decor';
 
@@ -360,7 +362,7 @@ export interface GameState {
   gloom?: number;
   /** The player's lord or lady, as they chose to look. */
   lord?: import('../render/lord').LordLook;
-  /** The lord's arms, flown on the manor's and the castle's flags. */
+  /** The lord's arms, flown on the manor's flags. */
   heraldry?: import('../render/heraldry').Heraldry;
   /** Years that ended with no one having gone hungry. */
   fedYears?: number;

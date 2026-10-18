@@ -218,8 +218,8 @@ export const QUESTS: Quest[] = [
   },
   {
     id: 'city',
-    title: 'Raise a castle',
-    hint: 'With 150 villagers and three charters, raise the Keep into a Castle and become a City.',
+    title: 'Become a City',
+    hint: 'With 150 villagers and three town charters, your town becomes a City.',
     reward: { gold: 500 },
     done: (s) => s.tier >= 4,
   },

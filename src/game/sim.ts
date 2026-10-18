@@ -33,7 +33,7 @@ import { CHARTERS, hasCharter, onPath } from './charters';
 import { rollEvent } from './events';
 import {
   HOUSE_LEVELS,
-  MANOR_STORAGE_PER_LEVEL,
+  STONE_MANOR,
   finishUpgrade,
   houseNeeds,
   isProject,
@@ -84,7 +84,6 @@ export function storageCap(s: GameState, kind: StorageKind): number {
   for (const b of s.buildings) {
     if (b.build < 1) continue;
     n += (STORAGE_CAPACITY[b.type]?.[kind] ?? 0) * (b.type === 'granary' && hasCharter(s, 'farm3a') ? 2 : 1);
-    if (b.type === 'townhall') n += (b.level - 1) * MANOR_STORAGE_PER_LEVEL[kind];
   }
   return n;
 }
@@ -186,14 +185,23 @@ export function footprintClear(s: GameState, x: number, y: number, w: number, h:
  */
 export function isUnlocked(s: GameState, type: BuildingType): boolean {
   const d = BUILDINGS[type];
+  if (MANOR_WORKS.includes(type)) return hasStoneManor(s);
   if (d.category !== 'decor') return true;
   return d.tier <= s.tier && (!d.charter || hasCharter(s, d.charter));
+}
+
+/** What a Stone Manor lets the lord build. */
+export const MANOR_WORKS: BuildingType[] = ['manorgarden', 'watchtower', 'wall'];
+
+export function hasStoneManor(s: GameState): boolean {
+  return s.buildings.some((b) => b.type === 'townhall' && b.build >= 1 && b.level >= STONE_MANOR);
 }
 
 /** Why a building is locked, for menus. */
 export function lockReason(s: GameState, type: BuildingType): string | null {
   const d = BUILDINGS[type];
   if (isUnlocked(s, type)) return null;
+  if (MANOR_WORKS.includes(type)) return 'Requires the Stone Manor';
   if (d.tier > s.tier) return `Requires ${TIERS[d.tier].name}`;
   if (d.charter && !hasCharter(s, d.charter)) return `Requires the ${CHARTERS.find((c) => c.id === d.charter)?.name ?? d.charter} charter`;
   return null;
@@ -212,6 +220,7 @@ export function placementError(s: GameState, type: BuildingType, x: number, y: n
   if (type === 'townhall' && s.buildings.some((b) => b.type === 'townhall')) return 'Your town has its manor';
   if (type === 'guildhall' && s.buildings.some((b) => b.type === 'guildhall')) return 'Your town has its guildhall';
   if (type === 'belltower' && s.buildings.some((b) => b.type === 'belltower')) return 'Your town has its bell tower';
+  if (type === 'manorgarden' && s.buildings.some((b) => b.type === 'manorgarden')) return 'Your manor has its garden';
   if ((d.cost.gold ?? 0) > s.res.gold) return 'Not enough coins';
   return null;
 }
@@ -2321,6 +2330,7 @@ function passiveStatus(s: GameState, b: Building): string {
     case 'maypole':
     case 'statue':
     case 'belltower':
+    case 'manorgarden':
     case 'cathedral':
     case 'church': {
       let homes = 0;
@@ -2803,6 +2813,8 @@ export function prestigeIncome(s: GameState): number {
     else if (b.type === 'wall') walls++;
     else if (b.type === 'statue') n += 1;
     else if (b.type === 'belltower') n += 2;
+    else if (b.type === 'manorgarden') n += 4;
+    else if (b.type === 'watchtower') n += 0.5;
     else if (b.type === 'guildhall') n += 4;
     else if (b.type === 'maypole') n += 0.5;
     else if (b.type === 'house' && b.level >= 3) n += 0.2;
@@ -2824,6 +2836,11 @@ export const WALL_SAFE = 40;
 /** Every sixth section of town wall has a postern: a small door villagers on foot can use. */
 export function isPostern(b: Building): boolean {
   return b.type === 'wall' && (b.x + b.y) % 6 === 0;
+}
+
+/** Whether a watchman stands on a watch tower. */
+export function watchKept(s: GameState): boolean {
+  return s.buildings.some((b) => b.type === 'watchtower' && b.build >= 1 && b.workers > 0);
 }
 
 export function wallSections(s: GameState): number {
@@ -2994,6 +3011,7 @@ export function updateHappiness(s: GameState): void {
   if ((s.title ?? 0) >= 2) factors.push({ label: `Proud to serve ${(s.title ?? 0) >= 3 ? 'a Duke' : 'an Earl'}`, value: 3 });
   if (s.buildings.some((b) => b.type === 'guildhall' && b.build >= 1)) factors.push({ label: 'Pride in the guildhall', value: 3 });
   if (wallSections(s) >= WALL_SAFE) factors.push({ label: 'Safe behind the town walls', value: 4 });
+  else if (watchKept(s)) factors.push({ label: 'A watch on the towers', value: 2 });
   if (s.retinue) factors.push({ label: "The lord's guard", value: 2 });
   if (s.charters?.length) {
     const c = (id: string, label: string, v: number) => hasCharter(s, id) && factors.push({ label, value: v });
