@@ -1028,6 +1028,8 @@ export class Game {
       if ((e.target as HTMLElement).tagName === 'INPUT') return;
       const k = e.key.toLowerCase();
       this.keys.add(k);
+      // Arrow keys pan the view; inside a game portal's frame they must not scroll the page too.
+      if (k.startsWith('arrow')) e.preventDefault();
       if (k === 'escape') {
         if (this.photo) {
           this.setPhoto(false);

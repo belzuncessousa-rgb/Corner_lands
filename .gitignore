@@ -2,3 +2,6 @@ node_modules
 dist
 saves
 *.log
+dist-itch
+corner-lands-itch.zip
+itch/*.png

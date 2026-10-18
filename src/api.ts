@@ -20,7 +20,11 @@ export function validThumb(t: unknown): string | undefined {
 const LOCAL_PREFIX = 'cornerlands.save.';
 let serverOk: boolean | null = null;
 
+/** Builds for game portals (itch.io) have no server: saves live in the browser. */
+const STATIC_BUILD = (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_STATIC === '1';
+
 async function server(): Promise<boolean> {
+  if (STATIC_BUILD) return false;
   if (serverOk !== null) return serverOk;
   try {
     const r = await fetch('/api/health', { signal: AbortSignal.timeout(1500) });
