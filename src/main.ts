@@ -420,6 +420,11 @@ export class Game {
     c.width = src.width;
     c.height = src.height;
     const ctx = c.getContext('2d')!;
+    // In 3D the town is on its own canvas under the flat one.
+    if (this.renderer.threeD && this.view3d) {
+      this.view3d.redraw();
+      ctx.drawImage(this.view3d.canvas, 0, 0, c.width, c.height);
+    }
     ctx.drawImage(src, 0, 0);
     const k = src.width / Math.max(1, src.clientWidth);
     const h = 54 * k;
@@ -485,7 +490,11 @@ export class Game {
       this.applyTurn(Math.abs(d) <= step ? this.turnTo : this.turn + Math.sign(d) * step);
     }
     const ov = this.overlay();
-    if (this.view3d && this.renderer.threeD) this.syncDecal(ov);
+    if (this.view3d && this.renderer.threeD) {
+      // The tile under the pointer gets its own outline; the rest lies on the ground.
+      this.view3d.setHover(ov.hover && !ov.ghost && !ov.tiles ? ov.hover : null);
+      this.syncDecal({ ...ov, hover: undefined });
+    }
     if (this.view3d && this.renderer.threeD) {
       // Villagers, carts and deer stand in the 3D world, so buildings hide them.
       const season = seasonOf(this.state.day);

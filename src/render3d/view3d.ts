@@ -413,7 +413,31 @@ export class View3D {
   }
 
   private camera: THREE.OrthographicCamera | null = null;
+
+  /**
+   * Draws the last frame again, so its picture can be copied right away (the
+   * 3D canvas does not keep its frame once shown).
+   */
+  redraw(): void {
+    if (this.camera) this.renderer.render(this.scene, this.camera);
+  }
   private decal: THREE.Mesh | null = null;
+  private hover: THREE.LineLoop | null = null;
+
+  /** Outlines the tile under the pointer (a small shape of its own, not the ground decal). */
+  setHover(t: { x: number; y: number } | null): void {
+    if (!t) {
+      if (this.hover) this.hover.visible = false;
+      return;
+    }
+    if (!this.hover) {
+      const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(1, 0, 0), new THREE.Vector3(1, 0, 1), new THREE.Vector3(0, 0, 1)]);
+      this.hover = new THREE.LineLoop(geo, new THREE.LineBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.6 }));
+      this.scene.add(this.hover);
+    }
+    this.hover.visible = true;
+    this.hover.position.set(t.x, 0.03, t.y);
+  }
 
   /**
    * Lays the ground overlays (a canvas covering tiles x0..x0+w, y0..y0+h)
