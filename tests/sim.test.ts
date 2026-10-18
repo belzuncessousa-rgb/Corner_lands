@@ -16,7 +16,7 @@ import {
   stepDay,
   totalHousing,
 } from '../src/game/sim';
-import type { BuildingType, GameState } from '../src/game/types';
+import type { Building, BuildingType, GameState } from '../src/game/types';
 import { generateWorld, idx } from '../src/game/world';
 
 function hall(s: GameState) {
@@ -1755,5 +1755,88 @@ describe('trade audit', () => {
     exportGoods(s);
     expect(before - s.res.stone).toBe(exportBudget({ ...s, res: { ...s.res, crates: 0 } } as typeof s).base + 10);
     expect(s.res.crates).toBe(0);
+  });
+});
+
+describe('gathering audit', () => {
+  /** An empty meadow with a staffed woodcutter's lodge at (30, 30). */
+  const lodge = () => {
+    const s = generateWorld(5);
+    for (const a of [s.terrain, s.trees, s.road, s.rock, s.ore, s.berriesMax, s.berries]) a.fill(0);
+    s.occ.fill(-1);
+    s.buildings = [];
+    s.dirty = true;
+    const b = placeOrder(s, 'woodcutter', 30, 30)!;
+    b.build = 1;
+    b.need = undefined;
+    recompute(s);
+    // Haulers fetch from its yard (the meadow has no stores of its own).
+    b.hauled = true;
+    b.stock = {};
+    return { s, b };
+  };
+  const work = async (s: GameState, b: Building) => {
+    const { produceOnce } = await import('../src/game/sim');
+    return produceOnce(s, b);
+  };
+
+  it('woodcutters fell the trees quickest to walk to, roads and all', async () => {
+    const { s, b } = lodge();
+    const near = idx(s, 38, 30); // eight tiles over open ground
+    const far = idx(s, 30, 44); // fourteen tiles, but along a road
+    s.trees[near] = 2;
+    s.trees[far] = 2;
+    for (let y = 32; y <= 44; y++) s.road[idx(s, 30, y)] = 3;
+    s.dirty = true;
+    recompute(s);
+    expect(await work(s, b)).toBeNull();
+    expect(s.trees[far]).toBe(1);
+    expect(s.trees[near]).toBe(2);
+  });
+
+  it('do not fell trees across water they cannot cross', async () => {
+    const { s, b } = lodge();
+    for (let y = 0; y < s.height; y++) s.terrain[idx(s, 34, y)] = 1;
+    s.trees[idx(s, 36, 30)] = 2;
+    s.dirty = true;
+    recompute(s);
+    expect(await work(s, b)).toMatch(/No trees/);
+    expect(s.trees[idx(s, 36, 30)]).toBe(2);
+  });
+
+  it('use nothing up when the yard is full', async () => {
+    const { s, b } = lodge();
+    s.trees[idx(s, 33, 30)] = 2;
+    b.hauled = true;
+    b.stock = { wood: 30 };
+    expect(await work(s, b)).toBe('Storage full');
+    expect(s.trees[idx(s, 33, 30)]).toBe(2);
+  });
+});
+
+describe('construction audit', () => {
+  it('the last store of a kind cannot be pulled down', async () => {
+    const { demolish, demolishBlocker } = await import('../src/game/sim');
+    const s = generateWorld(41);
+    const camp = s.buildings.find((b) => b.type === 'camp')!;
+    expect(demolishBlocker(s, camp)).toMatch(/last store/);
+    expect(demolish(s, camp)).toBe(false);
+    expect(s.buildings).toContain(camp);
+  });
+
+  it('a lodge raised from trees felled on the spot is credited what was felled, and gives none of it back', async () => {
+    const { demolish } = await import('../src/game/sim');
+    const s = generateWorld(42);
+    s.res.wood = 0;
+    const lodge = placeNearRoad(s, 'woodcutter');
+    // Just one tree level about the site.
+    for (let y = lodge.y - 4; y < lodge.y + lodge.h + 4; y++) for (let x = lodge.x - 4; x < lodge.x + lodge.w + 4; x++) s.trees[idx(s, x, y)] = 0;
+    s.trees[idx(s, lodge.x - 1, lodge.y)] = 1;
+    lodge.builders = 4;
+    run(s, 1);
+    const need = BUILDINGS.woodcutter.cost.wood! - (lodge.need?.wood ?? 0);
+    expect(need).toBeLessThanOrEqual(2);
+    demolish(s, lodge);
+    expect(s.res.wood).toBe(0);
   });
 });

@@ -339,7 +339,7 @@ export function deliveredTo(b: Building): Cost {
   const mats = materialsOf(b.upgrading ? upgradeCost(b) : d.cost);
   for (const k in mats) {
     const id = k as ResourceId;
-    out[id] = (mats[id] ?? 0) - (b.need?.[id] ?? 0);
+    out[id] = (mats[id] ?? 0) - (b.need?.[id] ?? 0) - (id === 'wood' && !b.upgrading ? (b.felled ?? 0) : 0);
   }
   return out;
 }
@@ -409,9 +409,11 @@ export function removeRoad(s: GameState, x: number, y: number): boolean {
   const i = idx(s, x, y);
   if (plannedRoad(s, i)) {
     // An unlaid tile is simply struck from the plan, and what was paid comes back.
-    const k = s.roadPlan!.findIndex((c) => c >> 2 === i);
-    refundRoad(s, i, s.roadPlan![k] & 3);
-    s.roadPlan!.splice(k, 1);
+    for (let k = s.roadPlan!.length - 1; k >= 0; k--) {
+      if (s.roadPlan![k] >> 2 !== i) continue;
+      refundRoad(s, i, s.roadPlan![k] & 3);
+      s.roadPlan!.splice(k, 1);
+    }
     return true;
   }
   if (!s.road[i]) return false;
@@ -447,7 +449,13 @@ export function planRoad(s: GameState, x: number, y: number, paved: boolean | Ro
   else if (grade === 2) pay(s, PAVING_COST);
   else if (isBridge(s, x, y)) pay(s, BRIDGE_COST);
   const i = idx(s, x, y);
-  (s.roadPlan ??= []).push(i * 4 + grade);
+  // One plan to a tile: a better road planned over a lesser one takes its place.
+  const k = (s.roadPlan ??= []).findIndex((c) => c >> 2 === i);
+  if (k >= 0) {
+    refundRoad(s, i, s.roadPlan[k] & 3);
+    s.roadPlan.splice(k, 1);
+  }
+  s.roadPlan.push(i * 4 + grade);
   return true;
 }
 
@@ -480,38 +488,56 @@ export function layRoads(s: GameState, days: number): number {
   return n;
 }
 
+/** Why a building cannot be pulled down, if it cannot: the manor, or the town's last store of a kind. */
+export function demolishBlocker(s: GameState, b: Building): string | null {
+  if (b.type === 'townhall' && b.build >= 1) return 'The manor cannot be pulled down';
+  const caps = STORAGE_CAPACITY[b.type];
+  if (b.build >= 1 && caps) {
+    for (const kind of Object.keys(caps) as StorageKind[]) {
+      const other = s.buildings.some((o) => o !== b && o.build >= 1 && (STORAGE_CAPACITY[o.type]?.[kind] ?? 0) > 0);
+      if (!other) return `The town's last store for ${kind}: build a ${kind === 'food' ? 'granary' : 'storehouse'} first`;
+    }
+  }
+  return null;
+}
+
 export function demolish(s: GameState, b: Building): boolean {
-  if (b.type === 'townhall' && b.build >= 1) return false;
+  if (demolishBlocker(s, b)) return false;
   const d = BUILDINGS[b.type];
-  // Sites return what was delivered (and the gold); finished buildings half.
+  // What comes back: sites return what was delivered (and the gold),
+  // finished buildings half their cost, and the barn and yard are emptied.
+  const back: Cost = {};
+  const add = (c: Cost, f = 1) => {
+    for (const k in c) {
+      const id = k as ResourceId;
+      if (id === 'gold' || id === 'prestige') s.res[id] += Math.floor((c[id] ?? 0) * f);
+      else back[id] = (back[id] ?? 0) + Math.floor((c[id] ?? 0) * f);
+    }
+  };
   if (b.build >= 1) {
-    refund(s, d.zone ? zoneCost(b.type, b.w, b.h) : d.cost, 0.5);
+    add(d.zone ? zoneCost(b.type, b.w, b.h) : d.cost, 0.5);
     if (b.upgrading) {
       // A renovation under way gives back its gold and what was carried in.
       const cost = upgradeCost(b);
       s.res.gold += cost.gold ?? 0;
       s.res.prestige += cost.prestige ?? 0;
-      const back = deliveredTo(b);
-      for (const k in back) store(s, k as ResourceId, back[k as ResourceId] ?? 0);
+      add(deliveredTo(b));
     }
   } else {
     s.res.gold += d.cost.gold ?? 0;
-    const back = deliveredTo(b);
-    for (const k in back) store(s, k as ResourceId, back[k as ResourceId] ?? 0);
+    add(deliveredTo(b));
   }
-  // A farm's barn and a workplace's yard are emptied into the stores first.
-  let lost = 0;
-  for (const k in b.barn) {
-    const n = b.barn[k as ResourceId] ?? 0;
-    lost += n - store(s, k as ResourceId, n);
-  }
-  for (const k in b.stock) {
-    const n = b.stock[k as ResourceId] ?? 0;
-    lost += n - store(s, k as ResourceId, n);
-  }
-  if (lost > 0) log(s, `${Math.floor(lost)} sacks from the barn had no room in the stores and were lost.`, 'bad');
+  if (b.barn) add(b.barn);
+  if (b.stock) add(b.stock);
+  // The building goes first, so a storehouse does not take its own refund.
   removeBuilding(s, b);
   recompute(s);
+  let lost = 0;
+  for (const k in back) {
+    const n = back[k as ResourceId] ?? 0;
+    lost += n - store(s, k as ResourceId, n);
+  }
+  if (lost >= 1) log(s, `${Math.floor(lost)} goods from the ${d.name.toLowerCase()} had no room in the stores and were lost.`, 'bad');
   return true;
 }
 
@@ -800,29 +826,37 @@ export function countInRadius(
   return n;
 }
 
-/** How far the nearest of what a gatherer gathers lies from a spot (null if none within reach). */
+/**
+ * How long a walk it is from a spot to the nearest of what a gatherer
+ * gathers, in tiles of open ground (roads make it shorter); null if none is
+ * within reach.
+ */
 export function nearestResource(s: GameState, type: BuildingType, c: { x: number; y: number }): number | null {
   const d = BUILDINGS[type];
-  let best: number | null = null;
-  const consider = (dist: number) => {
-    if (dist <= GATHER_REACH && (best === null || dist < best)) best = dist;
-  };
-  if (type === 'hunter') for (const h of s.herds ?? []) h.n >= 1 && consider(Math.hypot(h.x - c.x, h.y - c.y));
-  else if (type === 'fisher') for (const h of s.shoals ?? []) h.n >= 1 && consider(Math.hypot(h.x - c.x, h.y - c.y));
+  const x = Math.max(0, Math.min(s.width - 1, Math.floor(c.x)));
+  const y = Math.max(0, Math.min(s.height - 1, Math.floor(c.y)));
+  const f = walkingField(s, [y * s.width + x], s.occ[y * s.width + x] >= 0 ? [s.occ[y * s.width + x]] : []);
+  const offroad = OFFROAD_TILES_PER_DAY / ROAD_TILES_PER_DAY;
+  let best = Infinity;
+  if (type === 'hunter') for (const h of s.herds ?? []) h.n >= 1 && (best = Math.min(best, walkToPoint(f, s, h.x, h.y, 2)));
+  else if (type === 'fisher') for (const h of s.shoals ?? []) h.n >= 1 && (best = Math.min(best, walkToPoint(f, s, h.x, h.y, 4)));
   else {
     const has: Partial<Record<string, (i: number) => boolean>> = {
       trees: (i) => s.trees[i] > 0 && !inGrove(s, i),
       rock: (i) => s.rock[i] > 0,
       ore: (i) => s.ore[i] > 0,
-      berries: (i) => s.berriesMax[i] > 0,
+      // Foragers pick berries, and mushrooms in the woods.
+      berries: (i) => s.berriesMax[i] > 0 || (s.mushroomsMax?.[i] ?? 0) > 0,
     };
     const pred = has[d.gathers ?? ''];
     if (!pred) return null;
-    forTilesInRadius(s, c, GATHER_REACH, (i, _x, _y, dist) => {
-      if (pred(i)) consider(dist);
-    });
+    for (const i of f.order)
+      if (pred(i)) {
+        best = f.cost[i];
+        break;
+      }
   }
-  return best;
+  return Number.isFinite(best) ? best * offroad : null;
 }
 
 /** Amount of the gathered map resource available around a spot. */
@@ -938,18 +972,21 @@ export function travelField(s: GameState, rebuild = false): Float64Array {
     const g = field[i];
     const x = i % s.width;
     const y = (i - x) / s.width;
-    for (const [nx, ny] of [
-      [x + 1, y],
-      [x - 1, y],
-      [x, y + 1],
-      [x, y - 1],
-    ]) {
+    const open = (xx: number, yy: number) => {
+      const k = yy * s.width + xx;
+      return !(s.terrain[k] === 1 && !s.road[k]) && (s.occ[k] < 0 || zones.has(s.occ[k]));
+    };
+    // Eight ways, as the villagers walk; no cutting corners past buildings or water.
+    for (const [dx, dy, dl] of WALK_DIRS) {
+      const nx = x + dx;
+      const ny = y + dy;
       if (!inBounds(s, nx, ny)) continue;
       const j = ny * s.width + nx;
       if (s.terrain[j] === 1 && !s.road[j]) continue;
       // Paths may end at a building's edge but not cross other buildings.
       if (s.occ[j] >= 0 && field[i] > 0 && !zones.has(s.occ[j])) continue;
-      const ng = g + stepCost(s, j);
+      if (dx && dy && (!open(nx, y) || !open(x, ny))) continue;
+      const ng = g + dl * stepCost(s, j);
       if (ng < field[j]) {
         field[j] = ng;
         heap.push(j, ng);
@@ -1060,7 +1097,8 @@ export function employed(s: GameState): number {
 }
 
 /** Fells up to n units of timber from the trees around a site; false if there are none. */
-function fellNear(s: GameState, b: Building, n: number): boolean {
+/** Fells up to n timber's worth of trees around a site; returns the timber got. */
+function fellNear(s: GameState, b: Building, n: number): number {
   let got = 0;
   for (let r = 1; r <= 4 && got < n; r++) {
     for (let y = b.y - r; y < b.y + b.h + r && got < n; y++) {
@@ -1074,7 +1112,7 @@ function fellNear(s: GameState, b: Building, n: number): boolean {
       }
     }
   }
-  return got > 0;
+  return got;
 }
 
 /** True when a site still needs materials and none of them is in storage. */
@@ -1091,6 +1129,7 @@ export function starvedSite(s: GameState, b: Building): boolean {
 /** Re-runs connectivity, distributes residents and assigns jobs. */
 export function recompute(s: GameState): void {
   if (s.dirty) {
+    mapVersion++;
     assignOwners(s);
     travelField(s, true);
     for (const b of s.buildings) b.trip = tripDays(s, b);
@@ -1371,35 +1410,115 @@ export const SITE_BUILDERS = 2;
 const SITE_PRIORITY = 1.5;
 const WALL_SITE_PRIORITY = 6;
 
-// ---------------------------------------------------------------- production
+// ---------------------------------------------------------------- walking to resources
 
-function tileDist(s: GameState, b: Building, i: number): number {
-  const c = bCenter(b);
-  return Math.hypot((i % s.width) + 0.5 - c.x, Math.floor(i / s.width) + 0.5 - c.y);
+/**
+ * The longest walk a gatherer goes for what it gathers, in dirt-road tiles:
+ * GATHER_REACH tiles over open ground, further along roads.
+ */
+export const GATHER_COST = GATHER_REACH * (ROAD_TILES_PER_DAY / OFFROAD_TILES_PER_DAY);
+
+/** Walking times from a workplace's door: every tile within reach, nearest first. */
+interface WalkField {
+  cost: Float32Array;
+  order: number[];
+  key: string;
+}
+const walkCache = new WeakMap<GameState, Map<number, WalkField>>();
+/** Bumped whenever buildings or roads change, so the fields are worked out again. */
+let mapVersion = 0;
+
+const WALK_DIRS: [number, number, number][] = [
+  [1, 0, 1],
+  [-1, 0, 1],
+  [0, 1, 1],
+  [0, -1, 1],
+  [1, 1, Math.SQRT2],
+  [1, -1, Math.SQRT2],
+  [-1, 1, Math.SQRT2],
+  [-1, -1, Math.SQRT2],
+];
+
+/**
+ * Walking time from some starting tiles to every tile within GATHER_COST, as
+ * the villagers walk: roads, gravel and cobbles at their speeds, slower
+ * through woods, around buildings (fields and posterns can be crossed) and
+ * water (unless bridged).
+ */
+export function walkingField(s: GameState, starts: number[], allow: number[] = []): WalkField {
+  const n = s.width * s.height;
+  const cost = new Float32Array(n).fill(Infinity);
+  const order: number[] = [];
+  const zones = new Set(s.buildings.filter((b) => BUILDINGS[b.type].zone || isPostern(b)).map((b) => b.id));
+  const passable = (i: number) => {
+    if (s.terrain[i] === 1 && !s.road[i]) return false;
+    const o = s.occ[i];
+    return o < 0 || zones.has(o) || allow.includes(o);
+  };
+  const heap = new Heap();
+  for (const i of starts) {
+    cost[i] = 0;
+    heap.push(i, 0);
+  }
+  const done = new Uint8Array(n);
+  while (heap.size) {
+    const i = heap.pop();
+    if (done[i]) continue;
+    done[i] = 1;
+    order.push(i);
+    const x = i % s.width;
+    const y = (i - x) / s.width;
+    for (const [dx, dy, dl] of WALK_DIRS) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (!inBounds(s, nx, ny)) continue;
+      const j = ny * s.width + nx;
+      if (done[j] || !passable(j)) continue;
+      // No cutting corners past buildings or water.
+      if (dx && dy && (!passable(y * s.width + nx) || !passable(ny * s.width + x))) continue;
+      const g = cost[i] + (dl * (tileCost(s, i) + tileCost(s, j))) / 2;
+      if (g > GATHER_COST || g >= cost[j]) continue;
+      cost[j] = g;
+      heap.push(j, g);
+    }
+  }
+  return { cost, order, key: '' };
 }
 
-function nearestTile(
-  s: GameState,
-  b: Building,
-  r: number,
-  score: (i: number, d: number) => number | null,
-): number {
-  let best = -1;
-  let bestScore = Infinity;
-  forTilesInRadius(s, bCenter(b), r, (i, _x, _y, d) => {
-    const v = score(i, d);
-    if (v !== null && v < bestScore) {
-      bestScore = v;
-      best = i;
+/** The walking field from a workplace's door (kept until the map changes or a month passes). */
+export function walkFrom(s: GameState, b: Building): WalkField {
+  let m = walkCache.get(s);
+  if (!m) walkCache.set(s, (m = new Map()));
+  const key = `${mapVersion}:${b.x}:${b.y}:${Math.floor(s.day / DAYS_PER_MONTH)}`;
+  const had = m.get(b.id);
+  if (had && had.key === key) return had;
+  const d = doorTile(s, b);
+  const f = walkingField(s, [d.y * s.width + d.x], [b.id]);
+  f.key = key;
+  m.set(b.id, f);
+  return f;
+}
+
+/** The quickest tile to walk to that passes a test; -1 if none within reach. */
+function nearestTile(s: GameState, b: Building, test: (i: number) => boolean): number {
+  for (const i of walkFrom(s, b).order) if (test(i)) return i;
+  return -1;
+}
+
+/** Walking time to a point (a herd in the woods, a shoal off the bank): to the nearest land within a short way of it. */
+function walkToPoint(f: WalkField, s: GameState, px: number, py: number, near: number): number {
+  let best = Infinity;
+  const r = Math.ceil(near);
+  for (let y = Math.floor(py) - r; y <= Math.floor(py) + r; y++)
+    for (let x = Math.floor(px) - r; x <= Math.floor(px) + r; x++) {
+      if (!inBounds(s, x, y) || Math.hypot(x + 0.5 - px, y + 0.5 - py) > near) continue;
+      const c = f.cost[y * s.width + x];
+      if (c < best) best = c;
     }
-  });
   return best;
 }
 
-function fullFor(s: GameState, out: Cost): boolean {
-  for (const k in out) if (roomFor(s, k as ResourceId) <= 0) return true;
-  return false;
-}
+// ---------------------------------------------------------------- production
 
 /** How much more (or less) a workplace makes thanks to the town's charters. */
 export function charterBonus(s: GameState, b: Building, id: ResourceId): number {
@@ -1425,6 +1544,19 @@ export function charterBonus(s: GameState, b: Building, id: ResourceId): number 
   return f;
 }
 
+/** Whether a workplace has room for the whole of an output: in its yard if hauled, else in the stores. */
+function canHold(s: GameState, b: Building, out: Cost): boolean {
+  const bonus = b.trade ? HOME_TRADE_BONUS : 1;
+  let n = 0;
+  for (const k in out) {
+    const id = k as ResourceId;
+    const m = (out[id] ?? 0) * bonus * charterBonus(s, b, id);
+    if (!b.hauled && roomFor(s, id) < m) return false;
+    n += m;
+  }
+  return !b.hauled || yardTotal(b) + n <= YARD_STORE;
+}
+
 function addOutput(s: GameState, b: Building, out: Cost): boolean {
   const bonus = b.trade ? HOME_TRADE_BONUS : 1;
   if (b.hauled) {
@@ -1441,7 +1573,7 @@ function addOutput(s: GameState, b: Building, out: Cost): boolean {
     }
     return true;
   }
-  if (fullFor(s, out)) return false;
+  if (!canHold(s, b, out)) return false;
   for (const k in out) {
     const n = store(s, k as ResourceId, (out[k as ResourceId] ?? 0) * bonus * charterBonus(s, b, k as ResourceId));
     b.output += n;
@@ -1531,15 +1663,15 @@ export function dailyHaul(s: GameState): void {
   }
 }
 
-/** The nearest herd with game to hunt, within reach. */
-export function nearestHerd(s: GameState, b: Building): Herd | null {
-  const c = bCenter(b);
+/** The herd quickest to walk to that has game to hunt (or, with `any`, even one hunted out), within reach. */
+export function nearestHerd(s: GameState, b: Building, any = false): Herd | null {
+  const f = walkFrom(s, b);
   let best: Herd | null = null;
   let bd = Infinity;
   for (const h of s.herds ?? []) {
-    if (h.n < 1) continue;
-    const d = Math.hypot(h.x - c.x, h.y - c.y);
-    if (d <= GATHER_REACH && d < bd) {
+    if (h.n < 1 && !any) continue;
+    const d = walkToPoint(f, s, h.x, h.y, 2);
+    if (d < bd) {
       bd = d;
       best = h;
     }
@@ -1547,15 +1679,15 @@ export function nearestHerd(s: GameState, b: Building): Herd | null {
   return best;
 }
 
-/** The nearest shoal with fish to catch, within reach. */
-export function nearestShoal(s: GameState, b: Building): Shoal | null {
-  const c = bCenter(b);
+/** The shoal quickest to walk to (from the nearest bank) that has fish, within reach. */
+export function nearestShoal(s: GameState, b: Building, any = false): Shoal | null {
+  const f = walkFrom(s, b);
   let best: Shoal | null = null;
   let bd = Infinity;
   for (const h of s.shoals ?? []) {
-    if (h.n < 1) continue;
-    const d = Math.hypot(h.x - c.x, h.y - c.y);
-    if (d <= GATHER_REACH && d < bd) {
+    if (h.n < 1 && !any) continue;
+    const d = walkToPoint(f, s, h.x, h.y, 4);
+    if (d < bd) {
       bd = d;
       best = h;
     }
@@ -1613,6 +1745,11 @@ export function natureMonthly(s: GameState, rng: StateRng): void {
   }
 }
 
+/** One production cycle of a workplace, outside the daily round (for tests and tools). */
+export function produceOnce(s: GameState, b: Building): string | null {
+  return produce(s, b, new StateRng(s));
+}
+
 /** Performs one production cycle. Returns a status string on failure. */
 function produce(s: GameState, b: Building, rng: StateRng): string | null {
   const d = workDef(b);
@@ -1628,39 +1765,37 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
       }
       const e = enoughOf(s, r.outputs);
       if (e) return `Enough ${GOODS[e].name.toLowerCase()} in store`;
-      if (fullFor(s, r.outputs)) return 'Storage full';
-      const t = nearestTile(s, b, GATHER_REACH, (i, dist) => (s.trees[i] > 0 && !inGrove(s, i) ? dist - s.trees[i] * 1.2 : null));
-      if (t < 0) return s.groves?.length && nearestTile(s, b, GATHER_REACH, (i, dist) => (s.trees[i] > 0 ? dist : null)) >= 0 ? 'Only protected woods within reach' : 'No trees within reach';
-      b.resDist = tileDist(s, b, t);
+      if (!canHold(s, b, r.outputs)) return 'Storage full';
+      // The quickest trees to walk to (not the nearest as the crow flies).
+      const t = nearestTile(s, b, (i) => s.trees[i] > 0 && !inGrove(s, i));
+      if (t < 0) return s.groves?.length && nearestTile(s, b, (i) => s.trees[i] > 0) >= 0 ? 'Only protected woods within reach' : 'No trees within reach';
+      b.resDist = walkFrom(s, b).cost[t];
       s.trees[t]--;
       if (s.trees[t] === 0) (s.stumps ??= {})[t] = s.day;
       addOutput(s, b, r.outputs);
       return null;
     }
     case 'forester': {
+      // Plant on open ground about the lodge, wherever there is room.
       const c = bCenter(b);
-      for (let tries = 0; tries < 12; tries++) {
-        const x = Math.floor(c.x + (rng.next() * 2 - 1) * d.radius);
-        const y = Math.floor(c.y + (rng.next() * 2 - 1) * d.radius);
-        if (!inBounds(s, x, y)) continue;
-        if (Math.hypot(x + 0.5 - c.x, y + 0.5 - c.y) > d.radius) continue;
-        const i = idx(s, x, y);
-        if (s.terrain[i] || s.occ[i] >= 0 || s.road[i] || s.rock[i] || s.ore[i] || s.berriesMax[i]) continue;
-        if (s.trees[i] >= 4) continue;
-        s.trees[i]++;
-        b.output++;
-        return null;
-      }
-      return 'The woods are full';
+      const spots: number[] = [];
+      forTilesInRadius(s, c, d.radius, (i) => {
+        if (s.terrain[i] || s.occ[i] >= 0 || s.road[i] || s.rock[i] || s.ore[i] || s.berriesMax[i] || s.trees[i] >= 4) return;
+        spots.push(i);
+      });
+      if (!spots.length) return 'The woods are full';
+      const i = spots[Math.floor(rng.next() * spots.length)];
+      s.trees[i]++;
+      b.output++;
+      return null;
     }
     case 'quarry':
     case 'mine': {
       const arr = b.type === 'quarry' ? s.rock : s.ore;
-      const out = b.type === 'quarry' ? 'stone' : 'ore';
-      if (roomFor(s, out) <= 0) return 'Storage full';
-      const t = nearestTile(s, b, GATHER_REACH, (i, dist) => (arr[i] > 0 ? dist : null));
+      if (!canHold(s, b, d.outputs)) return 'Storage full';
+      const t = nearestTile(s, b, (i) => arr[i] > 0);
       if (t < 0) return b.type === 'quarry' ? 'No rock within reach' : 'No ore within reach';
-      b.resDist = tileDist(s, b, t);
+      b.resDist = walkFrom(s, b).cost[t];
       // Deep shafts never exhaust a vein.
       if (!(b.type === 'mine' && hasCharter(s, 'metal2'))) arr[t]--;
       // Precious veins: now and then a load of silver.
@@ -1673,52 +1808,38 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
       if (!r) return b.recipe ? 'Out of season' : 'Nothing to gather this season';
       const fixedEnough = enoughOf(s, r.outputs);
       if (fixedEnough) return `Enough ${GOODS[fixedEnough].name.toLowerCase()} in store`;
-      if (fullFor(s, r.outputs)) return 'Storage full';
+      if (!canHold(s, b, r.outputs)) return 'Storage full';
+      const f = walkFrom(s, b);
       if (r.id === 'berries') {
-        const t = nearestTile(s, b, GATHER_REACH, (i, dist) => (s.berries[i] > 0 ? dist : null));
-        if (t < 0) {
-          return countInRadius(s, bCenter(b), GATHER_REACH, (i) => s.berriesMax[i] > 0) > 0
-            ? 'Bushes picked clean for now'
-            : 'No berry bushes within reach';
-        }
-        b.resDist = tileDist(s, b, t);
+        const t = nearestTile(s, b, (i) => s.berries[i] > 0);
+        if (t < 0) return nearestTile(s, b, (i) => s.berriesMax[i] > 0) >= 0 ? 'Bushes picked clean for now' : 'No berry bushes within reach';
+        b.resDist = f.cost[t];
         s.berries[t]--;
       } else if (r.id === 'mushrooms') {
         // Mushrooms come up in rings in the old woods, and are picked out.
         const m = s.mushrooms ?? {};
-        let best = -1;
-        let bd = Infinity;
-        for (const k in m) {
-          if ((m[k] ?? 0) <= 0) continue;
-          const dd = tileDist(s, b, Number(k));
-          if (dd <= GATHER_REACH && dd < bd) {
-            bd = dd;
-            best = Number(k);
-          }
-        }
-        if (best < 0) return Object.keys(s.mushroomsMax ?? {}).length ? 'Mushrooms picked out for now' : 'No mushrooms within reach';
-        b.resDist = bd;
-        m[best]--;
+        const t = nearestTile(s, b, (i) => (m[i] ?? 0) > 0);
+        if (t < 0) return nearestTile(s, b, (i) => (s.mushroomsMax?.[i] ?? 0) > 0) >= 0 ? 'Mushrooms picked out for now' : 'No mushrooms within reach';
+        b.resDist = f.cost[t];
+        m[t]--;
       } else {
         // Herbs grow in the woods.
-        const t = nearestTile(s, b, GATHER_REACH, (i, dist) => (s.trees[i] > 0 ? dist : null));
+        const t = nearestTile(s, b, (i) => s.trees[i] > 0);
         if (t < 0) return 'No woods within reach for herbs';
-        b.resDist = tileDist(s, b, t);
+        b.resDist = f.cost[t];
       }
       addOutput(s, b, r.outputs);
       return null;
     }
     case 'hunter': {
-      if (roomFor(s, 'meat') <= 0 && !b.hauled) return 'Storage full';
       const h = nearestHerd(s, b);
-      if (!h) return s.herds?.some((o) => o.n >= 1) ? 'No game within reach' : 'The game has been hunted out';
-      b.resDist = Math.hypot(h.x - bCenter(b).x, h.y - bCenter(b).y);
+      if (!h) return nearestHerd(s, b, true) ? 'The game nearby has been hunted out for now' : 'No game within reach';
       // A deer feeds four outings' worth of meat; a rabbit, two.
+      const meat = { meat: h.kind === 'deer' ? 5 : 3 };
+      if (!canHold(s, b, meat)) return 'Storage full';
+      b.resDist = walkToPoint(walkFrom(s, b), s, h.x, h.y, 2);
       h.n -= h.kind === 'deer' ? 0.25 : 0.5;
-      if (!addOutput(s, b, { meat: h.kind === 'deer' ? 5 : 3 })) {
-        h.n += h.kind === 'deer' ? 0.25 : 0.5;
-        return 'Storage full';
-      }
+      addOutput(s, b, meat);
       // Deer bring a hide worth tanning now and then.
       if (h.kind === 'deer' && rng.next() < 0.5) produced(s, 'hides', 1);
       return null;
@@ -1726,21 +1847,19 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
     case 'claypit': {
       const water = countInRadius(s, bCenter(b), d.radius, (i) => s.terrain[i] === 1);
       if (water < 2) return 'No riverbank nearby';
-      if (roomFor(s, 'clay') <= 0) return 'Storage full';
       const amount = Math.max(1, Math.round((d.outputs.clay ?? 0) * Math.min(1, water / 10) * (season === 3 ? 0.4 : 1)));
+      if (!canHold(s, b, { clay: amount })) return 'Storage full';
       addOutput(s, b, { clay: amount });
       return null;
     }
     case 'fisher': {
-      if (roomFor(s, 'fish') <= 0 && !b.hauled) return 'Storage full';
       const sh = nearestShoal(s, b);
-      if (!sh) return s.shoals?.length ? 'The fish are fished out for now' : 'No fish within reach';
-      b.resDist = Math.hypot(sh.x - bCenter(b).x, sh.y - bCenter(b).y);
+      if (!sh) return nearestShoal(s, b, true) ? 'The fish are fished out for now' : 'No fish within reach';
+      const fish = { fish: Math.max(1, Math.round((d.outputs.fish ?? 0) * (season === 3 ? 0.5 : 1))) };
+      if (!canHold(s, b, fish)) return 'Storage full';
+      b.resDist = walkToPoint(walkFrom(s, b), s, sh.x, sh.y, 4);
       sh.n -= 0.5;
-      if (!addOutput(s, b, { fish: Math.max(1, Math.round((d.outputs.fish ?? 0) * (season === 3 ? 0.5 : 1))) })) {
-        sh.n += 0.5;
-        return 'Storage full';
-      }
+      addOutput(s, b, fish);
       return null;
     }
     default: {
@@ -2443,7 +2562,8 @@ function passiveStatus(s: GameState, b: Building): string {
 export function workEfficiency(b: Building): number {
   const d = workDef(b);
   if (!d.cycle) return 1;
-  const toResource = d.gathers && b.type !== 'claypit' ? (2 * (b.resDist ?? d.radius / 2)) / OFFROAD_TILES_PER_DAY : 0;
+  // resDist is the walking time to the resource, in dirt-road tiles.
+  const toResource = d.gathers && b.type !== 'claypit' ? (2 * (b.resDist ?? (d.radius / 2) * (ROAD_TILES_PER_DAY / OFFROAD_TILES_PER_DAY))) / ROAD_TILES_PER_DAY : 0;
   // Served by haulers, the workers no longer carry their goods to storage.
   const walking = ((b.hauled ? 0 : (b.trip ?? 0)) + toResource) / Math.max(1, d.workers);
   return d.cycle / (d.cycle + TRAVEL_WEIGHT * walking);
@@ -2586,10 +2706,15 @@ export function dailyConstruction(s: GameState): void {
       let missing = '';
       // With no timber in store, a woodcutter's lodge is raised from trees
       // felled on the spot, so a town can never be stuck without one.
-      if (b.type === 'woodcutter' && !renovating && (b.need!.wood ?? 0) > 0 && s.res.wood < 1 && fellNear(s, b, n * 2)) {
-        b.need!.wood = Math.max(0, (b.need!.wood ?? 0) - n * 2);
-        setStatus('Felling timber on the spot');
-        continue;
+      if (b.type === 'woodcutter' && !renovating && (b.need!.wood ?? 0) > 0 && s.res.wood < 1) {
+        const got = Math.min(b.need!.wood ?? 0, fellNear(s, b, Math.min(n * 2, b.need!.wood ?? 0)));
+        if (got > 0) {
+          b.need!.wood = (b.need!.wood ?? 0) - got;
+          // Felled here, not taken from the stores: cancelling the site gives none of it back.
+          b.felled = (b.felled ?? 0) + got;
+          setStatus('Felling timber on the spot');
+          continue;
+        }
       }
       for (const k in b.need) {
         const id = k as ResourceId;

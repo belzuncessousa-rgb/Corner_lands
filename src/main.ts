@@ -27,6 +27,7 @@ import {
   placementError,
   recompute,
   removeRoad,
+  demolishBlocker,
   nearestResource,
   seatOf,
   resourceInRange,
@@ -119,6 +120,11 @@ export class Game {
 
   /** Demolishes a building (from the tool or the inspector). There is no taking it back. */
   demolishBuilding(b: Building): boolean {
+    const why = demolishBlocker(this.state, b);
+    if (why) {
+      this.hud.flash(`${why}.`);
+      return false;
+    }
     if (!demolishWithUndo(this.state, b)) return false;
     log(this.state, `${BUILDINGS[b.type].name} demolished.`, 'info');
     return true;
@@ -612,10 +618,11 @@ export class Game {
       // No area to fill: what matters is how far the workers must walk.
       const c = centerOf(x, y, d.w, d.h);
       const dist = nearestResource(this.state, type, c);
-      const what = { woodcutter: 'trees', quarry: 'rock', mine: 'ore', forager: 'berry bushes', hunter: 'game', fisher: 'fish' }[type as string] ?? 'resources';
+      const what = { woodcutter: 'trees', quarry: 'rock', mine: 'ore', forager: 'berries or mushrooms', hunter: 'game', fisher: 'fish' }[type as string] ?? 'resources';
       if (dist === null) return `${d.name}: no ${what} within reach · the workers would have nothing to do`;
+      // The walk as the villagers walk it: quicker along roads, slower through woods.
       const walk = dist < 6 ? 'a short walk' : dist < 14 ? 'a fair walk' : 'a long walk: they will lose time on the way';
-      return `${d.name}: nearest ${what} ${Math.round(dist)} tiles away, ${walk} · Click to place`;
+      return `${d.name}: nearest ${what} ${Math.round(dist)} tiles' walk away, ${walk} · Click to place`;
     }
     if (d.gathers) {
       const c = centerOf(x, y, d.w, d.h);
