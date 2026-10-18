@@ -1010,8 +1010,14 @@ export const TAX_LEVELS = [
 export const TRADE_PRICES: Partial<Record<ResourceId, number>> = Object.fromEntries(
   RESOURCE_IDS.filter((r) => GOODS[r].price > 0).map((r) => [r, GOODS[r].price]),
 );
-export const SELL_FACTOR = 0.5;
+/**
+ * Trade is dear: goods brought in cost half again their price, while the
+ * town sells at well under it, so buying costs over three times what selling
+ * the same goods earns.
+ */
+export const IMPORT_FACTOR = 1.5;
+export const SELL_FACTOR = 0.4;
 /** Merchants pay a little better for regular exports. */
-export const EXPORT_FACTOR = 0.6;
+export const EXPORT_FACTOR = 0.48;
 /** Units one marketplace's merchants buy per month. */
 export const EXPORT_PER_MARKET = 60;

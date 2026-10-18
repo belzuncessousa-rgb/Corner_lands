@@ -21,6 +21,7 @@ import {
   type Recipe,
   type BuildingDef,
   SELL_FACTOR,
+  IMPORT_FACTOR,
   EXPORT_FACTOR,
   EXPORT_PER_MARKET,
   FOOD_IDS,
@@ -519,7 +520,7 @@ export function hasBuilt(s: GameState, type: BuildingType): boolean {
 
 /** Coins to buy n units at the market. */
 export function buyPrice(s: GameState, id: ResourceId, n: number): number {
-  return Math.ceil(priceOf(s, id) * n * (hasCharter(s, 'trade1') ? 0.85 : 1));
+  return Math.ceil(priceOf(s, id) * IMPORT_FACTOR * n * (hasCharter(s, 'trade1') ? 0.85 : 1));
 }
 
 /** Coins earned selling n units at the market. */
@@ -2449,7 +2450,7 @@ export function dailyProduction(s: GameState, rng: StateRng): void {
     b.hauled = servedByHaulers(s, b);
     b.efficiency = workEfficiency(b);
     // Time spent on the household's errands is time not spent at work.
-    b.work += ((b.workers / d.workers) * b.efficiency * (1 - (s.report.errands ?? 0))) / d.cycle;
+    b.work += ((b.workers / d.workers) * b.efficiency * moodYield(s) * (1 - (s.report.errands ?? 0))) / d.cycle;
     let status: string | null = null;
     let tried = false;
     while (b.work >= 1) {
@@ -2862,6 +2863,15 @@ export const WALL_SAFE = 40;
 /** Every sixth section of town wall has a postern: a small door villagers on foot can use. */
 export function isPostern(b: Building): boolean {
   return b.type === 'wall' && (b.x + b.y) % 6 === 0;
+}
+
+/**
+ * Cheerful villagers work a little harder, glum ones a little slower:
+ * from 90% at 20 happiness or less to 110% at 80 or more.
+ */
+export function moodYield(s: GameState): number {
+  const h = Math.max(20, Math.min(80, s.happiness ?? 50));
+  return 0.9 + ((h - 20) / 60) * 0.2;
 }
 
 /** Whether a watchman stands on a watch tower. */

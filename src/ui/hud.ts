@@ -41,6 +41,7 @@ import {
   seasonOf,
   setKeep,
   buyPrice,
+  moodYield,
   sellPrice,
   lockReason,
   prestigeIncome,
@@ -517,6 +518,7 @@ export class Hud {
       ${factors || '<i>No villagers yet</i>'}
       ${talk ? `<div class="sub">Town talk</div>${talk}` : ''}
       ${needs ? `<div class="sub">Needs of Timber Houses and Townhouses</div>${needs}` : ''}
+      <div class="kv" data-tip="Happy villagers work a little harder: from -10% at 20% happiness to +10% at 80%."><span>Pace of work</span><span class="${moodYield(s) >= 1 ? 'pos' : 'neg'}">${moodYield(s) >= 1 ? '+' : ''}${Math.round((moodYield(s) - 1) * 100)}%</span></div>
       <p class="note">Above 50% settlers arrive, if there are homes and two months of food in store; below 30% families leave.${s.happinessTarget !== s.happiness ? ` Heading towards ${s.happinessTarget}%.` : ''}</p>`;
   }
 
@@ -931,6 +933,10 @@ export class Hud {
         rows.push(`<div class="kv" data-tip="Goods wait here until the storehouse or granary haulers fetch them. A full yard stops the work: more haulers (or a store nearer by) keep it moving."><span>In the yard (${Math.floor(yardTotal(b))}/${YARD_STORE})</span><span class="costline">${costHtml(yard)}</span></div>`);
       } else if (b.hauled) {
         rows.push(`<div class="kv"><span>Haulers</span><span>fetch what is made here</span></div>`);
+      }
+      if (d.cycle && b.workers > 0) {
+        const m = moodYield(s);
+        if (Math.abs(m - 1) >= 0.02) rows.push(`<div class="kv" data-tip="Happy villagers work a little harder (up to +10%), unhappy ones slower (down to -10%)."><span>Mood of the workers</span><span class="${m < 1 ? 'neg' : 'pos'}">${m > 1 ? '+' : ''}${Math.round((m - 1) * 100)}%</span></div>`);
       }
       if (d.cycle && b.efficiency !== undefined && b.efficiency < 0.97) {
         rows.push(`<div class="kv" data-tip="Time lost walking to storage and to resources. Build closer to a storehouse or granary, or lay roads."><span>Walking time</span><span class="${b.efficiency < 0.7 ? 'neg' : ''}">${Math.round(b.efficiency * 100)}% efficient</span></div>`);
