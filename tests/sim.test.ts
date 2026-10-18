@@ -746,8 +746,8 @@ describe('workshops and household goods', () => {
     s.population = 15;
     s.res.clothes = 3;
     recompute(s);
-    run(s, DAYS_PER_MONTH * 7);
-    // Three months a set: the first set, then two more.
+    run(s, DAYS_PER_MONTH * 5);
+    // Two months a set: the first set, then two more.
     expect(s.res.clothes).toBe(0);
     expect(h.supply?.clothes).toBeGreaterThan(s.day);
   });

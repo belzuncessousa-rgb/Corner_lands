@@ -603,9 +603,9 @@ export function serveAle(s: GameState): void {
   }
 }
 
-/** Goods each home level uses up, one every three months. */
+/** Goods each home level uses up, one every two months. */
 export const HOUSE_GOODS: Record<number, ResourceId[]> = { 2: ['clothes'], 3: ['clothes', 'boots', 'medicine'], 4: ['clothes', 'boots', 'medicine', 'pottery'] };
-const SUPPLY_DAYS = DAYS_PER_MONTH * 3;
+const SUPPLY_DAYS = DAYS_PER_MONTH * 2;
 
 /** Whether a home has (or could get from store) a good it needs. */
 export function hasSupply(s: GameState, b: Building, id: ResourceId): boolean {
