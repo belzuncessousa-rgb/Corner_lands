@@ -10,6 +10,7 @@ import type { Animal } from './wildlife';
 import { Pen, TH, TW, iso, mix, shade } from './pen';
 import { mulberry32 } from '../game/rng';
 import { DEFAULT_HERALDRY, HERALDRY, heraldryKey } from './heraldry';
+import { DEFAULT_LORD, type LordLook, drawLord } from './lord';
 import {
   oreHeap,
   type Sprite,
@@ -255,6 +256,7 @@ export class Renderer {
     const season = seasonOf(s.day);
     const z = this.cam.zoom;
     HERALDRY.current = s.heraldry ?? DEFAULT_HERALDRY;
+    this.lordLook = s.lord ?? DEFAULT_LORD;
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     c.fillStyle = season === 3 ? '#9fb0b8' : '#5f7d4a';
     c.fillRect(0, 0, this.width, this.height);
@@ -1860,6 +1862,7 @@ export class Renderer {
     c.globalAlpha = 1;
   }
   private glow: HTMLCanvasElement | null = null;
+  private lordLook: LordLook = DEFAULT_LORD;
 
   /** The great tapestry's design flies on a tall banner beside the manor. */
   private drawHeraldry(b: Building): void {
@@ -2150,6 +2153,16 @@ export class Renderer {
       c.fillRect(lx - 1.1, ly - 1.8, 2.2, 2.8);
       c.fillStyle = '#3a2c20';
       c.fillRect(lx - 1.4, ly - 2.4, 2.8, 0.7);
+    }
+    if (a.role.kind === 'lord') {
+      // The lord, as the player dressed them, in a tabard of their arms.
+      c.save();
+      c.translate(wx, wy - bob);
+      if (a.dir < 0) c.scale(-1, 1);
+      drawLord(c, this.lordLook, 0, 0, 1.05, HERALDRY.current);
+      c.restore();
+      c.globalAlpha = 1;
+      return;
     }
     // Legs.
     c.strokeStyle = '#3a2c20';

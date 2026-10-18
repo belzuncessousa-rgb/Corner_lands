@@ -14,7 +14,8 @@ export type Role =
   | { kind: 'settler' }
   | { kind: 'cart'; id: number; leaving: boolean }
   /** Men-at-arms of the lord's retinue, pacing before the manor. */
-  | { kind: 'guard' };
+  | { kind: 'guard' }
+  | { kind: 'lord'; id: number };
 
 type Phase = 'walk' | 'inside' | 'act' | 'pause';
 
@@ -107,6 +108,9 @@ export class AgentSystem {
     const idle = s.population - roles.length;
     for (let k = 0; k < idle; k++) roles.push({ kind: 'idle' });
     if (s.retinue) roles.push({ kind: 'guard' }, { kind: 'guard' });
+    // Once the manor stands, the lord walks out to see the town.
+    const manor = s.buildings.find((b) => b.type === 'townhall' && b.build >= 1);
+    if (manor) roles.push({ kind: 'lord', id: manor.id });
     return roles;
   }
 
@@ -142,7 +146,7 @@ export class AgentSystem {
       if (keep.length >= MAX_AGENTS) break;
       i++;
       if (taken.has(key)) continue;
-      const home = homes[i % Math.max(1, homes.length)] ?? -1;
+      const home = role.kind === 'lord' ? role.id : (homes[i % Math.max(1, homes.length)] ?? -1);
       const a = this.spawn(s, key, role, home);
       if (settlersToSpawn > 0 && this.sendFromEdge(s, a)) settlersToSpawn--;
       keep.push(a);
@@ -347,7 +351,7 @@ export class AgentSystem {
   private decide(s: GameState, a: Agent): void {
     const r = a.role;
     if (r.kind === 'settler') return;
-    if (this.evening && (r.kind === 'work' || r.kind === 'build' || r.kind === 'idle')) {
+    if (this.evening && (r.kind === 'work' || r.kind === 'build' || r.kind === 'idle' || r.kind === 'lord')) {
       // Evening: home to supper and bed. Those already in stay in.
       const home = getBuilding(s, a.home);
       if (!a.visible || !home) {
@@ -379,6 +383,10 @@ export class AgentSystem {
     }
     if (r.kind === 'guard') {
       this.patrol(s, a);
+      return;
+    }
+    if (r.kind === 'lord') {
+      this.lordsWalk(s, a);
       return;
     }
     const b = getBuilding(s, r.id);
@@ -461,6 +469,35 @@ export class AgentSystem {
   }
 
   /** Guards pace between free tiles in front of the manor. */
+  /**
+   * The lord's rounds: out of the manor to look in on a workplace, a home
+   * or the market, a pause there, then on to the next or back home.
+   */
+  private lordsWalk(s: GameState, a: Agent): void {
+    const manor = getBuilding(s, a.home);
+    if (!manor) return;
+    if (a.phase === 'inside') {
+      const d = doorTile(s, manor);
+      a.x = d.x + 0.5;
+      a.y = d.y + 0.5;
+    }
+    a.carry = null;
+    if (a.phase !== 'inside' && Math.random() < 0.3) {
+      const d = doorTile(s, manor);
+      this.walkTo(s, a, d.x, d.y, [manor.id], 'enter-home');
+      return;
+    }
+    const c = bCenter(manor);
+    const sights = s.buildings.filter((b) => b.build >= 1 && b.id !== manor.id && b.type !== 'wall' && Math.hypot(bCenter(b).x - c.x, bCenter(b).y - c.y) < 22);
+    const b = sights[Math.floor(Math.random() * sights.length)];
+    if (!b) {
+      this.patrol(s, a);
+      return;
+    }
+    const d = doorTile(s, b);
+    this.walkTo(s, a, d.x, d.y, [b.id], 'wander-done');
+  }
+
   private patrol(s: GameState, a: Agent): void {
     const door = this.hallDoor(s);
     if (a.phase === 'inside') {

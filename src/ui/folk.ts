@@ -1,5 +1,6 @@
 import { BUILDINGS } from '../game/data';
 import { buildingName } from '../game/levels';
+import { townName } from '../game/names';
 import type { Building, BuildingType, GameState } from '../game/types';
 import type { Agent } from '../render/agents';
 
@@ -67,6 +68,7 @@ export function folkName(s: GameState, a: Agent): string {
   const first = FIRST[h % FIRST.length];
   const work = workplaceOf(s, a);
   if (a.role.kind === 'guard') return `${first} the man-at-arms`;
+  if (a.role.kind === 'lord') return `${s.lord?.garment === 'dress' ? 'The Lady' : 'The Lord'} of ${townName(s)}`;
   const trade = a.role.kind === 'work' && work ? TRADE_NAMES[work.trade ?? work.type] : undefined;
   return `${first} ${trade ?? PLACE[(h >>> 8) % PLACE.length]}`;
 }
@@ -81,6 +83,8 @@ export function folkDoing(s: GameState, a: Agent): string {
       return work ? `Building the ${BUILDINGS[work.type].name}` : 'Lending a hand on the building sites';
     case 'guard':
       return "Keeps watch at the lord's manor";
+    case 'lord':
+      return 'Out among the people, seeing how the town fares';
     case 'settler':
       return 'Newly come to settle here';
     default:
