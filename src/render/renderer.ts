@@ -24,6 +24,8 @@ import {
   fruitTreeSprite,
   drawSheep,
   YARD_CODES,
+  HOUSE_FORMS,
+  homeWindow,
   pavedTile,
   rockSprite,
   stallSprite,
@@ -1086,7 +1088,7 @@ export class Renderer {
     if (fest === 'midsummer' && b.type === 'townhall') this.drawBonfire(b);
     if (b.type === 'townhall' && s.commissions?.includes('tapestry')) this.drawHeraldry(b);
     // Lamplight in lived-in homes and the tavern as evening falls.
-    if (this.dusk > 0.25 && b.build >= 1 && (b.residents > 0 || (b.type === 'tavern' && b.workers > 0))) this.drawLamplight(b);
+    if (this.dusk > 0.25 && b.build >= 1 && (b.residents > 0 || (b.type === 'tavern' && b.workers > 0))) this.drawLamplight(s, b);
     if (b.upgrading) this.drawScaffold(b);
     if (selected) {
       c.save();
@@ -1831,9 +1833,10 @@ export class Renderer {
   }
 
   /** A soft window glow on the front of a building. */
-  private drawLamplight(b: Building): void {
+  private drawLamplight(s: GameState, b: Building): void {
     const c = this.ctx;
-    const [x, y] = iso(b.x + b.w * 0.75, b.y + b.h, 9);
+    const at: [number, number, number] = b.type === 'house' ? homeWindow(b.level, variantOf(s, b)) : [b.w * 0.75, b.h, 9];
+    const [x, y] = iso(b.x + at[0], b.y + at[1], at[2]);
     // One glow drawn once and stamped on every lit window: cheap in big towns.
     if (!this.glow) {
       const g = document.createElement('canvas');
@@ -2972,7 +2975,10 @@ function variantOf(s: GameState, b: Building): number {
   if (b.type === 'cathedral') return s.commissions?.includes('glass') ? 1 : 0;
   if (b.type !== 'house') return 0;
   const trade = b.trade ? HOME_TRADES.indexOf(b.trade) + 1 : 0;
-  return ((b.id * 7 + b.x) % 4) + 4 * Math.max(0, YARD_CODES.indexOf(b.yard ?? null)) + 16 * trade;
+  // Colours, yard, craft and the shape of the house, which the id picks.
+  const forms = HOUSE_FORMS[Math.min(3, b.level)] ?? 5;
+  const form = (((b.id * 2654435761) >>> 0) >>> 7) % forms;
+  return ((b.id * 7 + b.x) % 4) + 4 * Math.max(0, YARD_CODES.indexOf(b.yard ?? null)) + 16 * trade + 128 * form;
 }
 
 /** A small pile of one kind of goods. */

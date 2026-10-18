@@ -855,100 +855,9 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       drawManor(p, level, season, smoke);
       break;
     }
-    case 'house': {
-      const hv = HOUSE_VARIANTS[variant % HOUSE_VARIANTS.length];
-      const yard = YARD_CODES[Math.floor(variant / HOUSE_VARIANTS.length) % YARD_CODES.length] ?? null;
-      const trade = HOME_TRADES[Math.floor(variant / 16) - 1] ?? null;
-      const WALL = hv.wall;
-      p.roofTint = hv.tint;
-      if (level >= 3) {
-        // Townhouse: stone ground floor, two jettied timber storeys.
-        p.shadow(0.15, 0.2, 1.85, 1.7);
-        p.box(0.22, 0.28, 1.78, 1.62, 0, 12, STONE);
-        p.box(0.17, 0.23, 1.83, 1.67, 12, 13, WALL);
-        p.timber(0.17, 0.23, 1.83, 1.67, 12, 13, BEAM);
-        p.box(0.12, 0.18, 1.88, 1.72, 25, 12, WALL);
-        p.timber(0.12, 0.18, 1.88, 1.72, 25, 12, BEAM);
-        p.doorL(1.62, 0.85, 0.22, 11);
-        p.windowL(1.62, 0.38, 4, 0.16, 5, season === 3);
-        p.windowL(1.62, 1.4, 4, 0.16, 5);
-        drawHouseExtra(p, hv.extra, season, 1.62, [0.38, 1.4], 4, [0.85, 0.22]);
-        for (const x of [0.35, 0.85, 1.4]) {
-          p.windowL(1.67, x, 15, 0.14, 6, season === 3 && x > 1);
-          p.windowL(1.72, x, 28, 0.14, 6);
-        }
-        p.windowR(1.83, 0.55, 15, 0.14, 6);
-        p.windowR(1.88, 0.95, 28, 0.14, 6);
-        // Flower boxes under the upper windows.
-        if (season !== 3) {
-          for (const x of [0.35, 0.85, 1.4]) {
-            p.box(x - 0.02, 1.72, x + 0.16, 1.78, 26, 2, '#7b5a36');
-            const [fx, fy] = iso(x + 0.07, 1.78, 29);
-            p.ctx.fillStyle = ['#e84a6a', '#f2d34a', '#b97ae0'][Math.floor(x * 3) % 3];
-            p.ctx.beginPath();
-            p.ctx.arc(fx, fy, 2.2, 0, Math.PI * 2);
-            p.ctx.fill();
-          }
-        }
-        p.roofTint = null;
-        p.roofX(0.12, 0.18, 1.88, 1.72, 37, 22, 'tile', WALL, 0.12);
-        smoke.push(p.chimney(0.5, 1.15, 46, 16, '#8f8476'));
-        smoke.push(p.chimney(1.45, 1.15, 46, 16, '#8f8476'));
-        // Hanging sign.
-        p.line([1.9, 1.75, 20], [2.0, 1.85, 20], '#3b2a1a', 1.2);
-        p.wallR(1.95, 1.72, 1.92, 12, 18, '#c49a52');
-      } else if (level >= 2) {
-        p.shadow(0.2, 0.25, 1.8, 1.65);
-        p.box(0.25, 0.3, 1.75, 1.6, 0, 12, STONE);
-        p.box(0.2, 0.25, 1.8, 1.65, 12, 16, WALL);
-        p.timber(0.2, 0.25, 1.8, 1.65, 12, 16, BEAM);
-        p.doorL(1.6, 0.9, 0.2, 11);
-        p.windowL(1.6, 0.42, 4, 0.14, 5);
-        p.windowL(1.6, 1.4, 4, 0.14, 5);
-        drawHouseExtra(p, hv.extra, season, 1.6, [0.42, 1.4], 4, [0.9, 0.2]);
-        p.windowL(1.65, 0.45, 17, 0.14, 6, season === 3);
-        p.windowL(1.65, 1.35, 17, 0.14, 6);
-        p.windowR(1.8, 0.6, 17, 0.14, 6);
-        p.windowR(1.75, 0.8, 4, 0.14, 5);
-        p.roofTint = null;
-        p.roofX(0.2, 0.25, 1.8, 1.65, 28, 18, hv.roof2, WALL, 0.12);
-        smoke.push(p.chimney(1.35, 1.12, 34, 16, '#8f8476'));
-        p.bush(1.85, 1.85, 4, season === 3 ? '#8d9a86' : '#4d8a3a');
-        p.barrel(0.3, 1.85);
-      } else {
-        p.shadow(0.35, 0.45, 1.65, 1.45);
-        // Vegetable patch.
-        if (season !== 3 && yard === 'veg') {
-          p.poly(
-            [
-              [0.25, 1.6, 0],
-              [1.0, 1.6, 0],
-              [1.0, 1.92, 0],
-              [0.25, 1.92, 0],
-            ],
-            '#7a5a38',
-          );
-          for (let i = 0; i < 3; i++) {
-            for (let j = 0; j < 2; j++) p.bush(0.38 + i * 0.25, 1.7 + j * 0.15, 2.2, season === 2 ? '#b08a3a' : '#5d9a3a');
-          }
-        }
-        p.fence([0.2, 1.97], [1.05, 1.97]);
-        p.box(0.35, 0.45, 1.65, 1.45, 0, 17, WALL);
-        p.timber(0.35, 0.45, 1.65, 1.45, 0, 17, BEAM);
-        p.windowL(1.45, 0.52, 7, 0.14, 5, season === 3);
-        p.windowL(1.45, 1.32, 7, 0.14, 5);
-        p.doorL(1.45, 0.9, 0.18, 11);
-        p.windowR(1.65, 0.8, 7, 0.14, 5);
-        drawHouseExtra(p, hv.extra, season, 1.45, [0.52, 1.32], 7, [0.9, 0.18]);
-        p.roofX(0.35, 0.45, 1.65, 1.45, 17, 15, 'thatch', WALL, 0.13);
-        smoke.push(p.chimney(1.3, 1.08, 24, 14, '#8a7d70'));
-        if (!yard) drawHouseProp(p, hv.prop === 'hive' ? 'logs' : hv.prop, season);
-      }
-      if (yard) drawYard(p, yard, level, season);
-      if (trade) drawHomeCraft(p, trade, level, season);
-      p.roofTint = null;
+    case 'house':
+      drawHome(p, level, variant, season, smoke);
       break;
-    }
     case 'field':
     case 'pasture':
     case 'orchard': {
@@ -2749,53 +2658,408 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
 /** Backyard kinds, in the order they are encoded into a house sprite variant. */
 export const YARD_CODES: (string | null)[] = [null, 'veg', 'hens', 'bees'];
 
-/** Vegetable plots, hen coops and beehives behind a house. */
-function drawYard(p: Pen, yard: string, level: number, season: Season): void {
-  const big = level >= 2;
-  const x0 = big ? 1.84 : 1.7;
-  if (yard === 'veg' && level >= 2) {
-    // A strip of beds along the side of larger homes.
-    p.poly(
-      [
-        [x0, 0.3, 0],
-        [1.98, 0.3, 0],
-        [1.98, 1.4, 0],
-        [x0, 1.4, 0],
-      ],
-      season === 3 ? '#cfd4d4' : '#7a5a38',
-    );
-    if (season !== 3) for (let j = 0; j < 4; j++) p.bush((x0 + 1.98) / 2, 0.42 + j * 0.27, 2.2, season === 2 ? '#b08a3a' : '#5d9a3a');
+/** How many house shapes there are for each level (the rest of a variant is colours, yard and craft). */
+export const HOUSE_FORMS = [0, 5, 5, 3];
+
+/** Splits a house variant: colours, yard extension, home craft and shape. */
+function homeParts(variant: number) {
+  return {
+    hv: HOUSE_VARIANTS[variant % HOUSE_VARIANTS.length],
+    yard: YARD_CODES[Math.floor(variant / HOUSE_VARIANTS.length) % YARD_CODES.length] ?? null,
+    trade: HOME_TRADES[(Math.floor(variant / 16) % 8) - 1] ?? null,
+    form: Math.floor(variant / 128),
+  };
+}
+
+/** Where a lit window sits on a home's front, for the evening glow. */
+export function homeWindow(level: number, variant: number): [number, number, number] {
+  const { form } = homeParts(variant);
+  if (level >= 3) return [0.55, form === 1 ? 1.3 : 1.25, 16];
+  if (level === 2) return [0.5, form === 1 ? 1.2 : 1.15, 17];
+  return [0.5, form === 1 ? 1.15 : 1.05, 7];
+}
+
+/**
+ * A home on its 2x2 plot: the house stands at the back, leaving a yard in
+ * front and a strip down the side, where its garden, animals or a family
+ * workshop go, all inside a low wattle fence with a gate onto the street.
+ */
+function drawHome(p: Pen, level: number, variant: number, season: Season, smoke: V3[]): void {
+  const { hv, yard, trade, form } = homeParts(variant);
+  const winter = season === 3;
+  // The trodden yard and the path from the door to the gate.
+  p.poly([[0.12, 0.12, 0], [1.9, 0.12, 0], [1.9, 1.9, 0], [0.12, 1.9, 0]], winter ? 'rgba(235,240,240,0.35)' : 'rgba(150,130,80,0.18)');
+  const doorX = level >= 3 ? 0.95 : 0.85;
+  p.poly([[doorX - 0.1, 1.0, 0], [doorX + 0.12, 1.0, 0], [doorX + 0.16, 1.95, 0], [doorX - 0.14, 1.95, 0]], winter ? '#dfe3e2' : '#b8a27a');
+  p.roofTint = hv.tint;
+  if (level >= 3) drawTownhouse(p, form, hv, season, smoke);
+  else if (level === 2) drawTimberHouse(p, form, hv, season, smoke);
+  else drawCottage(p, form, hv, season, smoke);
+  p.roofTint = null;
+  if (trade) drawTradeAnnex(p, trade, level, season, smoke);
+  if (yard) drawYardPlot(p, yard, !!trade, season);
+  else drawGardenBits(p, hv, !!trade, doorX, season);
+  // Wattle fence along the street and the side, with a gate at the path.
+  wattle(p, [0.1, 1.95], [doorX - 0.2, 1.95], winter);
+  wattle(p, [doorX + 0.22, 1.95], [1.95, 1.95], winter);
+  wattle(p, [1.95, 0.1], [1.95, 1.95], winter);
+}
+
+/** A low woven-hazel fence between posts. */
+function wattle(p: Pen, a: [number, number], b: [number, number], winter: boolean): void {
+  const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  if (len < 0.05) return;
+  const col = winter ? '#9a8a78' : '#8a6a40';
+  p.poly([[a[0], a[1], 1], [b[0], b[1], 1], [b[0], b[1], 6], [a[0], a[1], 6]], shade(col, a[1] === b[1] ? 1 : 0.8), shade(col, 0.6));
+  const n = Math.max(1, Math.round(len / 0.12));
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    const x = a[0] + (b[0] - a[0]) * t;
+    const y = a[1] + (b[1] - a[1]) * t;
+    if (i % 3 === 0) p.line([x, y, 0], [x, y, 7.5], '#5e4129', 1.1);
+    else p.line([x, y, 1.5], [x, y, 5.5], shade(col, 0.7), 0.5);
+  }
+  if (winter) p.line([a[0], a[1], 6.2], [b[0], b[1], 6.2], '#f2f6f8', 1.4);
+}
+
+type HouseLook = (typeof HOUSE_VARIANTS)[number];
+
+/** A cottage: five shapes, each in four colourings. */
+function drawCottage(p: Pen, form: number, hv: HouseLook, season: Season, smoke: V3[]): void {
+  const winter = season === 3;
+  const W = hv.wall;
+  switch (form % 5) {
+    case 1: {
+      // Gable to the street: the door under the gable end.
+      p.shadow(0.35, 0.25, 1.25, 1.15);
+      p.box(0.35, 0.25, 1.25, 1.15, 0, 15, W);
+      p.timber(0.35, 0.25, 1.25, 1.15, 0, 15, BEAM);
+      p.doorL(1.15, 0.72, 0.18, 11);
+      p.windowL(1.15, 0.45, 7, 0.12, 5, winter);
+      p.windowL(1.15, 1.02, 7, 0.12, 5);
+      p.windowR(1.25, 0.55, 7, 0.14, 5);
+      drawHouseExtra(p, hv.extra, season, 1.15, [0.45, 1.02], 7, [0.72, 0.18]);
+      p.roofY(0.35, 0.25, 1.25, 1.15, 15, 17, 'thatch', W, 0.13);
+      smoke.push(p.chimney(0.55, 0.4, 22, 13, '#8a7d70'));
+      break;
+    }
+    case 2: {
+      // A long cottage with a lean-to store at its end.
+      p.shadow(0.25, 0.3, 1.55, 1.05);
+      p.box(0.25, 0.3, 1.2, 1.05, 0, 15, W);
+      p.timber(0.25, 0.3, 1.2, 1.05, 0, 15, BEAM);
+      p.box(1.2, 0.4, 1.55, 1.0, 0, 10, WOOD);
+      p.poly([[1.2, 0.36, 15], [1.2, 1.04, 15], [1.6, 1.04, 9], [1.6, 0.36, 9]], p.snow ? '#eef2f4' : shade(ROOF_COLORS.shingle, 0.9), shade(ROOF_COLORS.shingle, 0.5));
+      p.doorL(1.05, 0.7, 0.18, 11);
+      p.windowL(1.05, 0.38, 7, 0.13, 5, winter);
+      p.windowL(1.05, 1.0, 7, 0.12, 5);
+      drawHouseExtra(p, hv.extra, season, 1.05, [0.38, 1.0], 7, [0.7, 0.18]);
+      p.roofX(0.25, 0.3, 1.2, 1.05, 15, 14, 'thatch', W, 0.12);
+      smoke.push(p.chimney(0.4, 0.6, 22, 12, '#8a7d70'));
+      break;
+    }
+    case 3: {
+      // A rubble-stone cottage under a deep thatch.
+      p.shadow(0.3, 0.3, 1.3, 1.05);
+      p.box(0.3, 0.3, 1.3, 1.05, 0, 13, '#a49c8e', undefined, 'rubble');
+      p.doorL(1.05, 0.75, 0.18, 10);
+      p.windowL(1.05, 0.45, 6, 0.13, 5, winter);
+      p.windowL(1.05, 1.05, 6, 0.12, 5);
+      p.windowR(1.3, 0.6, 6, 0.13, 5);
+      drawHouseExtra(p, hv.extra, season, 1.05, [0.45, 1.05], 6, [0.75, 0.18]);
+      p.roofX(0.3, 0.3, 1.3, 1.05, 13, 17, 'thatch', '#a49c8e', 0.16);
+      smoke.push(p.chimney(1.12, 0.6, 20, 14, '#8a7d70'));
+      break;
+    }
+    case 4: {
+      // A boarded cottage under shingles, a little porch at the door.
+      p.shadow(0.3, 0.25, 1.3, 1.05);
+      p.box(0.3, 0.25, 1.3, 1.05, 0, 14, WOOD);
+      p.doorL(1.05, 0.72, 0.18, 10);
+      p.windowL(1.05, 0.42, 6, 0.13, 5, winter);
+      p.windowL(1.05, 1.05, 6, 0.12, 5);
+      p.windowR(1.3, 0.55, 6, 0.13, 5);
+      p.roofX(0.3, 0.25, 1.3, 1.05, 14, 14, 'shingle', WOOD, 0.12);
+      for (const x of [0.66, 0.98]) p.line([x, 1.25, 0], [x, 1.25, 10], BEAM, 1.2);
+      p.poly([[0.62, 1.04, 13], [1.02, 1.04, 13], [1.02, 1.28, 10], [0.62, 1.28, 10]], p.snow ? '#eef2f4' : shade(ROOF_COLORS.shingle, 0.95), shade(ROOF_COLORS.shingle, 0.5));
+      smoke.push(p.chimney(0.45, 0.6, 21, 12, '#8a7d70'));
+      break;
+    }
+    default: {
+      // The plain cruck cottage: plaster and timber under thatch.
+      p.shadow(0.3, 0.3, 1.35, 1.05);
+      p.box(0.3, 0.3, 1.35, 1.05, 0, 15, W);
+      p.timber(0.3, 0.3, 1.35, 1.05, 0, 15, BEAM);
+      p.doorL(1.05, 0.75, 0.18, 11);
+      p.windowL(1.05, 0.42, 7, 0.13, 5, winter);
+      p.windowL(1.05, 1.1, 7, 0.12, 5);
+      p.windowR(1.35, 0.6, 7, 0.13, 5);
+      drawHouseExtra(p, hv.extra, season, 1.05, [0.42, 1.1], 7, [0.75, 0.18]);
+      p.roofX(0.3, 0.3, 1.35, 1.05, 15, 14, 'thatch', W, 0.13);
+      smoke.push(p.chimney(1.1, 0.68, 22, 13, '#8a7d70'));
+    }
+  }
+}
+
+/** A Timber House: two storeys, five shapes. */
+function drawTimberHouse(p: Pen, form: number, hv: HouseLook, season: Season, smoke: V3[]): void {
+  const winter = season === 3;
+  const W = hv.wall;
+  const roof = hv.roof2;
+  switch (form % 5) {
+    case 1: {
+      // Gable to the street, the upper floor jettied out over the door.
+      p.shadow(0.3, 0.2, 1.3, 1.2);
+      p.box(0.32, 0.22, 1.28, 1.12, 0, 11, STONE);
+      p.box(0.29, 0.19, 1.31, 1.2, 11, 15, W);
+      p.timber(0.29, 0.19, 1.31, 1.2, 11, 15, BEAM);
+      p.doorL(1.12, 0.72, 0.18, 10);
+      p.windowL(1.12, 0.42, 4, 0.12, 5);
+      p.windowL(1.12, 1.02, 4, 0.12, 5);
+      drawHouseExtra(p, hv.extra, season, 1.12, [0.42, 1.02], 4, [0.72, 0.18]);
+      for (const x of [0.42, 0.72, 1.02]) p.windowL(1.2, x, 16, 0.13, 6, winter && x === 0.72);
+      p.windowR(1.31, 0.5, 16, 0.13, 6);
+      p.roofY(0.29, 0.19, 1.31, 1.2, 26, 20, roof, W, 0.1);
+      smoke.push(p.chimney(0.5, 0.3, 36, 14, '#8f8476'));
+      break;
+    }
+    case 2: {
+      // An L: the main range and a short cross wing at the side.
+      p.shadow(0.2, 0.2, 1.55, 1.2);
+      p.box(0.22, 0.3, 1.1, 1.1, 0, 11, STONE);
+      p.box(0.2, 0.28, 1.1, 1.14, 11, 14, W);
+      p.timber(0.2, 0.28, 1.1, 1.14, 11, 14, BEAM);
+      p.doorL(1.1, 0.62, 0.18, 10);
+      p.windowL(1.1, 0.32, 4, 0.12, 5);
+      p.windowL(1.14, 0.35, 16, 0.13, 6, winter);
+      p.windowL(1.14, 0.8, 16, 0.13, 6);
+      drawHouseExtra(p, hv.extra, season, 1.1, [0.32], 4, [0.62, 0.18]);
+      p.roofX(0.2, 0.28, 1.1, 1.14, 25, 16, roof, W, 0.1);
+      p.box(1.1, 0.2, 1.55, 1.2, 0, 11, STONE);
+      p.box(1.08, 0.18, 1.57, 1.22, 11, 14, W);
+      p.timber(1.08, 0.18, 1.57, 1.22, 11, 14, BEAM);
+      p.windowL(1.2, 1.22, 4, 0.14, 5);
+      p.windowL(1.22, 1.22, 16, 0.14, 6);
+      p.windowR(1.57, 0.5, 16, 0.13, 6);
+      p.roofY(1.08, 0.18, 1.57, 1.22, 25, 16, roof, W, 0.08);
+      smoke.push(p.chimney(0.45, 0.6, 36, 13, '#8f8476'));
+      break;
+    }
+    case 3: {
+      // Close-studded all the way up, with a catslide roof over an outshot.
+      p.shadow(0.25, 0.2, 1.4, 1.15);
+      p.box(0.25, 0.25, 1.4, 1.1, 0, 26, W);
+      p.timber(0.25, 0.25, 1.4, 1.1, 0, 13, BEAM);
+      p.timber(0.25, 0.25, 1.4, 1.1, 13, 13, BEAM);
+      for (let x = 0.33; x < 1.38; x += 0.12) p.line([x, 1.1, 1], [x, 1.1, 25], BEAM, 0.9);
+      p.doorL(1.1, 0.78, 0.18, 10);
+      p.windowL(1.1, 0.4, 4, 0.14, 5);
+      p.windowL(1.1, 1.12, 4, 0.14, 5);
+      drawHouseExtra(p, hv.extra, season, 1.1, [0.4, 1.12], 4, [0.78, 0.18]);
+      for (const x of [0.4, 0.78, 1.12]) p.windowL(1.1, x, 17, 0.13, 6, winter && x === 1.12);
+      p.windowR(1.4, 0.55, 17, 0.13, 6);
+      p.roofX(0.25, 0.25, 1.4, 1.1, 26, 18, roof, W, 0.1);
+      smoke.push(p.chimney(1.15, 0.6, 38, 14, '#8f8476'));
+      break;
+    }
+    case 4: {
+      // Stone below, timber above, and a dormer in the roof.
+      p.shadow(0.25, 0.25, 1.4, 1.15);
+      p.box(0.27, 0.27, 1.38, 1.1, 0, 12, '#a49c8e', undefined, 'rubble');
+      p.box(0.24, 0.24, 1.41, 1.14, 12, 12, W);
+      p.timber(0.24, 0.24, 1.41, 1.14, 12, 12, BEAM);
+      p.doorL(1.1, 0.75, 0.18, 10);
+      p.windowL(1.1, 0.4, 4, 0.14, 5, winter);
+      p.windowL(1.1, 1.1, 4, 0.14, 5);
+      drawHouseExtra(p, hv.extra, season, 1.1, [0.4, 1.1], 4, [0.75, 0.18]);
+      for (const x of [0.4, 1.1]) p.windowL(1.14, x, 15, 0.14, 6);
+      p.windowR(1.41, 0.6, 15, 0.13, 6);
+      p.roofX(0.24, 0.24, 1.41, 1.14, 24, 20, roof, W, 0.1);
+      p.box(0.7, 0.85, 0.95, 1.05, 27, 7, W);
+      p.windowL(1.05, 0.76, 28, 0.13, 4, winter);
+      p.roofY(0.69, 0.84, 0.96, 1.07, 34, 5, roof, W, 0.03);
+      smoke.push(p.chimney(0.4, 0.55, 36, 13, '#8f8476'));
+      break;
+    }
+    default: {
+      // Stone ground floor and a jettied timber storey.
+      p.shadow(0.2, 0.25, 1.4, 1.15);
+      p.box(0.25, 0.3, 1.38, 1.1, 0, 11, STONE);
+      p.box(0.2, 0.25, 1.42, 1.15, 11, 15, W);
+      p.timber(0.2, 0.25, 1.42, 1.15, 11, 15, BEAM);
+      p.doorL(1.1, 0.75, 0.18, 10);
+      p.windowL(1.1, 0.38, 4, 0.13, 5);
+      p.windowL(1.1, 1.1, 4, 0.13, 5);
+      drawHouseExtra(p, hv.extra, season, 1.1, [0.38, 1.1], 4, [0.75, 0.18]);
+      p.windowL(1.15, 0.4, 16, 0.13, 6, winter);
+      p.windowL(1.15, 1.08, 16, 0.13, 6);
+      p.windowR(1.42, 0.55, 16, 0.13, 6);
+      p.roofX(0.2, 0.25, 1.42, 1.15, 26, 17, roof, W, 0.1);
+      smoke.push(p.chimney(1.1, 0.65, 36, 14, '#8f8476'));
+    }
+  }
+}
+
+/** A Townhouse: three storeys, three shapes. */
+function drawTownhouse(p: Pen, form: number, hv: HouseLook, season: Season, smoke: V3[]): void {
+  const winter = season === 3;
+  const W = hv.wall;
+  const boxes = (x: number, y0: number, z: number) => {
+    if (winter) return;
+    p.box(x - 0.02, y0, x + 0.16, y0 + 0.06, z - 1, 2, '#7b5a36');
+    const [fx, fy] = iso(x + 0.07, y0 + 0.06, z + 2);
+    p.ctx.fillStyle = ['#e84a6a', '#f2d34a', '#b97ae0'][Math.floor(x * 7) % 3];
+    p.ctx.beginPath();
+    p.ctx.arc(fx, fy, 2, 0, Math.PI * 2);
+    p.ctx.fill();
+  };
+  switch (form % 3) {
+    case 1: {
+      // Tall and narrow, gable to the street, each storey jettied further out.
+      p.shadow(0.3, 0.15, 1.3, 1.3);
+      p.box(0.34, 0.18, 1.26, 1.2, 0, 11, STONE);
+      p.box(0.31, 0.16, 1.29, 1.25, 11, 12, W);
+      p.timber(0.31, 0.16, 1.29, 1.25, 11, 12, BEAM);
+      p.box(0.28, 0.14, 1.32, 1.3, 23, 12, W);
+      p.timber(0.28, 0.14, 1.32, 1.3, 23, 12, BEAM);
+      p.doorL(1.2, 0.7, 0.2, 10);
+      p.windowL(1.2, 0.42, 3, 0.13, 6, winter);
+      p.windowL(1.2, 1.02, 3, 0.13, 6);
+      drawHouseExtra(p, hv.extra, season, 1.2, [0.42, 1.02], 3, [0.7, 0.2]);
+      for (const x of [0.42, 0.72, 1.02]) {
+        p.windowL(1.25, x, 15, 0.13, 6);
+        p.windowL(1.3, x, 27, 0.13, 6, winter && x === 0.72);
+        boxes(x, 1.3, 26);
+      }
+      p.windowR(1.32, 0.5, 27, 0.13, 6);
+      p.roofY(0.28, 0.14, 1.32, 1.3, 35, 24, 'tile', W, 0.1);
+      smoke.push(p.chimney(0.45, 0.3, 46, 14, '#8f8476'));
+      break;
+    }
+    case 2: {
+      // Stone below, two timber storeys, and a pair of dormers.
+      p.shadow(0.15, 0.2, 1.5, 1.25);
+      p.box(0.18, 0.22, 1.48, 1.2, 0, 12, '#b6ae9f', undefined, 'stone');
+      p.box(0.15, 0.2, 1.5, 1.25, 12, 12, W);
+      p.timber(0.15, 0.2, 1.5, 1.25, 12, 12, BEAM);
+      p.box(0.12, 0.17, 1.53, 1.3, 24, 11, W);
+      p.timber(0.12, 0.17, 1.53, 1.3, 24, 11, BEAM);
+      p.doorL(1.2, 0.85, 0.22, 10);
+      p.windowL(1.2, 0.4, 3, 0.16, 6, winter);
+      p.windowL(1.2, 1.2, 3, 0.16, 6);
+      drawHouseExtra(p, hv.extra, season, 1.2, [0.4, 1.2], 3, [0.85, 0.22]);
+      for (const x of [0.35, 0.8, 1.25]) {
+        p.windowL(1.25, x, 15, 0.14, 6);
+        p.windowL(1.3, x, 27, 0.14, 6, winter && x === 1.25);
+      }
+      p.windowR(1.53, 0.6, 27, 0.13, 6);
+      p.roofX(0.12, 0.17, 1.53, 1.3, 35, 20, 'tile', W, 0.1);
+      for (const x of [0.4, 1.05]) {
+        p.box(x, 1.0, x + 0.25, 1.2, 38, 8, W);
+        p.windowL(1.2, x + 0.06, 39, 0.13, 5);
+        p.roofY(x - 0.02, 0.99, x + 0.27, 1.23, 46, 5, 'tile', W, 0.03);
+      }
+      smoke.push(p.chimney(0.75, 0.5, 46, 15, '#8f8476'));
+      break;
+    }
+    default: {
+      // Stone ground floor, two jettied timber storeys, a hanging sign.
+      p.shadow(0.15, 0.2, 1.5, 1.25);
+      p.box(0.2, 0.25, 1.45, 1.2, 0, 11, STONE);
+      p.box(0.17, 0.22, 1.48, 1.25, 11, 12, W);
+      p.timber(0.17, 0.22, 1.48, 1.25, 11, 12, BEAM);
+      p.box(0.14, 0.19, 1.51, 1.3, 23, 11, W);
+      p.timber(0.14, 0.19, 1.51, 1.3, 23, 11, BEAM);
+      p.doorL(1.2, 0.85, 0.22, 10);
+      p.windowL(1.2, 0.38, 3, 0.16, 6, winter);
+      p.windowL(1.2, 1.2, 3, 0.16, 6);
+      drawHouseExtra(p, hv.extra, season, 1.2, [0.38, 1.2], 3, [0.85, 0.22]);
+      for (const x of [0.35, 0.8, 1.25]) {
+        p.windowL(1.25, x, 14, 0.14, 6, winter && x > 1);
+        p.windowL(1.3, x, 26, 0.14, 6);
+        boxes(x, 1.3, 25);
+      }
+      p.windowR(1.48, 0.55, 14, 0.13, 6);
+      p.windowR(1.51, 0.9, 26, 0.13, 6);
+      p.roofX(0.14, 0.19, 1.51, 1.3, 34, 20, 'tile', W, 0.1);
+      smoke.push(p.chimney(0.45, 0.7, 43, 15, '#8f8476'));
+      smoke.push(p.chimney(1.25, 0.7, 43, 15, '#8f8476'));
+    }
+  }
+}
+
+/** The yard extension a household keeps: vegetable beds, hens or bees. */
+function drawYardPlot(p: Pen, yard: string, trade: boolean, season: Season): void {
+  const winter = season === 3;
+  // With a workshop down the side, the yard keeps to the front.
+  const sx = trade ? 0.25 : 1.45;
+  const sy = trade ? 1.35 : 0.3;
+  if (yard === 'veg') {
+    // Raised beds with plank edges: cabbages, leeks and beans on canes.
+    const beds: [number, number, number, number][] = trade
+      ? [[0.2, 1.3, 0.62, 1.82], [1.05, 1.3, 1.45, 1.82]]
+      : [[0.2, 1.3, 0.62, 1.82], [1.05, 1.3, 1.5, 1.82], [1.5, 0.3, 1.85, 1.05]];
+    beds.forEach(([x0, y0, x1, y1], i) => {
+      p.box(x0, y0, x1, y1, 0, 2, '#7b5a36', winter ? '#cfd4d4' : '#6a4a2c');
+      if (winter) return;
+      for (let x = x0 + 0.08; x < x1 - 0.04; x += 0.13) {
+        for (let y = y0 + 0.08; y < y1 - 0.04; y += 0.14) {
+          if (i % 3 === 0) {
+            p.circle(x, y, 3.4, 2.1, season === 2 ? '#8aa040' : '#5d9a3a');
+            p.circle(x - 0.01, y - 0.01, 4.2, 1.2, '#8ac05a');
+          } else if (i % 3 === 1) {
+            p.line([x, y, 2], [x - 0.02, y, 8], '#6aa84a', 0.9);
+            p.line([x, y, 2], [x + 0.03, y, 7], '#8ac05a', 0.7);
+          } else {
+            p.line([x, y, 2], [x, y, 12], '#8a6a40', 0.6);
+            p.circle(x, y, 8, 1.8, '#4f8a34');
+          }
+        }
+      }
+    });
   } else if (yard === 'hens') {
-    // A little coop on legs with a ramp, and hens scratching about.
-    p.box(x0, 0.45, x0 + 0.24, 0.8, 4, 7, '#9a7247', undefined, 'plank');
-    p.line([x0 + 0.02, 0.8, 0], [x0 + 0.02, 0.8, 4], BEAM, 1.2);
-    p.line([x0 + 0.22, 0.8, 0], [x0 + 0.22, 0.8, 4], BEAM, 1.2);
-    p.roofX(x0, 0.45, x0 + 0.24, 0.8, 11, 5, 'shingle', '#9a7247', 0.03);
-    p.line([x0 + 0.24, 0.6, 4], [x0 + 0.38, 0.6, 0], '#7b5a36', 1.4);
-    for (const [hx, hy] of [
-      [x0 + 0.05, 1.0],
-      [x0 + 0.2, 1.15],
-      [x0 - 0.05, 1.25],
-    ]) {
-      const [sx, sy] = iso(hx, hy, 0);
-      const c = p.ctx;
-      c.fillStyle = hx > x0 ? '#f2ece0' : '#a8622a';
-      c.beginPath();
-      c.ellipse(sx, sy - 2.5, 2.6, 2, 0, 0, Math.PI * 2);
-      c.fill();
-      c.beginPath();
-      c.arc(sx + 2, sy - 4.2, 1.2, 0, Math.PI * 2);
-      c.fill();
-      c.fillStyle = '#c8322a';
-      c.fillRect(sx + 1.8, sy - 5.8, 1, 1);
+    // A coop on legs with a ramp, a little run and hens about.
+    const x0 = sx;
+    const y0 = sy;
+    p.box(x0, y0, x0 + 0.32, y0 + 0.36, 4, 8, '#9a7247', undefined, 'plank');
+    for (const [lx, ly] of [[x0 + 0.03, y0 + 0.33], [x0 + 0.29, y0 + 0.33]] as const) p.line([lx, ly, 0], [lx, ly, 4], BEAM, 1.2);
+    p.roofX(x0, y0, x0 + 0.32, y0 + 0.36, 12, 6, 'shingle', '#9a7247', 0.04);
+    p.line([x0 + 0.16, y0 + 0.36, 4], [x0 + 0.16, y0 + 0.55, 0], '#7b5a36', 1.4);
+    if (!winter) {
+      const spots: [number, number, string][] = trade
+        ? [[0.75, 1.5, '#f2ece0'], [0.6, 1.75, '#a8622a'], [1.2, 1.6, '#f2ece0'], [1.35, 1.8, '#3a2a1a']]
+        : [[1.55, 0.95, '#f2ece0'], [1.75, 1.2, '#a8622a'], [1.6, 1.5, '#f2ece0'], [0.45, 1.55, '#3a2a1a'], [1.2, 1.7, '#a8622a']];
+      for (const [hx, hy, col] of spots) {
+        const [hsx, hsy] = iso(hx, hy, 0);
+        const c = p.ctx;
+        c.fillStyle = 'rgba(30,24,12,0.2)';
+        c.beginPath();
+        c.ellipse(hsx, hsy, 2.6, 1, 0, 0, Math.PI * 2);
+        c.fill();
+        c.fillStyle = col;
+        c.beginPath();
+        c.ellipse(hsx, hsy - 2.5, 2.6, 2, 0, 0, Math.PI * 2);
+        c.fill();
+        c.beginPath();
+        c.arc(hsx + 2, hsy - 4.2, 1.2, 0, Math.PI * 2);
+        c.fill();
+        c.fillStyle = '#c8322a';
+        c.fillRect(hsx + 1.8, hsy - 5.8, 1, 1);
+        c.fillStyle = '#e8a030';
+        c.fillRect(hsx + 3, hsy - 4.2, 1, 0.6);
+      }
     }
   } else if (yard === 'bees') {
-    p.box(x0, 0.5, x0 + 0.25, 0.65, 0, 4, '#7b5a36');
-    for (const y of [0.52, 0.62]) {
-      const [x, yy] = iso(x0 + 0.12, y, 4);
-      p.ctx.fillStyle = season === 3 ? '#e8ecee' : '#c9a050';
+    // Straw skeps on a plank stand, and lavender and borage for the bees.
+    const x0 = trade ? 0.25 : 1.5;
+    const y0 = trade ? 1.4 : 0.35;
+    p.box(x0, y0, x0 + 0.3, y0 + 0.5, 3, 1.5, '#7b5a36');
+    for (const [lx, ly] of [[x0 + 0.03, y0 + 0.47], [x0 + 0.27, y0 + 0.47], [x0 + 0.27, y0 + 0.03]] as const) p.line([lx, ly, 0], [lx, ly, 3], BEAM, 1);
+    for (const y of [y0 + 0.1, y0 + 0.25, y0 + 0.4]) {
+      const [x, yy] = iso(x0 + 0.15, y, 4.5);
+      p.ctx.fillStyle = winter ? '#e8ecee' : '#c9a050';
       p.ctx.beginPath();
-      p.ctx.ellipse(x, yy - 4, 4, 5, 0, Math.PI, 0);
+      p.ctx.ellipse(x, yy - 4, 4, 5.5, 0, Math.PI, 0);
       p.ctx.lineTo(x + 4, yy);
       p.ctx.lineTo(x - 4, yy);
       p.ctx.fill();
@@ -2810,68 +3074,188 @@ function drawYard(p: Pen, yard: string, level: number, season: Season): void {
       p.ctx.fillStyle = '#3a2a1a';
       p.ctx.fillRect(x - 0.8, yy - 1.4, 1.6, 1.2);
     }
-    if (season === 1 || season === 0) p.bush(x0 + 0.1, 1.0, 3, '#b97ae0');
+    if (!winter) {
+      for (let k = 0; k < 8; k++) {
+        const x = (trade ? 0.95 : 1.5) + (k % 4) * 0.1;
+        const y = (trade ? 1.4 : 1.1) + Math.floor(k / 4) * 0.25;
+        p.bush(x, y, 2.6, '#6a8a4a');
+        p.circle(x, y, 3.6, 1.5, k % 2 ? '#a07ad8' : '#6a8ae0');
+      }
+    }
   }
 }
 
-/** The sign and a telltale prop of a craft worked from home. */
-function drawHomeCraft(p: Pen, trade: BuildingType, level: number, season: Season): void {
-  const front = level >= 3 ? 1.72 : 1.65;
-  // Hanging sign on a bracket at the front corner.
-  const sx = level >= 3 ? 1.88 : 1.8;
-  p.line([sx, front, 22], [sx + 0.18, front + 0.12, 22], '#3b2a1a', 1.3);
-  p.wallR(sx + 0.13, front + 0.04, front + 0.24, 13, 21, '#e8d8b0');
-  p.wallR(sx + 0.131, front + 0.06, front + 0.22, 14, 20, TRADE_COLORS[trade] ?? '#8a3b2e');
-  const yx = level >= 3 ? 1.95 : 1.9;
-  switch (trade) {
-    case 'bakery': {
-      const [ox, oy] = iso(yx, 1.2, 0);
-      p.ctx.fillStyle = '#b39a80';
+/** Without a yard extension: a flower bed, and the family's woodpile, bench, cart or water butt. */
+function drawGardenBits(p: Pen, hv: HouseLook, trade: boolean, doorX: number, season: Season): void {
+  const winter = season === 3;
+  if (!winter) {
+    const colors = season === 2 ? ['#d88a3a', '#b8482a', '#e0c040'] : ['#e84a6a', '#f2d34a', '#b97ae0', '#f4f0e0'];
+    for (let k = 0; k < 5; k++) {
+      const x = 0.25 + k * 0.1;
+      p.bush(x, 1.3 + (k % 2) * 0.06, 2.4, '#4f8a34');
+      p.circle(x, 1.3 + (k % 2) * 0.06, 3.4, 1.4, colors[k % colors.length]);
+    }
+    p.bush(doorX + 0.45, 1.8, 3.4, '#4d8a3a');
+  }
+  if (trade) return;
+  switch (hv.prop) {
+    case 'logs':
+      p.logPile(1.55, 0.6, 3);
+      break;
+    case 'cart': {
+      p.box(1.5, 0.5, 1.8, 0.9, 4, 4, '#8a6236');
+      const [wx, wy] = iso(1.65, 0.92, 4);
+      p.ctx.strokeStyle = '#4a3020';
+      p.ctx.lineWidth = 1.2;
       p.ctx.beginPath();
-      p.ctx.ellipse(ox, oy - 1, 8, 6, 0, Math.PI, 0);
-      p.ctx.lineTo(ox + 8, oy + 1);
-      p.ctx.lineTo(ox - 8, oy + 1);
-      p.ctx.fill();
-      p.ctx.fillStyle = '#f08a2a';
-      p.ctx.fillRect(ox - 1.5, oy - 2.5, 3, 2);
+      p.ctx.ellipse(wx, wy, 3, 4, 0, 0, Math.PI * 2);
+      p.ctx.stroke();
+      p.line([1.5, 0.7, 6], [1.38, 0.7, 2], '#6b4a2e', 1.2);
+      p.sack(1.64, 0.65, '#d8c79c');
       break;
     }
-    case 'brewhouse':
-      p.barrel(yx, 1.0);
-      p.barrel(yx + 0.05, 1.25);
-      p.barrel(yx - 0.12, 1.15);
+    case 'well': {
+      // A water butt under the eaves and a washing tub.
+      p.barrel(1.5, 0.55);
+      const [tx, ty] = iso(1.6, 1.15, 0);
+      p.ctx.fillStyle = '#7b5a36';
+      p.ctx.beginPath();
+      p.ctx.ellipse(tx, ty - 2, 5, 2.4, 0, 0, Math.PI * 2);
+      p.ctx.fill();
+      p.ctx.fillStyle = winter ? '#dfe8ec' : '#7aa4c0';
+      p.ctx.beginPath();
+      p.ctx.ellipse(tx, ty - 2.6, 3.8, 1.6, 0, 0, Math.PI * 2);
+      p.ctx.fill();
       break;
-    case 'dairy':
-      p.box(yx - 0.1, 1.0, yx + 0.08, 1.3, 0, 5, '#7b5a36');
-      for (const y of [1.06, 1.18]) p.ellipse(yx - 0.01, y, 7, 2.6, 1.6, '#f0c850');
-      break;
-    case 'weaver':
-      // A loom frame with a half-woven cloth.
-      p.line([yx, 0.95, 0], [yx, 0.95, 13], '#6b4a2e', 1.4);
-      p.line([yx, 1.35, 0], [yx, 1.35, 13], '#6b4a2e', 1.4);
-      p.line([yx, 0.95, 13], [yx, 1.35, 13], '#6b4a2e', 1.4);
-      p.wallR(yx, 1.0, 1.3, 4, 11, season === 3 ? '#9aaac8' : '#5a7ab0');
-      break;
-    case 'tailor':
-      p.box(yx - 0.12, 1.0, yx + 0.08, 1.35, 0, 6, '#7b5a36');
-      p.wallR(yx + 0.081, 1.05, 1.15, 6, 10, '#8a3b2e');
-      p.wallR(yx + 0.081, 1.2, 1.3, 6, 9, '#6a3e22');
-      break;
-    case 'tanner':
-      p.line([yx, 0.95, 0], [yx, 0.95, 12], '#5e4129', 1.3);
-      p.line([yx, 1.4, 0], [yx, 1.4, 12], '#5e4129', 1.3);
-      p.line([yx, 0.95, 12], [yx, 1.4, 12], '#5e4129', 1.3);
-      p.wallR(yx, 1.0, 1.17, 3, 11, '#9a6a40');
-      p.wallR(yx, 1.22, 1.37, 4, 11, '#b88a5a');
-      break;
-    case 'apothecary':
-      for (const y of [1.0, 1.12, 1.24]) {
-        p.line([yx, y, 13], [yx, y, 8], '#6b4a2e', 0.6);
-        p.ellipse(yx, y, 7.5, 1.6, 2.4, season === 3 ? '#8a9a7a' : '#6aa04a');
-      }
-      p.line([yx, 0.95, 13], [yx, 1.3, 13], '#5e4129', 1.2);
-      break;
+    }
+    default:
+      p.logPile(1.55, 0.6, 2);
+      p.box(1.5, 1.2, 1.62, 1.32, 0, 4, '#8a6236');
   }
+}
+
+/** The workshop a craftsman's family builds on: each craft its own. */
+function drawTradeAnnex(p: Pen, trade: BuildingType, level: number, season: Season, smoke: V3[]): void {
+  const winter = season === 3;
+  const x0 = 1.42;
+  const x1 = 1.88;
+  const y0 = 0.25;
+  const y1 = 1.15;
+  // The hanging sign by the door.
+  const front = level >= 3 ? 1.3 : level === 2 ? 1.15 : 1.08;
+  p.line([0.22, front, 20], [0.22, front + 0.16, 20], '#3b2a1a', 1.2);
+  p.wallL(front + 0.1, 0.12, 0.32, 12, 19, '#e8d8b0');
+  p.wallL(front + 0.101, 0.14, 0.3, 13, 18, TRADE_COLORS[trade] ?? '#8a3b2e');
+  const shed = (h: number, wall: string, roof: 'shingle' | 'tile' | 'slate' | 'thatch' = 'shingle', mat?: Material) => {
+    p.box(x0, y0, x1, y1, 0, h, wall, undefined, mat);
+    p.poly([[x0 - 0.04, y0 - 0.04, h + 6], [x0 - 0.04, y1 + 0.04, h + 6], [x1 + 0.05, y1 + 0.04, h - 1], [x1 + 0.05, y0 - 0.04, h - 1]], p.snow ? '#eef2f4' : shade(ROOF_COLORS[roof], 0.92), shade(ROOF_COLORS[roof], 0.5));
+  };
+  switch (trade) {
+    case 'bakery': {
+      // A bakehouse with its domed oven and flue.
+      shed(11, '#b6ae9f', 'tile', 'stone');
+      p.doorR(x1, 0.4, 0.18, 9);
+      const [ox, oy] = iso(1.68, 1.4, 0);
+      p.ctx.fillStyle = '#b39a80';
+      p.ctx.beginPath();
+      p.ctx.ellipse(ox, oy - 1, 9, 7, 0, Math.PI, 0);
+      p.ctx.lineTo(ox + 9, oy + 1);
+      p.ctx.lineTo(ox - 9, oy + 1);
+      p.ctx.fill();
+      p.ctx.fillStyle = '#2a1a10';
+      p.ctx.beginPath();
+      p.ctx.ellipse(ox + 2, oy, 3.2, 3.2, 0, Math.PI, 0);
+      p.ctx.fill();
+      p.ctx.fillStyle = '#f08a2a';
+      p.ctx.fillRect(ox, oy - 1.4, 4, 1.4);
+      smoke.push(p.chimney(1.5, 0.5, 12, 14, '#9b8a78'));
+      p.box(1.45, 1.55, 1.7, 1.7, 0, 5, '#8a6440', '#d8a860');
+      break;
+    }
+    case 'brewhouse': {
+      // An open brew shed: the copper and casks.
+      shed(13, WOOD, 'shingle', 'plank');
+      p.wallR(x1 + 0.002, 0.35, 1.05, 0, 10, '#2a2018');
+      const [cx, cy] = iso(x1 - 0.1, 0.7, 0);
+      p.ctx.fillStyle = '#b4652e';
+      p.ctx.beginPath();
+      p.ctx.ellipse(cx, cy - 4, 5, 3, 0, 0, Math.PI * 2);
+      p.ctx.fill();
+      smoke.push(p.chimney(1.55, 0.4, 13, 10, '#8a7d70'));
+      p.barrel(1.55, 1.4);
+      p.barrel(1.75, 1.5);
+      p.barrel(1.62, 1.68);
+      break;
+    }
+    case 'dairy': {
+      // A cool stone dairy with a louvre, a churn and cheeses on a rack.
+      shed(12, '#c8c0b0', 'slate', 'stone');
+      for (let z = 4; z < 10; z += 1.5) p.line([x1 + 0.003, 0.55, z], [x1 + 0.003, 0.85, z], '#3a3530', 0.6);
+      p.box(1.5, 1.35, 1.82, 1.5, 0, 6, '#7b5a36');
+      for (const x of [1.55, 1.66, 1.77]) p.ellipse(x, 1.42, 7.5, 2.4, 1.6, '#f0c850');
+      const [jx, jy] = iso(1.55, 1.75, 0);
+      p.ctx.fillStyle = '#9a7247';
+      p.ctx.fillRect(jx - 2.2, jy - 9, 4.4, 9);
+      p.ctx.fillStyle = '#6b4a2e';
+      p.ctx.fillRect(jx - 0.4, jy - 12, 0.8, 3);
+      break;
+    }
+    case 'weaver': {
+      // A weaving shed with a long window for light, wool drying outside.
+      shed(13, hvWallFor(trade), 'thatch');
+      p.wallR(x1 + 0.002, 0.35, 1.05, 4, 10, '#4a3020');
+      p.wallR(x1 + 0.003, 0.38, 1.02, 5, 9, winter ? '#e0b04e' : '#3a3540');
+      for (let y = 0.5; y < 1.0; y += 0.15) p.line([x1 + 0.004, y, 5], [x1 + 0.004, y, 9], '#c8b890', 0.6);
+      p.line([1.45, 1.35, 0], [1.45, 1.35, 11], '#6b4a2e', 1.2);
+      p.line([1.85, 1.35, 0], [1.85, 1.35, 11], '#6b4a2e', 1.2);
+      p.line([1.45, 1.35, 10.5], [1.85, 1.35, 10.5], '#6b4a2e', 0.9);
+      ['#5a7ab0', '#c8b890', '#8a3b2e', '#f2ece0'].forEach((col, k) => p.wallL(1.352, 1.5 + k * 0.08, 1.56 + k * 0.08, 4 + (k % 2), 10, col));
+      break;
+    }
+    case 'tailor': {
+      // A shop front with an awning, bolts of cloth on the counter.
+      shed(12, hvWallFor(trade), 'tile');
+      p.wallR(x1 + 0.002, 0.35, 1.05, 3, 9, '#3a2a1e');
+      p.box(x1, 0.35, x1 + 0.08, 1.05, 0, 4, '#7b5a36');
+      ['#8a3b2e', '#5a7ab0', '#c8a040', '#3d7a3a'].forEach((col, k) => p.box(x1 + 0.005, 0.4 + k * 0.16, x1 + 0.07, 0.52 + k * 0.16, 4, 2, col));
+      for (let k = 0; k < 5; k++) p.poly([[x1, 0.3 + k * 0.16, 12], [x1, 0.38 + k * 0.16, 12], [x1 + 0.2, 0.38 + k * 0.16, 9], [x1 + 0.2, 0.3 + k * 0.16, 9]], k % 2 ? '#f1e8d6' : '#8a3b2e');
+      for (let k = 0; k < 5; k++) p.poly([[x1, 0.38 + k * 0.16, 12], [x1, 0.46 + k * 0.16, 12], [x1 + 0.2, 0.46 + k * 0.16, 9], [x1 + 0.2, 0.38 + k * 0.16, 9]], k % 2 ? '#8a3b2e' : '#f1e8d6');
+      break;
+    }
+    case 'tanner': {
+      // A lean-to with a soaking vat, hides on frames in the yard.
+      for (const [px, py] of [[x1, y0], [x1, y1]] as const) p.line([px, py, 0], [px, py, 10], '#5e4129', 1.6);
+      p.poly([[x0 - 0.04, y0 - 0.04, 15], [x0 - 0.04, y1 + 0.04, 15], [x1 + 0.05, y1 + 0.04, 10], [x1 + 0.05, y0 - 0.04, 10]], p.snow ? '#eef2f4' : shade(ROOF_COLORS.plank, 0.92), shade(ROOF_COLORS.plank, 0.5));
+      p.barrel(1.6, 0.6);
+      for (const y of [1.3, 1.62]) {
+        p.line([1.55, y - 0.12, 0], [1.55, y - 0.12, 12], '#5e4129', 1.1);
+        p.line([1.55, y + 0.12, 0], [1.55, y + 0.12, 12], '#5e4129', 1.1);
+        p.wallR(1.551, y - 0.1, y + 0.1, 3, 11, y > 1.5 ? '#b88a5a' : '#9a6a40');
+      }
+      break;
+    }
+    case 'apothecary': {
+      // A little glazed shop, herbs drying on a rack and a physic garden.
+      shed(12, hvWallFor(trade), 'slate');
+      p.wallR(x1 + 0.002, 0.4, 1.0, 4, 10, '#4a3020');
+      p.wallR(x1 + 0.003, 0.43, 0.97, 5, 9, '#c8e0d8');
+      for (const [y, col] of [[0.5, '#3d7a3a'], [0.62, '#a8322d'], [0.74, '#2e5e9a'], [0.86, '#c8962a']] as const) p.wallR(x1 + 0.004, y, y + 0.06, 5.5, 8, col);
+      p.line([1.45, 1.4, 11], [1.85, 1.4, 11], '#5e4129', 1);
+      for (let k = 0; k < 5; k++) {
+        const x = 1.5 + k * 0.08;
+        p.line([x, 1.4, 11], [x, 1.4, 7], '#6b4a2e', 0.5);
+        p.ellipse(x, 1.4, 6.5, 1.3, 2, winter ? '#8a9a7a' : '#6aa04a');
+      }
+      if (!winter) for (let k = 0; k < 6; k++) p.bush(1.5 + (k % 3) * 0.14, 1.6 + Math.floor(k / 3) * 0.16, 2.4, k % 2 ? '#7aa858' : '#5a8a44');
+      break;
+    }
+    default:
+      shed(12, WOOD, 'shingle', 'plank');
+  }
+}
+
+function hvWallFor(trade: BuildingType): string {
+  return trade === 'weaver' ? '#e6d6b8' : trade === 'tailor' ? '#efe3c8' : '#e8dcc4';
 }
 
 const TRADE_COLORS: Partial<Record<BuildingType, string>> = {
@@ -3162,51 +3546,6 @@ function cutBlocks(p: Pen, x: number, y: number, n = 3): void {
     const [dx, dy, z] = slots[i];
     p.box(x + dx, y + dy, x + dx + 0.24, y + dy + 0.15, z, 5, col);
     p.line([x + dx + 0.05, y + dy + 0.15, z + 2], [x + dx + 0.19, y + dy + 0.15, z + 2], 'rgba(90,80,60,0.35)', 0.5);
-  }
-}
-
-function drawHouseProp(p: Pen, prop: 'logs' | 'hive' | 'cart' | 'well', season: Season): void {
-  switch (prop) {
-    case 'logs':
-      p.logPile(1.75, 0.75, 2);
-      break;
-    case 'hive': {
-      // Straw beehives on a little bench.
-      p.box(1.7, 0.6, 1.95, 0.75, 0, 4, '#7b5a36');
-      for (const y of [0.62, 0.72]) {
-        const [x, yy] = iso(1.82, y, 4);
-        p.ctx.fillStyle = season === 3 ? '#e8ecee' : '#c9a050';
-        p.ctx.beginPath();
-        p.ctx.ellipse(x, yy - 4, 4, 5, 0, Math.PI, 0);
-        p.ctx.lineTo(x + 4, yy);
-        p.ctx.lineTo(x - 4, yy);
-        p.ctx.fill();
-        p.ctx.strokeStyle = '#8a6a30';
-        p.ctx.lineWidth = 0.5;
-        p.ctx.beginPath();
-        p.ctx.moveTo(x - 3.6, yy - 3);
-        p.ctx.lineTo(x + 3.6, yy - 3);
-        p.ctx.stroke();
-      }
-      break;
-    }
-    case 'cart': {
-      // A handcart with sacks.
-      p.box(1.68, 0.5, 1.95, 0.85, 4, 4, '#8a6236');
-      const [wx, wy] = iso(1.82, 0.88, 4);
-      p.ctx.strokeStyle = '#4a3020';
-      p.ctx.lineWidth = 1.2;
-      p.ctx.beginPath();
-      p.ctx.ellipse(wx, wy, 3, 4, 0, 0, Math.PI * 2);
-      p.ctx.stroke();
-      p.line([1.68, 0.67, 6], [1.55, 0.67, 2], '#6b4a2e', 1.2);
-      p.sack(1.8, 0.62, '#d8c79c');
-      break;
-    }
-    case 'well':
-      p.barrel(1.8, 0.7);
-      p.barrel(1.85, 0.9);
-      break;
   }
 }
 
