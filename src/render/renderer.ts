@@ -2979,6 +2979,16 @@ function drawBeast(c: CanvasRenderingContext2D, x: number, y: number, f: number,
 function variantOf(s: GameState, b: Building): number {
   // The cathedral shows its stained glass once commissioned.
   if (b.type === 'cathedral') return s.commissions?.includes('glass') ? 1 : 0;
+  // A dock builds its quay out over whichever side has more water.
+  if (b.type === 'dock') {
+    let side = 0;
+    let fore = 0;
+    for (let k = 0; k < 3; k++) {
+      if (s.terrain[(b.y + k) * s.width + b.x + b.w] === 1) side++;
+      if (s.terrain[(b.y + b.h) * s.width + b.x + k] === 1) fore++;
+    }
+    return fore > side ? 1 : 0;
+  }
   if (b.type !== 'house') return 0;
   const trade = b.trade ? HOME_TRADES.indexOf(b.trade) + 1 : 0;
   // Colours, yard, craft and the shape of the house, which the id picks.

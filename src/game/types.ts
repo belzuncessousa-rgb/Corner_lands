@@ -11,6 +11,7 @@ export const RESOURCE_IDS = [
   'ore',
   'iron',
   'silver',
+  'crates',
   // Food
   'bread',
   'meat',
@@ -49,6 +50,7 @@ export const RESOURCE_IDS = [
   'paper',
   'books',
   'jewellery',
+  'pottery',
   'weapons',
   // Currency
   'gold',
@@ -116,7 +118,18 @@ export type BuildingType =
   | 'maypole'
   | 'statue'
   | 'manorgarden'
-  | 'watchtower';
+  | 'watchtower'
+  | 'watermill'
+  | 'dock'
+  | 'cooper'
+  | 'potter'
+  | 'publicgarden'
+  | 'markethall'
+  | 'university'
+  | 'hedge'
+  | 'shrine'
+  | 'flowerbed'
+  | 'fountain';
 
 export type Category = 'housing' | 'resources' | 'farming' | 'food' | 'industry' | 'civic' | 'decor';
 

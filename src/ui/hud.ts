@@ -27,7 +27,6 @@ import { activeQuests } from '../game/quests';
 import { StateRng } from '../game/rng';
 import {
   canAfford,
-  hasBuilt,
   housingOf,
   isUnlocked,
   log,
@@ -41,6 +40,7 @@ import {
   seasonOf,
   setKeep,
   buyPrice,
+  hasTrade,
   moodYield,
   sellPrice,
   lockReason,
@@ -603,7 +603,7 @@ export class Hud {
       }
       ${this.titleRow()}
       ${this.commissionRows()}
-      <div class="row">${hasBuilt(s, 'tradingpost') ? '<button data-action="trade">⚖ Trade</button>' : ''}<button data-action="ledger">Ledger</button><button data-action="charters">${ICONS.prestige} Charters</button></div>`;
+      <div class="row">${hasTrade(s) ? '<button data-action="trade">⚖ Trade</button>' : ''}<button data-action="ledger">Ledger</button><button data-action="charters">${ICONS.prestige} Charters</button></div>`;
   }
 
   /**
@@ -644,7 +644,7 @@ export class Hud {
 
   private goodsPanel(group: GoodsGroup): string {
     const s = this.game.state;
-    const market = hasBuilt(s, 'tradingpost');
+    const market = hasTrade(s);
     const ids = RESOURCE_IDS.filter((r) => GOODS[r].group === group && (s.seen?.includes(r) || s.res[r] > 0 || ALWAYS_SHOWN.includes(r)));
     const rows = ids
       .map((r) => {
@@ -883,12 +883,12 @@ export class Hud {
           .join('')}</span></div>`);
       }
       rows.push(...this.zoneRows(b));
-      if (b.type === 'market' && b.build >= 1) {
+      if ((b.type === 'market' || b.type === 'markethall') && b.build >= 1) {
         rows.push(`<div class="kv"><span>Stalls</span><span>${b.workers} of ${marketStalls(b)} open${!b.workers ? ' <span class="neg">· needs a stallholder</span>' : ''}</span></div>`);
         // The town's markets together: each open stall serves the nearest households.
         const served = marketServed(s);
         const homes = s.buildings.filter((h) => h.residents > 0);
-        const open = s.buildings.filter((m) => m.type === 'market' && m.build >= 1).reduce((n, m) => n + Math.min(m.workers, marketStalls(m)), 0);
+        const open = s.buildings.filter((m) => (m.type === 'market' || m.type === 'markethall') && m.build >= 1).reduce((n, m) => n + Math.min(m.workers, marketStalls(m)), 0);
         rows.push(
           `<div class="kv" data-tip="Anyone may shop at a market, but each open stall can serve only ${HOMES_PER_STALL} households: the homes nearest a market come first. Homes left out go without their goods (food still comes from the stores)."><span>All markets serve</span><span class="${served.size < homes.length ? 'neg' : ''}">${served.size} of ${homes.length} homes · room for ${open * HOMES_PER_STALL}</span></div>`,
         );
@@ -973,7 +973,7 @@ export class Hud {
       actions.push(`<button data-action="pause-b">${b.paused ? '▶ Resume' : '❚❚ Pause'}</button>`);
     }
     if (b.type !== 'townhall') actions.push(`<button data-action="demolish-b">✖ ${b.build < 1 ? 'Cancel' : 'Demolish'}</button>`);
-    if (b.type === 'tradingpost' && b.build >= 1) actions.push('<button data-action="trade">⚖ Trade</button>');
+    if ((b.type === 'tradingpost' || b.type === 'dock') && b.build >= 1) actions.push('<button data-action="trade">⚖ Trade</button>');
     box.innerHTML = `
       <button class="close" data-action="deselect">✕</button>
       <h2>${esc(buildingName(b))}${b.trade ? ` <small>· ${esc(BUILDINGS[b.trade].name)}</small>` : ''}</h2>
@@ -988,7 +988,7 @@ export class Hud {
   private storeRows(b: Building): string[] {
     const s = this.game.state;
     const kinds = Object.keys(STORAGE_CAPACITY[b.type] ?? {}) as StorageKind[];
-    const market = hasBuilt(s, 'tradingpost');
+    const market = hasTrade(s);
     const rows: string[] = [];
     for (const kind of kinds) {
       const used = Math.floor(stored(s, kind));
@@ -1384,9 +1384,10 @@ export class Hud {
       return;
     }
     this.category = BUILDINGS[t].category;
-    if (t === 'wall') {
-      // Walls are laid like roads, section by section.
-      g.setTool(g.tool.kind === 'road' && g.tool.wall ? { kind: 'select' } : { kind: 'road', wall: true });
+    if (t === 'wall' || t === 'hedge' || t === 'flowerbed') {
+      // Walls, hedges and flower beds are laid like roads, click to click.
+      const lay = t === 'wall' ? undefined : t;
+      g.setTool(g.tool.kind === 'road' && g.tool.wall && g.tool.lay === lay ? { kind: 'select' } : { kind: 'road', wall: true, lay });
       return;
     }
     const kind = BUILDINGS[t].zone ? 'zone' : 'build';
@@ -2478,7 +2479,7 @@ export class Hud {
 
   private showTrade(): void {
     const s = this.game.state;
-    const staffed = s.buildings.some((b) => b.type === 'tradingpost' && b.build >= 1 && b.workers > 0);
+    const staffed = s.buildings.some((b) => (b.type === 'tradingpost' || b.type === 'dock') && b.build >= 1 && b.workers > 0);
     // Every tradeable good, in tabs by kind.
     const tab = this.tradeTab;
     const tabs = (['food', 'materials', 'goods'] as const)

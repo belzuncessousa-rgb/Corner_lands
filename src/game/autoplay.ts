@@ -42,6 +42,7 @@ import {
   zoneError,
   zonesOf,
   isUnlocked,
+  hasTrade,
 } from './sim';
 import type { BuildingType, Cost, GameState, ResourceId } from './types';
 import { idx, inBounds } from './world';
@@ -335,7 +336,7 @@ export function playBot(s: GameState, years: number, seed = 1): BotReport {
 
 /** Buys what is short at the market, as a sensible player would. */
 function shop(s: GameState): void {
-  if (!hasBuilt(s, 'tradingpost')) return;
+  if (!hasTrade(s)) return;
   // Let the merchants take what is above the stock targets.
   s.sell ??= {};
   for (const r of ['leather', 'cloth', 'hides', 'wool'] as ResourceId[]) s.sell[r] = true;
@@ -398,7 +399,7 @@ function renovate(s: GameState): void {
         const id = k as ResourceId;
         if (id === 'gold') continue;
         const short = (plan.cost[id] ?? 0) - s.res[id];
-        if (short > 0 && hasBuilt(s, 'tradingpost') && s.res.gold > (plan.cost.gold ?? 0) + 60) trade(s, id, Math.min(short, roomFor(s, id)));
+        if (short > 0 && hasTrade(s) && s.res.gold > (plan.cost.gold ?? 0) + 60) trade(s, id, Math.min(short, roomFor(s, id)));
       }
       saving = true;
     }
@@ -475,7 +476,7 @@ export function act(s: GameState, rand: () => number): void {
   // Key buildings for progression come first once unlocked.
   if (s.tier >= 1) {
     for (const t of ['sawmill', 'carpenter', 'windmill', 'bakery', 'tradingpost', 'stonemason'] as BuildingType[]) {
-      const ready = t === 'sawmill' || t === 'tradingpost' || (t === 'stonemason' ? hasBuilt(s, 'tradingpost') : count(s, 'farm') > 0);
+      const ready = t === 'sawmill' || t === 'tradingpost' || (t === 'stonemason' ? hasTrade(s) : count(s, 'farm') > 0);
       if (count(s, t) === 0 && ready) wants.push(t);
     }
   }

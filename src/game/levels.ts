@@ -71,12 +71,13 @@ export function roomToGrow(s: GameState, b: Building, size: number): boolean {
 
 /** Stalls a marketplace has room for: one for every six tiles, up to six. */
 export function marketStalls(b: Building): number {
+  if (b.type === 'markethall') return 10;
   return Math.max(1, Math.min(6, Math.floor((b.w * b.h) / 6)));
 }
 
 export function workersOf(b: Building): number {
   // A vendor for every stall.
-  if (b.type === 'market') return marketStalls(b);
+  if (b.type === 'market' || b.type === 'markethall') return marketStalls(b);
   // A family craft is worked by as many of the household as the workshop needs.
   if (b.trade) return Math.min(BUILDINGS[b.trade].workers, b.residents);
   return BUILDINGS[b.type].workers;

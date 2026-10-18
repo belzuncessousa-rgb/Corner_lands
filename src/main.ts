@@ -63,7 +63,7 @@ import { Hud } from './ui/hud';
 export type Tool =
   | { kind: 'select' }
   | { kind: 'build'; type: BuildingType }
-  | { kind: 'road'; paved?: boolean; cobbled?: boolean; wall?: boolean }
+  | { kind: 'road'; paved?: boolean; cobbled?: boolean; wall?: boolean; lay?: BuildingType }
   | { kind: 'zone'; type: BuildingType }
   | { kind: 'demolish' }
   | { kind: 'grove' };
@@ -511,6 +511,20 @@ export class Game {
             : `Protected wood ${w}×${h} · ${trees} tree${trees === 1 ? "" : "s"} kept standing · click to mark it`,
         big,
       );
+    } else if (tool.kind === 'road' && tool.wall && tool.lay) {
+      // Hedges and flower beds: laid along a line, one to a tile.
+      const type = tool.lay;
+      const tiles = this.roadTiles(tx, ty);
+      ov.tiles = tiles.map((t) => ({ ...t, ok: !placementError(s, type, t.x, t.y) }));
+      ov.tileColor = 'road';
+      const n = tiles.filter((t) => !placementError(s, type, t.x, t.y)).length;
+      const gold = n * (BUILDINGS[type].cost.gold ?? 0);
+      this.hud.setHint(
+        this.roadAnchor
+          ? `${BUILDINGS[type].name}: ${n} · ${gold} coins · click to lay them, keep clicking to continue · right-click to finish`
+          : `Click where the ${BUILDINGS[type].name.toLowerCase()}s start, then where they end`,
+        gold > s.res.gold,
+      );
     } else if (tool.kind === 'road' && tool.wall) {
       // Town walls: laid like a road; road tiles become gates.
       const tiles = this.roadTiles(tx, ty);
@@ -843,6 +857,13 @@ export class Game {
   private finishRoad(tx: number, ty: number): void {
     const s = this.state;
     let n = 0;
+    if (this.tool.kind === 'road' && this.tool.wall && this.tool.lay) {
+      const type = this.tool.lay;
+      let placed = 0;
+      for (const t of this.roadTiles(tx, ty)) if (!placementError(s, type, t.x, t.y) && placeOrder(s, type, t.x, t.y)) placed++;
+      if (placed) this.hud.sound('place');
+      return;
+    }
     if (this.tool.kind === 'road' && this.tool.wall) {
       let placed = 0;
       for (const t of this.roadTiles(tx, ty)) {

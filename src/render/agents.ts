@@ -84,7 +84,7 @@ export class AgentSystem {
     const marketDay = s.day % 10 === CART_DAY ? s.day : null;
     if (marketDay !== null && this.lastCartDay !== null && marketDay !== this.lastCartDay && dt > 0) {
       for (const m of s.buildings) {
-        if (m.type === 'tradingpost' && m.build >= 1 && Object.keys(s.sell ?? {}).length) this.sendCart(s, m);
+        if ((m.type === 'tradingpost' || m.type === 'dock') && m.build >= 1 && Object.keys(s.sell ?? {}).length) this.sendCart(s, m);
       }
     }
     if (marketDay !== null || this.lastCartDay === null) this.lastCartDay = marketDay ?? -1;
