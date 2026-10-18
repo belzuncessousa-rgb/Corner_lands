@@ -58,6 +58,7 @@ import type { Agent } from './render/agents';
 import { AgentSystem } from './render/agents';
 import { Wildlife } from './render/wildlife';
 import { type Overlay, Renderer } from './render/renderer';
+import { Tutor } from './ui/tutorial';
 import { Hud } from './ui/hud';
 
 export type Tool =
@@ -91,6 +92,7 @@ export class Game {
   agents = new AgentSystem();
   wildlife = new Wildlife();
   hud: Hud;
+  tutor: Tutor;
   tool: Tool = { kind: 'select' };
   selected: number | null = null;
   speedIndex = 1;
@@ -150,6 +152,7 @@ export class Game {
     this.renderer.showMarkers = false;
     this.state = makeDemoVillage();
     this.hud = new Hud(this, document.getElementById('ui')!);
+    this.tutor = new Tutor(this);
     this.renderer.resize();
     this.resetView();
     this.bindInput();
@@ -367,6 +370,7 @@ export class Game {
     this.renderer.setDayTime(this.clock(), !this.demo && this.speed <= 1, dt);
     this.renderer.render(this.state, this.agents.agents, this.overlay(), running ? dt : 0, this.wildlife.animals);
     this.hud.minimap.update(dt);
+    this.tutor.update(dt);
     this.hud.tickAudio(dt, running);
     this.hudTimer -= dt;
     if (this.hudTimer <= 0) {

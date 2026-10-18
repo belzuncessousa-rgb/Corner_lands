@@ -1,5 +1,6 @@
 import { NEWS } from './news';
 import { drawTapestry } from './tapestry';
+import { TUTORIAL_SEED } from './tutorial';
 import { CHARGES, DEFAULT_HERALDRY, DIVISIONS, type Heraldry, TINCTURES, paintArms } from '../render/heraldry';
 import { CLOTHS, DEFAULT_LORD, GARMENTS, HAIRS, HAIR_STYLES, HATS, type LordLook, SKINS, lordPortrait } from '../render/lord';
 import { placeName, townName, weeklySeed } from '../game/names';
@@ -1897,6 +1898,7 @@ export class Hud {
       <div class="menu">
         ${latest ? `<button class="primary" data-m="continue">Continue <small>(${esc(latest.summary.split(' — ')[0])})</small></button>` : ''}
         <button class="${latest ? '' : 'primary'}" data-m="new">New Settlement</button>
+        <button data-m="tutorial">Tutorial</button>
         ${saves.length ? '<button data-m="load">Load Game</button>' : ''}
         <button data-m="help">How to Play</button>
       </div>
@@ -1918,20 +1920,25 @@ export class Hud {
     });
     m.querySelector('[data-m="load"]')?.addEventListener('click', () => this.showLoad(true));
     m.querySelector('[data-m="help"]')!.addEventListener('click', () => this.showHelp(true));
+    m.querySelector('[data-m="tutorial"]')!.addEventListener('click', () => {
+      this.ensureAudio();
+      this.showNewGame(true, TUTORIAL_SEED, 'meadow', undefined, true);
+    });
   }
 
-  showNewGame(fromMain: boolean, presetSeed?: number, presetLand?: Land, preset?: { name: string; named: boolean; mode: string }): void {
+  showNewGame(fromMain: boolean, presetSeed?: number, presetLand?: Land, preset?: { name: string; named: boolean; mode: string }, tutorial = false): void {
     const seed = presetSeed ?? Math.floor(Math.random() * 999999);
     const mode0 = preset?.mode ?? 'normal';
     const m = this.openModal(
-      `<h2>New Settlement</h2>
+      `<h2>${tutorial ? 'Tutorial' : 'New Settlement'}</h2>
+      ${tutorial ? '<p>Fingamabob, your steward, will show you the ropes on a land chosen for learning. Pick how hard it should be; the land is always the same.</p>' : ''}
       <div class="row"><label>Name</label><input id="town" value="${esc(preset?.name ?? placeName(seed))}" maxlength="40"><button data-m="rename" data-tip="Another name">🎲</button></div>
       <div class="row lord-pick"><label>Your lord</label><span class="lord-mini"></span><span class="lord-mini flag"></span><button data-m="lord">Choose looks &amp; arms…</button></div>
-      <p>Every map is generated from a seed. Share a seed to play the same land, or take this week's seed, the same for everyone.</p>
+      <div class="land-pick" ${tutorial ? 'hidden' : ''}><p>Every map is generated from a seed. Share a seed to play the same land, or take this week's seed, the same for everyone.</p>
       <div class="row"><label>Seed</label><input id="seed" value="${seed}" inputmode="numeric"><button data-m="dice" data-tip="Another land">🎲</button><button data-m="weekly" data-tip="The same land for everyone until Monday">Seed of the week</button></div>
       <div class="lands">${(Object.keys(LANDS) as Land[])
         .map((l) => `<label class="mode"><input type="radio" name="land" value="${l}" ${(presetLand ?? 'meadow') === l ? 'checked' : ''}><span><b>${LANDS[l].name}</b><br><small>${esc(LANDS[l].desc)}</small></span></label>`)
-        .join('')}</div>
+        .join('')}</div></div>
       <div class="map-preview"><canvas width="300" height="160" aria-label="The land from above"></canvas><div class="map-facts"></div></div>
       <div class="modes">
         <label class="mode"><input type="radio" name="mode" value="normal" ${mode0 === 'normal' ? 'checked' : ''}><span><b>Normal</b><br><small>Hungry or unhappy villagers will leave.</small></span></label>
@@ -1941,7 +1948,7 @@ export class Hud {
       <div class="ornament">❦</div>
       <div class="row" style="justify-content:flex-end">
         <button data-m="back">Back</button>
-        <button class="primary" data-m="go">Found the Settlement</button>
+        <button class="primary" data-m="go">${tutorial ? 'Begin the Tutorial' : 'Found the Settlement'}</button>
       </div>`,
       false,
     );
@@ -1972,7 +1979,7 @@ export class Hud {
     const modeOf = () => (m.querySelector('input[name="mode"]:checked') as HTMLInputElement | null)?.value ?? 'normal';
     m.querySelector('[data-m="lord"]')!.addEventListener('click', () => {
       const back = { seed: seedOf(input.value.trim()), land: landOf(), preset: { name: town.value, named, mode: modeOf() } };
-      this.showLord(() => this.showNewGame(fromMain, back.seed, back.land, back.preset));
+      this.showLord(() => this.showNewGame(fromMain, back.seed, back.land, back.preset, tutorial));
     });
     const reseed = (n: number) => {
       input.value = String(n);
@@ -1988,7 +1995,8 @@ export class Hud {
     m.querySelector('[data-m="back"]')!.addEventListener('click', () => (fromMain ? this.showMainMenu() : this.showGameMenu()));
     m.querySelector('[data-m="go"]')!.addEventListener('click', () => {
       const mode = ((m.querySelector('input[name="mode"]:checked') as HTMLInputElement | null)?.value ?? 'normal') as 'normal' | 'relaxed' | 'hardy';
-      this.game.newGame(seedOf(input.value.trim()), mode, town.value, landOf());
+      this.game.newGame(tutorial ? TUTORIAL_SEED : seedOf(input.value.trim()), mode, town.value, tutorial ? 'meadow' : landOf());
+      if (tutorial) this.game.state.tutorial = { step: 0, chapter: 'start' };
       this.game.state.lord = { ...this.draftLord };
       this.game.state.heraldry = { ...this.draftArms };
       this.closeModal(true);
