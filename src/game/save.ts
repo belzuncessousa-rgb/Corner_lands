@@ -65,7 +65,8 @@ export function deserialize(json: string): GameState {
   // Version 2 brought wooden churches: the churches already built were stone.
   // The manor stopped storing goods too: a town that kept its food or
   // materials there is given a granary or a storehouse beside it.
-  if ((s.version ?? 1) < 2) {
+  const legacy = (s.version ?? 1) < 2;
+  if (legacy) {
     const manor = s.buildings.find((b) => b.type === 'townhall' && b.build >= 1);
     if (manor) for (const type of ['granary', 'storehouse'] as const) if (!s.buildings.some((b) => b.type === type)) giveStore(s, manor, type);
     for (const b of s.buildings) if (b.type === 'church') b.level = Math.max(b.level, 2);
@@ -79,9 +80,9 @@ export function deserialize(json: string): GameState {
     }
     delete s.exports;
   }
-  // Older saves ranked the settlement by population; carry that over to the manor.
+  // Saves from before version 2 ranked the settlement by its manor; carry that over once.
   const hall = s.buildings.find((b) => b.type === 'townhall');
-  if (hall) hall.level = Math.max(hall.level, s.tier + 1);
+  if (hall && legacy) hall.level = Math.max(hall.level, s.tier + 1);
   for (const b of s.buildings) {
     if (b.type === 'house' && b.level >= 2) b.level = Math.min(b.level, 4);
     // The manor now stops at the Stone Manor (4x4): keeps and castles step down.

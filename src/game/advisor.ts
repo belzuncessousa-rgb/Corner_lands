@@ -64,7 +64,8 @@ const MILL_PER_MONTH = 16;
 
 /** Months the windmills need to grind the wheat in store. */
 function millMonths(s: GameState): number {
-  const mills = s.buildings.filter((b) => b.type === 'windmill' && b.build >= 1).length;
+  // A watermill grinds twice what a windmill does.
+  const mills = s.buildings.reduce((n, b) => n + (b.build < 1 ? 0 : b.type === 'windmill' ? 1 : b.type === 'watermill' ? 2 : 0), 0);
   return mills ? s.res.grain / (mills * MILL_PER_MONTH) : Infinity;
 }
 
@@ -89,7 +90,7 @@ const ADVICE: Advice[] = [
     when: (s) => s.population > 0 && fed(s) < s.population * 2 && s.report.shortage === 0,
     text: (s) =>
       s.res.grain >= s.population * 2
-        ? `Steward: our food stores (${Math.floor(food(s))}) will last barely two months, though ${Math.floor(s.res.grain)} sacks of grain wait unground. Windmills and Bakeries would turn them into bread that feeds three times as many.`
+        ? `Steward: our food stores (${Math.floor(food(s))}) will last barely two months, though ${Math.floor(s.res.grain)} sacks of grain wait unground. Windmills and Bakeries would turn them into bread that feeds six times as many.`
         : `Steward: our food stores (${Math.floor(food(s))}) will last barely two months. Build another forager, hunter, fisher or farm.`,
   },
   {
@@ -141,7 +142,7 @@ const ADVICE: Advice[] = [
         return `Steward: ${Math.floor(s.res.grain)} wheat waits in the granaries, but the bakers rest: the bread in store has reached its target of ${keepOf(s, 'bread')}. Raise the bread target in the Food panel to bake more, or sell the surplus wheat.`;
       return mills
         ? `Steward: ${Math.floor(s.res.grain)} wheat waits in the granaries, about ${Math.round(millMonths(s))} months of grinding for our ${mills > 1 ? `${mills} windmills` : 'windmill'}. Another Windmill and Bakery would turn it into bread sooner.`
-        : `Steward: ${Math.floor(s.res.grain)} wheat sits unground. A Windmill grinds it into flour and a Bakery bakes the bread, which feeds three times as many as pottage.`;
+        : `Steward: ${Math.floor(s.res.grain)} wheat sits unground. A Windmill grinds it into flour and a Bakery bakes the bread, which feeds six times as many as pottage.`;
     },
   },
   {
@@ -201,7 +202,7 @@ const ADVICE: Advice[] = [
     id: 'pottage',
     when: (s) => s.population >= 20 && (s.report.pottage ?? 0) >= s.population * 0.3 && s.report.shortage === 0,
     text: (s) =>
-      `Steward: ${s.report.pottage} villagers lived on pottage last month, grain boiled whole for want of better food. Bread from a Windmill and a Bakery feeds three times as many from the same wheat; hunters and fishers add variety.`,
+      `Steward: ${s.report.pottage} villagers lived on pottage last month, grain boiled whole for want of better food. Bread from a Windmill and a Bakery feeds six times as many from the same wheat; hunters and fishers add variety.`,
   },
   {
     id: 'idle-hands',

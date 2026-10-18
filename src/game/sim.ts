@@ -1277,8 +1277,8 @@ export function restingNow(s: GameState, b: Building): boolean {
     if (!batchReady(s, b)) return true;
     b.batchOn = true;
   }
-  // The harvest is brought in on the first day of its month; then farmers are free.
-  if (b.type === 'farm' && monthOf(s.day) === 7 && s.day % DAYS_PER_MONTH !== 0) return true;
+  // The harvest is brought in early in its month; once it is in, the farmers are free.
+  if (b.type === 'farm' && monthOf(s.day) === 7 && s.day % DAYS_PER_MONTH !== 0 && !zonesOf(s, b).some((f) => f.growth > 0)) return true;
   // Foresters whose woods are full take other work until next month.
   if (b.blocked === BLOCK_SEASONAL && b.status === 'The woods are full') return true;
   if (b.blocked === BLOCK_SEASONAL && b.status.startsWith('Enough')) {
@@ -2209,7 +2209,16 @@ function stepFarm(s: GameState, b: Building): void {
     b.status = 'Crops ripening';
     for (const f of fields) f.status = f.growth > 0 ? `${cap(cropOf(f))} ripening` : 'Lying fallow';
     b.blocked = BLOCK_SEASONAL;
-  } else if (month === 7 && s.day % DAYS_PER_MONTH === 0) {
+  } else if (month === 7 && fields.some((f) => f.growth > 0)) {
+    // The harvest comes in on the farm's first working day of the month (a
+    // farm paused on the first day harvests when it resumes); without
+    // farmers the crop waits in the fields until the month's last day.
+    if (crew <= 0 && s.day % DAYS_PER_MONTH < DAYS_PER_MONTH - 1) {
+      b.status = 'The harvest waits for farmers';
+      // Not blocked: it must keep its place when villagers are given their work.
+      b.blocked = 0;
+      return;
+    }
     const got: Partial<Record<ResourceId, number>> = {};
     let unstaffed = 0;
     let spoiled = 0;
@@ -2254,9 +2263,10 @@ function stepFarm(s: GameState, b: Building): void {
     harvestDay ??= { got: {}, barn: 0, spoiled: 0, where: new Set(), at: b };
     for (const k in got) harvestDay.got[k as ResourceId] = (harvestDay.got[k as ResourceId] ?? 0) + (got[k as ResourceId] ?? 0);
     harvestDay.barn += inBarn;
+    // The toast points at the first farm whose crop spoiled.
+    if (spoiled && !harvestDay.spoiled) harvestDay.at = b;
     harvestDay.spoiled += spoiled;
     for (const w of spoiledIn) harvestDay.where.add(w);
-    if (spoiled && !harvestDay.spoiled) harvestDay.at = b;
     b.status = 'Harvest gathered';
     b.blocked = BLOCK_SEASONAL;
   } else if (month >= 7) {
@@ -2346,9 +2356,15 @@ export function buyAnimal(s: GameState, b: Building, kind: AnimalKind): string |
 export function slaughterAnimal(s: GameState, b: Building, kind: AnimalKind): string | null {
   const a = animalsOf(b);
   if (!(a[kind] ?? 0)) return `No ${HERDS[kind].plural} to slaughter`;
+  const meat = (hasCharter(s, 'herd1') ? 1.3 : 1) * (hasCharter(s, 'herd3a') ? 1.5 : 1);
+  // Not while the meat would have nowhere to go.
+  for (const k in HERDS[kind].meat) {
+    const id = k as ResourceId;
+    const n = HERDS[kind].meat[id] ?? 0;
+    if (id !== 'hides' && roomFor(s, id) < Math.round(n * meat)) return `No room in the granaries for the ${GOODS[id].name.toLowerCase()}`;
+  }
   a[kind] = (a[kind] ?? 0) - 1;
   b.herd = herdTotal(b);
-  const meat = (hasCharter(s, 'herd1') ? 1.3 : 1) * (hasCharter(s, 'herd3a') ? 1.5 : 1);
   for (const k in HERDS[kind].meat) {
     const id = k as ResourceId;
     const n = HERDS[kind].meat[id] ?? 0;
@@ -2451,16 +2467,26 @@ function stepOrchardist(s: GameState, b: Building): void {
     return;
   }
   let pick = (b.workers * PICK_PER_DAY * (b.efficiency ?? 1)) / (onPath(s, 'orchard') ? 1.33 : 1);
+  let full = false;
   for (const o of orchards) {
     if (pick <= 0) break;
-    const n = Math.min(Math.floor(o.growth), Math.ceil(pick));
-    if (n <= 0) continue;
     const good = (o.recipe ?? 'apples') as ResourceId;
+    // Only what the stores have room for is picked: the rest stays on the trees.
+    const n = Math.min(Math.floor(o.growth), Math.ceil(pick), Math.floor(roomFor(s, good)));
+    if (n <= 0) {
+      if (o.growth >= 1) full = true;
+      continue;
+    }
     const k = produced(s, good, n);
-    o.growth -= n;
+    o.growth -= k;
     o.lastOutput += k;
     b.output += k;
     pick -= n;
+  }
+  if (full && pick > 0) {
+    b.status = `Storage full: fruit waits on the trees (${Math.floor(hanging)})`;
+    b.blocked = BLOCK_SEASONAL;
+    return;
   }
   b.status = `Picking fruit (${Math.floor(hanging)} on the trees)`;
 }
@@ -2494,7 +2520,7 @@ function dailyOrchards(s: GameState): void {
 
 /** Backyard extensions a family can keep, what they cost and make. */
 export const YARDS: Record<string, { name: string; cost: Cost; desc: string; tier: number }> = {
-  veg: { name: 'Vegetable patch', cost: { wood: 4, gold: 8 }, desc: 'Cabbages, leeks and turnips: 3 vegetables a month from spring to autumn.', tier: 0 },
+  veg: { name: 'Vegetable patch', cost: { wood: 4, gold: 8 }, desc: 'Cabbages, leeks and turnips: 3 vegetables a month from early summer to late autumn.', tier: 0 },
   hens: { name: 'Hen coop', cost: { wood: 8, gold: 15 }, desc: 'A few hens: 3 eggs a month, 1 in winter.', tier: 0 },
   bees: { name: 'Beehives', cost: { wood: 6, gold: 25 }, desc: 'Straw skeps: about 8 honey each late summer.', tier: 1 },
 };

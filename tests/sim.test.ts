@@ -1869,3 +1869,34 @@ describe('people audit', () => {
     expect(eatFood(s, 5).groups).toBe(4);
   });
 });
+
+describe('save audit', () => {
+  it('loading a save keeps the manor as it was', async () => {
+    const { playBot } = await import('../src/game/autoplay');
+    const s = generateWorld(61);
+    playBot(s, 4, 61);
+    const hall = s.buildings.find((b) => b.type === 'townhall');
+    if (hall) hall.level = 1;
+    const back = deserialize(serialize(s));
+    expect(back.buildings.find((b) => b.type === 'townhall')?.level).toBe(hall?.level);
+  });
+});
+
+describe('farming audit', () => {
+  it('a farm paused on harvest day brings the crop in when it resumes', async () => {
+    const { playBot } = await import('../src/game/autoplay');
+    const s = generateWorld(7);
+    playBot(s, 4, 7);
+    while (s.day % DAYS_PER_YEAR !== 69) stepDay(s);
+    const farm = s.buildings.find((b) => b.type === 'farm' && b.build >= 1)!;
+    const fields = s.buildings.filter((f) => f.type === 'field' && f.owner === farm.id && f.growth > 0);
+    expect(fields.length).toBeGreaterThan(0);
+    farm.paused = true;
+    stepDay(s);
+    stepDay(s);
+    farm.paused = false;
+    // Within the Harvest month, once farmers are back at work.
+    while (s.day % DAYS_PER_YEAR < 76) stepDay(s);
+    expect(fields.reduce((n, f) => n + f.lastOutput, 0)).toBeGreaterThan(0);
+  });
+});

@@ -878,7 +878,7 @@ export class Hud {
           .map((r) => {
             const rec = d.recipes!.find((x) => x.id === r.id);
             const tip = rec
-              ? `<b>${rec.name}</b><br>${b.type === 'byre' ? 'Changing animals sells the old herd; a new one of six arrives.' : b.type === 'orchard' ? 'Replanting starts the trees over.' : rec.months ? `In ${seasonSpan(rec.months)}` : 'All year'}${rec.auto === false ? '<br>Auto never picks this; choose it to make it.' : ''}`
+              ? `<b>${rec.name}</b><br>${b.type === 'orchard' ? 'Replanting starts the trees over.' : rec.months ? `In ${seasonSpan(rec.months)}` : 'All year'}${rec.auto === false ? '<br>Auto never picks this; choose it to make it.' : ''}`
               : '<b>Auto</b><br>Make whatever is in season and below its stock target.';
             const icon = rec ? (ICONS[Object.keys(rec.outputs)[0] as ResourceId] ?? '') : '';
             return `<button data-action="recipe" data-r="${r.id}" class="${current === r.id ? 'active' : ''}" data-tip="${esc(tip)}">${icon}${r.name}</button>`;
@@ -1034,8 +1034,8 @@ export class Hud {
         const name = GOODS[fc.good].name.toLowerCase();
         // Crops nobody brings in rot: say so rather than promise a harvest.
         if (!owner) rows.push('<div class="kv"><span>Expected harvest</span><span class="neg">None: no farmstead tends it</span></div>');
-        else if (fc.crew === 0 && monthOf(s.day) <= 6 && b.growth > 0) rows.push('<div class="kv"><span>Expected harvest</span><span class="neg">At risk: no farmers at work</span></div>');
-        else rows.push(`<div class="kv" data-tip="Harvest comes in early autumn. It grows with the farmers' work through spring and summer, the soil's richness and crop rotation."><span>Expected harvest</span><span>${b.growth > 0 ? `~${fc.now} ${name}` : '—'}${fc.full > fc.now ? ` <small>(up to ${fc.full})</small>` : ''}</span></div>`);
+        else if (fc.crew === 0 && monthOf(s.day) <= 5 && b.growth > 0) rows.push('<div class="kv"><span>Expected harvest</span><span class="neg">At risk: no farmers at work</span></div>');
+        else rows.push(`<div class="kv" data-tip="Harvest comes in at the Harvest month. It grows with the farmers' work through spring and summer, the soil's richness and crop rotation."><span>Expected harvest</span><span>${b.growth > 0 ? `~${fc.now} ${name}` : '—'}${fc.full > fc.now ? ` <small>(up to ${fc.full})</small>` : ''}</span></div>`);
         rows.push(`<div class="kv" data-tip="Richer soil yields up to twice as much as poor soil. Look for dark green, lush ground."><span>Soil</span><span class="${fc.soil < 0.4 ? 'neg' : ''}">${fc.soil < 0.4 ? 'Poor' : fc.soil < 0.7 ? 'Fair' : 'Rich'} (${Math.round(fc.soil * 100)}%)</span></div>`);
         if (b.lastCrop) rows.push(`<div class="kv" data-tip="Growing the same crop two years running yields less."><span>Last year</span><span>${esc(b.lastCrop)}${b.lastCrop === (b.recipe ?? 'wheat') ? ' <span class="neg">(same crop: −15%)</span>' : ''}</span></div>`);
       } else if (b.type === 'orchard') {
@@ -2436,7 +2436,7 @@ export class Hud {
         <p><b>The Manor</b> is optional: build it for feasts, festivals and prestige, and renovate it as the town grows into a Manor House and then a Stone Manor, which lets you lay out a manor garden, watch towers and the town walls.</p>
         <p><b>Retinue</b>: a Borough can raise men-at-arms at the manor for prestige and arms. Paid 10 coins a month, they ride out against wolves and bandits.</p>
         <p><b>Harvest feast</b>: once each autumn, select the manor to call a feast. A meal for everyone and drink for every eight cheer the town for half a year and bring prestige.</p>
-        <p><b>Homes</b> eat one food a month each; several food groups (grain, meat, produce, dairy) cheer them. When every food is gone they boil stored wheat into pottage, which is only half as filling. Each winter month a home burns firewood. Finer homes need clothes, a tavern, boots and medicine, and enjoy luxuries. A family may set up a craft at home: the workshop costs materials and takes days to build, and the craft stays for good.</p>
+        <p><b>Villagers</b> eat one food a month each; several food groups (grain, meat, produce, dairy) cheer them. When every food is gone they boil stored wheat into pottage, which is only half as filling. Each winter month a home burns firewood. Finer homes need clothes, a tavern, boots and medicine, and enjoy luxuries. A family may set up a craft at home: the workshop costs materials and takes days to build, and the craft stays for good.</p>
         <p><b>Prestige</b> comes from a fine manor, a church and monuments. From Town on, spend it on <b>charters</b> (crown button) to specialise your town.</p>
         <p>Your <b>steward</b> warns you when things go wrong; the <b>Chronicle</b> (scroll button) keeps the full story.</p>
         <div class="ornament">❦</div>
