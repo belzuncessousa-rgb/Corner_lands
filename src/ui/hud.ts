@@ -1802,30 +1802,31 @@ export class Hud {
       const err = charterError(s, sel.id);
       const done = hasCharter(s, sel.id);
       const others = sel.excludes?.map((x) => CHARTERS.find((c) => c.id === x)!.name);
-      detail = `<h3 style="color:${path.color}">${esc(sel.name)}</h3>
+      detail = `<h3 style="border-color:${path.color}">${esc(sel.name)}</h3>
         <div class="sub">${esc(path.name)} · rank ${numeral(sel)}</div>
         <p>${esc(sel.desc)}</p>
         <p class="note"><b>Drawback of the path:</b> ${esc(path.malus)}</p>
         ${others?.length ? `<p class="note">Cannot be held alongside ${esc(others.join(' or '))}.</p>` : ''}
         ${done ? '<p class="pos"><b>Granted.</b></p>' : `<div class="kv"><span>Cost</span><b>${charterCost(s)} ${ICONS.prestige}</b></div>
-          <button class="primary" data-action="charter-grant" data-id="${sel.id}" ${err ? 'disabled' : ''}>Grant this charter</button>
+          <button class="plaque-btn" data-action="charter-grant" data-id="${sel.id}" ${err ? 'disabled' : ''}>Grant this charter</button>
           ${err ? `<p class="neg">${esc(err)}</p>` : ''}`}
-        <p><a href="#" data-action="charter-sel" data-id="">← Back</a></p>`;
+        <p><button class="plaque-btn small" data-action="charter-sel" data-id="">← All charters</button></p>`;
     }
-    const html = `<div class="charters">
+    const html = `<i class="plaque-rope l"></i><i class="plaque-rope r"></i>
+      <div class="charters">
         <div class="charter-hall">${hangings}</div>
         <div class="charter-detail">${detail}</div>
       </div>
-      <div class="row" style="justify-content:flex-end;margin-top:8px"><button class="primary" data-action="close-modal">Close</button></div>`;
+      <div class="row" style="justify-content:flex-end;margin-top:8px"><button class="plaque-btn" data-action="close-modal">Close</button></div>`;
     let root: HTMLElement;
     if (this.modal && this.modal.querySelector('.charters')) {
       root = this.modal.querySelector('.modal')!;
       root.innerHTML = html;
     } else {
       root = this.openModal(html).querySelector('.modal')!;
-      root.classList.add('wide', 'charter-modal');
+      root.classList.add('wide', 'charter-modal', 'plaque');
     }
-    root.querySelectorAll<HTMLCanvasElement>('canvas.t-scene').forEach((cv) => drawTapestry(cv, cv.dataset.path!, cv.dataset.color!, 108, 82));
+    root.querySelectorAll<HTMLCanvasElement>('canvas.t-scene').forEach((cv) => drawTapestry(cv, cv.dataset.path!, cv.dataset.color!, 126, 92));
   }
 
   private openModal(html: string, closable = true): HTMLElement {
@@ -1931,7 +1932,7 @@ export class Hud {
     const mode0 = preset?.mode ?? 'normal';
     const m = this.openModal(
       `<h2>${tutorial ? 'Tutorial' : 'New Settlement'}</h2>
-      ${tutorial ? '<p>Fingamabob, your steward, will show you the ropes on a land chosen for learning. Pick how hard it should be; the land is always the same.</p>' : ''}
+      ${tutorial ? '<p>Fingamoblineus, your steward, will show you the ropes on a land chosen for learning. Pick how hard it should be; the land is always the same.</p>' : ''}
       <div class="row"><label>Name</label><input id="town" value="${esc(preset?.name ?? placeName(seed))}" maxlength="40"><button data-m="rename" data-tip="Another name">🎲</button></div>
       <div class="row lord-pick"><label>Your lord</label><span class="lord-mini"></span><span class="lord-mini flag"></span><button data-m="lord">Choose looks &amp; arms…</button></div>
       <div class="land-pick" ${tutorial ? 'hidden' : ''}><p>Every map is generated from a seed. Share a seed to play the same land, or take this week's seed, the same for everyone.</p>

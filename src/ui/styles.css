@@ -1671,38 +1671,32 @@ table.goods button.sell.active svg {
 /* ------------------------------------------------------------ charters */
 
 .modal.wide.charter-modal {
-  width: min(1280px, calc(100vw - 24px));
+  width: min(1520px, calc(100vw - 24px));
 }
 .charters {
   display: flex;
-  gap: 14px;
+  gap: 18px;
   align-items: flex-start;
 }
-/* A hall of hangings: each path a tapestry on its rod, with medallions to grant. */
+/* A hall of hangings: each path a tapestry on its rod, hung straight on the plaque. */
 .charter-hall {
   flex: 0 0 auto;
   display: flex;
   gap: 6px;
-  padding: 14px 10px 18px;
-  border-radius: 8px;
-  background:
-    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.08) 0 2px, transparent 2px 24px),
-    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.06) 0 2px, transparent 2px 48px),
-    linear-gradient(#6a5c4c, #5a4c3e);
-  box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.45);
+  padding: 4px 2px 8px;
   overflow-x: auto;
-  max-width: calc(100vw - 340px);
+  max-width: calc(100vw - 380px);
 }
 .tapestry {
-  width: 120px;
+  width: 140px;
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 .t-rod {
-  width: 130px;
-  height: 7px;
+  width: 150px;
+  height: 8px;
   border-radius: 4px;
   background: linear-gradient(#c8a038, #7a5a1a);
   box-shadow: 0 2px 3px rgba(0, 0, 0, 0.5);
@@ -1710,8 +1704,8 @@ table.goods button.sell.active svg {
   z-index: 1;
 }
 .t-cloth {
-  width: 120px;
-  padding: 6px 3px 26px;
+  width: 140px;
+  padding: 8px 4px 30px;
   background:
     repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 3px),
     repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.07) 0 1px, transparent 1px 3px),
@@ -1731,7 +1725,7 @@ table.goods button.sell.active svg {
 .t-title {
   font-variant: small-caps;
   font-weight: 700;
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.05;
   color: #f8ecd0;
   text-align: center;
@@ -1772,13 +1766,13 @@ table.goods button.sell.active svg {
   align-items: center;
   gap: 1px;
   width: 100%;
-  max-width: 112px;
-  padding: 4px 3px;
+  max-width: 130px;
+  padding: 5px 3px;
   border-radius: 14px;
   border: 2px solid rgba(255, 248, 230, 0.55);
   background: rgba(30, 20, 10, 0.35);
   color: #f8ecd0;
-  font-size: 10.5px;
+  font-size: 12px;
   line-height: 1.1;
   cursor: pointer;
   text-align: center;
@@ -1821,8 +1815,9 @@ table.goods button.sell.active svg {
 }
 .charter-detail {
   flex: 1;
-  min-width: 240px;
-  font-size: 14px;
+  min-width: 250px;
+  font-size: 14.5px;
+  padding-top: 6px;
 }
 .charter-detail h3 {
   margin: 4px 0;
@@ -2347,4 +2342,128 @@ table.prod td.num {
   inset: 0;
   mask-size: 100% 100%;
   -webkit-mask-size: 100% 100%;
+}
+#tutor .t-shield {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+  cursor: pointer;
+  display: none;
+}
+
+
+/* ------------------------------------------------------------ wooden plaque */
+
+/* A signboard of planks in a darker frame, with cut-in corners, hung on two ropes. */
+.modal.plaque {
+  background: none;
+  border: none;
+  box-shadow: none;
+  position: relative;
+  isolation: isolate;
+  overflow: visible;
+  padding: 30px 34px 24px;
+  color: #fbefd6;
+  filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.55));
+  --notch: 26px;
+}
+.modal.plaque > .charters {
+  max-height: calc(100vh - 150px);
+  overflow: auto;
+}
+.modal.plaque::before,
+.modal.plaque::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  --m: radial-gradient(circle at 0 0, transparent var(--n), #000 calc(var(--n) + 0.5px)) top left / 51% 51% no-repeat,
+    radial-gradient(circle at 100% 0, transparent var(--n), #000 calc(var(--n) + 0.5px)) top right / 51% 51% no-repeat,
+    radial-gradient(circle at 0 100%, transparent var(--n), #000 calc(var(--n) + 0.5px)) bottom left / 51% 51% no-repeat,
+    radial-gradient(circle at 100% 100%, transparent var(--n), #000 calc(var(--n) + 0.5px)) bottom right / 51% 51% no-repeat;
+  -webkit-mask: var(--m);
+  mask: var(--m);
+}
+/* The frame. */
+.modal.plaque::before {
+  inset: 0;
+  --n: var(--notch);
+  background:
+    linear-gradient(180deg, rgba(255, 220, 160, 0.25), rgba(0, 0, 0, 0.25)),
+    var(--wood-img-dark, #6a4424) center / cover;
+}
+/* The board, set into the frame. */
+.modal.plaque::after {
+  inset: 9px;
+  --n: calc(var(--notch) + 2px);
+  background:
+    radial-gradient(ellipse at 50% 40%, rgba(255, 230, 180, 0.1), rgba(30, 12, 0, 0.32)),
+    var(--wood-img, #a87842) center / cover;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.4);
+}
+.modal.plaque h3 {
+  color: #ffe9b0;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  font-size: 20px;
+  border-bottom: 3px solid #e0c070;
+  padding-bottom: 4px;
+}
+.modal.plaque p,
+.modal.plaque .kv,
+.modal.plaque .sub {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
+}
+.modal.plaque .sub {
+  opacity: 0.85;
+  color: #f2dca8;
+}
+.modal.plaque .note {
+  opacity: 1;
+  color: #f2e2c2;
+}
+.modal.plaque .neg {
+  color: #ffb4a0;
+}
+.modal.plaque .pos {
+  color: #c8f0a0;
+}
+.plaque-rope {
+  position: absolute;
+  bottom: 100%;
+  width: 5px;
+  height: 100vh;
+  background: repeating-linear-gradient(160deg, #c8a46c 0 3px, #8a6a3a 3px 6px);
+  box-shadow: 1px 0 1px rgba(0, 0, 0, 0.4);
+  z-index: -2;
+}
+.plaque-rope.l {
+  left: 12%;
+}
+.plaque-rope.r {
+  right: 12%;
+}
+/* Buttons as little boards of dark wood. */
+button.plaque-btn,
+button.primary {
+  background:
+    linear-gradient(180deg, rgba(255, 220, 160, 0.22), rgba(0, 0, 0, 0.28)),
+    var(--wood-img-dark, #6a4424) center / cover;
+  color: #fbefd2;
+  border: 2px solid #3a2210;
+  border-radius: 3px;
+  box-shadow: inset 0 1px 0 rgba(255, 230, 190, 0.35), 0 2px 3px rgba(0, 0, 0, 0.4);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.7);
+  clip-path: polygon(6px 0, calc(100% - 6px) 0, 100% 6px, 100% calc(100% - 6px), calc(100% - 6px) 100%, 6px 100%, 0 calc(100% - 6px), 0 6px);
+  padding: 7px 16px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+button.plaque-btn:hover:not(:disabled),
+button.primary:hover:not(:disabled) {
+  background:
+    linear-gradient(180deg, rgba(255, 230, 180, 0.38), rgba(0, 0, 0, 0.18)),
+    var(--wood-img-dark, #7a5030) center / cover;
+}
+button.plaque-btn.small {
+  padding: 4px 12px;
+  font-size: 13px;
 }

@@ -59,6 +59,7 @@ import { AgentSystem } from './render/agents';
 import { Wildlife } from './render/wildlife';
 import { type Overlay, Renderer } from './render/renderer';
 import { Tutor } from './ui/tutorial';
+import { installWood } from './ui/wood';
 import { Hud } from './ui/hud';
 
 export type Tool =
@@ -152,6 +153,7 @@ export class Game {
     this.renderer.showMarkers = false;
     this.state = makeDemoVillage();
     this.hud = new Hud(this, document.getElementById('ui')!);
+    installWood();
     this.tutor = new Tutor(this);
     this.renderer.resize();
     this.resetView();
@@ -931,6 +933,7 @@ export class Game {
       this.lastPointer = { x: e.clientX, y: e.clientY };
       if (this.pointers.has(e.pointerId)) this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (this.pinch && this.pointers.size === 2) {
+        if (this.tutor?.locksCamera) return;
         const [a, b] = [...this.pointers.values()];
         const d = Math.hypot(a.x - b.x, a.y - b.y);
         this.setZoom((this.pinch.zoom * d) / this.pinch.dist);
@@ -948,7 +951,8 @@ export class Game {
         clearTimeout(this.longPress);
       }
       const panning = df.button !== 0 || (this.tool.kind !== 'road' && this.tool.kind !== 'demolish') || !this.dragTile;
-      if (this.moved && panning) {
+      // During the tutorial the guide moves the view; the player cannot.
+      if (this.moved && panning && !this.tutor?.locksCamera) {
         cv.classList.add('dragging');
         const z = this.renderer.cam.zoom;
         this.renderer.cam.x = df.camX - (e.clientX - df.x) / z;
@@ -1008,6 +1012,7 @@ export class Game {
       'wheel',
       (e) => {
         e.preventDefault();
+        if (this.tutor?.locksCamera) return;
         const r = this.renderer;
         const [wx, wy] = r.screenToWorld(e.clientX, e.clientY);
         this.setZoom(r.cam.zoom * Math.exp(-e.deltaY * 0.0015));
@@ -1091,7 +1096,7 @@ export class Game {
   }
 
   private panByKeys(dt: number): void {
-    if (this.modalOpen) return;
+    if (this.modalOpen || this.tutor?.locksCamera) return;
     let dx = 0;
     let dy = 0;
     if (this.keys.has('a') || this.keys.has('arrowleft')) dx -= 1;

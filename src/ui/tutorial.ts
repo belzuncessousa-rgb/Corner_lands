@@ -3,7 +3,7 @@ import { bCenter } from '../game/sim';
 import type { GameState } from '../game/types';
 
 /**
- * The tutorial: Fingamabob, an old steward with a beard, walks about the
+ * The tutorial: Fingamoblineus, an old steward with a beard, walks about the
  * screen with a little spotlight on himself and on whatever he is showing,
  * and talks in a balloon whose letters appear one by one. Some steps wait
  * for the player to do something; the rest wait for a click.
@@ -15,7 +15,7 @@ export const TUTORIAL_SEED = 209;
 type Spot = { x: number; y: number; w: number; h: number; round?: boolean };
 
 interface Step {
-  /** What Fingamabob says (a function to fit the moment). */
+  /** What Fingamoblineus says (a function to fit the moment). */
   say: string | ((g: Game) => string);
   /** What to light up: a selector on the interface, or a point in the land. */
   show?: string | ((g: Game) => Spot | null);
@@ -25,14 +25,12 @@ interface Step {
   until?: (g: Game) => boolean;
   /** Let time run while this step waits. */
   run?: boolean;
-  /** Dim the rest of the screen (on by default; off while the player works the map). */
-  dim?: boolean;
 }
 
 const count = (s: GameState, type: string, built = false) => s.buildings.filter((b) => b.type === type && (!built || b.build >= 1)).length;
 
 /** The nearest map feature to the camp matching a test, as a tile. */
-function nearest(s: GameState, test: (i: number) => boolean): { x: number; y: number } | null {
+function nearest(s: GameState, test: (i: number) => boolean, penalty: (i: number) => number = () => 0): { x: number; y: number } | null {
   const camp = s.buildings.find((b) => b.type === 'camp') ?? s.buildings[0];
   if (!camp) return null;
   const c = bCenter(camp);
@@ -42,7 +40,7 @@ function nearest(s: GameState, test: (i: number) => boolean): { x: number; y: nu
     if (!test(i)) continue;
     const x = i % s.width;
     const y = Math.floor(i / s.width);
-    const d = Math.hypot(x + 0.5 - c.x, y + 0.5 - c.y);
+    const d = Math.hypot(x + 0.5 - c.x, y + 0.5 - c.y) + penalty(i);
     if (d < bd) {
       bd = d;
       best = { x: x + 0.5, y: y + 0.5 };
@@ -57,13 +55,16 @@ function landSpot(g: Game, x: number, y: number, r = 46): Spot {
   return { x: sx - r, y: sy - r * 0.8, w: r * 2, h: r * 1.6, round: true };
 }
 
-function lookAt(g: Game, x: number, y: number): void {
-  g.renderer.centerOn(x, y);
+/** Where the guide is panning the view to (tiles); the view glides there. */
+let camGoal: { x: number; y: number } | null = null;
+
+function lookAt(_g: Game, x: number, y: number): void {
+  camGoal = { x, y };
 }
 
 const START: Step[] = [
   {
-    say: 'Greetings, my liege! Welcome to your new land. I am Fingamabob, and I shall assist you in your task.',
+    say: 'Greetings, my liege! Welcome to your new land. I am Fingamoblineus, and I shall assist you in your task.',
     enter: (g) => g.setSpeed(0),
   },
   {
@@ -110,13 +111,11 @@ const START: Step[] = [
     say: 'But that is enough tattle. Let us get this town going! Down here you place the buildings that will fuel your town and serve your subjects. Let us start with some essential work. Click on the Resources icon.',
     show: '#buildbar [data-cat="resources"]',
     until: () => !!document.querySelector('#buildbar [data-type="woodcutter"]'),
-    dim: true,
   },
   {
     say: "Most of our basic buildings need timber. We brought some with the settlers, but we will need much more for our mighty village. Choose the Woodcutter's Lodge and build it close to the forest.",
     show: '#buildbar [data-type="woodcutter"]',
     until: (g) => count(g.state, 'woodcutter') > 0,
-    dim: false,
   },
   {
     say: (g) => {
@@ -153,14 +152,24 @@ const START: Step[] = [
   {
     say: 'Mushrooms grow on the forest floor, best in autumn. Foragers gather those too.',
     show: (g) => {
-      const t = nearest(g.state, (i) => (g.state.mushroomsMax?.[i] ?? 0) > 0);
+      // A patch that can be seen: trees on the tiles in front of it would hide it.
+      const s = g.state;
+      const hidden = (i: number) => {
+        let n = 0;
+        const x = i % s.width;
+        const y = Math.floor(i / s.width);
+        for (let dy = 0; dy <= 2; dy++)
+          for (let dx = 0; dx <= 2; dx++) if (x + dx < s.width && y + dy < s.height && s.trees[(y + dy) * s.width + x + dx]) n++;
+        return n * 4;
+      };
+      const t = nearest(s, (i) => (s.mushroomsMax?.[i] ?? 0) > 0, hidden);
       if (!t) return null;
       lookAt(g, t.x, t.y);
       return landSpot(g, t.x, t.y);
     },
   },
   {
-    say: 'A herd of deer. Hunters bring home meat and hides. Mind, the animals may wander off if the woods about them are cut down, and if hunted too hard they grow few.',
+    say: 'A herd of deer. Hunters bring home meat and hides. Mind, the deer wander off if the woods about them are cut down, and a herd hunted too hard grows small and comes back only slowly.',
     show: (g) => {
       const camp = g.state.buildings.find((b) => b.type === 'camp');
       const c = camp ? bCenter(camp) : { x: 0, y: 0 };
@@ -197,13 +206,11 @@ const START: Step[] = [
       if (camp) lookAt(g, camp.x + 1.5, camp.y + 1.5);
     },
     until: (g) => count(g.state, 'forager') + count(g.state, 'hunter') + count(g.state, 'fisher') > 0,
-    dim: false,
   },
   {
     say: 'Our people still sleep in the tents they came with. Open Housing and build a cottage for a family. Leave room around it: homes grow, and gardens come later.',
     show: '#buildbar [data-cat="housing"]',
     until: (g) => count(g.state, 'house') > 0,
-    dim: false,
   },
   {
     say: 'Now a road. Buildings work without one, but villagers walk much faster on a road. Choose Road, click where it starts and click where it ends. Join the cottage to the camp.',
@@ -212,7 +219,6 @@ const START: Step[] = [
       (g as unknown as { tutorRoads: number }).tutorRoads = roadsOf(g.state);
     },
     until: (g) => roadsOf(g.state) > ((g as unknown as { tutorRoads?: number }).tutorRoads ?? 0),
-    dim: false,
   },
   {
     say: 'Well done! Now let time flow. Builders carry what each site needs from the stores, and raise it. I shall wait with you until our first buildings stand.',
@@ -224,7 +230,6 @@ const START: Step[] = [
       return count(s, 'woodcutter', true) > 0 && count(s, 'house', true) > 0 && food;
     },
     run: true,
-    dim: false,
   },
   {
     say: 'They stand! Click any building to see what it does, who works there and what it lacks. Workers leave what they make in a little yard, until someone carries it to storage.',
@@ -286,6 +291,7 @@ export class Tutor {
   private balloon: HTMLDivElement;
   private guide: HTMLCanvasElement;
   private grey: HTMLDivElement;
+  private shield: HTMLDivElement;
   private greyMask = '';
   private gx = -60;
   private gy = 0;
@@ -294,17 +300,58 @@ export class Tutor {
   private text = '';
   private stepKey = '';
   private active = false;
+  /** On a step that waits for the player: the speech is done and the screen is theirs again. */
+  private waiting = false;
+  /** Seconds the whole line has been on show. */
+  private shown = 0;
 
   constructor(private game: Game) {
     this.root = document.createElement('div');
     this.root.id = 'tutor';
-    this.root.innerHTML = `<div class="t-grey"></div><svg class="t-dim" aria-hidden="true"></svg><canvas class="t-guide"></canvas><div class="t-balloon"></div>`;
+    this.root.innerHTML = `<div class="t-grey"></div><svg class="t-dim" aria-hidden="true"></svg><div class="t-shield"></div><canvas class="t-guide"></canvas><div class="t-balloon"></div>`;
     document.body.appendChild(this.root);
     this.svg = this.root.querySelector('svg')!;
     this.grey = this.root.querySelector('.t-grey')!;
+    this.shield = this.root.querySelector('.t-shield')!;
     this.guide = this.root.querySelector('canvas')!;
     this.balloon = this.root.querySelector('.t-balloon')!;
-    this.balloon.addEventListener('click', (e) => this.onBalloon(e));
+    this.balloon.addEventListener('click', (e) => {
+      if ((e.target as HTMLElement).closest('[data-t="skip"]')) this.skip();
+      else this.next();
+    });
+    // While he talks, a click anywhere goes on.
+    this.shield.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      this.next();
+    });
+    // Clicking him while he waits brings his words back.
+    this.guide.addEventListener('click', () => {
+      if (!this.waiting) return;
+      this.waiting = false;
+      this.shown = 0;
+    });
+    // On a step that waits, the first click of the player's own (on the bar, the map) closes his balloon.
+    window.addEventListener(
+      'pointerdown',
+      (e) => {
+        if (!this.active || this.waiting || this.root.style.display === 'none') return;
+        if ((e.target as HTMLElement).closest('#tutor')) return;
+        const step = this.steps[this.game.state.tutorial?.step ?? 0];
+        if (step?.until && this.typed >= this.text.length) this.waiting = true;
+      },
+      true,
+    );
+    window.addEventListener(
+      'keydown',
+      (e) => {
+        if (e.key !== 'Enter' || !this.active || this.root.style.display === 'none' || this.game.modalOpen) return;
+        if ((e.target as HTMLElement).tagName === 'INPUT') return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        this.next();
+      },
+      true,
+    );
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     this.guide.width = 44 * dpr;
     this.guide.height = 64 * dpr;
@@ -312,25 +359,35 @@ export class Tutor {
     this.guide.style.height = '64px';
   }
 
+  /** The view stays where the guide puts it while he leads. */
+  get locksCamera(): boolean {
+    return this.active;
+  }
+
   private get steps(): Step[] {
     return this.game.state.tutorial?.chapter === 'manor' ? MANOR : START;
   }
 
-  private onBalloon(e: MouseEvent): void {
+  /** A click or Enter: finish the line, then go on (or, on a step that waits, step aside). */
+  private next(): void {
     const t = this.game.state.tutorial;
-    if (!t) return;
-    if ((e.target as HTMLElement).closest('[data-t="skip"]')) {
-      t.chapter = 'done';
-      this.hide();
-      this.game.setSpeed(1);
-      return;
-    }
+    if (!t || this.waiting) return;
     if (this.typed < this.text.length) {
       this.typed = this.text.length;
       return;
     }
     const step = this.steps[t.step];
-    if (step && !step.until) this.advance();
+    if (!step) return;
+    if (step.until) this.waiting = true;
+    else this.advance();
+  }
+
+  private skip(): void {
+    const t = this.game.state.tutorial;
+    if (!t) return;
+    t.chapter = 'done';
+    this.hide();
+    this.game.setSpeed(1);
   }
 
   private advance(): void {
@@ -349,6 +406,25 @@ export class Tutor {
     this.active = false;
     this.root.style.display = 'none';
     this.stepKey = '';
+    camGoal = null;
+  }
+
+  /** Glides the view toward where the guide wants to look. Returns whether it is still moving. */
+  private panCamera(dt: number): boolean {
+    if (!camGoal) return false;
+    const r = this.game.renderer;
+    const [cx, cy] = r.screenToTile(window.innerWidth / 2, window.innerHeight / 2);
+    const dx = camGoal.x - cx;
+    const dy = camGoal.y - cy;
+    const d = Math.hypot(dx, dy);
+    if (d < 0.05) {
+      camGoal = null;
+      return false;
+    }
+    // Ease in, at a walking pace: never more than a dozen tiles a second.
+    const v = Math.min(d, Math.max(d * dt * 2.2, 1.5 * dt), 12 * dt);
+    r.centerOn(cx + (dx / d) * v, cy + (dy / d) * v);
+    return d > 0.4;
   }
 
   /** Called every frame. */
@@ -379,12 +455,14 @@ export class Tutor {
       step.enter?.(g);
       this.text = typeof step.say === 'function' ? step.say(g) : step.say;
       this.typed = 0;
+      this.shown = 0;
+      this.waiting = false;
     }
     if (step.until?.(g)) {
       this.advance();
       return;
     }
-    // Where to light up, and where Fingamabob should stand.
+    // Where to light up, and where he should stand.
     let spot: Spot | null = null;
     if (typeof step.show === 'string') {
       const el = document.querySelector(step.show) as HTMLElement | null;
@@ -393,6 +471,7 @@ export class Tutor {
         if (r.width) spot = { x: r.left - 6, y: r.top - 6, w: r.width + 12, h: r.height + 12 };
       }
     } else if (step.show) spot = step.show(g);
+    const panning = this.panCamera(dt);
     const W = window.innerWidth;
     const H = window.innerHeight;
     let tx = W / 2 - 22;
@@ -412,22 +491,34 @@ export class Tutor {
     const dx = tx - this.gx;
     const dy = ty - this.gy;
     const d = Math.hypot(dx, dy);
+    // He walks (at a stroll, so it reads as walking) and only talks once there.
     const walking = d > 2;
     if (walking) {
-      const v = Math.min(d, 260 * dt);
+      const v = Math.min(d, 170 * dt);
       this.gx += (dx / d) * v;
       this.gy += (dy / d) * v;
       this.walk += dt * 10;
-    } else if (this.typed < this.text.length) {
+    } else if (!panning && this.typed < this.text.length) {
       this.typed = Math.min(this.text.length, this.typed + dt * 48);
+    } else if (!panning) {
+      this.shown += dt;
+      // On a step that waits, he steps aside once he has had his say.
+      if (step.until && !this.waiting && this.shown > 4) this.waiting = true;
     }
-    this.draw(spot, walking, step);
+    this.draw(spot, walking || panning, step);
   }
 
   private draw(spot: Spot | null, walking: boolean, step: Step): void {
     const W = window.innerWidth;
     const H = window.innerHeight;
-    // The dimmed screen, with holes for Fingamabob and what he shows.
+    const talking = !walking && !this.waiting;
+    // While he walks or waits nothing blocks the screen; while he talks a click anywhere goes on,
+    // except on a step that waits for the player, who must be free to do it.
+    this.shield.style.display = talking && !step.until ? 'block' : 'none';
+    this.guide.style.pointerEvents = this.waiting ? 'auto' : 'none';
+    this.guide.style.cursor = this.waiting ? 'pointer' : '';
+    this.guide.title = this.waiting ? 'Fingamoblineus: click to hear him again' : '';
+    // The dimmed, greyed screen, with holes for him and what he shows; none while he waits.
     const holes: string[] = [`<ellipse cx="${this.gx + 22}" cy="${this.gy + 34}" rx="46" ry="52" fill="black"/>`];
     if (spot) {
       holes.push(
@@ -436,33 +527,48 @@ export class Tutor {
           : `<rect x="${spot.x}" y="${spot.y}" width="${spot.w}" height="${spot.h}" rx="10" fill="black"/>`,
       );
     }
-    const dim = step.dim === false ? 0.12 : 0.34;
-    // The world outside the holes loses its colour (a masked backdrop filter).
-    const grey = step.dim === false ? 'grayscale(0.55)' : 'grayscale(0.9) brightness(0.8)';
-    const mask = `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><defs><mask id="m"><rect width="${W}" height="${H}" fill="white"/>${holes.join('')}</mask></defs><rect width="${W}" height="${H}" mask="url(#m)"/></svg>`)}")`;
-    if (mask + grey !== this.greyMask) {
-      this.greyMask = mask + grey;
-      this.grey.style.backdropFilter = grey;
-      this.grey.style.maskImage = mask;
-      this.grey.style.webkitMaskImage = mask;
-    }
+    const outline = spot
+      ? spot.round
+        ? `<ellipse cx="${spot.x + spot.w / 2}" cy="${spot.y + spot.h / 2}" rx="${spot.w / 2}" ry="${spot.h / 2}" fill="none" stroke="#f2d878" stroke-width="2.5" stroke-dasharray="6 5"/>`
+        : `<rect x="${spot.x}" y="${spot.y}" width="${spot.w}" height="${spot.h}" rx="10" fill="none" stroke="#f2d878" stroke-width="2.5"/>`
+      : '';
     this.svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
-    this.svg.innerHTML = `<defs><mask id="tmask"><rect width="${W}" height="${H}" fill="white"/>${holes.join('')}</mask>
-      <radialGradient id="tglow"><stop offset="0" stop-color="#fff4c8" stop-opacity="0.35"/><stop offset="1" stop-color="#fff4c8" stop-opacity="0"/></radialGradient></defs>
-      <rect width="${W}" height="${H}" fill="rgba(12,10,20,${dim})" mask="url(#tmask)"/>
-      <ellipse cx="${this.gx + 22}" cy="${this.gy + 40}" rx="40" ry="44" fill="url(#tglow)"/>
-      ${spot ? (spot.round ? `<ellipse cx="${spot.x + spot.w / 2}" cy="${spot.y + spot.h / 2}" rx="${spot.w / 2}" ry="${spot.h / 2}" fill="none" stroke="#f2d878" stroke-width="2.5" stroke-dasharray="6 5"/>` : `<rect x="${spot.x}" y="${spot.y}" width="${spot.w}" height="${spot.h}" rx="10" fill="none" stroke="#f2d878" stroke-width="2.5"/>`) : ''}`;
-    // Fingamabob himself.
+    if (this.waiting) {
+      this.svg.innerHTML = '';
+      if (this.greyMask) {
+        this.greyMask = '';
+        this.grey.style.backdropFilter = 'none';
+        this.grey.style.maskImage = 'none';
+        this.grey.style.webkitMaskImage = 'none';
+      }
+    } else {
+      this.svg.innerHTML = `<defs><mask id="tmask"><rect width="${W}" height="${H}" fill="white"/>${holes.join('')}</mask>
+        <radialGradient id="tglow"><stop offset="0" stop-color="#fff4c8" stop-opacity="0.35"/><stop offset="1" stop-color="#fff4c8" stop-opacity="0"/></radialGradient></defs>
+        <rect width="${W}" height="${H}" fill="rgba(12,10,20,0.34)" mask="url(#tmask)"/>
+        <ellipse cx="${this.gx + 22}" cy="${this.gy + 40}" rx="40" ry="44" fill="url(#tglow)"/>${walking ? '' : outline}`;
+      // The world outside the holes loses its colour (a masked backdrop filter).
+      const grey = 'grayscale(0.9) brightness(0.8)';
+      const mask = `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><defs><mask id="m"><rect width="${W}" height="${H}" fill="white"/>${holes.join('')}</mask></defs><rect width="${W}" height="${H}" mask="url(#m)"/></svg>`)}")`;
+      if (mask + grey !== this.greyMask) {
+        this.greyMask = mask + grey;
+        this.grey.style.backdropFilter = grey;
+        this.grey.style.maskImage = mask;
+        this.grey.style.webkitMaskImage = mask;
+      }
+    }
+    // Fingamoblineus himself.
     this.guide.style.left = `${this.gx}px`;
     this.guide.style.top = `${this.gy}px`;
     this.paintGuide(walking);
-    // His balloon, beside him on the side with more room.
+    // His balloon, only while he stands and talks, beside him on the side with more room.
+    this.balloon.style.display = talking ? 'block' : 'none';
+    if (!talking) return;
     const right = this.gx < W / 2;
-    const shown = this.text.slice(0, Math.floor(this.typed));
+    const shownText = this.text.slice(0, Math.floor(this.typed));
     const done = this.typed >= this.text.length;
     const t = this.game.state.tutorial!;
-    const html = `<div class="t-name">Fingamabob</div><p>${esc(shown)}<span class="t-caret">${done ? '' : '▌'}</span></p>
-      <div class="t-foot">${step.until ? `<span class="t-wait">${done ? 'Waiting for you, my liege…' : ''}</span>` : `<span class="t-next">${done ? 'Click to go on ▸' : 'Click to hurry him'}</span>`}<button data-t="skip">Skip tutorial</button></div>`;
+    const html = `<div class="t-name">Fingamoblineus</div><p>${esc(shownText)}<span class="t-caret">${done ? '' : '▌'}</span></p>
+      <div class="t-foot"><span class="t-next">${done ? (step.until ? 'Over to you, my liege ▸' : 'Click or press Enter to go on ▸') : 'Click to hurry him'}</span><button data-t="skip">Skip tutorial</button></div>`;
     if (this.balloon.dataset.html !== `${t.chapter}${t.step}:${Math.floor(this.typed)}`) {
       this.balloon.dataset.html = `${t.chapter}${t.step}:${Math.floor(this.typed)}`;
       this.balloon.innerHTML = html;

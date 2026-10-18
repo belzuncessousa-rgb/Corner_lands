@@ -357,9 +357,9 @@ export function isBridge(s: GameState, x: number, y: number): boolean {
 export const PAVING_COST: Cost = { stone: 2 };
 /** Settlement rank needed to pave roads (none: stone is its own price). */
 export const PAVING_TIER = 0;
-/** Dressed stone for each tile of cobbled street, and the rank it waits for. */
+/** Dressed stone for each tile of cobbled street, and the rank it waits for (none: dressed stone is its own price). */
 export const COBBLE_COST: Cost = { dressedstone: 1 };
-export const COBBLE_TIER = 2;
+export const COBBLE_TIER = 0;
 
 /** Road grades: 1 dirt, 2 stone (gravel and stone), 3 cobbled street. */
 export type RoadGrade = 1 | 2 | 3;
