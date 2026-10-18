@@ -73,6 +73,14 @@ export function folkName(s: GameState, a: Agent): string {
   return `${first} ${trade ?? PLACE[(h >>> 8) % PLACE.length]}`;
 }
 
+const LEISURE_DOING: Record<string, string> = {
+  dance: 'Dancing round the maypole',
+  pray: 'Saying a prayer',
+  toast: 'Raising a mug with the neighbours',
+  sit: 'Sitting a while, watching the world go by',
+  chat: 'Catching up on the gossip',
+};
+
 /** What the villager is about: their trade or task right now. */
 export function folkDoing(s: GameState, a: Agent): string {
   const work = workplaceOf(s, a);
@@ -88,6 +96,7 @@ export function folkDoing(s: GameState, a: Agent): string {
     case 'settler':
       return 'Newly come to settle here';
     default:
+      if (a.phase === 'act' && LEISURE_DOING[a.act]) return LEISURE_DOING[a.act];
       return 'No work today: strolling, chatting, resting';
   }
 }

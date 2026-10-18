@@ -47,6 +47,8 @@ export interface Agent {
   gone?: boolean;
   /** Where a visiting cart entered the map. */
   edge?: { x: number; y: number };
+  /** The ring a dancer circles: centre and radius in tiles. */
+  ring?: { x: number; y: number; r: number; t: number };
 }
 
 const TUNICS = ['#8a3b2e', '#4a5e8a', '#6b7a3a', '#9a7a3a', '#5e4a6e', '#7a5a3a', '#3a6a6a', '#a05a3a', '#556070'];
@@ -57,7 +59,38 @@ const ROAD_SPEED = ROAD_TILES_PER_DAY / DAY_SECONDS;
 const OFFROAD_SPEED = OFFROAD_TILES_PER_DAY / DAY_SECONDS;
 const PAVED_SPEED = STONE_ROAD_TILES_PER_DAY / DAY_SECONDS;
 const COBBLE_SPEED = COBBLE_TILES_PER_DAY / DAY_SECONDS;
-const GATHERING = new Set(['market', 'well', 'church', 'cathedral', 'maypole', 'garden', 'statue', 'belltower', 'guildhall']);
+const GATHERING = new Set(['market', 'markethall', 'well', 'church', 'cathedral', 'maypole', 'garden', 'publicgarden', 'statue', 'belltower', 'guildhall', 'tavern', 'fountain', 'shrine']);
+
+/** What villagers do for leisure at each gathering place. */
+const LEISURE: Record<string, string> = {
+  maypole: 'dance',
+  church: 'pray',
+  cathedral: 'pray',
+  shrine: 'pray',
+  tavern: 'toast',
+  fountain: 'sit',
+  garden: 'sit',
+  publicgarden: 'sit',
+  statue: 'sit',
+};
+
+/** Whether a ring round a building, and the tiles just beyond it, are free of other buildings and water. */
+function ringClear(s: GameState, b: Building, c: { x: number; y: number }, r: number): boolean {
+  for (let k = 0; k < 16; k++) {
+    const t = (k / 16) * Math.PI * 2;
+    const x = Math.floor(c.x + Math.cos(t) * r);
+    const y = Math.floor(c.y + Math.sin(t) * r);
+    for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
+      if (!inBounds(s, x + dx, y + dy)) return false;
+      const i = idx(s, x + dx, y + dy);
+      if ((s.occ[i] >= 0 && s.occ[i] !== b.id) || (dx === 0 && dy === 0 && s.terrain[i])) return false;
+    }
+  }
+  return true;
+}
+
+/** Leisure acts (no tools in hand). */
+export const LEISURE_ACTS = new Set(['dance', 'pray', 'toast', 'sit', 'chat']);
 const MAX_AGENTS = 180;
 
 export class AgentSystem {
@@ -301,6 +334,17 @@ export class AgentSystem {
     }
     a.timer -= dt;
     if (a.phase === 'act') a.step += dt * 6;
+    if (a.phase === 'act' && a.act === 'dance' && a.ring) {
+      // Hand in hand round the maypole.
+      const r = a.ring;
+      r.t += dt * 0.5;
+      const nx = r.x + Math.cos(r.t) * r.r;
+      const ny = r.y + Math.sin(r.t) * r.r;
+      const sx = nx - a.x - (ny - a.y);
+      if (Math.abs(sx) > 0.001) a.dir = sx > 0 ? 1 : -1;
+      a.x = nx;
+      a.y = ny;
+    }
     if (a.timer <= 0) this.decide(s, a);
   }
 
@@ -315,7 +359,7 @@ export class AgentSystem {
         break;
       case 'act':
         a.phase = 'act';
-        a.timer = 4 + Math.random() * 4;
+        a.timer = LEISURE_ACTS.has(a.act) ? 6 + Math.random() * 8 : 4 + Math.random() * 4;
         break;
       case 'fetch':
         // Loading up at the store.
@@ -552,7 +596,17 @@ export class AgentSystem {
             }
           }
           const [tx, ty] = around.length ? around[Math.floor(Math.random() * around.length)] : [spot.x, spot.y];
-          this.walkTo(s, a, tx, ty, [], 'wander-done');
+          // Dance round the maypole, pray at the church, raise a mug at the tavern, gossip at the well.
+          a.act = LEISURE[spot.type] ?? 'chat';
+          a.ring = undefined;
+          if (a.act === 'dance') {
+            const sc = bCenter(spot);
+            const r = Math.max(spot.w, spot.h) / 2 + 0.6;
+            // Dance only on open ground: next to another building they would be drawn wrongly.
+            if (ringClear(s, spot, sc, r)) a.ring = { x: sc.x, y: sc.y, r, t: Math.atan2(ty + 0.5 - sc.y, tx + 0.5 - sc.x) };
+            else a.act = 'chat';
+          }
+          this.walkTo(s, a, tx, ty, [], 'act');
           return;
         }
       }
@@ -622,7 +676,7 @@ export class AgentSystem {
     const door = doorTile(s, b);
     // After working outside, carry goods back.
     if (a.phase === 'act') {
-      a.carry = goodCarried(s, b);
+      a.carry = LEISURE_ACTS.has(a.act) ? null : goodCarried(s, b);
       this.walkTo(s, a, door.x, door.y, [b.id], 'enter-work');
       return;
     }

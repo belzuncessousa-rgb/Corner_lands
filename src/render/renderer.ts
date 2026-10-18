@@ -4,7 +4,7 @@ import { hasCharter } from '../game/charters';
 import { ANIMAL_KINDS, HOME_TRADES, animalsOf, deliveredTo, hasProblem, herdTotal, monthOf, nearestShoal, orchardMaturity, seasonOf, seatOf, storageCap, stored } from '../game/sim';
 import type { Building, BuildingType, GameState, ResourceId, Season } from '../game/types';
 import { idx, inBounds } from '../game/world';
-import type { Agent } from './agents';
+import { type Agent, LEISURE_ACTS } from './agents';
 import { ICONS } from '../ui/icons';
 import type { Animal } from './wildlife';
 import { Pen, TH, TW, iso, mix, shade } from './pen';
@@ -420,6 +420,10 @@ export class Renderer {
       }
     }
 
+    if (!this.light && (season === 0 || season === 1)) {
+      this.drawButterflies(s, visible);
+      if (season === 1) this.drawFireflies(s, visible);
+    }
     if (ov.ghost) this.drawGhost(s, ov.ghost, season);
 
     this.mark('objects');
@@ -1501,6 +1505,71 @@ export class Renderer {
     c.stroke();
   }
 
+  /** Butterflies flitting over flower beds and gardens on spring and summer days. */
+  private drawButterflies(s: GameState, visible: (x: number, y: number) => boolean): void {
+    if (this.dusk > 0.3) return;
+    const c = this.ctx;
+    const COLORS = ['#f2e8a0', '#f4f0e8', '#e89a3a', '#a8c8f0', '#e8a0c0'];
+    for (const b of s.buildings) {
+      if (b.build < 1) continue;
+      const n = b.type === 'flowerbed' ? 1 : b.type === 'garden' || b.type === 'fountain' ? 2 : b.type === 'publicgarden' ? 4 : b.type === 'manorgarden' ? 6 : 0;
+      if (!n) continue;
+      const [cx, cy] = iso(b.x + b.w / 2, b.y + b.h / 2);
+      if (!visible(cx, cy)) continue;
+      const r = Math.min(40, 6 + b.w * 4);
+      for (let k = 0; k < n; k++) {
+        const ph = b.id * 1.7 + k * 2.3;
+        const t = this.time * 0.6 + ph;
+        const x = cx + Math.sin(t) * r + Math.sin(t * 2.7) * 4;
+        const y = cy - 10 + Math.cos(t * 0.8) * r * 0.45 + Math.sin(t * 3.1) * 3;
+        const flap = Math.abs(Math.sin(this.time * 14 + ph));
+        c.fillStyle = COLORS[(b.id + k) % COLORS.length];
+        c.beginPath();
+        c.ellipse(x - 1.2, y, 1.6 * flap + 0.3, 1.2, -0.4, 0, Math.PI * 2);
+        c.ellipse(x + 1.2, y, 1.6 * flap + 0.3, 1.2, 0.4, 0, Math.PI * 2);
+        c.fill();
+        c.fillStyle = '#3a2c20';
+        c.fillRect(x - 0.3, y - 1, 0.6, 2);
+      }
+    }
+  }
+
+  /** Spots in the meadows and by the water where fireflies dance on summer nights. */
+  private fireflySpots: number[] | null = null;
+  private fireflyMap: Uint8Array | null = null;
+
+  private drawFireflies(s: GameState, visible: (x: number, y: number) => boolean): void {
+    if (this.dusk < 0.4) return;
+    if (!this.fireflySpots || this.fireflyMap !== s.terrain) {
+      this.fireflyMap = s.terrain;
+      this.fireflySpots = [];
+      for (let i = 0; i < s.terrain.length; i++) if (!s.terrain[i] && (Math.imul(i, 2246822519) >>> 0) % 23 === 0) this.fireflySpots.push(i);
+    }
+    const c = this.ctx;
+    const glow = Math.min(1, (this.dusk - 0.4) / 0.3);
+    for (const i of this.fireflySpots) {
+      if (s.occ[i] >= 0 || s.road[i]) continue;
+      const [cx, cy] = iso((i % s.width) + 0.5, Math.floor(i / s.width) + 0.5);
+      if (!visible(cx, cy)) continue;
+      for (let k = 0; k < 3; k++) {
+        const ph = i * 0.37 + k * 2.1;
+        const t = this.time * 0.5 + ph;
+        const x = cx + Math.sin(t) * 12 + Math.sin(t * 2.3) * 3;
+        const y = cy - 6 + Math.cos(t * 0.7) * 5 - Math.abs(Math.sin(t * 1.3)) * 6;
+        const blink = Math.max(0, Math.sin(this.time * 2.2 + ph * 3));
+        if (blink < 0.05) continue;
+        c.fillStyle = `rgba(220,255,110,${0.4 * glow * blink})`;
+        c.beginPath();
+        c.arc(x, y, 4.5, 0, Math.PI * 2);
+        c.fill();
+        c.fillStyle = `rgba(250,255,190,${glow * blink})`;
+        c.beginPath();
+        c.arc(x, y, 1.1, 0, Math.PI * 2);
+        c.fill();
+      }
+    }
+  }
+
   /** Quiet stretches of water near the shore where ducks paddle (terrain never changes). */
   private duckSpots: number[] | null = null;
   private duckMap: Uint8Array | null = null;
@@ -2120,8 +2189,15 @@ export class Renderer {
     const c = this.ctx;
     const [wx, wy] = iso(a.x + a.ox * 0.25, a.y + a.oy * 0.25);
     const walking = a.phase === 'walk';
-    const bob = walking ? Math.abs(Math.sin(a.step)) * 1.2 : 0;
-    const legA = walking ? Math.sin(a.step) * 2 : 0;
+    let bob = walking ? Math.abs(Math.sin(a.step)) * 1.2 : 0;
+    let legA = walking ? Math.sin(a.step) * 2 : 0;
+    // Leisure: dancing round the maypole, kneeling in prayer, sitting a while, a mug raised.
+    const leisure = a.phase === 'act' && LEISURE_ACTS.has(a.act) ? a.act : '';
+    const lh = hashKey(a.key);
+    if (leisure === 'dance') {
+      bob = Math.abs(Math.sin(this.time * 9 + lh)) * 1.8;
+      legA = Math.sin(this.time * 9 + lh) * 1.8;
+    } else if (leisure === 'pray' || leisure === 'sit') bob = 3;
     c.globalAlpha = a.fadeIn;
     if (a.key === this.selectedAgent) {
       // A gold ring at the feet of the villager being looked at.
@@ -2164,14 +2240,35 @@ export class Renderer {
       c.globalAlpha = 1;
       return;
     }
+    if (leisure === 'sit') {
+      // A log to sit on.
+      c.fillStyle = '#7a5a3a';
+      c.fillRect(wx - 3.5, wy - 4, 7, 3);
+      c.fillStyle = '#a07a50';
+      c.fillRect(wx - 3.5, wy - 4, 7, 0.9);
+    }
     // Legs.
     c.strokeStyle = '#3a2c20';
     c.lineWidth = 1.4;
     c.beginPath();
-    c.moveTo(wx - 1, wy - 4 - bob);
-    c.lineTo(wx - 1 + legA, wy);
-    c.moveTo(wx + 1, wy - 4 - bob);
-    c.lineTo(wx + 1 - legA, wy);
+    if (leisure === 'sit') {
+      // Knees forward, feet down.
+      for (const o of [-1, 1]) {
+        c.moveTo(wx + o, wy - 4 - bob);
+        c.lineTo(wx + o + 3 * a.dir, wy - 4 - bob + 0.6);
+        c.lineTo(wx + o + 3.4 * a.dir, wy);
+      }
+    } else if (leisure === 'pray') {
+      // Kneeling: shins along the ground behind.
+      c.moveTo(wx - 0.5, wy - 4 - bob);
+      c.lineTo(wx - 0.5, wy - 0.4);
+      c.lineTo(wx - 3.5 * a.dir, wy);
+    } else {
+      c.moveTo(wx - 1, wy - 4 - bob);
+      c.lineTo(wx - 1 + legA, wy);
+      c.moveTo(wx + 1, wy - 4 - bob);
+      c.lineTo(wx + 1 - legA, wy);
+    }
     c.stroke();
     // Body.
     c.fillStyle = a.tunic;
@@ -2216,8 +2313,9 @@ export class Renderer {
     c.beginPath();
     c.arc(wx, wy - 13.2 - bob, 2.2, Math.PI, 0);
     c.fill();
+    if (leisure) this.drawLeisure(a, leisure, wx, wy, bob, lh);
     // Tool animation while acting.
-    if (a.phase === 'act') {
+    if (a.phase === 'act' && !leisure) {
       const swing = Math.sin(a.step * 1.6);
       const ang = -0.6 + swing * 0.9;
       const hx = wx + a.dir * 2;
@@ -2254,6 +2352,67 @@ export class Renderer {
       c.restore();
     }
     c.globalAlpha = 1;
+  }
+
+  /** Arms and props for a villager at leisure. */
+  private drawLeisure(a: Agent, act: string, wx: number, wy: number, bob: number, h: number): void {
+    const c = this.ctx;
+    const sy = wy - 9.5 - bob;
+    c.strokeStyle = a.tunic;
+    c.lineWidth = 1.2;
+    c.lineCap = 'round';
+    if (act === 'dance') {
+      // Both arms up, waving with the music.
+      const w = Math.sin(this.time * 9 + h) * 1.2;
+      c.beginPath();
+      c.moveTo(wx - 2, sy);
+      c.lineTo(wx - 4 + w, sy - 5);
+      c.moveTo(wx + 2, sy);
+      c.lineTo(wx + 4 + w, sy - 5);
+      c.stroke();
+    } else if (act === 'pray') {
+      // Hands together before the chest.
+      c.fillStyle = '#e8c4a0';
+      c.beginPath();
+      c.arc(wx + 2.4 * a.dir, sy - 0.5, 1, 0, Math.PI * 2);
+      c.fill();
+    } else if (act === 'toast') {
+      // A mug, now and then raised high.
+      const up = Math.sin(this.time * 1.3 + h) > 0.5;
+      const mx = wx + 3.6 * a.dir;
+      const my = up ? sy - 6 : sy + 1.5;
+      c.beginPath();
+      c.moveTo(wx + 2 * a.dir, sy);
+      c.lineTo(mx, my + 1);
+      c.stroke();
+      c.fillStyle = '#8a5a2e';
+      c.fillRect(mx - 1.2, my - 1.2, 2.4, 3);
+      c.fillStyle = '#f4ecd8';
+      c.fillRect(mx - 1.3, my - 1.8, 2.6, 0.9);
+    } else if (act === 'chat') {
+      // A hand that talks, and now and then a word balloon.
+      const g = Math.sin(this.time * 3 + h);
+      c.beginPath();
+      c.moveTo(wx + 2 * a.dir, sy);
+      c.lineTo(wx + (4 + g) * a.dir, sy - 2 - g * 1.5);
+      c.stroke();
+      if (Math.sin(this.time * 0.8 + h * 0.7) > 0.55) {
+        const bx = wx + 5 * a.dir;
+        const by = wy - 21 - bob;
+        c.fillStyle = 'rgba(255,252,240,0.92)';
+        c.beginPath();
+        c.ellipse(bx, by, 4.5, 2.8, 0, 0, Math.PI * 2);
+        c.fill();
+        c.beginPath();
+        c.moveTo(bx - 1.6 * a.dir, by + 2);
+        c.lineTo(bx - 3.4 * a.dir, by + 4.4);
+        c.lineTo(bx - 0.2 * a.dir, by + 2.4);
+        c.fill();
+        c.fillStyle = '#5a4630';
+        for (let k = -1; k <= 1; k++) c.fillRect(bx + k * 1.6 - 0.4, by - 0.4, 0.8, 0.8);
+      }
+    }
+    c.lineCap = 'butt';
   }
 
   /** A merchant's covered cart pulled by a horse. */
