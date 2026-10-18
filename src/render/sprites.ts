@@ -2902,13 +2902,21 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       p.box(0.4, 1.45, 0.75, 1.55, 3, 1.5, '#8a6440');
       for (const [x, y] of [[0.42, 1.47], [0.73, 1.53]] as const) p.line([x, y, 0], [x, y, 3], BEAM, 1);
       p.line([0.38, 1.5, 5.5], [0.8, 1.5, 5.5], '#c8a46c', 3);
-      p.crate(1.0, 1.45, 0.2);
-      p.crate(1.22, 1.5, 0.18);
-      p.crate(1.06, 1.48, 0.17);
-      p.crate(1.6, 0.6, 0.2);
-      p.crate(1.65, 0.85, 0.18);
-      p.crate(1.6, 0.7, 0.16);
-      for (let i = 0; i < 3; i++) p.box(1.55, 1.1 + i * 0.01, 1.85, 1.3, i * 2, 2, i % 2 ? '#d7b47c' : '#c8a46c');
+      // Two neat stacks of crates, drawn from the back: two below, one on top.
+      const crate = (x: number, y: number, z: number) => {
+        const k = 0.2;
+        p.box(x, y, x + k, y + k, z, 7, '#a07a48');
+        p.line([x, y + k, z + 0.5], [x + k, y + k, z + 6.5], '#6e5030', 0.6);
+        p.line([x + k, y, z + 0.5], [x + k, y + k, z + 6.5], '#6e5030', 0.6);
+      };
+      crate(0.95, 1.45, 0);
+      crate(1.17, 1.45, 0);
+      crate(1.06, 1.45, 7);
+      crate(1.6, 0.55, 0);
+      crate(1.6, 0.77, 0);
+      crate(1.6, 0.66, 7);
+      // Planks waiting to be cut.
+      for (let i = 0; i < 3; i++) p.box(1.55, 1.1, 1.85, 1.3, i * 2, 2, i % 2 ? '#d7b47c' : '#c8a46c');
       break;
     }
     case 'potter': {
@@ -3010,18 +3018,25 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
         }
       }
       const crown = winter ? '#9aa894' : season === 2 ? '#c8783a' : '#4f8a3a';
-      for (const [x, y] of [[0.3, 0.3], [2.7, 1.5], [1.5, 2.75], [0.25, 1.7]] as const) {
+      const tree = (x: number, y: number) => {
         p.line([x, y, 0], [x, y, 14], '#5a3e26', 2);
-        if (winter) continue;
+        if (winter) return;
         p.circle(x + 0.05, y + 0.05, 17, 9, shade(crown, 0.8));
         p.circle(x - 0.04, y, 19, 8, crown);
         p.circle(x + 0.06, y - 0.06, 23, 5, shade(crown, 1.12));
-      }
-      for (const [x, y] of [[1.55, 1.2], [1.0, 2.05]] as const) {
+      };
+      const bench = (x: number, y: number) => {
         p.box(x, y, x + 0.3, y + 0.08, 2.5, 1.2, '#8a6236');
         p.line([x + 0.03, y + 0.07, 0], [x + 0.03, y + 0.07, 2.5], '#5e4129', 1);
         p.line([x + 0.27, y + 0.07, 0], [x + 0.27, y + 0.07, 2.5], '#5e4129', 1);
-      }
+      };
+      // Trees and benches back to front, so nearer ones cover farther ones.
+      const things: [number, number, () => void][] = [
+        ...([[0.3, 0.3], [2.7, 1.5], [1.5, 2.75], [0.25, 1.7]] as const).map(([x, y]) => [x, y, () => tree(x, y)] as [number, number, () => void]),
+        ...([[1.55, 1.2], [1.5, 1.92]] as const).map(([x, y]) => [x + 0.15, y + 0.04, () => bench(x, y)] as [number, number, () => void]),
+      ];
+      things.sort((a, b) => a[0] + a[1] - (b[0] + b[1]));
+      for (const t of things) t[2]();
       break;
     }
     case 'markethall': {
