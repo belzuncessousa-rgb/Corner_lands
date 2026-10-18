@@ -2808,7 +2808,7 @@ export function prestigeIncome(s: GameState): number {
   for (const b of s.buildings) {
     if (b.build < 1) continue;
     if (b.type === 'townhall') n += (b.level - 1) * 1.5;
-    else if (b.type === 'church') n += 1;
+    else if (b.type === 'church') n += b.level >= 2 ? 1 : 0.5;
     else if (b.type === 'cathedral') n += 6;
     else if (b.type === 'wall') walls++;
     else if (b.type === 'statue') n += 1;

@@ -1,6 +1,7 @@
-import type { GameState, ResourceId } from './types';
+import { BUILDINGS } from './data';
+import type { Building, BuildingType, GameState, ResourceId } from './types';
 import { mulberry32 } from './rng';
-import { emptyResources, makeBuilding, seedNature } from './world';
+import { emptyResources, makeBuilding, placeBuilding, seedNature } from './world';
 
 const TYPED_KEYS = [
   'terrain',
@@ -61,6 +62,15 @@ export function deserialize(json: string): GameState {
     seedNature(s, hall ? { x: hall.x, y: hall.y } : { x: s.width >> 1, y: s.height >> 1 }, mulberry32(s.seed + 404), false);
   }
   s.history ??= [];
+  // Version 2 brought wooden churches: the churches already built were stone.
+  // The manor stopped storing goods too: a town that kept its food or
+  // materials there is given a granary or a storehouse beside it.
+  if ((s.version ?? 1) < 2) {
+    const manor = s.buildings.find((b) => b.type === 'townhall' && b.build >= 1);
+    if (manor) for (const type of ['granary', 'storehouse'] as const) if (!s.buildings.some((b) => b.type === type)) giveStore(s, manor, type);
+    for (const b of s.buildings) if (b.type === 'church') b.level = Math.max(b.level, 2);
+    s.version = 2;
+  }
   if (s.exports) {
     for (const k in s.exports) {
       const id = k as ResourceId;
@@ -90,7 +100,7 @@ export function deserialize(json: string): GameState {
       }
     }
     // Workplaces are no longer expanded.
-    if (b.type !== 'house' && b.type !== 'townhall' && b.type !== 'market') {
+    if (b.type !== 'house' && b.type !== 'townhall' && b.type !== 'market' && b.type !== 'church') {
       if (b.level > 1) b.level = 1;
       if (b.upgrading && !b.craftTo) {
         b.upgrading = undefined;
@@ -121,4 +131,26 @@ export function deserialize(json: string): GameState {
   }
   s.dirty = true;
   return s;
+}
+
+/** Places a finished store of a type on clear ground near a building (for old saves). */
+function giveStore(s: GameState, near: Building, type: BuildingType): void {
+  const d = BUILDINGS[type];
+  for (let r = 1; r < 14; r++) {
+    for (let y = near.y - r - d.h; y <= near.y + near.h + r; y++) {
+      for (let x = near.x - r - d.w; x <= near.x + near.w + r; x++) {
+        let ok = x >= 1 && y >= 1 && x + d.w < s.width - 1 && y + d.h < s.height - 1;
+        for (let yy = y; ok && yy < y + d.h; yy++)
+          for (let xx = x; ok && xx < x + d.w; xx++) {
+            const i = yy * s.width + xx;
+            if (s.occ[i] >= 0 || s.terrain[i] || s.road[i] || s.rock[i] || s.ore[i]) ok = false;
+          }
+        if (!ok) continue;
+        const b = makeBuilding(s.nextId++, type, x, y);
+        b.build = 1;
+        placeBuilding(s, b);
+        return;
+      }
+    }
+  }
 }

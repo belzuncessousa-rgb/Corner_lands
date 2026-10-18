@@ -1161,7 +1161,7 @@ export class Renderer {
       this.upgradeKey = key;
       this.upgradable.clear();
       for (const o of s.buildings) {
-        if ((o.type === 'house' || o.type === 'townhall') && o.build >= 1 && !o.upgrading && !upgradeBlocker(s, o)) this.upgradable.add(o.id);
+        if ((o.type === 'house' || o.type === 'townhall' || o.type === 'church') && o.build >= 1 && !o.upgrading && !upgradeBlocker(s, o)) this.upgradable.add(o.id);
       }
     }
     return this.upgradable.has(b.id);

@@ -57,7 +57,7 @@ export function generateWorld(seed: number, opts: { relaxed?: boolean; hardy?: b
   const n = W * H;
   const rand = mulberry32(seed);
   const s: GameState = {
-    version: 1,
+    version: 2,
     seed,
     width: W,
     height: H,

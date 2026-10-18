@@ -493,6 +493,24 @@ describe('levels', () => {
     for (const t of ['manorgarden', 'watchtower', 'wall'] as const) expect(isUnlocked(s, t)).toBe(true);
   });
 
+  it('a church is raised in timber and rebuilt in stone once a Town', async () => {
+    const { buildingName, upgradePlan } = await import('../src/game/levels');
+    const s = generateWorld(18);
+    const c = placeNearRoad(s, 'church');
+    c.build = 1;
+    expect(buildingName(c)).toBe('Wooden Church');
+    const plan = upgradePlan(s, c)!;
+    expect(plan.name).toBe('Stone Church');
+    expect(plan.reqs[0].met).toBe(false);
+    s.tier = 2;
+    expect(upgradePlan(s, c)!.reqs[0].met).toBe(true);
+    // Churches in saves from before wooden churches were stone.
+    const old = JSON.parse(serialize(s));
+    old.version = 1;
+    const back = deserialize(JSON.stringify(old));
+    expect(back.buildings.find((b) => b.type === 'church')!.level).toBe(2);
+  });
+
   it('workplaces are not expanded', async () => {
     const { upgradePlan, workersOf } = await import('../src/game/levels');
     const s = generateWorld(16);

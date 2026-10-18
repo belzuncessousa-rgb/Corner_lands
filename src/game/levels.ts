@@ -41,6 +41,13 @@ export const MANOR_LEVELS: { name: string; cost?: Cost; days?: number }[] = [
   { name: 'Stone Manor', cost: { planks: 40, dressedstone: 40, stone: 20, gold: 150 }, days: 30 },
 ];
 
+/** A church is raised in timber and may be rebuilt in stone once the town is a Town. */
+export const CHURCH_LEVELS: { name: string; cost?: Cost; days?: number; tier?: number }[] = [
+  { name: '' },
+  { name: 'Wooden Church' },
+  { name: 'Stone Church', cost: { planks: 20, dressedstone: 30, stone: 20, tools: 5, gold: 80 }, days: 25, tier: 2 },
+];
+
 /** The manor's last step: once it stands, the lord may build what befits it. */
 export const STONE_MANOR = 3;
 
@@ -78,6 +85,7 @@ export function workersOf(b: Building): number {
 export function buildingName(b: Building): string {
   if (b.type === 'house') return HOUSE_LEVELS[b.level]?.name || 'Cottage';
   if (b.type === 'townhall') return MANOR_LEVELS[b.level]?.name || 'Manor Hall';
+  if (b.type === 'church') return CHURCH_LEVELS[b.level]?.name || 'Wooden Church';
   return BUILDINGS[b.type].name;
 }
 
@@ -127,6 +135,12 @@ export function upgradePlan(s: GameState, b: Building): UpgradePlan | null {
     reqs.push(...houseNeeds(s, b, b.level + 1).slice(2));
     return { to: b.level + 1, name: next.name, cost: next.cost, days: 6 + b.level * 3, reqs };
   }
+  if (b.type === 'church') {
+    const next = CHURCH_LEVELS[b.level + 1];
+    if (!next?.cost) return null;
+    const tier = next.tier ?? 0;
+    return { to: b.level + 1, name: next.name, cost: next.cost, days: next.days ?? 20, reqs: [{ label: `Settlement is a ${TIERS[tier].name}`, met: s.tier >= tier }] };
+  }
   if (b.type === 'townhall') {
     const next = MANOR_LEVELS[b.level + 1];
     if (!next?.cost) return null;
@@ -170,6 +184,7 @@ export function startUpgrade(s: GameState, b: Building): boolean {
 export function upgradeDays(b: Building): number {
   if (b.craftTo) return HOME_TRADE_DAYS;
   if (b.type === 'townhall') return MANOR_LEVELS[b.upgrading ?? 2]?.days ?? 20;
+  if (b.type === 'church') return CHURCH_LEVELS[b.upgrading ?? 2]?.days ?? 20;
   return 6 + (b.upgrading ?? 2) * 3;
 }
 
@@ -177,6 +192,7 @@ export function upgradeDays(b: Building): number {
 export function upgradeCost(b: Building): Cost {
   if (b.craftTo) return HOME_TRADE_COST;
   if (b.type === 'townhall') return MANOR_LEVELS[b.upgrading ?? 2]?.cost ?? {};
+  if (b.type === 'church') return CHURCH_LEVELS[b.upgrading ?? 2]?.cost ?? {};
   return HOUSE_LEVELS[b.upgrading ?? 2]?.cost ?? {};
 }
 

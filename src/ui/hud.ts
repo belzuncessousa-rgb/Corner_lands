@@ -22,7 +22,7 @@ import {
 } from '../game/data';
 import { commission, commissionError, COMMISSIONS, nextTitle, takeTitle, titleError, TITLES, fairCost, fairError, fairPrestige, FAIR_TIER, feastCost, feastError, FESTIVALS, festivalError, getEvent, holdFair, holdFeast, holdFestival, resolveEvent } from '../game/events';
 import { CHARTERS, CHARTER_TIER, PATHS, charterCost, charterError, grantCharter, hasCharter } from '../game/charters';
-import { HOUSE_LEVELS, MANOR_LEVELS, buildingName, houseNeeds, marketStalls, startUpgrade, upgradeBlocker, upgradePlan, workersOf } from '../game/levels';
+import { CHURCH_LEVELS, HOUSE_LEVELS, MANOR_LEVELS, buildingName, houseNeeds, marketStalls, startUpgrade, upgradeBlocker, upgradePlan, workersOf } from '../game/levels';
 import { activeQuests } from '../game/quests';
 import { StateRng } from '../game/rng';
 import {
@@ -2615,6 +2615,7 @@ function upgradeName(b: Building): string {
   if (b.craftTo) return `a ${BUILDINGS[b.craftTo].name}`;
   const to = b.upgrading ?? b.level + 1;
   if (b.type === 'house') return HOUSE_LEVELS[to]?.name ?? '';
+  if (b.type === 'church') return CHURCH_LEVELS[to]?.name ?? '';
   return MANOR_LEVELS[to]?.name ?? '';
 }
 
