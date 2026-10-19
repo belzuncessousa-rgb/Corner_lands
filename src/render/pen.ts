@@ -35,7 +35,7 @@ export function mix(a: string, b: string, t: number): string {
 }
 
 import { mulberry32 } from '../game/rng';
-import { HERALDRY, paintArms } from './heraldry';
+import { HERALDRY, flagOutline, paintArms } from './heraldry';
 
 export type RoofKind = 'thatch' | 'shingle' | 'slate' | 'tile' | 'plank';
 
@@ -769,11 +769,8 @@ export class Pen {
     const c = this.ctx;
     c.save();
     c.beginPath();
-    c.moveTo(sx, sy);
-    c.quadraticCurveTo(sx + 8, sy + 1, sx + 15, sy + 3);
-    c.lineTo(sx + 14, sy + 10);
-    c.quadraticCurveTo(sx + 7, sy + 8, sx, sy + 9);
-    c.closePath();
+    // The cloth droops a little towards the fly, cut to the arms' chosen shape.
+    flagOutline(c, HERALDRY.current.shape, sx, sy, 15, 8.8, (t) => t * 3 - Math.sin(t * Math.PI) * 1.2);
     c.clip();
     // Skewed a little, as the cloth hangs.
     c.transform(1, 3 / 15, 0, 1, 0, -(sx * 3) / 15);

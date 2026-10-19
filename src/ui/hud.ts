@@ -1,8 +1,8 @@
 import { NEWS } from './news';
 import { drawTapestry } from './tapestry';
 import { TUTORIAL_SEED } from './tutorial';
-import { CHARGES, DEFAULT_HERALDRY, DIVISIONS, type Heraldry, TINCTURES, paintArms } from '../render/heraldry';
-import { CLOTHS, DEFAULT_LORD, GARMENTS, HAIRS, HAIR_STYLES, HATS, type LordLook, SKINS, lordPortrait } from '../render/lord';
+import { CHARGES, DEFAULT_HERALDRY, DIVISIONS, FLAG_SHAPES, type Heraldry, TINCTURES, flagOutline, paintArms } from '../render/heraldry';
+import { BEARDS, CLOTHS, DEFAULT_LORD, FIXED_HATS, GARMENTS, HAIRS, HAIR_STYLES, HATS, HELD, type LordLook, SKINS, TRIMS, lordPortrait } from '../render/lord';
 import { placeName, townName, weeklySeed } from '../game/names';
 import { deleteSave, listSaves, type SaveInfo } from '../api';
 import {
@@ -2130,10 +2130,7 @@ export class Hud {
     const wave = (t: number) => Math.sin(t * Math.PI * 2) * fh * 0.05;
     c.save();
     c.beginPath();
-    c.moveTo(fx, fy);
-    for (let t = 0; t <= 1.001; t += 0.05) c.lineTo(fx + fw * t, fy + wave(t) * t);
-    for (let t = 1; t >= -0.001; t -= 0.05) c.lineTo(fx + fw * t, fy + fh + wave(t) * t);
-    c.closePath();
+    flagOutline(c, arms.shape, fx, fy, fw, fh, (t) => wave(t) * t);
     c.clip();
     paintArms(c, arms, fx, fy, fw, fh);
     // Folds of the cloth.
@@ -2152,39 +2149,50 @@ export class Hud {
    */
   showLord(after?: () => void): void {
     const s = this.game.state;
-    const look: LordLook = { ...(after ? this.draftLord : (s.lord ?? this.draftLord)) };
-    const arms: Heraldry = { ...(after ? this.draftArms : (s.heraldry ?? this.draftArms)) };
+    const look: LordLook = { ...DEFAULT_LORD, ...(after ? this.draftLord : (s.lord ?? this.draftLord)) };
+    const arms: Heraldry = { ...DEFAULT_HERALDRY, ...(after ? this.draftArms : (s.heraldry ?? this.draftArms)) };
+    let tab: 'lord' | 'arms' = 'lord';
     const m = this.openModal(
       `<h2>Your Lord</h2>
-      <div class="lord-edit">
-        <div class="lord-previews"><div class="lord-portrait"></div><div class="lord-flag"></div></div>
-        <div class="lord-opts"></div>
-      </div>
-      <div class="row" style="justify-content:flex-end">
-        <button data-m="dice" data-tip="A look and arms at random">🎲 Surprise me</button>
+      <div class="lord-stage"><div class="lord-portrait"></div><div class="lord-flag"></div></div>
+      <div class="lord-tabs"><button data-tab="lord">The Lord</button><button data-tab="arms">The Arms</button></div>
+      <div class="lord-opts"></div>
+      <div class="lord-foot">
+        <button data-m="dice" data-tip="A look and arms at random">Surprise me</button>
         <button class="primary" data-m="done">Done</button>
       </div>`,
       !after,
     );
-    m.querySelector('.modal')!.classList.add('wide');
+    m.querySelector('.modal')!.classList.add('lord-modal');
     const opts = m.querySelector('.lord-opts') as HTMLElement;
-    const swatches = (k: string, list: string[], cur: string) =>
+    const swatches = (k: string, list: string[], cur: string | undefined) =>
       `<div class="swatches">${list.map((col) => `<button class="swatch ${col === cur ? 'on' : ''}" style="background:${col}" data-k="${k}" data-v="${col}" aria-label="${col}"></button>`).join('')}</div>`;
-    const choices = (k: string, list: { id: string; name: string }[], cur: string) =>
+    const choices = (k: string, list: { id: string; name: string }[], cur: string | undefined) =>
       `<div class="choices">${list.map((o) => `<button class="${o.id === cur ? 'on' : ''}" data-k="${k}" data-v="${o.id}">${o.name}</button>`).join('')}</div>`;
+    const row = (label: string, body: string) => `<div class="lord-row"><label>${label}</label><div>${body}</div></div>`;
     const draw = () => {
-      m.querySelector('.lord-portrait')!.replaceChildren(lordPortrait(look, 150, look.garment === 'tunic' ? arms : undefined));
-      m.querySelector('.lord-flag')!.replaceChildren(this.flagCanvas(arms, 150, 150));
-      opts.innerHTML = `
-        <div class="sub">The lord</div>
-        <div class="lord-row"><label>Clothes</label>${choices('garment', GARMENTS, look.garment)}${swatches('cloth', CLOTHS, look.cloth)}</div>
-        <div class="lord-row"><label>Skin</label>${swatches('skin', SKINS, look.skin)}</div>
-        <div class="lord-row"><label>Hair</label>${choices('hairStyle', HAIR_STYLES, look.hairStyle)}${swatches('hair', HAIRS, look.hair)}</div>
-        <div class="lord-row"><label>Hat</label>${choices('hat', HATS, look.hat)}${look.hat !== 'none' && look.hat !== 'coronet' ? swatches('hatColor', CLOTHS, look.hatColor) : ''}</div>
-        <div class="sub">The arms <small>(flown on the manor)</small></div>
-        <div class="lord-row"><label>Field</label>${swatches('a.field', TINCTURES, arms.field)}</div>
-        <div class="lord-row"><label>Division</label>${choices('a.division', DIVISIONS, arms.division)}${arms.division !== 'plain' ? swatches('a.second', TINCTURES, arms.second) : ''}</div>
-        <div class="lord-row"><label>Charge</label>${choices('a.charge', CHARGES, arms.charge)}${arms.charge !== 'none' ? swatches('a.chargeColor', TINCTURES, arms.chargeColor) : ''}</div>`;
+      m.querySelector('.lord-portrait')!.replaceChildren(lordPortrait(look, 190, arms));
+      m.querySelector('.lord-flag')!.replaceChildren(this.flagCanvas(arms, 190, 190));
+      m.querySelectorAll<HTMLElement>('.lord-tabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
+      opts.innerHTML =
+        tab === 'lord'
+          ? [
+              row('Clothes', choices('garment', GARMENTS, look.garment) + swatches('cloth', CLOTHS, look.cloth)),
+              row('Trim', swatches('trim', TRIMS, look.trim)),
+              row('Cloak', choices('cloak', [{ id: '', name: 'None' }], look.cloak ? 'x' : '') + swatches('cloak', CLOTHS, look.cloak)),
+              row('Skin', swatches('skin', SKINS, look.skin)),
+              row('Hair', choices('hairStyle', HAIR_STYLES, look.hairStyle) + swatches('hair', HAIRS, look.hair)),
+              row('Beard', choices('beard', BEARDS, look.beard)),
+              row('Hat', choices('hat', HATS, look.hat) + (FIXED_HATS.includes(look.hat) ? '' : swatches('hatColor', CLOTHS, look.hatColor))),
+              row('Holding', choices('held', HELD, look.held)),
+            ].join('')
+          : [
+              `<div class="sub">Flown on the manor, and on the lord's banner</div>`,
+              row('Flag', choices('a.shape', FLAG_SHAPES, arms.shape)),
+              row('Field', swatches('a.field', TINCTURES, arms.field)),
+              row('Division', choices('a.division', DIVISIONS, arms.division) + (arms.division !== 'plain' ? swatches('a.second', TINCTURES, arms.second) : '')),
+              row('Charge', choices('a.charge', CHARGES, arms.charge) + (arms.charge !== 'none' ? swatches('a.chargeColor', TINCTURES, arms.chargeColor) : '')),
+            ].join('');
     };
     const apply = () => {
       this.draftLord = { ...look };
@@ -2199,6 +2207,12 @@ export class Hud {
         s.heraldry = { ...arms };
       }
     };
+    m.querySelector('.lord-tabs')!.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest('[data-tab]') as HTMLElement | null;
+      if (!b) return;
+      tab = b.dataset.tab as 'lord' | 'arms';
+      draw();
+    });
     opts.addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest('[data-k]') as HTMLElement | null;
       if (!b) return;
@@ -2215,15 +2229,20 @@ export class Hud {
       const pick = <T,>(l: readonly T[]) => l[Math.floor(Math.random() * l.length)];
       look.garment = pick(GARMENTS).id;
       look.cloth = pick(CLOTHS);
+      look.trim = pick(TRIMS);
+      look.cloak = Math.random() < 0.4 ? pick(CLOTHS.filter((c) => c !== look.cloth)) : '';
       look.skin = pick(SKINS);
       look.hairStyle = pick(HAIR_STYLES).id;
       look.hair = pick(HAIRS);
+      look.beard = Math.random() < 0.5 ? 'none' : pick(BEARDS).id;
       look.hat = pick(HATS).id;
       look.hatColor = pick(CLOTHS);
+      look.held = pick(HELD).id;
+      arms.shape = pick(FLAG_SHAPES).id;
       arms.field = pick(TINCTURES);
       arms.second = pick(TINCTURES.filter((t) => t !== arms.field));
       arms.division = pick(DIVISIONS).id;
-      arms.charge = pick(CHARGES).id;
+      arms.charge = pick(CHARGES.filter((c) => c.id !== 'none')).id;
       arms.chargeColor = pick(TINCTURES.filter((t) => t !== arms.field && (arms.division === 'plain' || t !== arms.second)));
       draw();
       apply();
