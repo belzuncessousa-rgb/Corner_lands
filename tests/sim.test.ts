@@ -1923,3 +1923,23 @@ describe('events audit', () => {
     for (let i = 1; i < seen.length; i++) expect(seen.slice(Math.max(0, i - 3), i)).not.toContain(seen[i]);
   });
 });
+
+describe('workshop inputs', () => {
+  it('a sawpit that ran dry is back to work the day timber is in store again', async () => {
+    const { dailyProduction } = await import('../src/game/sim');
+    const { StateRng } = await import('../src/game/rng');
+    const s = generateWorld(81);
+    const pit = placeNearRoad(s, 'sawmill');
+    pit.build = 1;
+    pit.need = undefined;
+    recompute(s);
+    // Out of timber for a while: it is flagged short and its workers go.
+    pit.blocked = 1;
+    pit.status = 'Waiting for timber';
+    pit.workers = 0;
+    s.res.wood = 200;
+    dailyProduction(s, new StateRng(s));
+    expect(pit.blocked).toBe(0);
+    expect(pit.status).toBe('Back to work');
+  });
+});

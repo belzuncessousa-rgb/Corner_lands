@@ -180,6 +180,8 @@ export interface Building {
   trip?: number;
   /** Distance to the last resource tile gathered from. */
   resDist?: number;
+  /** Days in a row a workshop has gone without its inputs. */
+  short?: number;
   /** Timber a site felled on the spot rather than took from the stores. */
   felled?: number;
   /** Production speed relative to an ideal site, 0..1 (travel overhead). */

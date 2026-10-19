@@ -2662,7 +2662,16 @@ export function dailyProduction(s: GameState, rng: StateRng): void {
       continue;
     }
     if (b.workers === 0) {
-      // Keep a blocked status so the job queue does not flip-flop daily;
+      // A workshop waiting for its inputs looks in the stores every day: as
+      // soon as they are there again it is back on the job list.
+      if (isBlocked(b) && b.status.startsWith('Waiting for') && inputsReady(s, b)) {
+        b.blocked = 0;
+        b.lack = undefined;
+        b.short = 0;
+        b.status = 'Back to work';
+        continue;
+      }
+      // Otherwise keep a blocked status so the job queue does not flip-flop daily;
       // blocked buildings are retried at the start of each month.
       if (!isBlocked(b)) b.status = 'No workers available';
       continue;
@@ -2693,10 +2702,32 @@ export function dailyProduction(s: GameState, rng: StateRng): void {
         !!status?.startsWith('Batch done') ||
         !!status?.startsWith('Enough');
       b.blocked = status ? (idle ? BLOCK_SEASONAL : BLOCK_PROBLEM) : 0;
+      // A day or two without inputs is no shortage: the workers wait for the
+      // next load rather than leave, and only a lasting want is flagged.
+      if (status?.startsWith('Waiting for')) {
+        b.short = (b.short ?? 0) + 1;
+        if (b.short < SHORT_DAYS) {
+          b.blocked = 0;
+          b.lack = undefined;
+          status = 'Waiting for the next load';
+        }
+      } else b.short = 0;
       if (status === 'Storage full' && b.hauled && yardTotal(b) > 0) status = 'Yard full: waiting for haulers';
     }
     if (status || !b.blocked) b.status = status ?? 'Working';
   }
+}
+
+/** Days a workshop waits for its inputs before it counts as short of them. */
+const SHORT_DAYS = 3;
+
+/** Whether a workshop's inputs (for its current product) are in store, above the firewood reserve. */
+export function inputsReady(s: GameState, b: Building): boolean {
+  const d = workDef(b);
+  const inputs = d.recipes ? chooseRecipe(s, b)?.inputs : d.inputs;
+  if (!inputs) return false;
+  if ((inputs.wood ?? 0) > 0 && s.res.wood - (inputs.wood ?? 0) < WOOD_RESERVE) return false;
+  return canAfford(s, inputs);
 }
 
 // ---------------------------------------------------------------- construction
