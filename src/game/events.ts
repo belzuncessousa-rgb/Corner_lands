@@ -1344,12 +1344,22 @@ const RECENT_EVENTS = 3;
 /** ...nor within this many days of itself. */
 const EVENT_COOLDOWN = Math.round(DAYS_PER_YEAR * 1.5);
 
+/** For towns saved before events were remembered: the tales the chronicle tells of. */
+function pastEvents(s: GameState): { id: string; day: number }[] {
+  const out: { id: string; day: number }[] = [];
+  for (const m of s.messages) {
+    const e = EVENTS.find((e) => m.text.startsWith(`${e.title}: `));
+    if (e) out.push({ id: e.id, day: m.day });
+  }
+  return out.slice(-12);
+}
+
 export function rollEvent(s: GameState, rng: StateRng, month: number): string | null {
   if (s.pendingEvent) return null;
   s.nextEventDay ??= Math.round(DAYS_PER_YEAR * 0.4) + rng.int(GAP_MAX - GAP_MIN);
   if (s.day < s.nextEventDay) return null;
   // No tale twice in a row: an event waits out the next few others, and a year and a half.
-  const recent = s.recentEvents ?? [];
+  const recent = s.recentEvents ?? pastEvents(s);
   const fresh = (id: string) => !recent.slice(-RECENT_EVENTS).some((r) => r.id === id) && !recent.some((r) => r.id === id && s.day - r.day < EVENT_COOLDOWN);
   let options = EVENTS.map((e) => ({ e, w: fresh(e.id) ? e.weight(s, month) : 0 })).filter((o) => o.w > 0);
   // Should nothing fresh fit, any but the last one will do.

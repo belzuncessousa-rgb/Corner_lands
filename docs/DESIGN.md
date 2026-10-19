@@ -393,7 +393,7 @@ art, the logic and balance get this pass. Grouped by how deep each change goes.
 ### For the visual refinement phase (later)
 
 On hold until the player has played the October changes (Phases 34–38) and given feedback on logic and balance: the player asked not to commit to more art before that.
-- [ ] Construction stages as different structures (scaffold, frame, walls, roof) instead of revealing the building
-- [ ] Stone roads look like gravel; a third, dressed-stone cobbled street
-- [ ] Fields worked and filling up progressively, and each crop easy to tell apart
-- [ ] Liked: children playing, people with dogs, fishers' boats
+- [x] Construction stages as different structures (scaffold, frame, walls, roof) instead of revealing the building
+- [x] Stone roads look like gravel; a third, dressed-stone cobbled street
+- [x] Fields worked and filling up progressively, and each crop easy to tell apart
+- [x] Liked: children playing, people with dogs, fishers' boats

@@ -1922,6 +1922,28 @@ describe('events audit', () => {
     expect(seen.length).toBeGreaterThan(20);
     for (let i = 1; i < seen.length; i++) expect(seen.slice(Math.max(0, i - 3), i)).not.toContain(seen[i]);
   });
+
+  it('an old save without remembered events reads the last ones from the chronicle', async () => {
+    const { rollEvent, autoResolve } = await import('../src/game/events');
+    const { StateRng } = await import('../src/game/rng');
+    const s = generateWorld(72);
+    s.population = 60;
+    s.tier = 2;
+    const rng = new StateRng(s);
+    s.nextEventDay = s.day;
+    const first = rollEvent(s, rng, 4);
+    expect(first).toBeTruthy();
+    autoResolve(s, rng);
+    for (let k = 0; k < 20; k++) {
+      s.recentEvents = undefined;
+      s.pendingEvent = undefined;
+      s.day += 30;
+      s.nextEventDay = s.day;
+      expect(rollEvent(s, rng, 4)).not.toBe(first);
+      s.recentEvents = undefined;
+      s.pendingEvent = undefined;
+    }
+  });
 });
 
 describe('workshop inputs', () => {
