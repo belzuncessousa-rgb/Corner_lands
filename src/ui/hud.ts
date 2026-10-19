@@ -75,6 +75,8 @@ import {
   bCenter,
   coveredBy,
   PAVING_TIER,
+  PAVING_COST,
+  COBBLE_COST,
   COBBLE_TIER,
   setWorkers,
   setPriority,
@@ -329,6 +331,7 @@ export class Hud {
     const s = g.state;
     const cats = Object.keys(CATEGORY_NAMES) as Category[];
     const tool = g.tool;
+    const roading = tool.kind === 'road' && !tool.wall;
     const tabs = cats
       .map(
         (c) =>
@@ -336,13 +339,28 @@ export class Hud {
       )
       .join('');
     const tools = `<span class="divider"></span>
-      <button data-action="road" class="tab ${tool.kind === 'road' && !tool.paved && !tool.cobbled && !tool.wall ? 'active' : ''}" data-tip="<b>Road</b> (R)<br>Click to start, click again to lay it. Roads speed up walking; buildings work without them.">${ICONS.road}<span>Road</span></button>
-      ${this.game.state.tier >= PAVING_TIER ? `<button data-action="road" data-paved="1" class="tab ${tool.kind === 'road' && tool.paved ? 'active' : ''}" data-tip="<b>Stone road</b> (T)<br>Gravel and broken stone: villagers walk a third faster than on dirt. 2 stone per tile; lay it over a dirt road to pave it.">${ICONS.paved}<span>Stone</span></button>` : ''}
-      ${this.game.state.tier >= COBBLE_TIER ? `<button data-action="road" data-cobbled="1" class="tab ${tool.kind === 'road' && tool.cobbled ? 'active' : ''}" data-tip="<b>Cobbled street</b> (Y)<br>Setts of dressed stone, the quickest going in town. 1 dressed stone per tile; lay it over a road to cobble it.">${ICONS.paved}<span>Cobbles</span></button>` : ''}
+      <button data-action="road" class="tab name-tip ${roading ? 'active' : ''}" data-tip="<b>Roads</b> (R)<br>Dirt by default; stone roads and cobbled streets are chosen above once the road tool is out.">${ICONS.road}<span>Road</span></button>
       <button data-action="grove" class="tab ${tool.kind === 'grove' ? 'active' : ''}" data-tip="<b>Protect woods</b> (P)<br>Mark a wood the woodcutters must leave standing: click one corner, then the other. Click twice inside one to lift it.">${ICONS.grove}<span>Protect</span></button>
       <button data-action="demolish" class="tab ${tool.kind === 'demolish' ? 'active' : ''}" data-tip="<b>Demolish</b> (X)<br>Remove buildings or roads. Finished buildings return half their cost.">${ICONS.demolish}<span>Demolish</span></button>`;
     let cards = '';
-    if (this.category) {
+    if (roading) {
+      // The road tool is out: choose the kind of road above the bar, dirt by default.
+      const kinds = [
+        { paved: false, cobbled: false, key: 'R', name: 'Dirt road', icon: ICONS.road, cost: 'Free', tip: 'Trodden earth. Click to start, click again to lay it. Roads speed up walking; buildings work without them.', open: true },
+        { paved: true, cobbled: false, key: 'T', name: 'Stone road', icon: ICONS.paved, cost: costHtml(PAVING_COST, s.res), tip: 'Gravel and broken stone: villagers walk a third faster than on dirt. 2 stone per tile; lay it over a dirt road to pave it.', open: s.tier >= PAVING_TIER },
+        { paved: false, cobbled: true, key: 'Y', name: 'Cobbled street', icon: ICONS.cobbles, cost: costHtml(COBBLE_COST, s.res), tip: 'Setts of dressed stone, the quickest going in town. 1 dressed stone per tile; lay it over a road to cobble it.', open: s.tier >= COBBLE_TIER },
+      ];
+      cards = kinds
+        .filter((k) => k.open)
+        .map((k) => {
+          const sel = tool.kind === 'road' && !!tool.paved === k.paved && !!tool.cobbled === k.cobbled;
+          return `<div class="card icon-card road-card ${sel ? 'sel' : ''}" data-action="road-kind" ${k.paved ? 'data-paved="1"' : ''} ${k.cobbled ? 'data-cobbled="1"' : ''} data-tip="${esc(`<b>${k.name}</b> (${k.key})<br>${k.tip}`)}">
+            <span class="key">${k.key}</span><span class="bicon">${k.icon}</span>
+            <div class="name">${k.name}</div><div class="cost">${k.cost}${k.paved || k.cobbled ? ' <small>a tile</small>' : ''}</div>
+          </div>`;
+        })
+        .join('');
+    } else if (this.category) {
       // Buildings not yet open to the town stay out of the menu until they are.
       cards = BUILD_ORDER.filter((t) => BUILDINGS[t].category === this.category && isUnlocked(s, t))
         .map((t) => {
@@ -359,7 +377,7 @@ export class Hud {
         .join('');
       if (!cards) cards = `<div class="cards-empty">Nothing here yet: more opens up as the town grows.</div>`;
     }
-    this.el.buildbar.classList.toggle('open', !!this.category);
+    this.el.buildbar.classList.toggle('open', !!cards);
     this.el.buildbar.innerHTML = `${cards ? `<div class="cards">${cards}</div>` : ''}<div class="tabs">${tabs}${tools}</div>`;
     this.buildBarKey = this.buildBarState();
   }
@@ -1555,14 +1573,14 @@ export class Hud {
       case 'build':
         this.pickBuilding(t.dataset.type as BuildingType);
         break;
-      case 'road': {
+      case 'road':
+        // One button for every road: it puts the road tool away, or takes it out laying dirt.
         this.category = null;
-        const paved = !!t.dataset.paved;
-        const cobbled = !!t.dataset.cobbled;
-        const same = g.tool.kind === 'road' && !g.tool.wall && !!g.tool.paved === paved && !!g.tool.cobbled === cobbled;
-        g.setTool(same ? { kind: 'select' } : { kind: 'road', paved, cobbled });
+        g.setTool(g.tool.kind === 'road' && !g.tool.wall ? { kind: 'select' } : { kind: 'road' });
         break;
-      }
+      case 'road-kind':
+        g.setTool({ kind: 'road', paved: !!t.dataset.paved, cobbled: !!t.dataset.cobbled });
+        break;
       case 'grove':
         this.category = null;
         g.setTool(g.tool.kind === 'grove' ? { kind: 'select' } : { kind: 'grove' });
@@ -1836,7 +1854,7 @@ export class Hud {
       Object.entries(c)
         .map(([k, v]) => `<span class="pg" data-tip="${GOODS[k as ResourceId].name}">${ICONS[k as ResourceId] ?? ''}${v}</span>`)
         .join('');
-    const cats: Category[] = ['resources', 'farming', 'food', 'industry', 'civic', 'works'];
+    const cats: Category[] = ['resources', 'farming', 'food', 'industry', 'civic', 'manor', 'works'];
     const sections = cats
       .map((cat) => {
         const rows = BUILD_ORDER.filter((t) => BUILDINGS[t].category === cat && (BUILDINGS[t].workers > 0 || BUILDINGS[t].zone))
@@ -2592,7 +2610,7 @@ export class Hud {
         <p><b>Gatherers</b> walk to the nearest trees, rocks, berries, game or fish, so place them close. Goods pile up in each workplace's yard until haulers from a Storehouse or Granary fetch them.</p>
         <p><b>Fields, pastures and orchards</b> (Farming) are drawn: click one corner, then the opposite one, near a Farmstead, Animal Farm or Orchard Keeper's Lodge. Choose each field's crop in the panel, and build a Silo to keep the grain; animals are bought at the Animal Farm once you have a Trading Post, and share its pasture room.</p>
         <p><b>Trading Post:</b> merchants come here to buy your surplus, and coins buy what you lack.</p>
-        <p><b>Roads</b> are optional but villagers walk faster on them, faster on stone roads (T), and fastest on cobbled streets of dressed stone (Y) once you are a Town. Click to start, click again to plan it, keep clicking to continue; the road is laid a few tiles each day.</p>
+        <p><b>Roads</b> are optional but villagers walk faster on them. The Road button lays dirt; above the bar you can switch to stone roads (T), faster, or cobbled streets of dressed stone (Y), the fastest. Click to start, click again to plan it, keep clicking to continue; the road is laid a few tiles each day.</p>
         <p><b>The top bar</b> shows happiness, villagers, food, materials, goods and the treasury. Hover a chip for the details, click to pin it: set how much of each good to keep, or stop making a good altogether. Workers rest when their goods reach the target.</p>
         <p><b>Trade</b> goes through a Trading Post or Dock: select it and add orders to import a good up to a target or export it down to one. The merchants work through the orders from the top each month, as far as their carts allow; drag orders to change which come first.</p>
         <p><b>Workers:</b> select a workplace to choose how many villagers work there, its priority and its product. Seasonal work frees hands in the off season. Hover the villagers chip to see who is idle and where hands are short.</p>

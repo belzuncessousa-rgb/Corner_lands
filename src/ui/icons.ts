@@ -3,7 +3,7 @@ import type { ResourceId } from '../game/types';
 const svg = (body: string) =>
   `<svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">${body}</svg>`;
 
-export const ICONS: Record<ResourceId | 'people' | 'happy' | 'materials' | 'goods' | 'storage' | 'granary' | 'road' | 'paved' | 'demolish' | 'grove' | 'cal', string> = {
+export const ICONS: Record<ResourceId | 'people' | 'happy' | 'materials' | 'goods' | 'storage' | 'granary' | 'road' | 'paved' | 'cobbles' | 'demolish' | 'grove' | 'cal', string> = {
   wood: svg(
     '<rect x="2" y="7" width="15" height="6" rx="3" fill="#7a5230"/><ellipse cx="16" cy="10" rx="2.4" ry="3" fill="#d8b47c"/><ellipse cx="16" cy="10" rx="1" ry="1.3" fill="#9a7346"/><path d="M4 9h8M5 11h7" stroke="#5a3a20" stroke-width=".8"/>',
   ),
@@ -109,6 +109,7 @@ export const ICONS: Record<ResourceId | 'people' | 'happy' | 'materials' | 'good
   paved: svg(
     '<path d="M5 18L8 2h4l3 16z" fill="#8a8274"/><g fill="#c2bbad"><ellipse cx="9" cy="5" rx="1.3" ry=".8"/><ellipse cx="11.2" cy="5.2" rx="1" ry=".8"/><ellipse cx="8.4" cy="9" rx="1.4" ry=".9"/><ellipse cx="11.4" cy="9" rx="1.4" ry=".9"/><ellipse cx="7.6" cy="14" rx="1.6" ry="1"/><ellipse cx="10.2" cy="14.2" rx="1.4" ry="1"/><ellipse cx="12.8" cy="14" rx="1.5" ry="1"/></g>',
   ),
+  cobbles: svg('<path d="M5 18L8 2h4l3 16z" fill="#6e6a62"/><g fill="#b8b0a0"><path d="M8.2 3h1.6v1.4h-1.6z"/><path d="M10.2 3h1.6v1.4h-1.6z"/><path d="M7.8 5.6h1.9v1.6h-1.9z"/><path d="M10.3 5.6h1.9v1.6h-1.9z"/><path d="M7.2 8.6h2.2v1.8h-2.2z"/><path d="M9.8 8.6h2.2v1.8h-2.2z"/><path d="M6.6 12h2.4v2h-2.4z"/><path d="M9.2 12h2.4v2h-2.4z"/><path d="M11.8 12h1.7v2h-1.7z"/><path d="M5.9 15.6h2.6v2h-2.6z"/><path d="M8.8 15.6h2.6v2h-2.6z"/><path d="M11.7 15.6h2.4v2h-2.4z"/></g>'),
   road: svg('<path d="M6 18L9 2h2l3 16z" fill="#a88a5c"/><path d="M10 4v2M10 9v2M10 14v2" stroke="#e8d8b0" stroke-width="1"/>'),
   demolish: svg(
     '<path d="M4 16l8-8" stroke="#7a5230" stroke-width="2.2" stroke-linecap="round"/><path d="M10 4l6 6-3 1-4-4z" fill="#8a8e94"/><path d="M13 14l3 3M15 13l2 1M12 16l1 2" stroke="#c84a2a" stroke-width="1.2" stroke-linecap="round"/>',
@@ -135,6 +136,7 @@ export const CATEGORY_ICONS: Record<string, string> = {
   industry: svg('<path d="M3 12h11l2-3H6z" fill="#5d6068"/><path d="M6 12h6v2H6z" fill="#4a4d52"/><path d="M5 14h8l1 3H4z" fill="#6d7078"/><path d="M14 4l3 3-6 6-3-3z" fill="#8a6236"/>'),
   civic: svg('<path d="M4 17V8h12v9" fill="#b0a898" stroke="#6d6558"/><path d="M3 8l7-5 7 5z" fill="#5d6670"/><path d="M10 1v4" stroke="#d8b84a" stroke-width="1.2"/><rect x="8.5" y="12" width="3" height="5" fill="#4a2f1b"/>'),
   decor: svg('<path d="M10 18v-7" stroke="#3f7a35" stroke-width="1.4"/><circle cx="10" cy="7" r="2" fill="#f2d34a"/><g fill="#e84a6a"><circle cx="10" cy="4" r="2"/><circle cx="13" cy="7" r="2"/><circle cx="10" cy="10" r="2"/><circle cx="7" cy="7" r="2"/></g><circle cx="10" cy="7" r="1.6" fill="#f2d34a"/><path d="M10 15c-3 0-4-2-4-3 2 0 4 1 4 3z" fill="#5d9a3a"/>'),
+  manor: svg('<path d="M3 18v-8h14v8z" fill="#eadcbf" stroke="#5b3a22" stroke-width=".8"/><path d="M2 10.5L10 6l8 4.5z" fill="#a8483a" stroke="#5b3a22" stroke-width=".7"/><rect x="8.6" y="13" width="2.8" height="5" fill="#5b3a22"/><path d="M6 13h1.6M12.4 13H14" stroke="#5b3a22" stroke-width="1.2"/><path d="M6.5 4.6L7.3 1.5l1.6 1.8L10 1l1.1 2.3 1.6-1.8.8 3.1z" fill="#e8b83a" stroke="#8a6a1a" stroke-width=".5"/>'),
   works: svg('<path d="M4 18V7h3v2h2V7h2v2h2V7h3v11z" fill="#b0a898" stroke="#6d6558" stroke-width=".8"/><path d="M8.5 18v-4a1.5 1.5 0 013 0v4z" fill="#4a2f1b"/><path d="M10 7V2" stroke="#6d6558" stroke-width=".9"/><path d="M10 2l4 1.3-4 1.3z" fill="#c8483a"/><path d="M6 11h1.2M12.8 11H14" stroke="#6d6558" stroke-width="1.1"/>'),
   scroll: svg('<rect x="4" y="3" width="12" height="14" rx="1.5" fill="#f1e4c3" stroke="#6b4a2b"/><path d="M7 7h6M7 10h6M7 13h4" stroke="#6b4a2b" stroke-width="1.1"/>'),
   menu: svg('<path d="M4 6h12M4 10h12M4 14h12" stroke="#3b2a1a" stroke-width="2" stroke-linecap="round"/>'),

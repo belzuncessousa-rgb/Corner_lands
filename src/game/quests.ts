@@ -233,7 +233,7 @@ export const QUESTS: Quest[] = [
   {
     id: 'walls',
     title: 'Raise the town walls',
-    hint: 'A City may wall itself in (Great Works menu: Town Wall): lay it like a road, section by section. Where it crosses a road a gate tower rises. Forty sections keep wolves and bandits out.',
+    hint: 'A City may wall itself in (Manor menu: Town Wall): lay it like a road, section by section. Where it crosses a road a gate tower rises. Forty sections keep wolves and bandits out.',
     reward: { prestige: 40 },
     done: (s) => count(s, 'wall') >= 40,
   },

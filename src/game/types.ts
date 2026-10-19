@@ -132,7 +132,7 @@ export type BuildingType =
   | 'flowerbed'
   | 'fountain';
 
-export type Category = 'housing' | 'resources' | 'farming' | 'food' | 'industry' | 'civic' | 'works' | 'decor';
+export type Category = 'housing' | 'resources' | 'farming' | 'food' | 'industry' | 'civic' | 'manor' | 'works' | 'decor';
 
 export type Season = 0 | 1 | 2 | 3; // spring, summer, autumn, winter
 

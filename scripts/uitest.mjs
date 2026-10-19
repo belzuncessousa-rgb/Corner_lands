@@ -104,6 +104,15 @@ await clickTile(hall.x + 1, hall.y + 3);
 await clickTile(hall.x + 4, hall.y + 3);
 check('pave a road with T (planned, then laid)', (await page.evaluate(() => { const s = window.game.state; return s.road.filter((v) => v === 2).length + (s.roadPlan ?? []).filter((c) => (c & 3) === 2).length; })) >= 3);
 await page.keyboard.press('Escape');
+// One Road button: dirt by default, the other kinds chosen from the cards it shows.
+await page.evaluate(() => window.game.setTool({ kind: 'select' }));
+await page.click('#buildbar [data-action="road"]');
+const dirt = await page.evaluate(() => { const t = window.game.tool; return t.kind === 'road' && !t.paved && !t.cobbled && document.querySelectorAll('#buildbar .road-card').length; });
+await page.click('#buildbar .road-card[data-cobbled="1"]');
+const cob = await page.evaluate(() => window.game.tool.cobbled === true && !!document.querySelector('#buildbar .road-card.sel[data-cobbled="1"]'));
+check('road button lays dirt, cards offer stone and cobbles', dirt === 3 && cob, JSON.stringify([dirt, cob]));
+await page.click('#buildbar [data-action="road"]');
+check('road button puts the road tool away', (await page.evaluate(() => window.game.tool.kind)) === 'select');
 // Animal farm and a pasture; switch to cattle.
 await page.evaluate(() => { const s = window.game.state; s.tier = 2; s.res.prestige = 200; s.res.wood = 300; s.res.gold = 800; s.population = 30; });
 await pick('farming', 'byre');
@@ -244,11 +253,11 @@ await page.keyboard.press('v');
 const reach = await page.evaluate(() => window.game.coverage);
 await page.keyboard.press('Escape');
 check('reach overlay toggles', reach === 'well' && (await page.evaluate(() => window.game.coverage)) === null);
-// Town walls (once the manor is a Stone Manor): laid like a road from the Great Works menu.
+// Town walls (once the manor is a Stone Manor): laid like a road from the Manor menu.
 {
   await page.evaluate(() => { const s = window.game.state; s.tier = 4; const m = s.buildings.find((b) => b.type === 'townhall'); m.build = 1; m.level = 3; s.res.stone += 200; s.res.dressedstone += 100; s.res.gold += 500; window.game.hud.update(); });
   await page.evaluate(() => document.querySelectorAll('.banner').forEach((e) => e.remove()));
-  await pick('works', 'wall');
+  await pick('manor', 'wall');
   const wy = hall.y - 6;
   await page.evaluate(([x, y]) => window.game.renderer.centerOn(x, y), [hall.x + 2, wy]);
   await clickTile(hall.x - 2, wy);

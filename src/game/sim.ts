@@ -1201,7 +1201,7 @@ export function totalHousing(s: GameState): number {
   return n;
 }
 
-const CATEGORY_PRIORITY: Record<Category, number> = { farming: 0, food: 0.5, resources: 1, industry: 2, civic: 3, works: 3.5, housing: 4, decor: 5 };
+const CATEGORY_PRIORITY: Record<Category, number> = { farming: 0, food: 0.5, resources: 1, industry: 2, civic: 3, manor: 3.5, works: 3.5, housing: 4, decor: 5 };
 /** Fine ordering inside a category: staple food producers are staffed first. */
 const TYPE_PRIORITY: Partial<Record<BuildingType, number>> = {
   farm: 0,
