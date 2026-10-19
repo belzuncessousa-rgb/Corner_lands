@@ -14,12 +14,14 @@
   --plank-b: #f0d4a0;
   --seam: #c99a5c;
   --seam-soft: rgba(176, 122, 62, 0.28);
-  /* Boards: wide planks in near-matching tones that fade into each other, no lines to cross the text. */
-  --planks:
-    /* Fine painted grain, tilted so it never runs along a line of text. */
-    repeating-linear-gradient(158deg, transparent 0 13px, rgba(150, 96, 44, 0.09) 13px 14.5px, transparent 14.5px 31px, rgba(255, 249, 230, 0.4) 31px 32px, transparent 32px 47px),
-    repeating-linear-gradient(158deg, transparent 0 57px, rgba(150, 96, 44, 0.07) 57px 59.5px, transparent 59.5px 89px, rgba(150, 96, 44, 0.05) 89px 90px, transparent 90px 121px),
-    repeating-linear-gradient(158deg, var(--plank-a) 0 60px, var(--plank-b) 90px 150px, var(--plank-a) 180px);
+  /* Boards: pale painted grain on a slant over soft bands of tone, in a frame of darker grain. */
+  --board:
+    radial-gradient(ellipse at 50% 20%, rgba(255, 248, 228, 0.35), transparent 70%) padding-box,
+    var(--grain-pale) 0 0 / 550px 200px padding-box,
+    repeating-linear-gradient(158deg, var(--plank-a) 0 60px, var(--plank-b) 90px 150px, var(--plank-a) 180px) padding-box,
+    linear-gradient(180deg, rgba(255, 224, 176, 0.45), transparent 6px, transparent calc(100% - 6px), rgba(30, 14, 4, 0.45)) border-box,
+    linear-gradient(90deg, rgba(30, 14, 4, 0.2), transparent 6px, transparent calc(100% - 6px), rgba(30, 14, 4, 0.2)) border-box,
+    var(--grain-frame, var(--frame-c)) 0 0 / 275px 100px border-box;
   /* Darker wood for everything you press. */
   --btn-hi: #9c6438;
   --btn-lo: #87542c;
@@ -37,16 +39,17 @@
 /* ------------------------------------------------------------ boards */
 
 .panel {
-  background:
-    radial-gradient(ellipse at 50% 20%, rgba(255, 248, 228, 0.35), transparent 70%),
-    var(--planks);
-  /* A painted frame, lit from above: the four sides mitred at the corners. */
-  border: 5px solid;
-  border-color: var(--frame-hi) var(--frame-c) var(--frame-lo) var(--frame-c);
+  /* A painted frame lit from above, around a board of pale painted wood. */
+  background: var(--board);
+  border: 5px solid transparent;
   border-radius: 10px;
   outline: 2.5px solid var(--line);
   box-shadow: inset 0 0 0 2px var(--line), 0 6px 0 rgba(40, 22, 8, 0.32);
   color: var(--ink);
+}
+#buildbar,
+.pill-panel.min {
+  background: var(--board);
 }
 .panel h1,
 .panel h2,
@@ -172,9 +175,7 @@ button.plaque-btn:hover:not(:disabled) {
 
 /* ------------------------------------------------------------ build bar */
 
-#buildbar {
-  background: var(--planks);
-}
+
 #buildbar .tab {
   border-radius: 8px;
   font-weight: 700;
@@ -678,4 +679,17 @@ table.goods td.num,
 table.goods td.keep span {
   font-family: var(--title);
   font-weight: 700;
+}
+
+/* The production book's figures are written straight onto the board. */
+.chain .link {
+  background: none;
+  border: none;
+  box-shadow: none;
+  padding: 0 2px;
+}
+.chain .link.weak {
+  background: none;
+  border: none;
+  color: #9a2a1e;
 }
