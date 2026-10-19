@@ -443,7 +443,64 @@ function vergeSpecks(ctx: CanvasRenderingContext2D, pts: [number, number, number
   ctx.globalAlpha = 1;
 }
 
-export function roadTile(season: Season, mask: number, layer: 'edge' | 'fill'): Sprite {
+/**
+ * Ragged blots of `color` along both sides of a road, so its border wanders
+ * in and out instead of running as a clean line.
+ */
+function raggedEdge(ctx: CanvasRenderingContext2D, pts: [number, number, number, number][], color: string, from: number, to: number, alpha: [number, number], seed: number): void {
+  const rand = mulberry32(seed);
+  ctx.fillStyle = color;
+  for (const [bx, by, ux, uy] of pts) {
+    for (const side of [-1, 1]) {
+      const d = from + (to - from) * rand();
+      const r = 1.2 + rand() * 2.2;
+      ctx.globalAlpha = alpha[0] + (alpha[1] - alpha[0]) * rand();
+      ctx.beginPath();
+      ctx.ellipse(bx - uy * d * side, by + ux * d * side, r * 1.4, r * 0.8, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+/** Tufts of grass (or drifts of snow) creeping in over a road's border. */
+export function encroach(ctx: CanvasRenderingContext2D, pts: [number, number, number, number][], season: Season, at: number, seed: number): void {
+  const rand = mulberry32(seed);
+  for (const [bx, by, ux, uy] of pts) {
+    for (const side of [-1, 1]) {
+      if (rand() < 0.4) continue;
+      const d = at + (rand() - 0.4) * 2.5;
+      tuft(ctx, bx - uy * d * side, by + ux * d * side, season, rand);
+    }
+  }
+}
+
+/** One tuft: a soft patch of turf with a few blades, or a little drift of snow. */
+export function tuft(ctx: CanvasRenderingContext2D, x: number, y: number, season: Season, rand: () => number): void {
+  const tones = GRASS[season];
+  const snow = season === 3;
+  ctx.fillStyle = tones[(snow ? 0 : 2) + Math.floor(rand() * 2)];
+  ctx.globalAlpha = snow ? 0.25 + rand() * 0.2 : 0.35 + rand() * 0.25;
+  ctx.beginPath();
+  ctx.ellipse(x, y, (1.6 + rand() * 1.6) * (snow ? 1.4 : 1), (0.8 + rand() * 0.6) * (snow ? 1.2 : 1), 0, 0, Math.PI * 2);
+  ctx.fill();
+  if (season !== 3) {
+    ctx.globalAlpha = 0.85;
+    ctx.strokeStyle = shade(tones[3], 0.72);
+    ctx.lineWidth = 0.55;
+    ctx.beginPath();
+    for (let k = 0; k < 2 + Math.floor(rand() * 2); k++) {
+      const ox = x + (rand() - 0.5) * 2.4;
+      ctx.moveTo(ox - 0.5, y - 1.6 - rand());
+      ctx.lineTo(ox, y + 0.2);
+      ctx.lineTo(ox + 0.6, y - 1.5 - rand());
+    }
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
+export function roadTile(season: Season, mask: number, layer: 'edge' | 'fill', variant = 0): Sprite {
   return makeSprite(TW + 28, TH + 28, TW / 2 + 14, 14, (ctx) => {
     const cx = 0;
     const cy = TH / 2;
@@ -480,17 +537,23 @@ export function roadTile(season: Season, mask: number, layer: 'edge' | 'fill'): 
       }
       ctx.stroke();
     };
+    const segs = mids.filter(([bit]) => mask & bit);
+    const pts = roadPoints(cx, cy, segs.length ? segs : [mids[0], mids[2]], corner, 2.2);
+    const seed = mask * 7 + season * 101 + variant * 997;
     if (layer === 'edge') {
-      let segs = mids.filter(([bit]) => mask & bit);
-      softVerge(ctx, cx, cy, segs, corner, edge, 11, 24, 0.55);
-      if (!segs.length) segs = [mids[0], mids[2]];
-      vergeSpecks(ctx, roadPoints(cx, cy, segs, corner, 2.5), shade(edge, 0.9), 6, 11, mask * 7 + season);
+      // A wide, faint wear in the grass where feet stray off the track.
+      softVerge(ctx, cx, cy, segs, corner, edge, 10, 32, 0.32);
+      vergeSpecks(ctx, pts, shade(edge, 0.9), 7, 14, seed);
       return;
     }
-    draw(dirt, 12);
+    // Packed earth that thins out at its borders rather than stopping.
+    softVerge(ctx, cx, cy, segs, corner, dirt, 6, 19, 0.9);
+    raggedEdge(ctx, pts, dirt, 3.5, 7.5, [0.45, 0.95], seed + 1);
+    draw(dirt, 7);
+    encroach(ctx, pts, season, 8.2, seed + 2);
     // Wheel ruts.
     ctx.save();
-    ctx.globalAlpha = 0.5;
+    ctx.globalAlpha = 0.35;
     draw(shade(dirt, 0.85), 6);
     ctx.globalAlpha = 1;
     draw(dirt, 3.4);
@@ -505,7 +568,7 @@ export function roadTile(season: Season, mask: number, layer: 'edge' | 'fill'): 
 }
 
 /** Cobbled stone road; mask bits like roadTile. */
-export function pavedTile(season: Season, mask: number, layer: 'edge' | 'fill'): Sprite {
+export function pavedTile(season: Season, mask: number, layer: 'edge' | 'fill', variant = 0): Sprite {
   return makeSprite(TW + 28, TH + 28, TW / 2 + 14, 14, (ctx) => {
     const cx = 0;
     const cy = TH / 2;
@@ -536,9 +599,14 @@ export function pavedTile(season: Season, mask: number, layer: 'edge' | 'fill'):
     };
     if (layer === 'edge') {
       // A strip of trodden earth fading into the ground.
-      const earth = season === 3 ? '#b9b2a6' : '#8d7a5a';
-      softVerge(ctx, cx, cy, segs, corner, earth, 14, 27, 0.5);
-      vergeSpecks(ctx, roadPoints(cx, cy, segs, corner, 2.5), season === 3 ? '#9a958c' : '#857c6e', 7.5, 12, mask * 13 + season);
+      // A band of brown, trodden earth along the stones, fading into the ground.
+      const earth = season === 3 ? '#b9ad9c' : '#937652';
+      const pts = roadPoints(cx, cy, segs, corner, 2.2);
+      const seed = mask * 13 + season * 101 + variant * 997;
+      softVerge(ctx, cx, cy, segs, corner, earth, 14, 32, 0.72);
+      raggedEdge(ctx, pts, earth, 7, 10.5, [0.3, 0.7], seed);
+      encroach(ctx, pts, season, 12.5, seed + 1);
+      vergeSpecks(ctx, pts, season === 3 ? '#9a958c' : '#857c6e', 7.5, 13, seed + 2);
       return;
     }
     const mortar = season === 3 ? '#c4c0b8' : '#8a8274';

@@ -22,6 +22,7 @@ import {
   drawSails,
   buildingSprite,
   grassTile,
+  tuft,
   roadTile,
   fruitTreeSprite,
   drawSheep,
@@ -314,14 +315,16 @@ export class Renderer {
           const [wx, wy] = iso(x, y);
           if (!visible(wx, wy)) continue;
           const mask = this.roadMask(s, x, y);
+          // A few versions of each piece, so ragged borders do not repeat.
+          const v = (x * 7 + y * 13) % 3;
           const sp =
             s.terrain[i] === 1
               ? this.sprite(`br:${season}:${mask}:${layer}`, () => bridgeTile(season, mask, layer))
               : s.road[i] === 3
                 ? this.sprite(`rc:${season}:${mask}:${layer}`, () => cobbleTile(season, mask, layer))
               : s.road[i] === 2
-                ? this.sprite(`rp:${season}:${mask}:${layer}`, () => pavedTile(season, mask, layer))
-                : this.sprite(`r:${season}:${mask}:${layer}`, () => roadTile(season, mask, layer));
+                ? this.sprite(`rp:${season}:${mask}:${layer}:${v}`, () => pavedTile(season, mask, layer, v))
+                : this.sprite(`r:${season}:${mask}:${layer}:${v}`, () => roadTile(season, mask, layer, v));
           this.blit(sp, wx, wy);
         }
       }
@@ -586,6 +589,84 @@ export class Renderer {
     c.globalAlpha = 1;
   }
 
+  /**
+   * The market square: a patch of rolled red clay with a wandering border
+   * that thins into the grass or snow, lighter sun-dried clay in the middle
+   * and the odd damp, darker patch.
+   */
+  private drawClaySquare(p: Pen, b: Building, season: Season): void {
+    const c = this.ctx;
+    const snow = season === 3;
+    const rand = mulberry32(b.id * 131 + 7);
+    // A wobble for each side, smooth so the edge bends rather than zigzags.
+    const waves = Array.from({ length: 4 }, () => [rand() * 6.3, rand() * 6.3, 2 + rand() * 2, 5 + rand() * 3]);
+    const ring = (m: number, amp: number): V3[] => {
+      const pts: V3[] = [];
+      const step = 0.2;
+      const side = (k: number, len: number, at: (u: number, d: number) => [number, number]) => {
+        const [p1, p2, f1, f2] = waves[k];
+        for (let u = 0; u < len; u += step) {
+          const taper = Math.min(1, u / 0.6, (len - u) / 0.6);
+          const d = m + amp * taper * (0.6 * Math.sin(u * f1 + p1) + 0.4 * Math.sin(u * f2 + p2));
+          const [x, y] = at(u, d);
+          pts.push([x, y, 0]);
+        }
+      };
+      side(0, b.w, (u, d) => [b.x + u, b.y - d]);
+      side(1, b.h, (u, d) => [b.x + b.w + d, b.y + u]);
+      side(2, b.w, (u, d) => [b.x + b.w - u, b.y + b.h + d]);
+      side(3, b.h, (u, d) => [b.x - d, b.y + b.h - u]);
+      return pts;
+    };
+    // Worn soil around it, fading out.
+    const soil = snow ? 'rgba(190,170,160,0.11)' : 'rgba(140,98,58,0.15)';
+    for (const m of [0.3, 0.2, 0.11]) p.poly(ring(m, 0.16), soil);
+    p.poly(ring(0.02, 0.14), snow ? 'rgba(205,180,168,0.55)' : 'rgba(176,96,56,0.55)');
+    p.poly(ring(-0.08, 0.13), snow ? '#d9c4b8' : '#c4693e');
+    const spot = (x: number, y: number, r: number, color: string) => {
+      const [sx, sy] = iso(x, y);
+      c.fillStyle = color;
+      c.beginPath();
+      c.ellipse(sx, sy, r * TW * 0.5, r * TH * 0.5, 0, 0, Math.PI * 2);
+      c.fill();
+    };
+    const cx = b.x + b.w / 2;
+    const cy = b.y + b.h / 2;
+    const inside = (spread: number): [number, number] => [cx + (rand() - 0.5) * b.w * spread, cy + (rand() - 0.5) * b.h * spread];
+    // Sun-dried, lighter clay towards the middle, where most feet go:
+    // many faint, overlapping spots, so it brightens without hard rims.
+    for (let k = 0; k < 14 + b.w * 4; k++) {
+      const [x, y] = inside(0.65);
+      spot(x, y, 0.2 + rand() * 0.35, snow ? 'rgba(240,226,218,0.14)' : 'rgba(232,158,106,0.14)');
+    }
+    for (let k = 0; k < 4; k++) spot(cx + (rand() - 0.5) * 0.6, cy + (rand() - 0.5) * 0.6, Math.min(b.w, b.h) * (0.12 + k * 0.07), snow ? 'rgba(245,235,228,0.1)' : 'rgba(232,162,114,0.1)');
+    // A few damp, darker patches.
+    for (let k = 0; k < 2; k++) {
+      const [x, y] = inside(0.75);
+      for (let j = 0; j < 5; j++) spot(x + (rand() - 0.5) * 0.3, y + (rand() - 0.5) * 0.3, 0.08 + rand() * 0.16, snow ? 'rgba(170,130,115,0.06)' : 'rgba(120,52,24,0.07)');
+    }
+    // Brushed in sweeps of uneven length, the light catching some.
+    for (let k = 1; k < b.h * 6; k++) {
+      const y = b.y + k / 6 + (rand() - 0.5) * 0.05;
+      const a = b.x + 0.2 + rand() * b.w * 0.3;
+      const e = b.x + b.w - 0.2 - rand() * b.w * 0.3;
+      p.line([a, y, 0], [e, y, 0], rand() < 0.5 ? 'rgba(255,215,185,0.07)' : snow ? 'rgba(160,120,100,0.05)' : 'rgba(110,45,20,0.06)', 1 + rand());
+    }
+    // Grit, scuffs and footprints.
+    for (let k = 0; k < b.w * b.h * 9; k++) {
+      const [sx, sy] = iso(b.x + 0.15 + rand() * (b.w - 0.3), b.y + 0.15 + rand() * (b.h - 0.3));
+      c.fillStyle = rand() < 0.55 ? 'rgba(120,50,22,0.26)' : snow ? 'rgba(255,255,255,0.5)' : 'rgba(240,180,130,0.35)';
+      c.fillRect(sx, sy, 1 + rand() * 1.5, 0.8);
+    }
+    // Grass (or snow) creeping in over the border.
+    for (const [x, y] of ring(-0.05, 0.14)) {
+      if (rand() < 0.35) continue;
+      const [sx, sy] = iso(x, y);
+      tuft(c, sx + (rand() - 0.5) * 4, sy + (rand() - 0.5) * 2, season, rand);
+    }
+    c.globalAlpha = 1;
+  }
+
   private drawFields(s: GameState, season: Season, selected?: number): void {
     const p = new Pen(this.ctx);
     const month = monthOf(s.day);
@@ -603,40 +684,7 @@ export class Renderer {
           season === 3 ? '#d6dbd9' : '#9c8a5e',
         );
       } else if (b.type === 'market') {
-        // A square of rolled red clay, its edge worn into the ground around it.
-        const clay = season === 3 ? '#d9c4b8' : '#c4693e';
-        const rect = (m: number): V3[] => [
-          [b.x - m, b.y - m, 0],
-          [b.x + b.w + m, b.y - m, 0],
-          [b.x + b.w + m, b.y + b.h + m, 0],
-          [b.x - m, b.y + b.h + m, 0],
-        ];
-        for (const m of [0.16, 0.1, 0.05]) p.poly(rect(m), season === 3 ? 'rgba(200,180,170,0.1)' : 'rgba(150,104,62,0.16)');
-        p.poly(rect(0), clay);
-        // Brushed in sweeps of uneven length, the light catching some.
-        const rand = mulberry32(b.id * 131 + 7);
-        for (let k = 1; k < b.h * 6; k++) {
-          const y = b.y + k / 6 + (rand() - 0.5) * 0.05;
-          const a = b.x + 0.06 + rand() * b.w * 0.3;
-          const e = b.x + b.w - 0.06 - rand() * b.w * 0.3;
-          p.line([a, y, 0], [e, y, 0], rand() < 0.5 ? 'rgba(255,215,185,0.08)' : season === 3 ? 'rgba(160,120,100,0.05)' : 'rgba(110,45,20,0.07)', 1 + rand());
-        }
-        // Grit, scuffs and footprints.
-        for (let k = 0; k < b.w * b.h * 9; k++) {
-          const [sx, sy] = iso(b.x + 0.1 + rand() * (b.w - 0.2), b.y + 0.1 + rand() * (b.h - 0.2));
-          this.ctx.fillStyle = rand() < 0.55 ? 'rgba(120,50,22,0.28)' : season === 3 ? 'rgba(255,255,255,0.5)' : 'rgba(240,180,130,0.35)';
-          this.ctx.fillRect(sx, sy, 1 + rand() * 1.5, 0.8);
-        }
-        // A lighter, trodden band where the crowd walks between the stalls.
-        p.poly(
-          [
-            [b.x + 0.15, b.y + b.h / 2 - 0.18, 0],
-            [b.x + b.w - 0.15, b.y + b.h / 2 - 0.18, 0],
-            [b.x + b.w - 0.15, b.y + b.h / 2 + 0.18, 0],
-            [b.x + 0.15, b.y + b.h / 2 + 0.18, 0],
-          ],
-          season === 3 ? 'rgba(255,255,255,0.15)' : 'rgba(235,160,110,0.18)',
-        );
+        this.drawClaySquare(p, b, season);
       } else if (b.type === 'field') {
         this.drawField(p, b, season, month);
       } else if (b.type === 'pasture') {
