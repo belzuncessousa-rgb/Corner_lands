@@ -357,8 +357,94 @@ function roadPoints(cx: number, cy: number, segs: [number, number, number][], co
   return out;
 }
 
+/**
+ * The worn verge of a road: trodden earth that fades into the ground around
+ * it instead of a hard kerb line. Segments end square at the tile's edge, so
+ * neighbouring tiles meet without the verge doubling up at the joint.
+ */
+function softVerge(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  segs: [number, number, number][],
+  corner: [[number, number], [number, number]] | null,
+  color: string,
+  inner: number,
+  outer: number,
+  peak: number,
+): void {
+  const mk = () => {
+    const cv = document.createElement('canvas');
+    cv.width = ctx.canvas.width;
+    cv.height = ctx.canvas.height;
+    const c = cv.getContext('2d')!;
+    c.setTransform(ctx.getTransform());
+    return { cv, c };
+  };
+  const acc = mk();
+  const lvl = mk();
+  const steps = 7;
+  for (let k = 0; k < steps; k++) {
+    const w = outer - ((outer - inner) * k) / steps;
+    // One level, solid, so overlapping strokes do not add up...
+    lvl.c.save();
+    lvl.c.setTransform(1, 0, 0, 1, 0, 0);
+    lvl.c.clearRect(0, 0, lvl.cv.width, lvl.cv.height);
+    lvl.c.restore();
+    lvl.c.strokeStyle = color;
+    lvl.c.fillStyle = color;
+    lvl.c.lineWidth = w;
+    lvl.c.lineCap = 'butt';
+    lvl.c.beginPath();
+    if (corner) {
+      lvl.c.moveTo(corner[0][0], corner[0][1]);
+      lvl.c.quadraticCurveTo(cx, cy, corner[1][0], corner[1][1]);
+      lvl.c.stroke();
+    } else {
+      for (const [, mx, my] of segs) {
+        lvl.c.moveTo(cx, cy);
+        lvl.c.lineTo(mx, my);
+      }
+      lvl.c.stroke();
+      lvl.c.beginPath();
+      lvl.c.ellipse(cx, cy, w / 2, w / 2, 0, 0, Math.PI * 2);
+      lvl.c.fill();
+    }
+    // ...then laid over the wider ones with its own strength.
+    acc.c.save();
+    acc.c.setTransform(1, 0, 0, 1, 0, 0);
+    acc.c.globalCompositeOperation = 'destination-out';
+    acc.c.drawImage(lvl.cv, 0, 0);
+    acc.c.globalCompositeOperation = 'source-over';
+    acc.c.globalAlpha = peak * ((k + 1) / steps) ** 1.6;
+    acc.c.drawImage(lvl.cv, 0, 0);
+    acc.c.restore();
+  }
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(acc.cv, 0, 0);
+  ctx.restore();
+}
+
+/** A few clods and pebbles scattered along the verge, thinning outwards. */
+function vergeSpecks(ctx: CanvasRenderingContext2D, pts: [number, number, number, number][], color: string, from: number, to: number, seed: number): void {
+  const rand = mulberry32(seed);
+  for (const [bx, by, ux, uy] of pts) {
+    for (const side of [-1, 1]) {
+      if (rand() < 0.35) continue;
+      const d = from + (to - from) * rand() ** 1.8;
+      const x = bx - uy * d * side;
+      const y = by + ux * d * side;
+      ctx.globalAlpha = 0.25 + 0.35 * (1 - (d - from) / (to - from));
+      ctx.fillStyle = color;
+      ctx.fillRect(x, y, 1 + rand() * 1.2, 0.8);
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
 export function roadTile(season: Season, mask: number, layer: 'edge' | 'fill'): Sprite {
-  return makeSprite(TW + 4, TH + 4, TW / 2 + 2, 2, (ctx) => {
+  return makeSprite(TW + 28, TH + 28, TW / 2 + 14, 14, (ctx) => {
     const cx = 0;
     const cy = TH / 2;
     const mids: [number, number, number][] = [
@@ -395,7 +481,10 @@ export function roadTile(season: Season, mask: number, layer: 'edge' | 'fill'): 
       ctx.stroke();
     };
     if (layer === 'edge') {
-      draw(edge, 15);
+      let segs = mids.filter(([bit]) => mask & bit);
+      softVerge(ctx, cx, cy, segs, corner, edge, 11, 24, 0.55);
+      if (!segs.length) segs = [mids[0], mids[2]];
+      vergeSpecks(ctx, roadPoints(cx, cy, segs, corner, 2.5), shade(edge, 0.9), 6, 11, mask * 7 + season);
       return;
     }
     draw(dirt, 12);
@@ -417,7 +506,7 @@ export function roadTile(season: Season, mask: number, layer: 'edge' | 'fill'): 
 
 /** Cobbled stone road; mask bits like roadTile. */
 export function pavedTile(season: Season, mask: number, layer: 'edge' | 'fill'): Sprite {
-  return makeSprite(TW + 4, TH + 4, TW / 2 + 2, 2, (ctx) => {
+  return makeSprite(TW + 28, TH + 28, TW / 2 + 14, 14, (ctx) => {
     const cx = 0;
     const cy = TH / 2;
     const mids: [number, number, number][] = [
@@ -446,8 +535,10 @@ export function pavedTile(season: Season, mask: number, layer: 'edge' | 'fill'):
       ctx.stroke();
     };
     if (layer === 'edge') {
-      // Kerb stones and a strip of trodden earth.
-      draw(season === 3 ? '#a8a49c' : '#6e6658', 19);
+      // A strip of trodden earth fading into the ground.
+      const earth = season === 3 ? '#b9b2a6' : '#8d7a5a';
+      softVerge(ctx, cx, cy, segs, corner, earth, 14, 27, 0.5);
+      vergeSpecks(ctx, roadPoints(cx, cy, segs, corner, 2.5), season === 3 ? '#9a958c' : '#857c6e', 7.5, 12, mask * 13 + season);
       return;
     }
     const mortar = season === 3 ? '#c4c0b8' : '#8a8274';
@@ -481,7 +572,7 @@ export function pavedTile(season: Season, mask: number, layer: 'edge' | 'fill'):
 
 /** Cobbled street (dressed stone): rounded setts over the whole roadway. */
 export function cobbleTile(season: Season, mask: number, layer: 'edge' | 'fill'): Sprite {
-  return makeSprite(TW + 4, TH + 4, TW / 2 + 2, 2, (ctx) => {
+  return makeSprite(TW + 28, TH + 28, TW / 2 + 14, 14, (ctx) => {
     const cx = 0;
     const cy = TH / 2;
     const mids: [number, number, number][] = [
@@ -510,8 +601,10 @@ export function cobbleTile(season: Season, mask: number, layer: 'edge' | 'fill')
       ctx.stroke();
     };
     if (layer === 'edge') {
-      // Kerb stones and a strip of trodden earth.
-      draw(season === 3 ? '#a8a49c' : '#6e6658', 19);
+      // A strip of trodden earth fading into the ground.
+      const earth = season === 3 ? '#b9b2a6' : '#8d7a5a';
+      softVerge(ctx, cx, cy, segs, corner, earth, 14, 27, 0.5);
+      vergeSpecks(ctx, roadPoints(cx, cy, segs, corner, 2.5), season === 3 ? '#9a958c' : '#857c6e', 7.5, 12, mask * 13 + season);
       return;
     }
     const mortar = season === 3 ? '#b4b0a8' : '#6e6658';

@@ -603,20 +603,40 @@ export class Renderer {
           season === 3 ? '#d6dbd9' : '#9c8a5e',
         );
       } else if (b.type === 'market') {
-        // A trodden square of packed earth with a cobbled edge.
+        // A square of rolled red clay, its edge worn into the ground around it.
+        const clay = season === 3 ? '#d9c4b8' : '#c4693e';
+        const rect = (m: number): V3[] => [
+          [b.x - m, b.y - m, 0],
+          [b.x + b.w + m, b.y - m, 0],
+          [b.x + b.w + m, b.y + b.h + m, 0],
+          [b.x - m, b.y + b.h + m, 0],
+        ];
+        for (const m of [0.16, 0.1, 0.05]) p.poly(rect(m), season === 3 ? 'rgba(200,180,170,0.1)' : 'rgba(150,104,62,0.16)');
+        p.poly(rect(0), clay);
+        // Brushed in sweeps of uneven length, the light catching some.
+        const rand = mulberry32(b.id * 131 + 7);
+        for (let k = 1; k < b.h * 6; k++) {
+          const y = b.y + k / 6 + (rand() - 0.5) * 0.05;
+          const a = b.x + 0.06 + rand() * b.w * 0.3;
+          const e = b.x + b.w - 0.06 - rand() * b.w * 0.3;
+          p.line([a, y, 0], [e, y, 0], rand() < 0.5 ? 'rgba(255,215,185,0.08)' : season === 3 ? 'rgba(160,120,100,0.05)' : 'rgba(110,45,20,0.07)', 1 + rand());
+        }
+        // Grit, scuffs and footprints.
+        for (let k = 0; k < b.w * b.h * 9; k++) {
+          const [sx, sy] = iso(b.x + 0.1 + rand() * (b.w - 0.2), b.y + 0.1 + rand() * (b.h - 0.2));
+          this.ctx.fillStyle = rand() < 0.55 ? 'rgba(120,50,22,0.28)' : season === 3 ? 'rgba(255,255,255,0.5)' : 'rgba(240,180,130,0.35)';
+          this.ctx.fillRect(sx, sy, 1 + rand() * 1.5, 0.8);
+        }
+        // A lighter, trodden band where the crowd walks between the stalls.
         p.poly(
           [
-            [b.x + 0.05, b.y + 0.05, 0],
-            [b.x + b.w - 0.05, b.y + 0.05, 0],
-            [b.x + b.w - 0.05, b.y + b.h - 0.05, 0],
-            [b.x + 0.05, b.y + b.h - 0.05, 0],
+            [b.x + 0.15, b.y + b.h / 2 - 0.18, 0],
+            [b.x + b.w - 0.15, b.y + b.h / 2 - 0.18, 0],
+            [b.x + b.w - 0.15, b.y + b.h / 2 + 0.18, 0],
+            [b.x + 0.15, b.y + b.h / 2 + 0.18, 0],
           ],
-          season === 3 ? '#d6dadb' : '#b5a88e',
-          season === 3 ? '#b8bec0' : '#8a7c62',
-          1.5,
+          season === 3 ? 'rgba(255,255,255,0.15)' : 'rgba(235,160,110,0.18)',
         );
-        for (let i = 1; i < b.w * 2; i++) p.line([b.x + i * 0.5, b.y + 0.1, 0], [b.x + i * 0.5, b.y + b.h - 0.1, 0], 'rgba(90,75,55,0.18)', 0.5);
-        for (let i = 1; i < b.h * 2; i++) p.line([b.x + 0.1, b.y + i * 0.5, 0], [b.x + b.w - 0.1, b.y + i * 0.5, 0], 'rgba(90,75,55,0.18)', 0.5);
       } else if (b.type === 'field') {
         this.drawField(p, b, season, month);
       } else if (b.type === 'pasture') {
