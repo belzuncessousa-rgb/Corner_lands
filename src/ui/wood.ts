@@ -1,6 +1,7 @@
 /**
  * Painted wood for signboards and plaques: planks of grain with a knot or
- * two, drawn once into images the stylesheet uses (`--wood-img`, `--wood-img-dark`).
+ * two, drawn once into images the stylesheet uses (`--wood-img`, `--wood-img-dark`,
+ * `--wood-pale` and `--wood-frame`).
  */
 
 function mulberry(seed: number): () => number {
@@ -90,9 +91,47 @@ function paintWood(w: number, h: number, tones: [string, string, string], seed: 
   return cv.toDataURL('image/jpeg', 0.86);
 }
 
+/**
+ * Woven cloth, as a see-through overlay: warp and weft threads passing over
+ * and under each other, laid over any colour (`--weave`).
+ */
+function paintWeave(seed: number): string {
+  const n = 48;
+  const cv = document.createElement('canvas');
+  cv.width = n;
+  cv.height = n;
+  const c = cv.getContext('2d');
+  if (!c) return '';
+  const rand = mulberry(seed);
+  const t = 3;
+  for (let y = 0; y < n; y += t) {
+    for (let x = 0; x < n; x += t) {
+      const over = ((x + y) / t) % 2 === 0;
+      const j = rand() * 0.06;
+      // The thread on top catches the light along its length; the one beneath sits in shade.
+      const g = over ? c.createLinearGradient(x, y, x + t, y) : c.createLinearGradient(x, y, x, y + t);
+      g.addColorStop(0, `rgba(0,0,0,${0.16 + j})`);
+      g.addColorStop(0.5, `rgba(255,248,230,${0.1 + j})`);
+      g.addColorStop(1, `rgba(0,0,0,${0.2 + j})`);
+      c.fillStyle = g;
+      c.fillRect(x, y, t, t);
+    }
+  }
+  // A few slubs: thicker bits of yarn.
+  for (let k = 0; k < 10; k++) {
+    c.fillStyle = `rgba(255,245,220,${0.06 + rand() * 0.08})`;
+    c.fillRect(Math.floor(rand() * n), Math.floor(rand() * n / t) * t, 4 + rand() * 8, 1.4);
+  }
+  return cv.toDataURL('image/png');
+}
+
 /** Paints the wood once and hands it to the stylesheet. */
 export function installWood(): void {
   const root = document.documentElement.style;
   root.setProperty('--wood-img', `url(${paintWood(1024, 512, ['#b98a55', '#a87842', '#5a3416'], 7)})`);
   root.setProperty('--wood-img-dark', `url(${paintWood(512, 256, ['#7a5230', '#6a4424', '#3a200c'], 19)})`);
+  // Pale pine for the boards text is read from, and walnut for their frames.
+  root.setProperty('--wood-pale', `url(${paintWood(768, 384, ['#e9cd9c', '#dcb985', '#a87a46'], 31)})`);
+  root.setProperty('--wood-frame', `url(${paintWood(512, 256, ['#83552e', '#6b4223', '#2e1608'], 43)})`);
+  root.setProperty('--weave', `url(${paintWeave(5)})`);
 }

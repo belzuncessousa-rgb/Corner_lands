@@ -7,12 +7,19 @@
 :root {
   --ink: #3a2412;
   --ink-soft: #7a5432;
-  --title: 'Alegreya SC', 'Cinzel', Georgia, serif;
-  --serif: 'Alegreya', 'EB Garamond', Georgia, serif;
+  --title: 'Texturina', 'Cinzel', Georgia, serif;
+  --serif: 'Kurale', 'EB Garamond', Georgia, serif;
   --line: #3a2412;
-  --plank-a: #f2d49c;
-  --plank-b: #ead0a0;
+  --plank-a: #f3d8a6;
+  --plank-b: #f0d4a0;
   --seam: #c99a5c;
+  --seam-soft: rgba(176, 122, 62, 0.28);
+  /* Boards: wide planks in near-matching tones that fade into each other, no lines to cross the text. */
+  --planks: repeating-linear-gradient(180deg, var(--plank-a) 0 40px, var(--plank-b) 56px 96px, var(--plank-a) 112px);
+  /* Darker wood for everything you press. */
+  --btn-hi: #9c6438;
+  --btn-lo: #87542c;
+  --btn-text: #fff1d6;
   --frame-c: #8a5530;
   --frame-hi: #b07444;
   --frame-lo: #5c3418;
@@ -27,8 +34,8 @@
 
 .panel {
   background:
-    /* Planks: two tones, a drawn seam between them. */
-    repeating-linear-gradient(180deg, var(--plank-a) 0 34px, var(--seam) 34px 36px, var(--plank-b) 36px 70px, var(--seam) 70px 72px);
+    radial-gradient(ellipse at 50% 20%, rgba(255, 248, 228, 0.35), transparent 70%),
+    var(--planks);
   /* A painted frame, lit from above: the four sides mitred at the corners. */
   border: 5px solid;
   border-color: var(--frame-hi) var(--frame-c) var(--frame-lo) var(--frame-c);
@@ -54,44 +61,64 @@
 button {
   font-family: var(--serif);
   font-weight: 600;
-  color: var(--ink);
-  background: linear-gradient(180deg, #fbe6bc 0 50%, #f2d49c 50%);
+  color: var(--btn-text);
+  text-shadow: 0 1px 0 rgba(40, 20, 6, 0.55);
+  /* Painted darker wood: two flat tones and a couple of streaks of grain. */
+  background:
+    linear-gradient(180deg, transparent 30%, rgba(255, 230, 190, 0.12) 30% 34%, transparent 34% 68%, rgba(40, 20, 6, 0.12) 68% 72%, transparent 72%),
+    linear-gradient(180deg, var(--btn-hi) 0 50%, var(--btn-lo) 50%);
   border: 2.5px solid var(--line);
   border-radius: 8px;
-  box-shadow: 0 3px 0 var(--line);
+  box-shadow: inset 0 1.5px 0 rgba(255, 220, 170, 0.35), 0 3px 0 var(--line);
+  min-height: 30px;
+  padding: 4px 12px;
+}
+button svg {
+  filter: drop-shadow(0 1px 0 rgba(40, 20, 6, 0.5));
 }
 button:hover:not(:disabled) {
-  background: linear-gradient(180deg, #fff0cf 0 50%, #f8dfae 50%);
+  background:
+    linear-gradient(180deg, transparent 30%, rgba(255, 230, 190, 0.12) 30% 34%, transparent 34% 68%, rgba(40, 20, 6, 0.12) 68% 72%, transparent 72%),
+    linear-gradient(180deg, #ad7244 0 50%, #965f34 50%);
 }
 button:active:not(:disabled) {
   transform: translateY(3px);
-  box-shadow: 0 0 0 var(--line);
+  box-shadow: inset 0 2px 0 rgba(0, 0, 0, 0.2), 0 0 0 var(--line);
 }
+button:disabled {
+  opacity: 1;
+  color: rgba(255, 241, 214, 0.55);
+  background: linear-gradient(180deg, #a68a6e 0 50%, #98806a 50%);
+  box-shadow: 0 2px 0 rgba(58, 36, 18, 0.6);
+}
+/* Chosen: painted honey, pressed in. */
 button.active,
 #buildbar .tab.active {
-  color: #fff4dc;
-  background: linear-gradient(180deg, #d0802e 0 50%, #c06e22 50%);
+  color: var(--ink);
+  text-shadow: 0 1px 0 rgba(255, 240, 200, 0.6);
+  background: linear-gradient(180deg, #f6c860 0 50%, #e8a838 50%);
   border-color: var(--line);
-  box-shadow: 0 1px 0 var(--line), inset 0 2px 0 rgba(0, 0, 0, 0.18);
+  box-shadow: inset 0 2px 0 rgba(90, 50, 10, 0.25), 0 1px 0 var(--line);
   transform: translateY(2px);
 }
 button.active svg,
 #buildbar .tab.active svg {
-  filter: drop-shadow(0 0 0 #fff4dc) drop-shadow(0 1px 0 rgba(0, 0, 0, 0.3));
+  filter: none;
 }
+/* The one to press next: berry red. */
 button.primary,
 button.plaque-btn {
   color: #fff4dc;
-  background: linear-gradient(180deg, var(--frame-hi) 0 50%, var(--frame-c) 50%);
+  background: linear-gradient(180deg, #c8524a 0 50%, #b0403a 50%);
   border: 2.5px solid var(--line);
   border-radius: 8px;
   clip-path: none;
-  box-shadow: 0 3px 0 var(--line);
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+  box-shadow: inset 0 1.5px 0 rgba(255, 210, 190, 0.35), 0 3px 0 var(--line);
+  text-shadow: 0 1px 0 rgba(60, 10, 6, 0.5);
 }
 button.primary:hover:not(:disabled),
 button.plaque-btn:hover:not(:disabled) {
-  background: linear-gradient(180deg, #c2844f 0 50%, #9a6038 50%);
+  background: linear-gradient(180deg, #d4625a 0 50%, #bc4a42 50%);
 }
 #inspector .close,
 #chip-panel .close {
@@ -142,7 +169,7 @@ button.plaque-btn:hover:not(:disabled) {
 /* ------------------------------------------------------------ build bar */
 
 #buildbar {
-  background: repeating-linear-gradient(180deg, var(--plank-a) 0 34px, var(--seam) 34px 36px, var(--plank-b) 36px 70px, var(--seam) 70px 72px);
+  background: var(--planks);
 }
 #buildbar .tab {
   border-radius: 8px;
@@ -323,29 +350,81 @@ input[type='number'] {
   right: 18%;
 }
 
-/* An event is a painted cloth banner. */
+/* An event is a woven hanging: linen in an embroidered border, a rod above and a fringe below. */
+:root {
+  --embroidery: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' fill='%23b0403a'/%3E%3Crect x='2.5' y='2.5' width='43' height='43' fill='none' stroke='%23f0c860' stroke-width='1.2' stroke-dasharray='2.4 1.6'/%3E%3Crect x='13.5' y='13.5' width='21' height='21' fill='none' stroke='%23f0c860' stroke-width='1.2' stroke-dasharray='2.4 1.6'/%3E%3Cg fill='%23f0c860' stroke='%233a2412' stroke-width='.8'%3E%3Cpath d='M24 3.6L28.4 8L24 12.4L19.6 8Z'/%3E%3Cpath d='M24 35.6L28.4 40L24 44.4L19.6 40Z'/%3E%3Cpath d='M3.6 24L8 19.6L12.4 24L8 28.4Z'/%3E%3Cpath d='M35.6 24L40 19.6L44.4 24L40 28.4Z'/%3E%3Ccircle cx='8' cy='8' r='3.6'/%3E%3Ccircle cx='40' cy='8' r='3.6'/%3E%3Ccircle cx='8' cy='40' r='3.6'/%3E%3Ccircle cx='40' cy='40' r='3.6'/%3E%3C/g%3E%3Cg fill='%234a7ab0'%3E%3Ccircle cx='24' cy='8' r='1.4'/%3E%3Ccircle cx='24' cy='40' r='1.4'/%3E%3Ccircle cx='8' cy='24' r='1.4'/%3E%3Ccircle cx='40' cy='24' r='1.4'/%3E%3Ccircle cx='8' cy='8' r='1.5'/%3E%3Ccircle cx='40' cy='8' r='1.5'/%3E%3Ccircle cx='8' cy='40' r='1.5'/%3E%3Ccircle cx='40' cy='40' r='1.5'/%3E%3C/g%3E%3C/svg%3E");
+  --rod:
+    radial-gradient(circle at 50% 42%, #f6d48a 0 30%, #c08a3c 30% 62%, var(--line) 62% 74%, transparent 76%) left center / 24px 24px no-repeat,
+    radial-gradient(circle at 50% 42%, #f6d48a 0 30%, #c08a3c 30% 62%, var(--line) 62% 74%, transparent 76%) right center / 24px 24px no-repeat,
+    linear-gradient(180deg, transparent 5px, var(--line) 5px 7px, var(--frame-hi) 7px 11px, var(--frame-c) 11px 15px, var(--line) 15px 17px, transparent 17px) center / calc(100% - 18px) 100% no-repeat;
+  --fringe: repeating-linear-gradient(90deg, #f0c860 0 2px, #b0403a 2px 4px, var(--honey) 4px 6px, transparent 6px 8px);
+}
 .modal:has(> .event) {
-  background: #f6e6c4;
-  border: 8px solid var(--berry);
+  position: relative;
+  overflow: visible;
+  margin-top: 20px;
+  border: 16px solid transparent;
+  border-image: var(--embroidery) 16 round;
+  border-radius: 0;
   outline: 3px solid var(--line);
-  box-shadow: inset 0 0 0 2.5px var(--line), inset 0 0 0 5px #f6e6c4, inset 0 0 0 7px var(--honey), 0 8px 0 rgba(40, 22, 8, 0.4);
-  padding: 20px 28px 24px;
+  outline-offset: 0;
+  background:
+    var(--weave) 0 0 / 48px 48px,
+    radial-gradient(ellipse at 50% 40%, #fbf1da, #ecdab4 95%);
+  box-shadow: 0 8px 0 rgba(40, 22, 8, 0.4);
+  padding: 10px 22px 18px;
+}
+.modal:has(> .event)::before {
+  content: '';
+  position: absolute;
+  left: -34px;
+  right: -34px;
+  top: -34px;
+  height: 24px;
+  background: var(--rod);
+  pointer-events: none;
+}
+.modal:has(> .event)::after {
+  content: '';
+  position: absolute;
+  left: -16px;
+  right: -16px;
+  top: calc(100% + 19px);
+  height: 16px;
+  background: var(--fringe);
+  -webkit-mask: linear-gradient(180deg, #000 55%, transparent);
+  mask: linear-gradient(180deg, #000 55%, transparent);
+  pointer-events: none;
+}
+.event .ornament {
+  display: none;
+}
+.modal .event h2 {
+  margin-top: 8px;
+  background: var(--weave) 0 0 / 48px 48px, var(--berry);
 }
 .event .initial {
   color: #fff4dc;
-  background: var(--sky);
+  background: var(--weave) 0 0 / 48px 48px, var(--sky);
   border: 2.5px solid var(--line);
   border-radius: 6px;
-  box-shadow: 0 3px 0 var(--line);
+  box-shadow: inset 0 0 0 2px #f0c860, 0 3px 0 var(--line);
 }
+/* Choices stitched onto the linen as patches. */
 .event .choice {
-  background: #fff4dc;
+  color: var(--ink);
+  text-shadow: none;
+  background: var(--weave) 0 0 / 48px 48px, #fff6e0;
   border: 2.5px solid var(--line);
-  border-radius: 9px;
-  box-shadow: 0 3px 0 var(--line);
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 3px #fff6e0, inset 0 0 0 4.5px rgba(176, 64, 58, 0.55), 0 3px 0 var(--line);
 }
 .event .choice:hover:not(:disabled) {
-  background: #ffe7a6;
+  background: var(--weave) 0 0 / 48px 48px, #ffe9b0;
+}
+.event .choice:disabled {
+  color: rgba(58, 36, 18, 0.5);
+  background: var(--weave) 0 0 / 48px 48px, #e8dcc4;
 }
 
 /* ------------------------------------------------------------ the charter plaque, painted */
@@ -359,15 +438,20 @@ input[type='number'] {
   background: repeating-linear-gradient(180deg, #c48a52 0 26px, #a8723e 26px 28px, #bc8450 28px 54px, #a8723e 54px 56px);
 }
 .t-rod {
-  height: 10px;
-  background: var(--frame-lo);
-  border: 2px solid var(--line);
-  border-radius: 5px;
+  width: 168px;
+  height: 16px;
+  border-radius: 0;
+  background: var(--rod);
+  background-size: 16px 16px, 16px 16px, calc(100% - 12px) 100%;
+  box-shadow: none;
 }
 .t-cloth {
+  background:
+    var(--weave) 0 0 / 48px 48px,
+    var(--c);
   border-left: 3px solid var(--line);
   border-right: 3px solid var(--line);
-  box-shadow: inset 0 0 0 3px rgba(255, 230, 160, 0.6);
+  box-shadow: inset 0 0 0 3px rgba(240, 200, 96, 0.75), inset 0 0 0 4px rgba(58, 36, 18, 0.5);
 }
 
 /* ------------------------------------------------------------ scrollbars: a painted peg */
@@ -401,4 +485,120 @@ input[type='number'] {
     scrollbar-color: var(--frame-c) var(--seam);
     scrollbar-width: thin;
   }
+}
+
+/* ------------------------------------------------------------ steppers: − [ number ] + */
+
+/* A number is a little cream slot cut between two dark pegs. */
+.trade .keep,
+table.goods td.keep {
+  white-space: nowrap;
+}
+.trade .keep,
+table.goods td.keep {
+  display: inline-flex;
+  align-items: stretch;
+  vertical-align: middle;
+}
+table.goods td.keep {
+  display: table-cell;
+}
+.trade .keep b,
+table.goods td.keep span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 46px;
+  height: 28px;
+  padding: 0 6px;
+  margin: 0 -2.5px;
+  position: relative;
+  z-index: 1;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  background: #fff6e0;
+  border: 2.5px solid var(--line);
+  box-shadow: inset 0 2px 0 rgba(120, 70, 20, 0.18);
+  vertical-align: middle;
+}
+.trade .keep button,
+table.goods td.keep button {
+  min-width: 30px;
+  min-height: 28px;
+  height: 28px;
+  padding: 0 8px;
+  font-size: 17px;
+  line-height: 1;
+  vertical-align: middle;
+}
+.trade .keep button:first-of-type,
+table.goods td.keep button:first-of-type {
+  border-radius: 8px 0 0 8px;
+}
+.trade .keep button:last-of-type,
+table.goods td.keep button:last-of-type {
+  border-radius: 0 8px 8px 0;
+}
+.trade button,
+table.goods button.sell {
+  min-height: 28px;
+  padding: 2px 10px;
+  font-size: 14px;
+}
+.trade button small {
+  color: rgba(255, 241, 214, 0.8);
+}
+.trade button.active small {
+  color: var(--ink-soft);
+}
+table.goods button.sell svg {
+  opacity: 0.7;
+}
+.trade td {
+  padding: 5px 4px;
+  border-bottom: 1px solid var(--seam-soft);
+}
+/* Tabs on the build bar stay lettering on the plank until chosen. */
+#buildbar .tab {
+  color: var(--ink);
+  text-shadow: none;
+  min-height: 0;
+}
+#buildbar .tab svg {
+  filter: none;
+}
+
+#chip-panel {
+  width: 380px;
+}
+/* A chosen option among several, like the lord's clothes: painted honey. */
+.choices button.on {
+  color: var(--ink);
+  text-shadow: 0 1px 0 rgba(255, 240, 200, 0.6);
+  background: linear-gradient(180deg, #f6c860 0 50%, #e8a838 50%);
+  border-color: var(--line);
+  box-shadow: inset 0 2px 0 rgba(90, 50, 10, 0.25), 0 1px 0 var(--line);
+  transform: translateY(2px);
+}
+button:disabled {
+  color: rgba(58, 36, 18, 0.6);
+  text-shadow: 0 1px 0 rgba(255, 240, 210, 0.35);
+}
+button:disabled small {
+  color: inherit;
+}
+/* Colour swatches are round dabs of paint. */
+.swatch {
+  width: 22px;
+  height: 22px;
+  min-height: 0;
+  padding: 0;
+  border-radius: 50%;
+  border: 2.5px solid var(--line);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.3), 0 2px 0 var(--line);
+}
+.swatch.on {
+  border-color: var(--line);
+  box-shadow: 0 0 0 2.5px #f6c860, 0 0 0 4.5px var(--line);
 }
