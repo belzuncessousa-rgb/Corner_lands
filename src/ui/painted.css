@@ -1,0 +1,404 @@
+/*
+ * Painted toy wood: the interface drawn the way the town is, in flat
+ * colour with a bold outline. Boards are planks in two tones of honey,
+ * set in a chunky brown frame with a hard shadow; nothing is blurred or
+ * photographic. Loaded after styles.css and only restyles.
+ */
+:root {
+  --ink: #3a2412;
+  --ink-soft: #7a5432;
+  --title: 'Alegreya SC', 'Cinzel', Georgia, serif;
+  --serif: 'Alegreya', 'EB Garamond', Georgia, serif;
+  --line: #3a2412;
+  --plank-a: #f2d49c;
+  --plank-b: #ead0a0;
+  --seam: #c99a5c;
+  --frame-c: #8a5530;
+  --frame-hi: #b07444;
+  --frame-lo: #5c3418;
+  --berry: #b8433a;
+  --leaf: #4f8a3c;
+  --honey: #e8a838;
+  --sky: #4a7ab0;
+  --hard: 0 4px 0 rgba(40, 22, 8, 0.35);
+}
+
+/* ------------------------------------------------------------ boards */
+
+.panel {
+  background:
+    /* Planks: two tones, a drawn seam between them. */
+    repeating-linear-gradient(180deg, var(--plank-a) 0 34px, var(--seam) 34px 36px, var(--plank-b) 36px 70px, var(--seam) 70px 72px);
+  /* A painted frame, lit from above: the four sides mitred at the corners. */
+  border: 5px solid;
+  border-color: var(--frame-hi) var(--frame-c) var(--frame-lo) var(--frame-c);
+  border-radius: 10px;
+  outline: 2.5px solid var(--line);
+  box-shadow: inset 0 0 0 2px var(--line), 0 6px 0 rgba(40, 22, 8, 0.32);
+  color: var(--ink);
+}
+.panel h1,
+.panel h2,
+.panel h3 {
+  color: var(--ink);
+  letter-spacing: 0.02em;
+}
+.modal h2,
+#inspector h2,
+#chip-panel h3 {
+  font-weight: 800;
+}
+
+/* ------------------------------------------------------------ buttons: chunky painted blocks */
+
+button {
+  font-family: var(--serif);
+  font-weight: 600;
+  color: var(--ink);
+  background: linear-gradient(180deg, #fbe6bc 0 50%, #f2d49c 50%);
+  border: 2.5px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 3px 0 var(--line);
+}
+button:hover:not(:disabled) {
+  background: linear-gradient(180deg, #fff0cf 0 50%, #f8dfae 50%);
+}
+button:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: 0 0 0 var(--line);
+}
+button.active,
+#buildbar .tab.active {
+  color: #fff4dc;
+  background: linear-gradient(180deg, #d0802e 0 50%, #c06e22 50%);
+  border-color: var(--line);
+  box-shadow: 0 1px 0 var(--line), inset 0 2px 0 rgba(0, 0, 0, 0.18);
+  transform: translateY(2px);
+}
+button.active svg,
+#buildbar .tab.active svg {
+  filter: drop-shadow(0 0 0 #fff4dc) drop-shadow(0 1px 0 rgba(0, 0, 0, 0.3));
+}
+button.primary,
+button.plaque-btn {
+  color: #fff4dc;
+  background: linear-gradient(180deg, var(--frame-hi) 0 50%, var(--frame-c) 50%);
+  border: 2.5px solid var(--line);
+  border-radius: 8px;
+  clip-path: none;
+  box-shadow: 0 3px 0 var(--line);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+}
+button.primary:hover:not(:disabled),
+button.plaque-btn:hover:not(:disabled) {
+  background: linear-gradient(180deg, #c2844f 0 50%, #9a6038 50%);
+}
+#inspector .close,
+#chip-panel .close {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff4dc;
+  background: var(--berry);
+}
+
+/* ------------------------------------------------------------ top bar */
+
+#top {
+  top: 10px;
+}
+#top #topbar {
+  opacity: 1;
+}
+.res:hover,
+#topbar .chip.open {
+  background: rgba(138, 85, 48, 0.18);
+  border-radius: 6px;
+}
+.res.full,
+.res.low {
+  color: var(--berry);
+}
+.sep,
+#buildbar .divider {
+  width: 2.5px;
+  border-radius: 2px;
+  background: var(--seam);
+}
+#topbar .chip .badge,
+.pill .count {
+  background: var(--berry);
+  color: #fff4dc;
+  border: 1.5px solid var(--line);
+}
+#clock .date {
+  font-weight: 800;
+}
+
+/* ------------------------------------------------------------ build bar */
+
+#buildbar {
+  background: repeating-linear-gradient(180deg, var(--plank-a) 0 34px, var(--seam) 34px 36px, var(--plank-b) 36px 70px, var(--seam) 70px 72px);
+}
+#buildbar .tab {
+  border-radius: 8px;
+  font-weight: 700;
+}
+#buildbar .tab:hover:not(.active) {
+  background: rgba(138, 85, 48, 0.16);
+  border-color: transparent;
+}
+#buildbar .cards {
+  border-bottom: 2.5px solid var(--seam);
+}
+.card {
+  border: 2.5px solid var(--line);
+  border-radius: 9px;
+  background: #fbecc8;
+  box-shadow: 0 3px 0 var(--line);
+}
+.card:hover {
+  background: #fff4dc;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 0 var(--line);
+}
+.card.sel {
+  border-color: var(--line);
+  background: #ffe7a6;
+  box-shadow: 0 3px 0 var(--line), inset 0 0 0 3px var(--honey);
+}
+
+/* ------------------------------------------------------------ controls */
+
+#inspector .status {
+  background: #fbecc8;
+  border: 2px solid var(--seam);
+  border-radius: 6px;
+}
+.seg {
+  gap: 0;
+}
+.seg button {
+  border-radius: 0;
+  margin-left: -2.5px;
+}
+.seg button:first-child {
+  border-radius: 8px 0 0 8px;
+  margin-left: 0;
+}
+.seg button:last-child {
+  border-radius: 0 8px 8px 0;
+}
+.pips i {
+  border-radius: 50% 50% 3px 3px;
+  background: #fbecc8;
+  border: 2px solid var(--line);
+}
+.pips i.on {
+  background: var(--leaf);
+}
+.progress,
+.lbar,
+#chip-panel .bar {
+  height: 12px;
+  background: #fbecc8;
+  border: 2.5px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.progress i,
+#chip-panel .bar i {
+  border-radius: 0;
+  background: linear-gradient(180deg, #f6c860 0 45%, var(--honey) 45%);
+}
+.upgrade-box,
+.modal .save,
+.mode,
+.chron {
+  background: #fbecc8;
+  border: 2px solid var(--seam);
+  border-radius: 8px;
+}
+.modal input,
+input[type='text'],
+input[type='number'] {
+  background: #fff8e8;
+  border: 2.5px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  font-family: var(--serif);
+}
+
+/* ------------------------------------------------------------ notes and boards */
+
+.msg {
+  border-left: 3px solid var(--line);
+}
+/* A painted tab at the start of each note says what kind of news it is. */
+.msg::before {
+  content: '';
+  float: left;
+  width: 8px;
+  height: 1.3em;
+  margin: 1px 8px 0 -4px;
+  border-radius: 4px;
+  background: var(--frame-c);
+  border: 1.5px solid var(--line);
+}
+.msg.good::before {
+  background: var(--leaf);
+}
+.msg.bad::before {
+  background: var(--berry);
+}
+.msg.advice::before,
+.msg.tip::before {
+  background: var(--honey);
+}
+.modal-back {
+  background: rgba(40, 26, 12, 0.5);
+}
+.modal {
+  border-width: 8px;
+  border-radius: 14px;
+  outline-width: 3px;
+  box-shadow: inset 0 0 0 2.5px var(--line), 0 8px 0 rgba(40, 22, 8, 0.4);
+  padding: 18px 24px 20px;
+}
+/* Titles on a painted ribbon. */
+.modal > h2:first-child,
+.modal .event h2 {
+  display: table;
+  margin: 0 auto 14px;
+  padding: 4px 26px 5px;
+  font-size: 21px;
+  color: #fff4dc;
+  background: var(--berry);
+  border: 2.5px solid var(--line);
+  border-radius: 6px;
+  box-shadow: 0 3px 0 var(--line);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
+}
+.modal h1,
+.banner h1 {
+  color: var(--frame-c);
+  font-weight: 800;
+  text-shadow: 0 3px 0 var(--line);
+  -webkit-text-stroke: 1.5px var(--line);
+  paint-order: stroke fill;
+}
+.ornament {
+  font-size: 0;
+  height: 12px;
+  width: 140px;
+  margin: 6px auto 10px;
+  background:
+    radial-gradient(circle, var(--berry) 0 3.5px, var(--line) 3.5px 5px, transparent 5px) center / 12px 12px no-repeat,
+    radial-gradient(circle, var(--honey) 0 2.5px, var(--line) 2.5px 4px, transparent 4px) calc(50% - 22px) center / 10px 10px no-repeat,
+    radial-gradient(circle, var(--honey) 0 2.5px, var(--line) 2.5px 4px, transparent 4px) calc(50% + 22px) center / 10px 10px no-repeat,
+    linear-gradient(var(--seam), var(--seam)) center / 100% 2.5px no-repeat;
+}
+.banner {
+  overflow: visible;
+}
+.banner::before,
+.banner::after {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  width: 5px;
+  height: 100vh;
+  background: var(--frame-lo);
+  border-left: 1.5px solid var(--line);
+  border-right: 1.5px solid var(--line);
+}
+.banner::before {
+  left: 18%;
+}
+.banner::after {
+  right: 18%;
+}
+
+/* An event is a painted cloth banner. */
+.modal:has(> .event) {
+  background: #f6e6c4;
+  border: 8px solid var(--berry);
+  outline: 3px solid var(--line);
+  box-shadow: inset 0 0 0 2.5px var(--line), inset 0 0 0 5px #f6e6c4, inset 0 0 0 7px var(--honey), 0 8px 0 rgba(40, 22, 8, 0.4);
+  padding: 20px 28px 24px;
+}
+.event .initial {
+  color: #fff4dc;
+  background: var(--sky);
+  border: 2.5px solid var(--line);
+  border-radius: 6px;
+  box-shadow: 0 3px 0 var(--line);
+}
+.event .choice {
+  background: #fff4dc;
+  border: 2.5px solid var(--line);
+  border-radius: 9px;
+  box-shadow: 0 3px 0 var(--line);
+}
+.event .choice:hover:not(:disabled) {
+  background: #ffe7a6;
+}
+
+/* ------------------------------------------------------------ the charter plaque, painted */
+
+.modal.plaque::before {
+  background: var(--frame-c);
+  outline: 3px solid var(--line);
+  outline-offset: -3px;
+}
+.modal.plaque::after {
+  background: repeating-linear-gradient(180deg, #c48a52 0 26px, #a8723e 26px 28px, #bc8450 28px 54px, #a8723e 54px 56px);
+}
+.t-rod {
+  height: 10px;
+  background: var(--frame-lo);
+  border: 2px solid var(--line);
+  border-radius: 5px;
+}
+.t-cloth {
+  border-left: 3px solid var(--line);
+  border-right: 3px solid var(--line);
+  box-shadow: inset 0 0 0 3px rgba(255, 230, 160, 0.6);
+}
+
+/* ------------------------------------------------------------ scrollbars: a painted peg */
+
+::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+::-webkit-scrollbar-button {
+  display: none;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+::-webkit-scrollbar-track {
+  margin: 6px;
+  border-radius: 7px;
+  background: var(--seam);
+  border: 2px solid var(--line);
+}
+::-webkit-scrollbar-thumb {
+  border-radius: 7px;
+  border: 2px solid var(--line);
+  background: linear-gradient(90deg, var(--frame-hi) 0 50%, var(--frame-c) 50%);
+}
+::-webkit-scrollbar-thumb:horizontal {
+  background: linear-gradient(180deg, var(--frame-hi) 0 50%, var(--frame-c) 50%);
+}
+@supports (-moz-appearance: none) {
+  * {
+    scrollbar-color: var(--frame-c) var(--seam);
+    scrollbar-width: thin;
+  }
+}
