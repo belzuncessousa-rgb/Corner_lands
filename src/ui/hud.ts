@@ -328,7 +328,7 @@ export class Hud {
     const tabs = cats
       .map(
         (c) =>
-          `<button data-action="cat" data-cat="${c}" class="tab ${c === this.category ? 'active' : ''}" data-tip="<b>${CATEGORY_NAMES[c]}</b>">${CATEGORY_ICONS[c]}<span>${CATEGORY_NAMES[c]}</span></button>`,
+          `<button data-action="cat" data-cat="${c}" class="tab name-tip ${c === this.category ? 'active' : ''}" data-tip="<b>${CATEGORY_NAMES[c]}</b>">${CATEGORY_ICONS[c]}<span>${CATEGORY_NAMES[c]}</span></button>`,
       )
       .join('');
     const tools = `<span class="divider"></span>
@@ -1324,7 +1324,9 @@ export class Hud {
   private onTipMove(e: MouseEvent): void {
     const target = (e.target as HTMLElement).closest('[data-tip]') as HTMLElement | null;
     const tip = this.el.tooltip;
-    if (!target) {
+    // A category tab whose name is showing says all its tip would: only icon-only tabs (narrow screens) need it.
+    const named = target?.classList.contains('name-tip') && (target.querySelector('span') as HTMLElement | null)?.offsetParent;
+    if (!target || named) {
       tip.style.display = 'none';
       return;
     }
