@@ -93,6 +93,18 @@ function ringClear(s: GameState, b: Building, c: { x: number; y: number }, r: nu
   return true;
 }
 
+/** Work done standing beside the thing worked on (a tree, rock, bush or fruit tree), facing it. */
+const BESIDE_ACTS = new Set(['chop', 'dig', 'pick', 'reach']);
+
+/** Workshops whose workers are sometimes seen at work in the yard, and at what. */
+const YARD_WORK: Partial<Record<string, string[]>> = {
+  sawmill: ['saw'],
+  carpenter: ['saw', 'hammer'],
+  cooper: ['hammer'],
+  stonemason: ['chisel'],
+  tanner: ['scrape'],
+};
+
 /** Leisure acts (no tools in hand). */
 export const LEISURE_ACTS = new Set(['dance', 'pray', 'toast', 'sit', 'chat']);
 const MAX_AGENTS = 180;
@@ -368,6 +380,25 @@ export class AgentSystem {
       case 'act':
         a.phase = 'act';
         a.timer = LEISURE_ACTS.has(a.act) ? 6 + Math.random() * 8 : 4 + Math.random() * 4;
+        // A hunter turns to the herd.
+        if (a.act === 'hunt' && a.cast) {
+          const sx = a.cast.x - a.cast.y - (a.x - a.y);
+          if (Math.abs(sx) > 0.05) a.dir = sx > 0 ? 1 : -1;
+        }
+        // At a tree, rock or bush: step to its near side and face it, rather than stand in it.
+        if (BESIDE_ACTS.has(a.act)) {
+          const tx = Math.floor(a.x);
+          const ty = Math.floor(a.y);
+          if (Math.random() < 0.5) {
+            a.x = tx + 0.92;
+            a.y = ty + 0.55;
+            a.dir = -1;
+          } else {
+            a.x = tx + 0.55;
+            a.y = ty + 0.92;
+            a.dir = 1;
+          }
+        }
         break;
       case 'fetch':
         // Loading up at the store.
@@ -607,7 +638,8 @@ export class AgentSystem {
     }
     if (!spots.length) return;
     const [x, y] = spots[Math.floor(Math.random() * spots.length)];
-    a.act = 'hammer';
+    // Most builders hammer; some saw planks to length on a sawhorse.
+    a.act = Math.random() < 0.3 ? 'saw' : 'hammer';
     this.exitIfInside(s, a);
     this.walkTo(s, a, x, y, [], next);
   }
@@ -813,10 +845,23 @@ export class AgentSystem {
     if (target) {
       this.exitAt(a, door);
       a.act = target.act;
-      a.cast = target.act === 'fish' ? castFrom(s, target.x, target.y) : undefined;
+      // A fisher's float, or the herd a hunter stalks.
+      a.cast = target.act === 'fish' ? castFrom(s, target.x, target.y) : target.aim;
       a.carry = null;
       this.walkTo(s, a, target.x, target.y, [b.id], 'act');
       return;
+    }
+    // Some trades are seen at work in the yard before the door.
+    const yardAct = YARD_WORK[b.trade ?? b.type];
+    if (yardAct && Math.random() < 0.4) {
+      const spot = besideFree(s, b, a.key.length + b.id);
+      if (spot) {
+        this.exitAt(a, door);
+        a.act = yardAct[Math.floor(Math.random() * yardAct.length)];
+        a.carry = null;
+        this.walkTo(s, a, spot.x, spot.y, [b.id], 'act');
+        return;
+      }
     }
     // Where haulers come for the goods, workers leave them in the yard.
     if (!b.hauled && d.outputs && Object.keys(d.outputs).length && Math.random() < 0.5 && b.type !== 'market') {
@@ -863,7 +908,7 @@ export class AgentSystem {
     }
   }
 
-  private workTarget(s: GameState, b: Building): { x: number; y: number; act: string } | null {
+  private workTarget(s: GameState, b: Building): { x: number; y: number; act: string; aim?: { x: number; y: number } } | null {
     const d = BUILDINGS[b.type];
     const c = bCenter(b);
     // Gatherers go to the nearest of what they gather, however far; others work their own area.
@@ -882,7 +927,7 @@ export class AgentSystem {
       for (let tries = 0; tries < 12; tries++) {
         const x = Math.floor(hx + (Math.random() * 2 - 1) * 2.5);
         const y = Math.floor(hy + (Math.random() * 2 - 1) * 2.5);
-        if (inBounds(s, x, y) && s.terrain[idx(s, x, y)] === 0 && s.occ[idx(s, x, y)] < 0) return { x, y, act };
+        if (inBounds(s, x, y) && s.terrain[idx(s, x, y)] === 0 && s.occ[idx(s, x, y)] < 0) return { x, y, act, aim: { x: hx, y: hy } };
       }
       return null;
     };
@@ -921,7 +966,7 @@ export class AgentSystem {
             if (inBounds(s, x + dx, y + dy) && s.terrain[idx(s, x + dx, y + dy)] === 1) return true;
           }
           return false;
-        }, b.type === 'claypit' ? 'dig' : 'fish');
+        }, b.type === 'claypit' ? 'shovel' : 'fish');
       }
       case 'farm':
       case 'byre':
@@ -932,7 +977,7 @@ export class AgentSystem {
         const zones = s.buildings.filter((z) => z.owner === b.id);
         if (!zones.length) return null;
         const z = zones[Math.floor(Math.random() * zones.length)];
-        const act = b.type === 'farm' ? (m >= 6 ? 'scythe' : 'hoe') : b.type === 'orchardist' ? 'pick' : 'herd';
+        const act = b.type === 'farm' ? (m >= 6 ? 'scythe' : 'hoe') : b.type === 'orchardist' ? 'reach' : 'herd';
         return { x: z.x + Math.floor(Math.random() * z.w), y: z.y + Math.floor(Math.random() * z.h), act };
       }
       default:

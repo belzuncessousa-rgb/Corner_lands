@@ -2620,10 +2620,15 @@ export class Renderer {
     // Leisure: dancing round the maypole, kneeling in prayer, sitting a while, a mug raised.
     const leisure = a.phase === 'act' && LEISURE_ACTS.has(a.act) ? a.act : '';
     const lh = hashKey(a.key);
+    // Work that is done low: kneeling to plant, crouching to pick from the ground.
+    const work = a.phase === 'act' && !leisure ? a.act : '';
+    const kneel = work === 'plant';
+    const crouch = work === 'pick';
     if (leisure === 'dance') {
       bob = Math.abs(Math.sin(this.time * 9 + lh)) * 1.8;
       legA = Math.sin(this.time * 9 + lh) * 1.8;
-    } else if (leisure === 'pray' || leisure === 'sit') bob = 3;
+    } else if (leisure === 'pray' || leisure === 'sit' || kneel) bob = 3;
+    else if (crouch) bob = 1.8;
     c.globalAlpha = a.fadeIn;
     if (a.key === this.selectedAgent) {
       // A gold ring at the feet of the villager being looked at.
@@ -2696,11 +2701,18 @@ export class Renderer {
         c.lineTo(wx + o + 3 * a.dir, wy - 4 - bob + 0.6);
         c.lineTo(wx + o + 3.4 * a.dir, wy);
       }
-    } else if (leisure === 'pray') {
+    } else if (leisure === 'pray' || kneel) {
       // Kneeling: shins along the ground behind.
       c.moveTo(wx - 0.5, wy - 4 - bob);
       c.lineTo(wx - 0.5, wy - 0.4);
       c.lineTo(wx - 3.5 * a.dir, wy);
+    } else if (crouch) {
+      // Crouching: knees bent forward over the feet.
+      for (const o of [-1, 1]) {
+        c.moveTo(wx + o * 0.8, wy - 4 - bob);
+        c.lineTo(wx + o * 0.8 + 2.4 * a.dir, wy - 2.2);
+        c.lineTo(wx + o * 0.8 + 0.6 * a.dir, wy);
+      }
     } else {
       c.moveTo(wx - 1, wy - 4 - bob);
       c.lineTo(wx - 1 + legA, wy);
@@ -2753,25 +2765,8 @@ export class Renderer {
     c.fill();
     if (leisure) this.drawLeisure(a, leisure, wx, wy, bob, lh);
     if (casting) this.drawFishing(a, wx, wy, casting);
-    // Tool animation while acting.
-    else if (a.phase === 'act' && !leisure) {
-      const swing = Math.sin(a.step * 1.6);
-      const ang = -0.6 + swing * 0.9;
-      const hx = wx + a.dir * 2;
-      const hy = wy - 8;
-      const tx = hx + Math.cos(ang) * 7 * a.dir;
-      const ty = hy + Math.sin(ang) * 7;
-      c.strokeStyle = '#6b4a2e';
-      c.lineWidth = 1.2;
-      c.beginPath();
-      c.moveTo(hx, hy);
-      c.lineTo(tx, ty);
-      c.stroke();
-      if (a.act === 'chop' || a.act === 'dig' || a.act === 'hammer' || a.act === 'scythe' || a.act === 'hoe') {
-        c.fillStyle = '#a8adb2';
-        c.fillRect(tx - 1.5, ty - 1.5, 3, 3);
-      }
-    }
+    // The work itself: each trade with its own tool and motion.
+    else if (work) this.drawWork(a, work, wx, wy, bob);
     // Carried goods.
     if (a.carry) {
       // Loads are drawn large, so who carries what reads at a glance.
@@ -2783,6 +2778,390 @@ export class Renderer {
       c.restore();
     }
     c.globalAlpha = 1;
+  }
+
+  /**
+   * A villager at work, drawn in their scaled frame: arms, the tool of the
+   * trade and its motion, and what flies from it (chips, clods, sawdust).
+   * `step` runs on while they work; each act turns it into its own cycle.
+   */
+  private drawWork(a: Agent, act: string, wx: number, wy: number, bob: number): void {
+    const c = this.ctx;
+    const f = a.dir;
+    const t = a.step;
+    const sx = wx + 0.8 * f;
+    const sy = wy - 9.4 - bob;
+    const arm = shade(a.tunic, 0.82);
+    const skin = '#e8c4a0';
+    const IRON = '#9aa0a6';
+    const HANDLE = '#7a5434';
+    const at = (ang: number, r: number, ox = sx, oy = sy): [number, number] => [ox + Math.cos(ang) * r * f, oy + Math.sin(ang) * r];
+    const line = (x0: number, y0: number, x1: number, y1: number, col: string, w: number) => {
+      c.strokeStyle = col;
+      c.lineWidth = w;
+      c.beginPath();
+      c.moveTo(x0, y0);
+      c.lineTo(x1, y1);
+      c.stroke();
+    };
+    const hand = (x: number, y: number) => {
+      c.fillStyle = skin;
+      c.beginPath();
+      c.arc(x, y, 0.8, 0, Math.PI * 2);
+      c.fill();
+    };
+    const armTo = (x: number, y: number) => {
+      line(sx, sy, x, y, arm, 1.3);
+      hand(x, y);
+    };
+    const bits = (x: number, y: number, q: number, col: string, n = 3, spread = 2.6) => {
+      c.fillStyle = col;
+      for (let k = 0; k < n; k++) {
+        const vx = (k - (n - 1) / 2) * spread + f * 1.5;
+        c.fillRect(x + vx * q - 0.5, y - 4 * q + 7 * q * q - 0.5, 1.1, 1.1);
+      }
+    };
+    c.lineCap = 'round';
+    switch (act) {
+      case 'chop':
+      case 'dig': {
+        // Raised up behind the head, then brought down hard; it rests a beat on the blow.
+        const p = (t * 0.32) % 1;
+        const ease = (u: number) => 1 - (1 - u) * (1 - u);
+        const ang = p < 0.55 ? 0.55 + (-2.5 - 0.55) * ease(p / 0.55) : p < 0.68 ? -2.5 + (0.55 + 2.5) * ((p - 0.55) / 0.13) ** 2 : 0.55;
+        const [hx, hy] = at(ang, 3.6);
+        const [ex, ey] = at(ang, 10.5);
+        const [bx, by] = at(ang, 1.6);
+        line(sx - 0.6 * f, sy + 0.4, bx, by, arm, 1.3);
+        armTo(hx, hy);
+        hand(bx, by);
+        line(bx, by, ex, ey, HANDLE, 1.2);
+        const ux = Math.cos(ang) * f;
+        const uy = Math.sin(ang);
+        const nx = -Math.sin(ang) * f;
+        const ny = Math.cos(ang);
+        if (act === 'chop') {
+          // The axe head: a wedge flaring to its edge.
+          c.fillStyle = IRON;
+          c.beginPath();
+          c.moveTo(ex - ux * 0.8, ey - uy * 0.8);
+          c.lineTo(ex + ux * 0.6, ey + uy * 0.6);
+          c.lineTo(ex + ux * 1.4 + nx * 2.8, ey + uy * 1.4 + ny * 2.8);
+          c.lineTo(ex - ux * 1.8 + nx * 2.8, ey - uy * 1.8 + ny * 2.8);
+          c.closePath();
+          c.fill();
+          line(ex + ux * 1.4 + nx * 2.8, ey + uy * 1.4 + ny * 2.8, ex - ux * 1.8 + nx * 2.8, ey - uy * 1.8 + ny * 2.8, '#dfe4e8', 0.6);
+        } else {
+          // The pick: a curved iron bar across the end of the haft.
+          c.strokeStyle = IRON;
+          c.lineWidth = 1.4;
+          c.beginPath();
+          c.moveTo(ex - nx * 2.4 - ux * 0.7, ey - ny * 2.4 - uy * 0.7);
+          c.quadraticCurveTo(ex + ux * 0.5, ey + uy * 0.5, ex + nx * 2.6 - ux * 0.7, ey + ny * 2.6 - uy * 0.7);
+          c.stroke();
+        }
+        if (p >= 0.68 && p < 0.92) bits(ex + nx * 2.6, ey + ny * 2.6, (p - 0.68) / 0.24, act === 'chop' ? '#d8b078' : '#a8a49c');
+        break;
+      }
+      case 'shovel': {
+        // Spade down into the bank, lift, and a clod tossed onto the heap.
+        const p = (t * 0.28) % 1;
+        const u = p < 0.35 ? p / 0.35 : p < 0.7 ? 1 - (p - 0.35) / 0.35 : 0;
+        const tipX = wx + (4.5 + (p < 0.35 ? 0 : 1)) * f;
+        const tipY = wy - 0.5 - (p < 0.35 ? 0 : (1 - u) * 5);
+        const topX = sx + (1.5 + u * 1.8) * f;
+        const topY = sy - 1 + u * 3;
+        line(topX, topY, tipX, tipY, HANDLE, 1.2);
+        armTo(topX, topY);
+        const mx = (topX * 2 + tipX) / 3;
+        const my = (topY * 2 + tipY) / 3;
+        line(sx - 0.5 * f, sy + 0.5, mx, my, arm, 1.3);
+        hand(mx, my);
+        c.fillStyle = IRON;
+        c.beginPath();
+        c.ellipse(tipX, tipY, 1.4, 2, Math.atan2(tipY - topY, tipX - topX) + Math.PI / 2, 0, Math.PI * 2);
+        c.fill();
+        if (p >= 0.35 && p < 0.7) {
+          c.fillStyle = '#7a5838';
+          c.beginPath();
+          c.arc(tipX, tipY - 1.2, 1.3, 0, Math.PI * 2);
+          c.fill();
+        } else if (p >= 0.7) bits(tipX, tipY - 5, (p - 0.7) / 0.3, '#7a5838', 2, 3);
+        break;
+      }
+      case 'hammer': {
+        // Quick short taps on a beam at waist height.
+        const p = (t * 0.9) % 1;
+        const up = p < 0.6 ? p / 0.6 : 1 - (p - 0.6) / 0.4;
+        const ang = 0.5 - up * 1.6;
+        const [hx, hy] = at(ang, 4.2);
+        armTo(hx, hy);
+        const [ex, ey] = at(ang, 8.2);
+        line(hx, hy, ex, ey, HANDLE, 1);
+        c.fillStyle = '#6a6e72';
+        c.save();
+        c.translate(ex, ey);
+        c.rotate(ang * f + (f < 0 ? Math.PI : 0));
+        c.fillRect(-0.6, -1.6, 1.8, 3.2);
+        c.restore();
+        // The beam being nailed, on two trestles.
+        c.fillStyle = '#b48a58';
+        c.fillRect(wx + 3.2 * f - (f < 0 ? 6 : 0), wy - 5, 6, 1.3);
+        line(wx + 4 * f, wy - 3.8, wx + 4 * f, wy, '#7a5434', 0.8);
+        line(wx + 8 * f, wy - 3.8, wx + 8 * f, wy, '#7a5434', 0.8);
+        if (p > 0.95 || p < 0.06) bits(ex, ey + 1, ((p + 0.05) % 1) * 4, '#f2e2a0', 2, 1.5);
+        break;
+      }
+      case 'saw': {
+        // A plank on a sawhorse, the saw run back and forth, sawdust falling.
+        const off = Math.sin(t * 1.5) * 2.2;
+        const px = wx + 5 * f;
+        line(px - 2, wy, px + 1.5, wy - 4.5, '#6a4a2a', 0.9);
+        line(px + 2, wy, px - 1.5, wy - 4.5, '#6a4a2a', 0.9);
+        c.fillStyle = '#c8a46c';
+        c.fillRect(px - 6, wy - 5.6, 12, 1.4);
+        const hx = wx + (2.6 + off * 0.5) * f;
+        const hy = wy - 7.2;
+        armTo(hx, hy);
+        c.fillStyle = '#b8bec4';
+        c.beginPath();
+        c.moveTo(hx, hy - 0.6);
+        c.lineTo(hx + 6 * f, wy - 5.2);
+        c.lineTo(hx + 6 * f, wy - 4.4);
+        c.lineTo(hx, hy + 1);
+        c.closePath();
+        c.fill();
+        line(hx - 0.8 * f, hy - 0.8, hx + 0.6 * f, hy + 1.2, HANDLE, 1.6);
+        c.fillStyle = '#f2e2b0';
+        for (let k = 0; k < 3; k++) {
+          const q = (this.time * 1.4 + k / 3) % 1;
+          c.fillRect(px - 0.5 + (k - 1) * 0.6, wy - 4 + q * 4, 0.8, 0.8);
+        }
+        break;
+      }
+      case 'scythe': {
+        // A long low sweep through the crop, then the blade carried back.
+        const p = (t * 0.26) % 1;
+        const sweep = p < 0.4 ? p / 0.4 : 1 - (p - 0.4) / 0.6;
+        const k = sweep * sweep * (3 - 2 * sweep);
+        const bx = wx + (-5 + k * 11) * f;
+        const by = wy - 0.8 - (p >= 0.4 ? 1.5 : 0);
+        const tx = sx + (-0.5 + k * 3) * f;
+        const ty = sy + 1;
+        line(tx, ty, bx, by, HANDLE, 1.1);
+        armTo(tx, ty);
+        const mx = (tx + bx) / 2;
+        const my = (ty + by) / 2;
+        line(sx, sy + 0.6, mx, my, arm, 1.3);
+        hand(mx, my);
+        c.strokeStyle = '#c8ccd0';
+        c.lineWidth = 1.1;
+        c.beginPath();
+        c.moveTo(bx, by);
+        c.quadraticCurveTo(bx + 3.5 * f, by + 1.6, bx + 7 * f, by + 0.4);
+        c.stroke();
+        if (p > 0.3 && p < 0.55) bits(bx + 4 * f, by - 1, (p - 0.3) / 0.25, '#c8b050', 3, 2);
+        break;
+      }
+      case 'hoe': {
+        // Raised to the shoulder and chopped down into the soil, then drawn back.
+        const p = (t * 0.32) % 1;
+        const ang = p < 0.5 ? 1 - (p / 0.5) * 2.6 : p < 0.62 ? -1.6 + ((p - 0.5) / 0.12) * 2.75 : 1.15 - ((p - 0.62) / 0.38) * 0.15;
+        const [hx, hy] = at(ang, 3.4);
+        const [bx, by] = at(ang, 1.4);
+        const [ex, ey] = at(ang, 10.5);
+        line(sx - 0.5 * f, sy + 0.4, bx, by, arm, 1.3);
+        armTo(hx, hy);
+        hand(bx, by);
+        line(bx, by, ex, ey, HANDLE, 1.1);
+        // The blade, square to the haft and turned toward the hoer.
+        const nx = -Math.sin(ang) * f;
+        const ny = Math.cos(ang);
+        line(ex, ey, ex - Math.cos(ang) * f * 0.4 + nx * 2.4, ey - Math.sin(ang) * 0.4 + ny * 2.4, '#7c8288', 1.8);
+        if (p >= 0.62 && p < 0.85) bits(ex, ey, (p - 0.62) / 0.23, '#6e5034', 3, 1.8);
+        break;
+      }
+      case 'pick': {
+        // Crouched by the bush: a hand from the branches to the basket on the arm.
+        const p = (t * 0.35) % 1;
+        const u = p < 0.5 ? p / 0.5 : 1 - (p - 0.5) / 0.5;
+        const hx = wx + (1.5 + u * 3.5) * f;
+        const hy = sy + 2.5 + u * 3;
+        armTo(hx, hy);
+        if (u > 0.1 && p >= 0.5) {
+          c.fillStyle = '#a8324a';
+          c.beginPath();
+          c.arc(hx, hy - 0.4, 0.7, 0, Math.PI * 2);
+          c.fill();
+        }
+        this.drawBasket(wx - 2.2 * f, wy - 4.5 - bob, '#a8324a');
+        break;
+      }
+      case 'reach': {
+        // Reaching up into the branches; the basket waits at the foot of the tree.
+        const p = (t * 0.3) % 1;
+        const up = p < 0.6 ? 1 : 1 - (p - 0.6) / 0.4;
+        const hx = sx + (1.2 + Math.sin(t * 0.9) * 0.6) * f;
+        const hy = sy - 1 - up * 6.5;
+        armTo(hx, hy);
+        line(sx - 0.4 * f, sy + 0.3, sx + 0.6 * f, sy - 1 - up * 6, arm, 1.3);
+        hand(sx + 0.6 * f, sy - 1 - up * 6);
+        if (up < 0.9) {
+          c.fillStyle = '#c8402c';
+          c.beginPath();
+          c.arc(hx, hy + 0.6, 0.9, 0, Math.PI * 2);
+          c.fill();
+        }
+        this.drawBasket(wx + 4 * f, wy - 1.2, '#c8402c');
+        break;
+      }
+      case 'plant': {
+        // Kneeling: a sapling lowered into the hole, then the soil firmed round it.
+        const p = (t * 0.25) % 1;
+        const gx = wx + 4.2 * f;
+        c.fillStyle = '#6e5034';
+        c.beginPath();
+        c.ellipse(gx, wy - 0.2, 2.2, 0.8, 0, 0, Math.PI * 2);
+        c.fill();
+        const planted = p >= 0.45;
+        const sapX = planted ? gx : wx + (2.6 + p * 3.5) * f;
+        const sapY = planted ? wy - 0.6 : sy + 2 + p * 9;
+        line(sapX, sapY, sapX, sapY - 4, '#6a4a2a', 0.7);
+        c.fillStyle = '#4f8a3c';
+        c.beginPath();
+        c.arc(sapX - 0.8, sapY - 4, 1.1, 0, Math.PI * 2);
+        c.arc(sapX + 0.8, sapY - 4.4, 1.1, 0, Math.PI * 2);
+        c.arc(sapX, sapY - 5.2, 1.1, 0, Math.PI * 2);
+        c.fill();
+        if (planted) {
+          const pat = Math.abs(Math.sin(t * 2.4)) * 1.6;
+          armTo(gx + 1.6 * f, wy - 1 - pat);
+        } else armTo(sapX, sapY - 1.5);
+        break;
+      }
+      case 'hunt': {
+        // The bow raised and drawn, held, loosed: the arrow flies off.
+        const p = (t * 0.22) % 1;
+        const draw = p < 0.55 ? (p / 0.55) * 3.6 : p < 0.72 ? 3.6 : 0;
+        const bx = wx + 5 * f;
+        const by = sy + 0.6;
+        armTo(bx - 0.3 * f, by);
+        c.strokeStyle = '#6a4a2a';
+        c.lineWidth = 1.1;
+        c.beginPath();
+        c.moveTo(bx - 0.6 * f, by - 5.2);
+        c.quadraticCurveTo(bx + 2.6 * f, by, bx - 0.6 * f, by + 5.2);
+        c.stroke();
+        const nx = bx - (0.6 + draw) * f;
+        line(bx - 0.6 * f, by - 5.2, nx, by, 'rgba(240,235,220,0.9)', 0.4);
+        line(nx, by, bx - 0.6 * f, by + 5.2, 'rgba(240,235,220,0.9)', 0.4);
+        line(sx - 0.4 * f, sy + 0.4, nx, by, arm, 1.3);
+        hand(nx, by);
+        if (p < 0.72) line(nx, by, bx + 2.4 * f, by, '#8a6a44', 0.6);
+        else {
+          const q = (p - 0.72) / 0.28;
+          c.globalAlpha *= 1 - q;
+          line(bx + (2 + q * 40) * f, by - q * 3, bx + (6 + q * 40) * f, by - q * 3, '#8a6a44', 0.6);
+          c.globalAlpha = a.fadeIn;
+        }
+        break;
+      }
+      case 'herd': {
+        // Leaning on a shepherd's crook; now and then an arm waved at a stray.
+        const cx = wx + 3.4 * f;
+        line(cx, wy + 0.2, cx, wy - 16, HANDLE, 1);
+        c.strokeStyle = HANDLE;
+        c.lineWidth = 1;
+        c.beginPath();
+        c.arc(cx + 1.3 * f, wy - 16, 1.3, Math.PI, f > 0 ? Math.PI * 2 : 0, f < 0);
+        c.stroke();
+        armTo(cx, wy - 9.5 - bob * 0.5);
+        if (Math.sin(t * 0.25) > 0.75) {
+          const w = Math.sin(t * 2) * 0.8;
+          line(sx - 1.4 * f, sy, sx - (2.6 + w) * f, sy - 5, arm, 1.3);
+          hand(sx - (2.6 + w) * f, sy - 5);
+        }
+        break;
+      }
+      case 'chisel': {
+        // A block of stone at the feet: chisel held to it, the mallet tapping.
+        const bx = wx + 4.6 * f;
+        c.fillStyle = '#b8b4aa';
+        c.fillRect(bx - 2.6, wy - 4.4, 5.2, 4.4);
+        c.fillStyle = '#d0ccc2';
+        c.fillRect(bx - 2.6, wy - 4.4, 5.2, 1);
+        c.fillStyle = 'rgba(0,0,0,0.15)';
+        c.fillRect(bx + (f > 0 ? 1.6 : -2.6), wy - 3.4, 1, 3.4);
+        const cx = bx - 2.2 * f;
+        line(sx - 0.6 * f, sy + 0.6, cx, wy - 5.4, arm, 1.3);
+        hand(cx, wy - 5.4);
+        line(cx, wy - 5.4, cx + 0.6 * f, wy - 3.8, IRON, 0.8);
+        const p = (t * 0.8) % 1;
+        const up = p < 0.7 ? p / 0.7 : 1 - (p - 0.7) / 0.3;
+        const mx = cx - (0.4 + up * 0.8) * f;
+        const my = wy - 7.2 - up * 4.5;
+        armTo(mx, my);
+        c.fillStyle = '#8a6440';
+        c.fillRect(mx - 1.2, my - 1.6, 2.4, 2);
+        if (p > 0.92 || p < 0.1) bits(cx + 0.8 * f, wy - 4, ((p + 0.08) % 1) * 4, '#e0dcd2', 3, 1.4);
+        break;
+      }
+      case 'scrape': {
+        // A hide stretched on a frame, scraped clean with a two-handled knife.
+        const fx = wx + 5 * f;
+        line(fx - 3, wy, fx - 3, wy - 13, '#6a4a2a', 0.9);
+        line(fx + 3, wy, fx + 3, wy - 13, '#6a4a2a', 0.9);
+        line(fx - 3.4, wy - 12.4, fx + 3.4, wy - 12.4, '#6a4a2a', 0.9);
+        c.fillStyle = '#c89a6a';
+        c.beginPath();
+        c.moveTo(fx - 2.4, wy - 12);
+        c.lineTo(fx + 2.4, wy - 12);
+        c.quadraticCurveTo(fx + 2.8, wy - 6, fx + 2, wy - 2.4);
+        c.lineTo(fx - 2, wy - 2.4);
+        c.quadraticCurveTo(fx - 2.8, wy - 6, fx - 2.4, wy - 12);
+        c.fill();
+        const k = (Math.sin(t * 1.2) + 1) / 2;
+        const ky = wy - 10.5 + k * 6.5;
+        armTo(fx - 1.8 * f, ky);
+        line(sx - 0.5 * f, sy + 0.4, fx + 1.2 * f, ky, arm, 1.3);
+        hand(fx + 1.2 * f, ky);
+        line(fx - 2.4 * f, ky, fx + 1.8 * f, ky, IRON, 0.9);
+        break;
+      }
+      default: {
+        // Any other work: busy hands at the bench.
+        armTo(wx + 3.5 * f, sy + 2 + Math.sin(t) * 0.8);
+      }
+    }
+    c.lineCap = 'butt';
+  }
+
+  /** A wicker basket with a handle, heaped with what is being picked. */
+  private drawBasket(x: number, y: number, fruit: string): void {
+    const c = this.ctx;
+    c.fillStyle = '#a0784a';
+    c.beginPath();
+    c.moveTo(x - 2.2, y - 1.6);
+    c.lineTo(x + 2.2, y - 1.6);
+    c.lineTo(x + 1.6, y + 1.2);
+    c.lineTo(x - 1.6, y + 1.2);
+    c.closePath();
+    c.fill();
+    c.strokeStyle = '#7a5434';
+    c.lineWidth = 0.5;
+    c.beginPath();
+    c.moveTo(x - 2, y - 0.3);
+    c.lineTo(x + 2, y - 0.3);
+    c.stroke();
+    c.beginPath();
+    c.arc(x, y - 1.6, 1.8, Math.PI, 0);
+    c.stroke();
+    c.fillStyle = fruit;
+    for (const dx of [-1, 0, 1]) {
+      c.beginPath();
+      c.arc(x + dx * 0.9, y - 1.9, 0.65, 0, Math.PI * 2);
+      c.fill();
+    }
   }
 
   /**
