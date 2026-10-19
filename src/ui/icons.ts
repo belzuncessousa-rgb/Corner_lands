@@ -139,6 +139,9 @@ export const CATEGORY_ICONS: Record<string, string> = {
   menu: svg('<path d="M4 6h12M4 10h12M4 14h12" stroke="#3b2a1a" stroke-width="2" stroke-linecap="round"/>'),
 };
 
+/** The game's name, signwritten on an arch like an inn sign. */
+export const LOGO = `<svg class="logo" viewBox="0 0 420 132" role="img" aria-label="Corner Lands"><defs><path id="logo-arc" d="M30 118 Q210 8 390 118"/></defs><text><textPath href="#logo-arc" startOffset="50%" text-anchor="middle">Corner Lands</textPath></text></svg>`;
+
 /**
  * Icons look painted onto the boards: one shared filter gives every icon a
  * dark brush outline with a slight wobble, and a faint streak of grain.

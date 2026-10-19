@@ -107,7 +107,7 @@ import type { StorageKind } from '../game/data';
 import { RESOURCE_IDS } from '../game/types';
 import { LANDS, generateWorld, idx, inBounds } from '../game/world';
 import type { Game } from '../main';
-import { CATEGORY_ICONS, ICONS, SEASON_ICONS } from './icons';
+import { CATEGORY_ICONS, ICONS, LOGO, SEASON_ICONS } from './icons';
 import { Minimap } from './minimap';
 import { Ambient } from './ambient';
 import { Music } from './music';
@@ -1894,7 +1894,7 @@ export class Hud {
     const latest = saves[0];
     const m = this.openModal(
       `<div class="art-slot title-art" data-art="title"></div>
-      <h1>Corner Lands</h1>
+      <h1 class="logo-h">${LOGO}</h1>
       <div class="sub">Raise a humble hamlet into a thriving medieval city</div>
       <div class="ornament">❦ ❦ ❦</div>
       <div class="menu">
@@ -2238,7 +2238,7 @@ export class Hud {
 
   showGameMenu(): void {
     const m = this.openModal(
-      `<h1>Corner Lands</h1>
+      `<h1 class="logo-h">${LOGO}</h1>
       <div class="sub">${esc(this.game.summary())}</div>
       <div class="menu">
         <button class="primary" data-m="resume">Resume</button>

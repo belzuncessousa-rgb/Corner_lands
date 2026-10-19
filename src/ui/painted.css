@@ -611,3 +611,67 @@ button:disabled small {
 #menu-btn.icon-btn {
   padding: 0;
 }
+
+/* ------------------------------------------------------------ lettering */
+
+/* The name on an arch: cream signwriting, outlined, with a red drop. */
+.modal h1.logo-h {
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+  line-height: 0;
+  margin: -4px auto 0;
+}
+svg.logo {
+  display: block;
+  width: min(380px, 100%);
+  height: auto;
+  margin: 0 auto;
+  overflow: visible;
+  filter: drop-shadow(3px 3px 0 #b0403a) drop-shadow(1px 2px 0 var(--line));
+}
+svg.logo text {
+  font-family: var(--title);
+  font-weight: 700;
+  font-size: 58px;
+  letter-spacing: 1px;
+  fill: #fff4dc;
+  stroke: var(--line);
+  stroke-width: 5px;
+  stroke-linejoin: round;
+  paint-order: stroke;
+}
+/* Titles on a swallowtail banner; the outline is drawn by shadows so the cut ends keep it. */
+.modal > h2:first-child,
+.modal .event h2 {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 5px 34px 6px;
+  clip-path: none;
+  background: none;
+  position: relative;
+  isolation: isolate;
+  filter: drop-shadow(0 2.5px 0 var(--line)) drop-shadow(0 -1.5px 0 var(--line)) drop-shadow(1.5px 0 0 var(--line)) drop-shadow(-1.5px 0 0 var(--line));
+}
+.modal > h2:first-child::before,
+.modal .event h2::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--berry);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 14px) 50%, 100% 100%, 0 100%, 14px 50%);
+}
+.modal .event h2::before {
+  background: var(--weave) 0 0 / 48px 48px, var(--berry);
+}
+/* Numbers on the signs in Texturina: sturdier than the reading face. */
+.res,
+#clock .date,
+.trade td.num,
+table.goods td.num,
+.trade .keep b,
+table.goods td.keep span {
+  font-family: var(--title);
+  font-weight: 700;
+}
