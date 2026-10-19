@@ -6,6 +6,7 @@ import { chooseRecipe, lordRides, doorTile, forTilesInRadius, bCenter, isWinter,
 const CART_DAY = 4;
 import type { Building, GameState, ResourceId } from '../game/types';
 import { getBuilding, idx, inBounds } from '../game/world';
+import { buildingDoor } from './sprites';
 
 export type Role =
   | { kind: 'work'; id: number }
@@ -53,6 +54,11 @@ export interface Agent {
   cast?: { x: number; y: number };
   /** The ring a dancer circles: centre and radius in tiles. */
   ring?: { x: number; y: number; r: number; t: number };
+  /** Points walked before the path (out of a door to the road) and after it (up to a door and in). */
+  lead?: { x: number; y: number }[];
+  tail?: { x: number; y: number }[];
+  /** Going in or out by a building's door: which building, and the doorway's point on the wall (tiles). */
+  door?: { id: number; x: number; y: number };
 }
 
 const TUNICS = ['#8a3b2e', '#4a5e8a', '#6b7a3a', '#9a7a3a', '#5e4a6e', '#7a5a3a', '#3a6a6a', '#a05a3a', '#556070'];
@@ -304,34 +310,81 @@ export class AgentSystem {
   // ---------------------------------------------------------------- behaviour
 
   private walkTo(s: GameState, a: Agent, tx: number, ty: number, allow: number[], next: Agent['next']): void {
-    const sx = Math.floor(a.x);
-    const sy = Math.floor(a.y);
+    // Stepping out of a door first: the path starts where the door leads.
+    const from = a.lead?.length ? a.lead[a.lead.length - 1] : { x: a.x, y: a.y };
+    const sx = Math.floor(from.x);
+    const sy = Math.floor(from.y);
     const extra = [...allow];
     const occ = inBounds(s, sx, sy) ? s.occ[idx(s, sx, sy)] : -1;
     if (occ >= 0) extra.push(occ);
     const path = findPath(s, sx, sy, tx, ty, extra);
     a.next = next;
     a.visible = true;
+    a.tail = undefined;
     if (!path) {
       // Unreachable: just appear there.
       a.x = tx + 0.5;
       a.y = ty + 0.5;
       a.path = [];
+      a.lead = undefined;
+      a.door = undefined;
     } else {
       a.path = path;
     }
     a.phase = 'walk';
+    // Going in: on from the door tile up to the door itself. Calling: to the doorstep.
+    const enter = next === 'enter-work' || next === 'enter-home';
+    if (enter || next === 'fetch' || next === 'drop' || next === 'return') {
+      const b = allow.map((id) => getBuilding(s, id)).find((o) => o && o.build >= 1 && sameTile(doorTile(s, o), tx, ty));
+      const spot = b ? doorSpot(s, b) : null;
+      if (b && spot) {
+        const route = ringRoute(b, { x: tx + 0.5, y: ty + 0.5 }, spot.out);
+        a.tail = enter ? [...route, spot.step, spot.wall] : [...route, spot.step];
+      }
+    }
+  }
+
+  /** Steps out of a building by its door: from the doorway, down to the door tile, then on. */
+  private exitAt(s: GameState, a: Agent, b: Building | null | undefined): void {
+    if (a.visible || !b) return;
+    const d = doorTile(s, b);
+    const spot = doorSpot(s, b);
+    if (spot) {
+      a.x = spot.wall.x;
+      a.y = spot.wall.y;
+      a.lead = [spot.step, ...ringRoute(b, spot.out, { x: d.x + 0.5, y: d.y + 0.5 })];
+      a.door = { id: b.id, x: spot.wall.x, y: spot.wall.y };
+      a.fadeIn = 1;
+    } else {
+      a.x = d.x + 0.5;
+      a.y = d.y + 0.5;
+      a.fadeIn = 0;
+    }
   }
 
   private tick(s: GameState, a: Agent, dt: number): void {
     if (a.fadeIn < 1) a.fadeIn = Math.min(1, a.fadeIn + dt * 2);
     if (a.phase === 'walk') {
-      const here = idx(s, Math.floor(a.x), Math.floor(a.y));
-      let move = (a.role.kind === 'lord' && lordRides(s) ? 1.8 : 1) * dt * (s.road[here] === 3 ? COBBLE_SPEED : s.road[here] === 2 ? PAVED_SPEED : s.road[here] ? ROAD_SPEED : s.trees[here] ? OFFROAD_SPEED / WOODS_SLOWDOWN : OFFROAD_SPEED) * (a.carry ? 0.85 : 1);
-      while (move > 0 && a.path.length) {
-        const t = a.path[0];
-        const tx = (t % s.width) + 0.5;
-        const ty = Math.floor(t / s.width) + 0.5;
+      const here = inBounds(s, Math.floor(a.x), Math.floor(a.y)) ? idx(s, Math.floor(a.x), Math.floor(a.y)) : 0;
+      // At the door the pace slows to a step.
+      const atDoor = !!(a.lead?.length || (a.tail?.length && !a.path.length));
+      let move = (a.role.kind === 'lord' && lordRides(s) ? 1.8 : 1) * dt * (atDoor ? ROAD_SPEED * 0.8 : s.road[here] === 3 ? COBBLE_SPEED : s.road[here] === 2 ? PAVED_SPEED : s.road[here] ? ROAD_SPEED : s.trees[here] ? OFFROAD_SPEED / WOODS_SLOWDOWN : OFFROAD_SPEED) * (a.carry ? 0.85 : 1);
+      while (move > 0) {
+        // Out of the door first, then the path, then up to the next door.
+        let tx: number;
+        let ty: number;
+        let from: 'lead' | 'path' | 'tail';
+        if (a.lead?.length) {
+          ({ x: tx, y: ty } = a.lead[0]);
+          from = 'lead';
+        } else if (a.path.length) {
+          tx = (a.path[0] % s.width) + 0.5;
+          ty = Math.floor(a.path[0] / s.width) + 0.5;
+          from = 'path';
+        } else if (a.tail?.length) {
+          ({ x: tx, y: ty } = a.tail[0]);
+          from = 'tail';
+        } else break;
         const dx = tx - a.x;
         const dy = ty - a.y;
         const d = Math.hypot(dx, dy);
@@ -339,7 +392,11 @@ export class AgentSystem {
           a.x = tx;
           a.y = ty;
           move -= d;
-          a.path.shift();
+          if (from === 'lead') a.lead!.shift();
+          else if (from === 'path') a.path.shift();
+          else {
+            a.tail!.shift();
+          }
         } else {
           a.x += (dx / d) * move;
           a.y += (dy / d) * move;
@@ -347,9 +404,23 @@ export class AgentSystem {
         }
         // Screen-space facing: +1 right, -1 left.
         if (Math.abs(dx - dy) > 0.01) a.dir = dx - dy > 0 ? 1 : -1;
+        // The last steps in: the door is opened for them.
+        if (from === 'tail' && a.tail!.length <= 2 && a.next.startsWith('enter') && !a.door) {
+          const wall = a.tail![a.tail!.length - 1];
+          const b = s.occ[idx(s, Math.floor(wall.x), Math.floor(wall.y))];
+          if (b >= 0) a.door = { id: b, x: wall.x, y: wall.y };
+        }
       }
+      // Out through the door and clear of it: it can close behind them.
+      if (a.door && !a.tail?.length && Math.hypot(a.x - a.door.x, a.y - a.door.y) > 1.2) a.door = undefined;
       a.step += dt * 6;
-      if (!a.path.length) this.arrive(s, a);
+      if (!a.path.length && !a.lead?.length && !a.tail?.length) this.arrive(s, a);
+      return;
+    }
+    // Left in a doorway with the way out still to walk: walk it.
+    if (a.lead?.length && a.visible) {
+      a.phase = 'walk';
+      if (!a.path.length && !a.tail?.length && a.next.startsWith('enter')) a.next = 'wander-done';
       return;
     }
     a.timer -= dt;
@@ -375,6 +446,7 @@ export class AgentSystem {
         a.phase = 'inside';
         a.visible = false;
         a.carry = null;
+        a.door = undefined;
         a.timer = 4 + Math.random() * 5;
         break;
       case 'act':
@@ -544,9 +616,7 @@ export class AgentSystem {
         a.timer = 2 + Math.random() * 2;
         return;
       }
-      a.x = sd.x + 0.5;
-      a.y = sd.y + 0.5;
-      a.fadeIn = 0;
+      this.exitAt(s, a, stable);
       a.visible = true;
     }
     if (this.evening) {
@@ -559,7 +629,8 @@ export class AgentSystem {
       a.carry = null;
       a.act = 'graze';
       const spot = besideFree(s, stable, r.id * 3);
-      if (spot && Math.hypot(spot.x + 0.5 - a.x, spot.y + 0.5 - a.y) > 0.6) this.walkTo(s, a, spot.x, spot.y, [stable.id], 'act');
+      // Just out of the stall, it always walks clear of the door first.
+      if (spot && (a.lead?.length || Math.hypot(spot.x + 0.5 - a.x, spot.y + 0.5 - a.y) > 0.6)) this.walkTo(s, a, spot.x, spot.y, [stable.id], 'act');
       else {
         a.phase = 'act';
         a.timer = 5 + Math.random() * 5;
@@ -617,12 +688,8 @@ export class AgentSystem {
   private exitIfInside(s: GameState, a: Agent): void {
     if (a.visible) return;
     const home = getBuilding(s, a.home);
-    if (home) {
-      const d = doorTile(s, home);
-      a.x = d.x + 0.5;
-      a.y = d.y + 0.5;
-    }
-    a.fadeIn = 0;
+    if (home) this.exitAt(s, a, home);
+    else a.fadeIn = 0;
   }
 
   private goToSiteEdge(s: GameState, a: Agent, b: Building, next: Agent['next'] = 'act'): void {
@@ -652,13 +719,10 @@ export class AgentSystem {
   private lordsWalk(s: GameState, a: Agent): void {
     const manor = getBuilding(s, a.home);
     if (!manor) return;
-    if (a.phase === 'inside') {
-      const d = doorTile(s, manor);
-      a.x = d.x + 0.5;
-      a.y = d.y + 0.5;
-    }
+    const wasIn = a.phase === 'inside';
+    if (wasIn) this.exitAt(s, a, manor);
     a.carry = null;
-    if (a.phase !== 'inside' && Math.random() < 0.3) {
+    if (!wasIn && Math.random() < 0.3) {
       const d = doorTile(s, manor);
       this.walkTo(s, a, d.x, d.y, [manor.id], 'enter-home');
       return;
@@ -712,11 +776,7 @@ export class AgentSystem {
         });
         const spot = near[Math.floor(Math.random() * near.length)];
         if (spot) {
-          if (home) {
-            const d = doorTile(s, home);
-            a.x = d.x + 0.5;
-            a.y = d.y + 0.5;
-          }
+          this.exitAt(s, a, home);
           a.carry = null;
           // Linger on a free tile right beside it.
           const around: [number, number][] = [];
@@ -744,11 +804,7 @@ export class AgentSystem {
       }
       if (roads.length && Math.random() < 0.7) {
         const t = roads[Math.floor(Math.random() * roads.length)];
-        if (home) {
-          const d = doorTile(s, home);
-          a.x = d.x + 0.5;
-          a.y = d.y + 0.5;
-        }
+        this.exitAt(s, a, home);
         a.carry = null;
         this.walkTo(s, a, t % s.width, Math.floor(t / s.width), [], 'wander-done');
       } else {
@@ -793,7 +849,7 @@ export class AgentSystem {
     // Mostly the fullest, nearest yard; sometimes another, so haulers spread out.
     sources.sort((p, q) => q.score - p.score);
     const pick = sources[Math.random() < 0.6 ? 0 : Math.floor(Math.random() * Math.min(4, sources.length))];
-    this.exitAt(a, door);
+    this.exitAt(s, a, b);
     a.want = pick.id;
     const wd = doorTile(s, pick.w);
     this.walkTo(s, a, wd.x, wd.y, [pick.w.id, b.id], 'fetch');
@@ -822,7 +878,7 @@ export class AgentSystem {
     if (Math.random() < 0.07) {
       const errand = this.errandStop(s, a);
       if (errand) {
-        this.exitAt(a, door);
+        this.exitAt(s, a, b);
         a.carry = null;
         a.want = errand.carry;
         const ed = doorTile(s, errand.at);
@@ -834,7 +890,7 @@ export class AgentSystem {
     if (a.home !== -1 && Math.random() < 0.08) {
       const home = getBuilding(s, a.home);
       if (home) {
-        this.exitAt(a, door);
+        this.exitAt(s, a, b);
         a.carry = null;
         const hd = doorTile(s, home);
         this.walkTo(s, a, hd.x, hd.y, [home.id], 'enter-home');
@@ -843,7 +899,7 @@ export class AgentSystem {
       }
     }
     if (target) {
-      this.exitAt(a, door);
+      this.exitAt(s, a, b);
       a.act = target.act;
       // A fisher's float, or the herd a hunter stalks.
       a.cast = target.act === 'fish' ? castFrom(s, target.x, target.y) : target.aim;
@@ -856,7 +912,7 @@ export class AgentSystem {
     if (yardAct && Math.random() < 0.4) {
       const spot = besideFree(s, b, a.key.length + b.id);
       if (spot) {
-        this.exitAt(a, door);
+        this.exitAt(s, a, b);
         a.act = yardAct[Math.floor(Math.random() * yardAct.length)];
         a.carry = null;
         this.walkTo(s, a, spot.x, spot.y, [b.id], 'act');
@@ -868,7 +924,7 @@ export class AgentSystem {
       // Deliver goods to the manor hall or a storehouse.
       const store = nearestStore(s, b);
       if (store) {
-        this.exitAt(a, door);
+        this.exitAt(s, a, b);
         a.carry = goodCarried(s, b);
         const sd = doorTile(s, store);
         this.walkTo(s, a, sd.x, sd.y, [b.id, store.id], 'return');
@@ -900,13 +956,6 @@ export class AgentSystem {
     return best ? { at: best, carry: type === 'market' ? 'vegetables' : 'milk' } : null;
   }
 
-  private exitAt(a: Agent, door: { x: number; y: number }): void {
-    if (!a.visible) {
-      a.x = door.x + 0.5;
-      a.y = door.y + 0.5;
-      a.fadeIn = 0;
-    }
-  }
 
   private workTarget(s: GameState, b: Building): { x: number; y: number; act: string; aim?: { x: number; y: number } } | null {
     const d = BUILDINGS[b.type];
@@ -984,6 +1033,72 @@ export class AgentSystem {
         return null;
     }
   }
+}
+
+function sameTile(d: { x: number; y: number }, x: number, y: number): boolean {
+  return d.x === x && d.y === y;
+}
+
+/**
+ * A building's door in world tiles: the point on the wall villagers go in by,
+ * the doorstep just outside it, and where the path to it meets the ring of
+ * tiles round the building.
+ */
+function doorSpot(s: GameState, b: Building): { wall: { x: number; y: number }; step: { x: number; y: number }; out: { x: number; y: number } } | null {
+  const d = buildingDoor(s, b);
+  if (!d) return null;
+  const mid = (d.a + d.b) / 2;
+  if (d.face === 'L') {
+    return { wall: { x: b.x + mid, y: b.y + d.plane + 0.02 }, step: { x: b.x + mid, y: b.y + d.plane + 0.42 }, out: { x: b.x + mid, y: b.y + b.h + 0.5 } };
+  }
+  return { wall: { x: b.x + d.plane + 0.02, y: b.y + mid }, step: { x: b.x + d.plane + 0.42, y: b.y + mid }, out: { x: b.x + b.w + 0.5, y: b.y + mid } };
+}
+
+/**
+ * The way round a building between two points on the ring of tile centres
+ * just outside it: the corners passed on the shorter way, then the end.
+ */
+function ringRoute(b: Building, from: { x: number; y: number }, to: { x: number; y: number }): { x: number; y: number }[] {
+  const x0 = b.x - 0.5;
+  const y0 = b.y - 0.5;
+  const x1 = b.x + b.w + 0.5;
+  const y1 = b.y + b.h + 0.5;
+  const W = x1 - x0;
+  const H = y1 - y0;
+  // Distance round the ring, clockwise on screen from the top-left corner.
+  const at = (p: { x: number; y: number }) => {
+    const x = Math.max(x0, Math.min(x1, p.x));
+    const y = Math.max(y0, Math.min(y1, p.y));
+    const dl = Math.abs(x - x0);
+    const dr = Math.abs(x - x1);
+    const dt = Math.abs(y - y0);
+    const db = Math.abs(y - y1);
+    const m = Math.min(dl, dr, dt, db);
+    if (m === dt) return x - x0;
+    if (m === dr) return W + (y - y0);
+    if (m === db) return W + H + (x1 - x);
+    return 2 * W + H + (y1 - y);
+  };
+  const corners = [
+    { t: 0, x: x0, y: y0 },
+    { t: W, x: x1, y: y0 },
+    { t: W + H, x: x1, y: y1 },
+    { t: 2 * W + H, x: x0, y: y1 },
+  ];
+  const P = 2 * (W + H);
+  const a = at(from);
+  const z = at(to);
+  const fwd = (z - a + P) % P;
+  const out: { x: number; y: number }[] = [];
+  if (fwd <= P / 2) {
+    for (const c of corners) if (((c.t - a + P) % P) > 0.01 && ((c.t - a + P) % P) < fwd - 0.01) out.push(c);
+    out.sort((p, q) => ((at(p) - a + P) % P) - ((at(q) - a + P) % P));
+  } else {
+    for (const c of corners) if (((a - c.t + P) % P) > 0.01 && ((a - c.t + P) % P) < P - fwd - 0.01) out.push(c);
+    out.sort((p, q) => ((a - at(p) + P) % P) - ((a - at(q) + P) % P));
+  }
+  out.push(to);
+  return out.map(({ x, y }) => ({ x, y }));
 }
 
 /** The draught stable nearest the building an animal works for. */

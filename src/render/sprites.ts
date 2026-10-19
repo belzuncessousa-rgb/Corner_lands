@@ -3,7 +3,8 @@ import { mulberry32 } from '../game/rng';
 import { HERALDRY } from './heraldry';
 import { HOME_TRADES } from '../game/sim';
 import type { BuildingType, Season } from '../game/types';
-import { type Material, Pen, ROOF_COLORS, TH, TW, iso, mix, shade, type V3 } from './pen';
+import { type Material, Pen, type PenDoor, ROOF_COLORS, TH, TW, iso, mix, shade, type V3 } from './pen';
+import type { Building, GameState } from '../game/types';
 
 /** Supersampling factor so sprites stay crisp when zoomed in. */
 export const SS = 2;
@@ -17,6 +18,8 @@ export interface Sprite {
   h: number;
   /** Chimney tops in local 3D coordinates, for smoke. */
   smoke: V3[];
+  /** The door villagers go in and out by, in local tile coordinates, if it has one. */
+  door?: PenDoor;
 }
 
 export function makeSprite(w: number, h: number, ax: number, ay: number, draw: (ctx: CanvasRenderingContext2D) => V3[] | void): Sprite {
@@ -1089,12 +1092,87 @@ export function buildingSprite(type: BuildingType, w: number, h: number, level: 
   const top = 200;
   const sw = (w + h) * (TW / 2) + 30;
   const sh = (w + h) * (TH / 2) + top + 14;
-  return makeSprite(sw, sh, h * (TW / 2) + 15, top, (ctx) => {
+  let door: PenDoor | undefined;
+  const sp = makeSprite(sw, sh, h * (TW / 2) + 15, top, (ctx) => {
     const p = new Pen(ctx);
     p.snow = season === 3;
     p.matFor = wallMaterial;
-    return drawBuilding(p, type, level, season, variant);
+    const smoke = drawBuilding(p, type, level, season, variant);
+    door = pickDoor(p, w, h, type);
+    return smoke;
   });
+  sp.door = door;
+  return sp;
+}
+
+/**
+ * The door to use from those drawn: the first proper door on a front wall,
+ * else the front-most dark doorway standing on the ground. Doors on inner
+ * walls (a porch, a lean-to) count only if they face out from the building.
+ */
+function pickDoor(p: Pen, w: number, h: number, type: BuildingType): PenDoor | undefined {
+  if (DOOR_SPOTS[type]) return DOOR_SPOTS[type];
+  const front = (d: PenDoor) => (d.face === 'L' ? d.plane > h * 0.4 : d.plane > w * 0.4);
+  const real = p.doors.filter(front);
+  if (real.length) return real[0];
+  const rough = p.doorish.filter(front).sort((a, b) => b.plane - a.plane || (b.b - b.a) - (a.b - a.a));
+  return rough[0];
+}
+
+/**
+ * Doors the pictures draw in their own way (stall doors, tent flaps, a raised
+ * granary door, the cathedral's portal), and the spot under the roof where
+ * open sheds are entered.
+ */
+const DOOR_SPOTS: Partial<Record<BuildingType, PenDoor>> = {
+  camp: { face: 'R', plane: 1.1, a: 1.65, b: 1.95, h: 11, open: true },
+  cathedral: { face: 'L', plane: 5.752, a: 2.26, b: 2.74, h: 20 },
+  granary: { face: 'L', plane: 1.722, a: 0.62, b: 0.92, h: 23, z0: 9 },
+  stable: { face: 'L', plane: 1.052, a: 1.35, b: 1.77, h: 11, open: true },
+  draughtstable: { face: 'L', plane: 1.222, a: 1.02, b: 1.42, h: 10, open: true },
+  byre: { face: 'L', plane: 1.202, a: 0.85, b: 1.2, h: 11, open: true },
+  stonemason: { face: 'L', plane: 1.0, a: 0.7, b: 1.0, h: 9, open: true },
+  bloomery: { face: 'L', plane: 1.15, a: 0.7, b: 1.0, h: 9, open: true },
+  tanner: { face: 'L', plane: 0.95, a: 0.7, b: 1.0, h: 9, open: true },
+  kiln: { face: 'R', plane: 1.15, a: 0.8, b: 1.05, h: 7, open: true },
+  builderyard: { face: 'L', plane: 0.722, a: 0.5, b: 1.0, h: 9, open: true },
+  markethall: { face: 'L', plane: 2.85, a: 1.6, b: 2.2, h: 14, open: true },
+};
+
+const DOORS = new Map<string, PenDoor | null>();
+
+/** Where a building's door is drawn (local tile coordinates), for villagers to walk in by; cached. */
+export function buildingDoor(s: GameState, b: Building): PenDoor | null {
+  const v = variantOf(s, b);
+  const key = `${b.type}:${b.w}:${b.h}:${b.level}:${v}`;
+  let d = DOORS.get(key);
+  if (d === undefined) {
+    d = buildingSprite(b.type, b.w, b.h, b.level, 0, v).door ?? null;
+    DOORS.set(key, d);
+  }
+  return d;
+}
+
+/** Which look a building's picture takes: the house forms and colours, the dock's side, the cathedral's glass. */
+export function variantOf(s: GameState, b: Building): number {
+  // The cathedral shows its stained glass once commissioned.
+  if (b.type === 'cathedral') return s.commissions?.includes('glass') ? 1 : 0;
+  // A dock builds its quay out over whichever side has more water.
+  if (b.type === 'dock') {
+    let side = 0;
+    let fore = 0;
+    for (let k = 0; k < 3; k++) {
+      if (s.terrain[(b.y + k) * s.width + b.x + b.w] === 1) side++;
+      if (s.terrain[(b.y + b.h) * s.width + b.x + k] === 1) fore++;
+    }
+    return fore > side ? 1 : 0;
+  }
+  if (b.type !== 'house') return 0;
+  const trade = b.trade ? HOME_TRADES.indexOf(b.trade) + 1 : 0;
+  // Colours, yard, craft and the shape of the house, which the id picks.
+  const forms = HOUSE_FORMS[Math.max(1, Math.min(4, b.level))] || 5;
+  const form = (((b.id * 2654435761) >>> 0) >>> 7) % forms;
+  return ((b.id * 7 + b.x) % 4) + 4 * Math.max(0, YARD_CODES.indexOf(b.yard ?? null)) + 16 * trade + 128 * form;
 }
 
 const STONE_COLORS = new Set([STONE, '#c8c0b0', '#9d9488', '#b0a898', '#b6ae9f', '#9d978c', '#a49c8e', '#c8c2b6', '#9b9284']);
@@ -1274,7 +1352,8 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
         p.wallL(1.452, x, x + 0.14, 8, 19, '#3a3a52');
         p.ellipse(x + 0.07, 1.453, 19, 2.2, 1.6, '#3a3a52');
       }
-      p.windowR(1.55, 0.7, 10, 0.14, 9);
+      p.windowR(1.55, 0.6, 10, 0.14, 9);
+      p.doorR(1.55, 1.0, 0.2, 13);
       p.roofX(0.35, 0.35, 1.55, 1.45, 24, 18, 'slate', '#b6ae9f', 0.1);
       // A little bell-cote.
       p.box(1.38, 0.82, 1.5, 0.98, 42, 8, '#b6ae9f');
