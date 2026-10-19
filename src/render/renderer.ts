@@ -2981,9 +2981,153 @@ export class Renderer {
     c.globalAlpha = 1;
   }
 
+  /** A brown bear: a heavy lumbering body with a hump at the shoulders, or reared up on its hind legs. */
+  private drawBear(a: Animal): void {
+    const c = this.ctx;
+    const [wx, wy] = iso(a.x, a.y);
+    const f = a.dir;
+    const walk = a.grazing ? 0 : Math.sin(a.step);
+    const fur = '#5e4026';
+    const dark = '#3e2a18';
+    c.globalAlpha = a.alpha;
+    c.fillStyle = 'rgba(20,20,10,0.28)';
+    c.beginPath();
+    c.ellipse(wx, wy, 9, 3, 0, 0, Math.PI * 2);
+    c.fill();
+    if (a.rear !== undefined) {
+      // Up on its hind legs, forepaws hanging, nose to the wind.
+      const lift = Math.min(1, (2.2 - a.rear) * 3, a.rear * 3);
+      const top = wy - 10 - 9 * lift;
+      c.fillStyle = dark;
+      c.fillRect(wx - 3.2, wy - 5, 2.4, 5);
+      c.fillRect(wx + 0.8, wy - 5, 2.4, 5);
+      c.fillStyle = fur;
+      c.beginPath();
+      c.ellipse(wx, (wy - 5 + top) / 2, 4.6, (wy - 5 - top) / 2 + 2, 0, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = '#7a5634';
+      c.beginPath();
+      c.ellipse(wx + 0.6 * f, (wy - 5 + top) / 2 + 1, 2.6, (wy - 5 - top) / 3, 0, 0, Math.PI * 2);
+      c.fill();
+      c.strokeStyle = dark;
+      c.lineWidth = 1.8;
+      c.lineCap = 'round';
+      c.beginPath();
+      c.moveTo(wx + 2.5 * f, top + 3);
+      c.lineTo(wx + 5 * f, top + 6.5);
+      c.moveTo(wx - 1 * f, top + 3.5);
+      c.lineTo(wx + 2 * f, top + 7);
+      c.stroke();
+      c.lineCap = 'butt';
+      this.bearHead(wx + 1 * f, top - 1.5, f);
+      c.globalAlpha = 1;
+      return;
+    }
+    // Four heavy legs, moving in pairs.
+    c.strokeStyle = dark;
+    c.lineWidth = 2.2;
+    c.beginPath();
+    for (const [lx, ph] of [[-5, 1], [-3, -1], [3, -1], [5, 1]] as const) {
+      c.moveTo(wx + lx * f, wy - 5);
+      c.lineTo(wx + lx * f + walk * ph * 1.4, wy);
+    }
+    c.stroke();
+    // Body, with the hump over the shoulders.
+    c.fillStyle = fur;
+    c.beginPath();
+    c.ellipse(wx - 0.5 * f, wy - 7.5, 7.5, 4.2, 0, 0, Math.PI * 2);
+    c.fill();
+    c.beginPath();
+    c.ellipse(wx + 3 * f, wy - 10, 3.6, 2.6, 0, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = 'rgba(255,220,170,0.12)';
+    c.beginPath();
+    c.ellipse(wx, wy - 9.5, 5.5, 1.6, 0, 0, Math.PI * 2);
+    c.fill();
+    // Head held low, swinging as it walks.
+    this.bearHead(wx + 7.5 * f, wy - 7 + (a.grazing ? 1.5 : walk * 0.5), f);
+    c.globalAlpha = 1;
+  }
+
+  private bearHead(x: number, y: number, f: number): void {
+    const c = this.ctx;
+    c.fillStyle = '#5e4026';
+    c.beginPath();
+    c.arc(x, y, 2.8, 0, Math.PI * 2);
+    c.fill();
+    c.beginPath();
+    c.arc(x - 1.6 * f, y - 2.4, 1.1, 0, Math.PI * 2);
+    c.arc(x + 0.8 * f, y - 2.7, 1.1, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = '#a07a52';
+    c.beginPath();
+    c.ellipse(x + 2.4 * f, y + 0.6, 1.7, 1.2, 0, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = '#1e140c';
+    c.beginPath();
+    c.arc(x + 3.6 * f, y + 0.3, 0.6, 0, Math.PI * 2);
+    c.arc(x + 0.9 * f, y - 0.8, 0.45, 0, Math.PI * 2);
+    c.fill();
+  }
+
+  /** A pond turtle: a little domed shell basking on the shore, or sliding into the water. */
+  private drawTurtle(a: Animal): void {
+    const c = this.ctx;
+    const [wx, wy] = iso(a.x, a.y);
+    const f = a.dir;
+    const paddle = a.grazing ? 0 : Math.sin(a.step * 2) * 0.5;
+    c.globalAlpha = a.alpha;
+    c.save();
+    c.translate(wx, wy);
+    c.scale(1.45, 1.45);
+    c.translate(-wx, -wy);
+    if (!a.swim) {
+      c.fillStyle = 'rgba(20,20,10,0.25)';
+      c.beginPath();
+      c.ellipse(wx, wy + 0.2, 3, 1, 0, 0, Math.PI * 2);
+      c.fill();
+    }
+    // Head and legs peeking out of the shell.
+    c.fillStyle = '#6e7a3e';
+    c.beginPath();
+    c.ellipse(wx + 2.9 * f, wy - 1.3, 1.1, 0.8, 0, 0, Math.PI * 2);
+    c.fill();
+    for (const [lx, ph] of [[-1.8, 1], [1.6, -1]] as const) {
+      c.beginPath();
+      c.ellipse(wx + lx + paddle * ph, wy - 0.2, 0.8, 0.5, 0, 0, Math.PI * 2);
+      c.fill();
+    }
+    // The shell: dark, with paler plates and a rim.
+    c.fillStyle = '#4a4a2a';
+    c.beginPath();
+    c.ellipse(wx, wy - 1.2, 2.7, 1.5, 0, Math.PI, 0);
+    c.ellipse(wx, wy - 1.2, 2.7, 0.6, 0, 0, Math.PI);
+    c.fill();
+    c.fillStyle = '#7a7440';
+    for (const px of [-1.1, 0.2, 1.4]) {
+      c.beginPath();
+      c.ellipse(wx + px, wy - 1.9, 0.55, 0.4, 0, 0, Math.PI * 2);
+      c.fill();
+    }
+    c.fillStyle = '#e8d070';
+    c.beginPath();
+    c.arc(wx + 3.3 * f, wy - 1.5, 0.25, 0, Math.PI * 2);
+    c.fill();
+    c.restore();
+    c.globalAlpha = 1;
+  }
+
   private drawAnimal(a: Animal, season: Season): void {
     if (a.kind === 'rabbit') {
       this.drawRabbit(a, season);
+      return;
+    }
+    if (a.kind === 'bear') {
+      this.drawBear(a);
+      return;
+    }
+    if (a.kind === 'turtle') {
+      this.drawTurtle(a);
       return;
     }
     const c = this.ctx;
