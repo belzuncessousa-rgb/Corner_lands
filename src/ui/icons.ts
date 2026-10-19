@@ -144,7 +144,8 @@ export const LOGO = `<svg class="logo" viewBox="0 0 420 132" role="img" aria-lab
 
 /**
  * Icons look painted onto the boards: one shared filter gives every icon a
- * dark brush outline with a slight wobble, and a faint streak of grain.
+ * dark brush outline, a slight wobble to its paint, and streaks of grain
+ * showing through.
  * The stylesheet applies it (`filter: url(#ic-paint)`).
  */
 export function installIconPaint(): void {
@@ -157,10 +158,11 @@ export function installIconPaint(): void {
       <feDisplacementMap in="wide" in2="noise" scale="1.5" xChannelSelector="R" yChannelSelector="G" result="wobble"/>
       <feFlood flood-color="#3a2412"/>
       <feComposite in2="wobble" operator="in" result="outline"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="0.8" xChannelSelector="R" yChannelSelector="G" result="brushed"/>
       <feTurbulence type="fractalNoise" baseFrequency="0.06 1.6" numOctaves="2" seed="9" result="grain"/>
-      <feColorMatrix in="grain" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -0.55 0.3" result="streaks"/>
-      <feComposite in="streaks" in2="SourceGraphic" operator="in" result="grained"/>
-      <feMerge><feMergeNode in="outline"/><feMergeNode in="SourceGraphic"/><feMergeNode in="grained"/></feMerge>
+      <feColorMatrix in="grain" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -0.9 0.62" result="streaks"/>
+      <feComposite in="streaks" in2="brushed" operator="in" result="grained"/>
+      <feMerge><feMergeNode in="outline"/><feMergeNode in="brushed"/><feMergeNode in="grained"/></feMerge>
     </filter></defs></svg>`;
   document.body.appendChild(holder.firstElementChild!);
 }

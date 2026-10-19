@@ -15,7 +15,11 @@
   --seam: #c99a5c;
   --seam-soft: rgba(176, 122, 62, 0.28);
   /* Boards: wide planks in near-matching tones that fade into each other, no lines to cross the text. */
-  --planks: repeating-linear-gradient(180deg, var(--plank-a) 0 40px, var(--plank-b) 56px 96px, var(--plank-a) 112px);
+  --planks:
+    /* Fine painted grain, tilted so it never runs along a line of text. */
+    repeating-linear-gradient(158deg, transparent 0 13px, rgba(150, 96, 44, 0.09) 13px 14.5px, transparent 14.5px 31px, rgba(255, 249, 230, 0.4) 31px 32px, transparent 32px 47px),
+    repeating-linear-gradient(158deg, transparent 0 57px, rgba(150, 96, 44, 0.07) 57px 59.5px, transparent 59.5px 89px, rgba(150, 96, 44, 0.05) 89px 90px, transparent 90px 121px),
+    repeating-linear-gradient(158deg, var(--plank-a) 0 60px, var(--plank-b) 90px 150px, var(--plank-a) 180px);
   /* Darker wood for everything you press. */
   --btn-hi: #9c6438;
   --btn-lo: #87542c;
