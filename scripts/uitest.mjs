@@ -159,8 +159,8 @@ await page.click('[data-action="charter-sel"][data-id="farm1"]');
 await page.click('[data-action="charter-grant"]');
 check('grant a charter', (await page.evaluate(() => window.game.state.charters?.includes('farm1'))) === true);
 await page.click('[data-action="close-modal"]');
-// With a trading post, the manor's store panel sells planks above the stock target.
-const sale = await page.evaluate(() => {
+// A trading post takes orders: add an import and an export from the picker, set a target, reorder by dragging.
+const postId = await page.evaluate(() => {
   const s = window.game.state;
   const h = s.buildings.find((b) => (b.type === 'townhall' || b.type === 'camp'));
   let m = null;
@@ -168,16 +168,40 @@ const sale = await page.evaluate(() => {
   m.build = 1;
   m.need = undefined;
   window.cl.recompute(s);
-  s.res.planks = window.cl.keepOf(s, 'planks') + 40;
-  window.game.select(s.buildings.find((b) => (b.type === 'townhall' || b.type === 'camp')).id);
+  window.game.select(m.id);
   window.game.hud.update();
-  return { planks: s.res.planks, gold: s.res.gold };
+  return m.id;
 });
 await page.waitForTimeout(300);
-await page.screenshot({ path: process.env.SHOT || '/tmp/claude-0/store.png', clip: { x: 1440 - 420, y: 0, width: 420, height: 900 } });
-await page.click('#inspector [data-action="store-sell"][data-res="planks"]');
-const after = await page.evaluate(() => ({ planks: window.game.state.res.planks, gold: window.game.state.res.gold }));
-check('sell surplus from the store panel', after.planks === sale.planks - 40 && after.gold > sale.gold, JSON.stringify([sale, after]));
+await page.click('#inspector [data-action="order-new"][data-kind="import"]');
+await page.click('.picker-modal .trade-tabs [data-tab="food"]');
+await page.click('.picker-modal .pick[data-res="fish"]');
+await page.waitForTimeout(200);
+await page.click('#inspector [data-action="order-new"][data-kind="export"]');
+await page.click('.picker-modal .trade-tabs [data-tab="materials"]');
+await page.click('.picker-modal .pick[data-res="planks"]');
+await page.waitForTimeout(200);
+const orders0 = await page.evaluate((id) => window.game.state.buildings.find((b) => b.id === id).orders.map((o) => `${o.kind}:${o.res}:${o.target}`), postId);
+check('add import and export orders from the picker', orders0.length === 2 && orders0[0].startsWith('import:fish') && orders0[1].startsWith('export:planks'), JSON.stringify(orders0));
+const t0 = await page.evaluate((id) => window.game.state.buildings.find((b) => b.id === id).orders[0].target, postId);
+await page.click('#inspector .order:first-child [data-action="order-target"][data-d="10"]');
+const t1 = await page.evaluate((id) => window.game.state.buildings.find((b) => b.id === id).orders[0].target, postId);
+check('raise an order\'s target', t1 === t0 + 10, JSON.stringify([t0, t1]));
+await page.waitForTimeout(200);
+{
+  const grips = await page.$$('#inspector .order .grip');
+  const a = await grips[1].boundingBox();
+  const t = await grips[0].boundingBox();
+  await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(a.x + a.width / 2, t.y + 2, { steps: 8 });
+  await page.mouse.up();
+}
+const orders1 = await page.evaluate((id) => window.game.state.buildings.find((b) => b.id === id).orders.map((o) => o.res), postId);
+check('drag an order to the top', orders1[0] === 'planks' && orders1[1] === 'fish', JSON.stringify(orders1));
+await page.click('#inspector .order:first-child [data-action="order-del"]');
+const orders2 = await page.evaluate((id) => window.game.state.buildings.find((b) => b.id === id).orders.length, postId);
+check('strike off an order', orders2 === 1);
 // Build a manor (once the town is a Village) and call a harvest feast from it in autumn.
 await page.evaluate(() => {
   const s = window.game.state;

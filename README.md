@@ -50,8 +50,14 @@ then fall back to the browser's localStorage.
   they walk faster on dirt roads and faster still on paved ones.
 - **Top bar** — happiness, villagers, food, materials, goods and the treasury
   (coins and prestige). Hover a chip for the breakdown, click to pin it: set
-  how much of each good to keep in stock and whether merchants may buy the
-  surplus. The villagers chip shows who is working, building, idle or resting.
+  how much of each good to keep in stock, or stop making it for now. The
+  villagers chip shows who is working, building, idle or resting.
+- **Trade** — a Trading Post or Dock takes standing orders: import a good up to
+  a target, or export it down to one. Each month the merchants work through
+  the orders from the top as far as their carts allow (a dock carries more,
+  spare crates add room for exports); drag an order to change its place, and
+  give the same good more than one order to raise its target only when the
+  carts have room to spare.
 - **Labour** — select a workplace to choose how many villagers work there, its
   priority and, where it has several, its product (or Auto). Seasonal work and
   workplaces whose goods are at their stock target free their workers.

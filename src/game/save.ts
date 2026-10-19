@@ -2,6 +2,7 @@ import { BUILDINGS } from './data';
 import type { Building, BuildingType, GameState, ResourceId } from './types';
 import { mulberry32 } from './rng';
 import { emptyResources, makeBuilding, placeBuilding, seedNature } from './world';
+import { addOrder, keepOf } from './sim';
 
 const TYPED_KEYS = [
   'terrain',
@@ -79,6 +80,12 @@ export function deserialize(json: string): GameState {
       (s.sell ??= {})[id] = true;
     }
     delete s.exports;
+  }
+  // Goods once sold above their target become export orders at the first trading post or dock.
+  if (s.sell) {
+    const post = s.buildings.find((b) => b.type === 'tradingpost' || b.type === 'dock');
+    if (post) for (const k in s.sell) if (s.sell[k as ResourceId]) addOrder(s, post, 'export', k as ResourceId, keepOf(s, k as ResourceId));
+    delete s.sell;
   }
   // Saves from before version 2 ranked the settlement by its manor; carry that over once.
   const hall = s.buildings.find((b) => b.type === 'townhall');

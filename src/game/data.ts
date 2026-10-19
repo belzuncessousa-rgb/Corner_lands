@@ -38,7 +38,7 @@ export interface GoodDef {
   /** Hunger one unit satisfies (villager-months); edible goods only. */
   food?: number;
   foodGroup?: FoodGroup;
-  /** Default amount kept in store before workers rest and merchants buy. */
+  /** Default amount kept in store before workers rest. */
   keep: number;
 }
 
@@ -817,7 +817,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   dock: def({
     type: 'dock',
     name: 'Dock',
-    desc: 'A quay where boats tie up: trade as at a trading post, but boats carry more and bring goods in cheaper. Merchants buy more each month, and pay more. Must be built on the water\'s edge.',
+    desc: 'A quay where boats tie up: give it import and export orders as at a trading post, but boats carry more each month, bring goods in cheaper and pay more for what they take. Must be built on the water\'s edge.',
     category: 'civic',
     w: 3,
     h: 3,
@@ -853,7 +853,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   tradingpost: def({
     type: 'tradingpost',
     name: 'Trading Post',
-    desc: 'Where the outside world comes to trade: buy and sell goods, and visiting merchants buy your surplus each month. Animals for the pastures are bought here too.',
+    desc: 'Where the outside world comes to trade: give it orders to import goods up to a target or export them down to one, and the merchants work through them each month. Animals for the pastures are bought here too.',
     category: 'civic',
     w: 3,
     h: 2,

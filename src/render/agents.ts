@@ -115,12 +115,12 @@ export class AgentSystem {
   /** `dayFrac` is how far through the day it is (0 at dawn, 1 at the next). */
   update(s: GameState, dt: number, dayFrac = 0.5): void {
     this.evening = dayFrac > 0.8 && dayFrac < 0.97;
-    // Once a month a merchant cart visits trading posts that sell goods.
+    // Once a month a merchant cart visits trading posts and docks with orders.
     // The first such day seen after a load sends no cart; later ones do.
     const marketDay = s.day % 10 === CART_DAY ? s.day : null;
     if (marketDay !== null && this.lastCartDay !== null && marketDay !== this.lastCartDay && dt > 0) {
       for (const m of s.buildings) {
-        if ((m.type === 'tradingpost' || m.type === 'dock') && m.build >= 1 && Object.keys(s.sell ?? {}).length) this.sendCart(s, m);
+        if ((m.type === 'tradingpost' || m.type === 'dock') && m.build >= 1 && m.orders?.length) this.sendCart(s, m);
       }
     }
     if (marketDay !== null || this.lastCartDay === null) this.lastCartDay = marketDay ?? -1;

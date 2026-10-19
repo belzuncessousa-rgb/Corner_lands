@@ -19,7 +19,7 @@ import {
   setKeep,
   setPriority,
   setRecipe,
-  setSell,
+  setStopped,
   setTax,
   setTrade,
   setWorkers,
@@ -90,7 +90,7 @@ function monkey(s: GameState, seed: number) {
       }
     },
     () => setKeep(s, pick([...RESOURCE_IDS]), Math.floor(r() * 300)),
-    () => setSell(s, pick([...RESOURCE_IDS]), r() < 0.5),
+    () => setStopped(s, pick([...RESOURCE_IDS]), r() < 0.5),
     () => setTax(s, Math.floor(r() * 4)),
     () => trade(s, pick([...RESOURCE_IDS]), (r() < 0.5 ? -1 : 1) * Math.floor(r() * 40)),
     () => {

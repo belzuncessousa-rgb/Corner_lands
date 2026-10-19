@@ -848,3 +848,260 @@ table.goods td.keep span {
   right: 3px;
   font-size: 10px;
 }
+
+/* ------------------------------------------------------------ trade orders */
+
+ol.orders {
+  list-style: none;
+  margin: 4px 0 6px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.order {
+  display: grid;
+  grid-template-columns: 16px 16px auto 1fr 24px;
+  grid-template-areas: 'grip n kind good x' 'grip n target target target' 'grip n note note note';
+  align-items: center;
+  column-gap: 5px;
+  row-gap: 2px;
+  padding: 4px 6px;
+  background: #fbecc8;
+  border: 2px solid var(--seam);
+  border-radius: 8px;
+  transition: transform 0.12s;
+  font-size: 13.5px;
+}
+.order.dragging {
+  transition: none;
+  position: relative;
+  z-index: 2;
+  border-color: var(--line);
+  box-shadow: 0 4px 0 rgba(40, 22, 8, 0.3);
+}
+.order .grip {
+  grid-area: grip;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  color: var(--ink-soft);
+  font-size: 15px;
+  touch-action: none;
+  user-select: none;
+}
+.order.dragging .grip {
+  cursor: grabbing;
+}
+.order .ord-n {
+  grid-area: n;
+  align-self: start;
+  font-family: var(--title);
+  font-weight: 700;
+  color: var(--ink-soft);
+  text-align: center;
+  padding-top: 1px;
+}
+.order .ord-kind {
+  grid-area: kind;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 0 6px;
+  border-radius: 4px;
+  border: 1.5px solid var(--line);
+  color: #fff4dc;
+}
+.order.import .ord-kind {
+  background: var(--sky);
+}
+.order.export .ord-kind {
+  background: var(--leaf);
+}
+.order .ord-good {
+  grid-area: good;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.order .ord-good svg {
+  width: 16px;
+  height: 16px;
+}
+.order .ord-x {
+  grid-area: x;
+  min-height: 0;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  font-size: 11px;
+  border-radius: 50%;
+}
+.order .ord-target {
+  grid-area: target;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.order .ord-target small {
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+.order .stepper {
+  display: inline-flex;
+  align-items: stretch;
+}
+.order .stepper button {
+  min-height: 0;
+  height: 24px;
+  min-width: 26px;
+  padding: 0 6px;
+  font-size: 15px;
+  line-height: 1;
+}
+.order .stepper button:first-child {
+  border-radius: 7px 0 0 7px;
+}
+.order .stepper button:last-child {
+  border-radius: 0 7px 7px 0;
+}
+.order .stepper b {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  height: 24px;
+  margin: 0 -2.5px;
+  position: relative;
+  z-index: 1;
+  font-family: var(--title);
+  background: #fff6e0;
+  border: 2.5px solid var(--line);
+}
+.order .ord-target .have {
+  margin-left: auto;
+}
+.order .ord-note {
+  grid-area: note;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--ink-soft);
+}
+.order .ord-note.met {
+  color: var(--leaf);
+}
+.order .ord-note.short {
+  color: var(--berry);
+}
+.order-add {
+  display: flex;
+  gap: 6px;
+  margin: 2px 0 4px;
+}
+.order-add button {
+  flex: 1;
+}
+
+/* Choosing the good for a new order. */
+.modal.picker-modal {
+  width: min(640px, calc(100vw - 32px));
+}
+.trade-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 0;
+  margin-bottom: 10px;
+}
+.trade-tabs button {
+  min-width: 110px;
+  border-radius: 0;
+  margin-left: -2.5px;
+}
+.trade-tabs button:first-child {
+  border-radius: 8px 0 0 8px;
+  margin-left: 0;
+}
+.trade-tabs button:last-child {
+  border-radius: 0 8px 8px 0;
+}
+.pick-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 6px;
+  max-height: 52vh;
+  overflow: auto;
+  padding: 2px;
+}
+.pick-grid .pick {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  grid-template-areas: 'ic name' 'ic info';
+  align-items: center;
+  column-gap: 6px;
+  text-align: left;
+  padding: 5px 8px;
+  color: var(--ink);
+  text-shadow: none;
+  background: #fff6e0;
+}
+.pick-grid .pick:hover:not(:disabled) {
+  background: #ffe9b0;
+}
+.pick-grid .pick svg {
+  grid-area: ic;
+  width: 22px;
+  height: 22px;
+}
+.pick-grid .pick b {
+  grid-area: name;
+}
+.pick-grid .pick small {
+  grid-area: info;
+  color: var(--ink-soft);
+  font-size: 11.5px;
+}
+
+/* Stop producing, in the stock panels. */
+table.goods button.stop {
+  min-height: 0;
+  height: 26px;
+  padding: 0 7px;
+  font-size: 12px;
+}
+table.goods tr.stopped td:not(:last-child) {
+  opacity: 0.55;
+}
+
+/* The town's new size, large, with only the decorations it opens. */
+.banner .tier-sub {
+  font-style: italic;
+  color: var(--ink-soft);
+  margin-top: 2px;
+}
+.banner h1 {
+  font-size: 64px;
+  line-height: 1.05;
+  margin: 2px 0 6px;
+}
+.banner p {
+  margin: 4px 0 8px;
+  font-family: var(--title);
+  font-weight: 700;
+  font-style: normal;
+}
+
+/* The illuminated initial: the letter sits in the middle of its square. */
+.event .initial {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  padding: 0;
+  font-size: 40px;
+  line-height: 1;
+}

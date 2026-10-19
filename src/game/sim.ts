@@ -48,7 +48,7 @@ import {
 import { Heap, tileCost } from './path';
 import { checkQuests } from './quests';
 import { StateRng } from './rng';
-import type { Building, BuildingType, Category, Cost, GameState, Herd, MessageKind, ResourceId, Season, Shoal } from './types';
+import type { Building, BuildingType, Category, Cost, GameState, Herd, MessageKind, ResourceId, Season, Shoal, TradeOrder } from './types';
 import { RESOURCE_IDS } from './types';
 import { getBuilding, idx, inBounds, makeBuilding, placeBuilding, removeBuilding, setRoad } from './world';
 
@@ -578,16 +578,151 @@ export function surplusOf(s: GameState, id: ResourceId): number {
 export const UNITS_PER_CRATE = 10;
 
 /**
- * Goods the merchants take each month: so many per staffed trading post and
- * dock, more with charters and a high title, and ten more for every crate in
- * store above its stock target, up to half as much again.
+ * Goods the merchants carry each month at one staffed trading post or dock,
+ * more with charters and a high title.
  */
+export function tradeCapacity(s: GameState, b: Building): number {
+  if (b.build < 1 || b.workers <= 0) return 0;
+  const per = b.type === 'dock' ? EXPORT_PER_DOCK : b.type === 'tradingpost' ? EXPORT_PER_MARKET : 0;
+  return Math.floor(per * (hasCharter(s, 'trade2') ? 2 : 1) * ((s.title ?? 0) >= 3 ? 1.5 : 1));
+}
+
+/** Crates in store above their stock target: each lets a cart carry ten more exports. */
+function spareCrates(s: GameState): number {
+  return Math.max(0, Math.floor(s.res.crates - keepOf(s, 'crates')));
+}
+
+/** All the town's staffed posts and docks together: the base load and what crates add for exports. */
 export function exportBudget(s: GameState): { base: number; crated: number } {
-  const posts = s.buildings.filter((b) => b.type === 'tradingpost' && b.build >= 1 && b.workers > 0).length;
-  const docks = s.buildings.filter((b) => b.type === 'dock' && b.build >= 1 && b.workers > 0).length;
-  const base = Math.floor((posts * EXPORT_PER_MARKET + docks * EXPORT_PER_DOCK) * (hasCharter(s, 'trade2') ? 2 : 1) * ((s.title ?? 0) >= 3 ? 1.5 : 1));
-  const spare = Math.max(0, Math.floor(s.res.crates - keepOf(s, 'crates')));
-  return { base, crated: Math.min(Math.floor(base / 2), spare * UNITS_PER_CRATE) };
+  const base = s.buildings.reduce((n, b) => n + tradeCapacity(s, b), 0);
+  return { base, crated: Math.min(Math.floor(base / 2), spareCrates(s) * UNITS_PER_CRATE) };
+}
+
+export function addOrder(s: GameState, b: Building, kind: TradeOrder['kind'], res: ResourceId, target?: number): TradeOrder | null {
+  if (b.type !== 'tradingpost' && b.type !== 'dock') return null;
+  if (!priceOf(s, res)) return null;
+  s.nextOrderId = (s.nextOrderId ?? 1) + 1;
+  // Imports start a little above what is in store, exports at the stock target.
+  const start = target ?? (kind === 'import' ? Math.ceil((s.res[res] + 30) / 10) * 10 : Math.max(0, Math.round(keepOf(s, res) / 10) * 10));
+  const o: TradeOrder = { id: s.nextOrderId, kind, res, target: Math.max(0, start) };
+  (b.orders ??= []).push(o);
+  return o;
+}
+
+export function removeOrder(b: Building, id: number): void {
+  b.orders = (b.orders ?? []).filter((o) => o.id !== id);
+}
+
+export function setOrderTarget(b: Building, id: number, target: number): void {
+  const o = b.orders?.find((x) => x.id === id);
+  if (o) o.target = Math.max(0, Math.round(target));
+}
+
+/** Moves an order to `to` in the list (0 is worked first). */
+export function moveOrder(b: Building, id: number, to: number): void {
+  const list = b.orders ?? [];
+  const from = list.findIndex((o) => o.id === id);
+  if (from < 0) return;
+  const [o] = list.splice(from, 1);
+  list.splice(Math.max(0, Math.min(list.length, to)), 0, o);
+}
+
+/**
+ * The monthly merchant visit: each staffed trading post and dock works
+ * through its orders from the first, buying up to an import's target or
+ * selling down to an export's, until its carts are full. Spare crates let
+ * the carts take more exports. Returns coins earned and spent.
+ */
+export function runTradeOrders(s: GameState): { earned: number; spent: number } {
+  let earned = 0;
+  let spent = 0;
+  let crates = spareCrates(s);
+  const sold: string[] = [];
+  const bought: string[] = [];
+  for (const b of s.buildings) {
+    if (b.type !== 'tradingpost' && b.type !== 'dock') continue;
+    const orders = b.orders ?? [];
+    for (const o of orders) {
+      o.moved = 0;
+      o.note = undefined;
+    }
+    let room = tradeCapacity(s, b);
+    if (!room) {
+      for (const o of orders) o.note = b.build < 1 ? 'Not built yet' : 'No one to meet the merchants';
+      continue;
+    }
+    let extra = Math.min(Math.floor(room / 2), crates * UNITS_PER_CRATE);
+    let extraUsed = 0;
+    for (const o of orders) {
+      const id = o.res;
+      if (o.kind === 'export') {
+        // Never below the target, nor what the building sites are still owed.
+        const free = Math.floor(s.res[id] - Math.max(o.target, owedTo(s, id)));
+        const price = exportUnitPrice(s, id);
+        if (free <= 0) {
+          o.note = 'Down to its target';
+          continue;
+        }
+        if (room + extra <= 0) {
+          o.note = 'The carts were full';
+          continue;
+        }
+        const n = Math.min(free, room + extra);
+        const fromExtra = Math.max(0, n - room);
+        room -= n - fromExtra;
+        extra -= fromExtra;
+        extraUsed += fromExtra;
+        s.res[id] -= n;
+        earned += n * price;
+        o.moved = n;
+        o.note = free > n ? 'The carts were full' : 'Down to its target';
+        sold.push(`${n} ${GOODS[id].name.toLowerCase()}`);
+      } else {
+        const want = Math.floor(o.target - s.res[id]);
+        if (want <= 0) {
+          o.note = 'Up to its target';
+          continue;
+        }
+        if (room <= 0) {
+          o.note = 'The carts were full';
+          continue;
+        }
+        const unit = buyPrice(s, id, 1);
+        const space = Math.floor(roomFor(s, id));
+        const purse = Math.floor(s.res.gold / Math.max(1, unit));
+        const n = Math.min(want, room, space, purse);
+        if (n <= 0) {
+          o.note = space <= 0 ? 'No room in the stores' : 'Not enough coins';
+          continue;
+        }
+        const cost = buyPrice(s, id, n);
+        s.res.gold -= cost;
+        s.res[id] += n;
+        spent += cost;
+        o.moved = n;
+        // What stopped it short, if anything.
+        o.note = n >= want ? 'Up to its target' : n === room ? 'The carts were full' : n === space ? 'No room in the stores' : 'Not enough coins';
+        room -= n;
+        bought.push(`${n} ${GOODS[id].name.toLowerCase()}`);
+      }
+    }
+    // The crates go with the goods carried beyond the usual load.
+    const used = Math.ceil(extraUsed / UNITS_PER_CRATE);
+    if (used) {
+      s.res.crates = Math.max(0, s.res.crates - used);
+      crates -= used;
+    }
+  }
+  earned = Math.floor(earned);
+  s.res.gold += earned;
+  if (sold.length) log(s, `Merchants bought ${sold.join(', ')} for ${earned} coins.`, 'info');
+  if (bought.length) log(s, `Merchants brought ${bought.join(', ')} for ${spent} coins.`, 'info');
+  return { earned, spent };
+}
+
+/** The monthly merchant visit; returns the coins earned from exports. */
+export function exportGoods(s: GameState): number {
+  return runTradeOrders(s).earned;
 }
 
 /** Whether the town can trade: a trading post or a dock. */
@@ -711,7 +846,7 @@ function supplyHomes(s: GameState): void {
   }
 }
 
-/** Units of a good to keep in store: producers rest and merchants buy above it. */
+/** Units of a good to keep in store: producers rest above it. */
 export function keepOf(s: GameState, id: ResourceId): number {
   return s.targets?.[id] ?? GOODS[id].keep;
 }
@@ -721,22 +856,16 @@ export function setKeep(s: GameState, id: ResourceId, keep: number): void {
   s.targets[id] = Math.max(0, Math.round(keep));
 }
 
-/** Whether visiting merchants may buy this good's surplus. */
-export function selling(s: GameState, id: ResourceId): boolean {
-  return !!s.sell?.[id];
+/** Whether the town has stopped making this good for now. */
+export function stoppedMaking(s: GameState, id: ResourceId): boolean {
+  return !!s.stopped?.includes(id);
 }
 
-export function setSell(s: GameState, id: ResourceId, on: boolean): void {
-  s.sell ??= {};
-  if (on) s.sell[id] = true;
-  else delete s.sell[id];
-}
-
-/** Sets an export rule: keep `keep` units and sell the surplus (null stops selling). */
-export function setExport(s: GameState, id: ResourceId, keep: number | null): void {
-  if (keep === null) return setSell(s, id, false);
-  setKeep(s, id, keep);
-  setSell(s, id, true);
+export function setStopped(s: GameState, id: ResourceId, on: boolean): void {
+  const list = (s.stopped ?? []).filter((x) => x !== id);
+  if (on) list.push(id);
+  s.stopped = list.length ? list : undefined;
+  s.dirty = true;
 }
 
 /** True when every good a building makes is at or above its stock target. */
@@ -745,6 +874,11 @@ export function enoughOf(s: GameState, out: Cost): ResourceId | null {
   for (const k in out) {
     const id = k as ResourceId;
     if (id === 'gold' || id === 'prestige') return null;
+    // A good the town has stopped making counts as enough, whatever the stock.
+    if (stoppedMaking(s, id)) {
+      first ??= id;
+      continue;
+    }
     // Materials still owed to building sites come on top of the stock target.
     if (s.res[id] < keepOf(s, id) + owedTo(s, id)) return null;
     first ??= id;
@@ -763,35 +897,6 @@ export function owedTo(s: GameState, id: ResourceId): number {
 export function noteSeen(s: GameState): void {
   s.seen ??= [];
   for (const id of RESOURCE_IDS) if (s.res[id] > 0 && !s.seen.includes(id)) s.seen.push(id);
-}
-
-/** Monthly visit of merchants buying surplus goods at staffed trading posts and docks. */
-export function exportGoods(s: GameState): number {
-  const { base, crated } = exportBudget(s);
-  let budget = base + crated;
-  let gold = 0;
-  let shipped = 0;
-  const sold: string[] = [];
-  for (const k in s.sell ?? {}) {
-    const id = k as ResourceId;
-    const price = exportUnitPrice(s, id);
-    if (!price || budget <= 0) continue;
-    // Never what the building sites are still waiting for.
-    const n = Math.min(budget, surplusOf(s, id));
-    if (n <= 0) continue;
-    s.res[id] -= n;
-    budget -= n;
-    shipped += n;
-    gold += n * price;
-    sold.push(`${n} ${GOODS[id].name.toLowerCase()}`);
-  }
-  gold = Math.floor(gold);
-  s.res.gold += gold;
-  // The crates go with the goods carried beyond the usual load.
-  const extra = Math.max(0, shipped - base);
-  if (extra > 0) s.res.crates = Math.max(0, s.res.crates - Math.ceil(extra / UNITS_PER_CRATE));
-  if (gold > 0) log(s, `Merchants bought ${sold.join(', ')} for ${gold} coins.`, 'info');
-  return gold;
 }
 
 export function setTax(s: GameState, level: number): void {
@@ -2728,7 +2833,7 @@ export function dailyProduction(s: GameState, rng: StateRng): void {
           status = 'Waiting for the next load';
         }
       } else b.short = 0;
-      if (status === 'Storage full' && b.hauled && yardTotal(b) > 0) status = 'Yard full: waiting for haulers';
+      if (status === 'Storage full' && b.hauled && yardTotal(b) > 0) status = 'Full';
     }
     if (status || !b.blocked) b.status = status ?? 'Working';
   }
@@ -3068,7 +3173,9 @@ export function monthly(s: GameState, rng: StateRng): void {
   supplyHomes(s);
   monthlyHerds(s, month);
   monthlyYards(s, month);
-  report.trade = exportGoods(s);
+  const merchants = runTradeOrders(s);
+  report.trade = merchants.earned;
+  report.imports = merchants.spent;
 
   updateHappiness(s);
   migrate(s, rng);

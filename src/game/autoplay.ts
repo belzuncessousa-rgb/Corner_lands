@@ -8,6 +8,8 @@ import { grantCharter } from './charters';
 import { startUpgrade, upgradeBlocker, upgradePlan } from './levels';
 import { StateRng } from './rng';
 import {
+  addOrder,
+  keepOf,
   labourSummary,
   WALL_SAFE,
   coveredBy,
@@ -337,9 +339,9 @@ export function playBot(s: GameState, years: number, seed = 1): BotReport {
 /** Buys what is short at the market, as a sensible player would. */
 function shop(s: GameState): void {
   if (!hasTrade(s)) return;
-  // Let the merchants take what is above the stock targets.
-  s.sell ??= {};
-  for (const r of ['leather', 'cloth', 'hides', 'wool'] as ResourceId[]) s.sell[r] = true;
+  // Let the merchants take what is above the stock targets, at the first post or dock.
+  const post = s.buildings.find((b) => (b.type === 'tradingpost' || b.type === 'dock') && b.build >= 1);
+  if (post && !post.orders?.length) for (const r of ['leather', 'cloth', 'hides', 'wool'] as ResourceId[]) addOrder(s, post, 'export', r, keepOf(s, r));
   const buy = (id: ResourceId, n: number, keep: number) => {
     if (s.res.gold > keep) trade(s, id, n);
   };

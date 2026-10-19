@@ -412,14 +412,14 @@ describe('decision events', () => {
 
 describe('exports', () => {
   it('merchants buy surplus above the kept amount at staffed trading posts', async () => {
-    const { setExport } = await import('../src/game/sim');
+    const { addOrder } = await import('../src/game/sim');
     const s = generateWorld(8);
     s.tier = 2;
     const m = placeNearRoad(s, 'tradingpost');
     m.build = 1;
     m.need = undefined;
     s.res.wood = 110;
-    setExport(s, 'wood', 50);
+    addOrder(s, m, 'export', 'wood', 50);
     s.dirty = true;
     const gold = s.res.gold;
     run(s, DAYS_PER_MONTH);
@@ -1402,7 +1402,7 @@ describe('steward on idle hands and unused piles', () => {
 
 describe('great works', () => {
   it('one guildhall and one bell tower per town; the guildhall lifts prices and spirits', async () => {
-    const { exportGoods, prestigeIncome } = await import('../src/game/sim');
+    const { addOrder, exportGoods, prestigeIncome } = await import('../src/game/sim');
     const s = generateWorld(21);
     s.tier = 4;
     s.res.gold = 50000;
@@ -1420,7 +1420,7 @@ describe('great works', () => {
     const tower = put('belltower');
     expect(placementError(s, 'guildhall', 1, 1)).toMatch(/has its guildhall/);
     expect(placementError(s, 'belltower', 1, 1)).toMatch(/has its bell tower/);
-    s.sell = { stone: true };
+    addOrder(s, market, 'export', 'stone', 0);
     s.res.stone = 500;
     const plain = exportGoods(structuredClone(s));
     guild.build = 1;
@@ -1730,31 +1730,105 @@ describe('trade audit', () => {
   });
 
   it('merchants never buy what building sites are still owed', async () => {
-    const { exportGoods } = await import('../src/game/sim');
+    const { addOrder, exportGoods } = await import('../src/game/sim');
     const s = tradeTown();
     const site = placeNearRoad(s, 'church');
     site.need = { planks: 50 };
     s.res.planks = 60;
-    s.targets = { ...(s.targets ?? {}), planks: 0 };
-    s.sell = { planks: true };
+    addOrder(s, s.buildings.find((b) => b.type === 'tradingpost')!, 'export', 'planks', 0);
     staff(s);
     exportGoods(s);
     expect(s.res.planks).toBe(50);
   });
 
   it('crates carry ten more goods each, and only the extra goods use them up', async () => {
-    const { exportBudget, exportGoods } = await import('../src/game/sim');
+    const { addOrder, exportBudget, exportGoods } = await import('../src/game/sim');
     const s = tradeTown();
     s.targets = { ...(s.targets ?? {}), stone: 0, crates: 0 };
     s.res.stone = 500;
     s.res.crates = 1;
     staff(s);
     expect(exportBudget(s).crated).toBe(10);
-    s.sell = { stone: true };
+    addOrder(s, s.buildings.find((b) => b.type === 'tradingpost')!, 'export', 'stone', 0);
     const before = s.res.stone;
     exportGoods(s);
     expect(before - s.res.stone).toBe(exportBudget({ ...s, res: { ...s.res, crates: 0 } } as typeof s).base + 10);
     expect(s.res.crates).toBe(0);
+  });
+});
+
+describe('trade orders', () => {
+  const town = () => {
+    const s = generateWorld(31);
+    s.tier = 4;
+    s.res.gold = 100000;
+    const post = placeNearRoad(s, 'tradingpost');
+    post.build = 1;
+    post.need = undefined;
+    recompute(s);
+    post.workers = 2;
+    return { s, post };
+  };
+
+  it('imports buy up to the target and exports sell down to it, first order first', async () => {
+    const { addOrder, runTradeOrders, tradeCapacity } = await import('../src/game/sim');
+    const { s, post } = town();
+    const cap = tradeCapacity(s, post);
+    s.res.fish = 10;
+    s.res.stone = 500;
+    addOrder(s, post, 'import', 'fish', 40);
+    addOrder(s, post, 'export', 'stone', 0);
+    const gold = s.res.gold;
+    const r = runTradeOrders(s);
+    expect(s.res.fish).toBe(40);
+    // The carts had room left for the rest after the fish.
+    expect(500 - s.res.stone).toBe(cap - 30);
+    expect(r.spent).toBeGreaterThan(0);
+    expect(r.earned).toBeGreaterThan(0);
+    expect(s.res.gold).toBe(gold - r.spent + r.earned);
+  });
+
+  it('a later order for the same good raises the target if the carts have room', async () => {
+    const { addOrder, runTradeOrders, tradeCapacity } = await import('../src/game/sim');
+    const { s, post } = town();
+    s.res.fish = 0;
+    s.res.stone = 0;
+    const cap = tradeCapacity(s, post);
+    addOrder(s, post, 'import', 'fish', 20);
+    addOrder(s, post, 'import', 'stone', cap - 30);
+    addOrder(s, post, 'import', 'fish', 40);
+    runTradeOrders(s);
+    // 20 fish, then the stone, then the 10 carts still had room for.
+    expect(s.res.stone).toBe(cap - 30);
+    expect(s.res.fish).toBe(30);
+    expect(post.orders![2].note).toBe('The carts were full');
+  });
+
+  it('orders can be moved, retargeted and struck off; an unstaffed post trades nothing', async () => {
+    const { addOrder, moveOrder, removeOrder, runTradeOrders, setOrderTarget } = await import('../src/game/sim');
+    const { s, post } = town();
+    const a = addOrder(s, post, 'import', 'fish', 10)!;
+    const b = addOrder(s, post, 'export', 'stone', 5)!;
+    moveOrder(post, b.id, 0);
+    expect(post.orders!.map((o) => o.id)).toEqual([b.id, a.id]);
+    setOrderTarget(post, a.id, -5);
+    expect(a.target).toBe(0);
+    removeOrder(post, b.id);
+    expect(post.orders!.length).toBe(1);
+    post.workers = 0;
+    s.res.fish = 0;
+    setOrderTarget(post, a.id, 50);
+    runTradeOrders(s);
+    expect(s.res.fish).toBe(0);
+  });
+
+  it('a stopped good counts as enough, so its makers rest', async () => {
+    const { enoughOf, setStopped } = await import('../src/game/sim');
+    const s = generateWorld(3);
+    s.res.planks = 0;
+    expect(enoughOf(s, { planks: 2 })).toBeNull();
+    setStopped(s, 'planks', true);
+    expect(enoughOf(s, { planks: 2 })).toBe('planks');
   });
 });
 

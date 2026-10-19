@@ -139,7 +139,7 @@ const ADVICE: Advice[] = [
       const mills = s.buildings.filter((b) => b.type === 'windmill' && b.build >= 1).length;
       // The bakers rest once the bread in store reaches its target: more mills would not help.
       if (mills && s.res.bread >= keepOf(s, 'bread'))
-        return `Steward: ${Math.floor(s.res.grain)} wheat waits in the granaries, but the bakers rest: the bread in store has reached its target of ${keepOf(s, 'bread')}. Raise the bread target in the Food panel to bake more, or sell the surplus wheat.`;
+        return `Steward: ${Math.floor(s.res.grain)} wheat waits in the granaries, but the bakers rest: the bread in store has reached its target of ${keepOf(s, 'bread')}. Raise the bread target in the Food panel to bake more, or export the surplus wheat from a trading post.`;
       return mills
         ? `Steward: ${Math.floor(s.res.grain)} wheat waits in the granaries, about ${Math.round(millMonths(s))} months of grinding for our ${mills > 1 ? `${mills} windmills` : 'windmill'}. Another Windmill and Bakery would turn it into bread sooner.`
         : `Steward: ${Math.floor(s.res.grain)} wheat sits unground. A Windmill grinds it into flour and a Bakery bakes the bread, which feeds six times as many as pottage.`;
@@ -184,7 +184,7 @@ const ADVICE: Advice[] = [
     when: (s) => storageCap(s, 'materials') > 0 && stored(s, 'materials') >= storageCap(s, 'materials') - 5,
     at: (s) => s.buildings.find((b) => b.type === 'storehouse'),
     text: (s) =>
-      `Steward: the storehouses are full${piles(s, 'materials')}, so quarries and woodcutters stand idle. Build another Storehouse, sell the surplus, or lower some stock targets.`,
+      `Steward: the storehouses are full${piles(s, 'materials')}, so quarries and woodcutters stand idle. Build another Storehouse, export the surplus from a trading post, or lower some stock targets.`,
   },
   {
     id: 'granary',

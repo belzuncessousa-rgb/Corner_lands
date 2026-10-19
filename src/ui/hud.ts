@@ -20,6 +20,8 @@ import {
   RESOURCE_STORAGE,
   STORAGE_CAPACITY,
   YARD_STORE,
+  EXPORT_PER_DOCK,
+  EXPORT_PER_MARKET,
 } from '../game/data';
 import { commission, commissionError, COMMISSIONS, nextTitle, takeTitle, titleError, TITLES, fairCost, fairError, fairPrestige, FAIR_TIER, feastCost, feastError, FESTIVALS, festivalError, getEvent, holdFair, holdFeast, holdFestival, resolveEvent } from '../game/events';
 import { CHARTERS, CHARTER_TIER, PATHS, charterCost, charterError, grantCharter, hasCharter } from '../game/charters';
@@ -41,9 +43,7 @@ import {
   seasonOf,
   setKeep,
   buyPrice,
-  hasTrade,
   moodYield,
-  sellPrice,
   lockReason,
   prestigeIncome,
   setTrade,
@@ -79,17 +79,21 @@ import {
   setWorkers,
   setPriority,
   setRecipe,
-  setSell,
-  selling,
+  setStopped,
+  stoppedMaking,
+  addOrder,
+  removeOrder,
+  setOrderTarget,
+  moveOrder,
+  tradeCapacity,
+  exportUnitPrice,
   keepOf,
   setTax,
   hasProblem,
-  roomFor,
   storageCap,
   stored,
   totalFood,
   totalHousing,
-  trade,
   yearOf,
   RETINUE_COST,
   RETINUE_PAY,
@@ -101,8 +105,6 @@ import {
   yearGoalMet,
   seatOf,
   yardTotal,
-  exportBudget,
-  surplusOf,
 } from '../game/sim';
 import type { Building, BuildingType, Category, Cost, GoodsGroup, Land, ResourceId } from '../game/types';
 import type { StorageKind } from '../game/data';
@@ -267,6 +269,7 @@ export class Hud {
     }
     this.minimap = new Minimap(root, game.renderer, () => game.state);
     root.addEventListener('click', (e) => this.onClick(e));
+    root.addEventListener('pointerdown', (e) => this.onOrderPointerDown(e));
     root.addEventListener('mousemove', (e) => this.onTipMove(e));
     root.addEventListener('mouseleave', () => (this.el.tooltip.style.display = 'none'));
     // The mouse wheel scrolls a long row of building cards sideways.
@@ -611,7 +614,7 @@ export class Hud {
       }
       ${this.titleRow()}
       ${this.commissionRows()}
-      <div class="row">${hasTrade(s) ? '<button data-action="trade">⚖ Trade</button>' : ''}<button data-action="ledger">Ledger</button><button data-action="charters">${ICONS.prestige} Charters</button></div>`;
+      <div class="row"><button data-action="ledger">Ledger</button><button data-action="charters">${ICONS.prestige} Charters</button></div>`;
   }
 
   /**
@@ -652,21 +655,21 @@ export class Hud {
 
   private goodsPanel(group: GoodsGroup): string {
     const s = this.game.state;
-    const market = hasTrade(s);
     const ids = RESOURCE_IDS.filter((r) => GOODS[r].group === group && (s.seen?.includes(r) || s.res[r] > 0 || ALWAYS_SHOWN.includes(r)));
     const rows = ids
       .map((r) => {
         const g = GOODS[r];
         const flow = s.flow?.[r] ?? 0;
         const keep = keepOf(s, r);
-        const sell = selling(s, r);
+        const stop = stoppedMaking(s, r);
+        const made = s.buildings.some((b) => Object.keys(workDef(b).outputs).includes(r) || workDef(b).recipes?.some((x) => r in x.outputs));
         const wanted = s.buildings.some((b) => b.lack === r && hasProblem(b));
-        return `<tr data-tip="${esc(`<b>${g.name}</b><br>${esc(g.desc)}${g.food ? `<br>Feeds ${g.food} · ${g.foodGroup}` : ''}${this.goodDiagnosis(r)}`)}">
+        return `<tr class="${stop ? 'stopped' : ''}" data-tip="${esc(`<b>${g.name}</b><br>${esc(g.desc)}${g.food ? `<br>Feeds ${g.food} · ${g.foodGroup}` : ''}${this.goodDiagnosis(r)}`)}">
           <td class="ic">${ICONS[r]}</td><td>${g.name}${wanted ? ' <span class="neg" title="Workplaces are waiting for this">⚠</span>' : ''}</td>
           <td class="num"><b>${Math.floor(s.res[r])}</b></td>
           <td class="num flow ${flow > 0 ? 'pos' : flow < 0 ? 'neg' : ''}">${flow > 0 ? '+' : ''}${flow || ''}</td>
-          <td class="keep" data-tip="<b>Keep in stock</b><br>Workers making ${g.name.toLowerCase()} rest once there are ${keep}, plus whatever building sites still need${market ? '; merchants buy what is above it if you sell' : ''}."><button data-action="keep" data-res="${r}" data-d="-10">−</button><span>${keep}</span><button data-action="keep" data-res="${r}" data-d="10">+</button></td>
-          ${market && g.price ? `<td><button class="sell ${sell ? 'active' : ''}" data-action="sell" data-res="${r}" data-tip="${sell ? 'Selling the surplus above the target to merchants. Click to stop.' : 'Sell the surplus above the target to visiting merchants.'}">${ICONS.gold}</button></td>` : '<td></td>'}
+          <td class="keep" data-tip="<b>Keep in stock</b><br>Workers making ${g.name.toLowerCase()} rest once there are ${keep}, plus whatever building sites still need."><button data-action="keep" data-res="${r}" data-d="-10">−</button><span>${keep}</span><button data-action="keep" data-res="${r}" data-d="10">+</button></td>
+          ${made || stop ? `<td><button class="stop ${stop ? 'active' : ''}" data-action="stop" data-res="${r}" data-tip="${stop ? `<b>Stopped</b><br>No workplace makes ${g.name.toLowerCase()} for now, whatever the stock. Click to start again.` : `<b>Stop producing</b><br>Workplaces stop making ${g.name.toLowerCase()} until you start them again; their workers take other jobs.`}">${stop ? 'Stopped' : 'Stop'}</button></td>` : '<td></td>'}
         </tr>`;
       })
       .join('');
@@ -836,9 +839,10 @@ export class Hud {
       b.id, b.status, b.workers, b.builders, b.residents, b.build.toFixed(2), b.paused, b.level, b.lastOutput, b.growth.toFixed(2), b.want, b.priority, b.recipe, b.yard, b.flowers, b.trade, b.herd, JSON.stringify(b.animals ?? {}), b.owner, Math.floor(b.growth),
       s.tier, blocker, b.need, (b.upProgress ?? 0).toFixed(2), b.unmet, Math.floor(yardTotal(b)), b.hauled, s.buildings.length, Math.floor(s.res.gold / 10), s.population,
       s.lastFeast, s.festivals, monthOf(s.day), b.type === 'market' ? s.day : 0, s.retinue, Math.floor(s.res.wood), Math.floor(totalFood(s)), b.barn, Math.floor(s.res.prestige), Math.floor(s.res.weapons),
+      JSON.stringify(b.orders ?? []),
       STORAGE_CAPACITY[b.type] ? RESOURCE_IDS.map((r) => (RESOURCE_STORAGE[r] ? Math.floor(s.res[r]) : 0)).join() : '',
     ]);
-    if (key === this.lastInspectorKey) return;
+    if (key === this.lastInspectorKey || this.orderDrag) return;
     this.lastInspectorKey = key;
     box.style.display = 'block';
     // A family craft works like that workshop; name and description stay the home's.
@@ -902,16 +906,15 @@ export class Hud {
         );
       }
       rows.push(...this.storeRows(b));
+      if (b.type === 'tradingpost' || b.type === 'dock') rows.push(...this.orderRows(b));
       if (b.type === 'townhall') {
         const c = feastCost(s);
         const err = feastError(s);
         rows.push(`<div class="kv feast" data-tip="Once each autumn: a meal for every villager and a cask for every eight. With drink for all it is merrier (+14 happiness for half a year, +10 prestige); without, +9 and +5."><span>Harvest feast</span><span>${
           err ? `<small class="muted">${esc(err)}</small>` : `<button data-action="feast">Call a feast <small>${c.food} food · ${c.drink} drink</small></button>`
         }</span></div>`);
-        // Seasonal festivals: shown in their season, or once the maypole needed stands.
+        // Seasonal festivals: always listed so they can be planned for; held in their season.
         for (const f of FESTIVALS) {
-          const month = monthOf(s.day);
-          if (!f.months.includes(month)) continue;
           const err = festivalError(s, f.id);
           const c = f.cost(s);
           rows.push(`<div class="kv feast" data-tip="${esc(`<b>${f.name}</b><br>${f.desc}<br>+${f.mood} happiness for a season, +${f.prestige} prestige.`)}"><span>${f.name}</span><span>${
@@ -939,8 +942,6 @@ export class Hud {
       if (b.stock && yardTotal(b) >= 1) {
         const yard = Object.fromEntries(Object.entries(b.stock).map(([k, v]) => [k, Math.floor(v ?? 0)]).filter(([, v]) => (v as number) > 0));
         rows.push(`<div class="kv" data-tip="Goods wait here until the storehouse or granary haulers fetch them. A full yard stops the work: more haulers (or a store nearer by) keep it moving."><span>In the yard (${Math.floor(yardTotal(b))}/${YARD_STORE})</span><span class="costline">${costHtml(yard)}</span></div>`);
-      } else if (b.hauled) {
-        rows.push(`<div class="kv"><span>Haulers</span><span>fetch what is made here</span></div>`);
       }
       if (d.cycle && b.workers > 0) {
         const m = moodYield(s);
@@ -981,7 +982,6 @@ export class Hud {
       actions.push(`<button data-action="pause-b">${b.paused ? '▶ Resume' : '❚❚ Pause'}</button>`);
     }
     if (b.type !== 'townhall') actions.push(`<button data-action="demolish-b">✖ ${b.build < 1 ? 'Cancel' : 'Demolish'}</button>`);
-    if ((b.type === 'tradingpost' || b.type === 'dock') && b.build >= 1) actions.push('<button data-action="trade">⚖ Trade</button>');
     box.innerHTML = `
       <button class="close" data-action="deselect">✕</button>
       <h2>${esc(buildingName(b))}${b.trade ? ` <small>· ${esc(BUILDINGS[b.trade].name)}</small>` : ''}</h2>
@@ -991,12 +991,136 @@ export class Hud {
       <div class="actions">${actions.join('')}</div>`;
   }
 
+  /**
+   * A trading post's or dock's standing orders, the first worked first: each
+   * can be dragged by its grip to change its place, its target set with the
+   * pegs, or struck off. New ones are added from the buttons below.
+   */
+  private orderRows(b: Building): string[] {
+    const s = this.game.state;
+    const cap = tradeCapacity(s, b);
+    const orders = b.orders ?? [];
+    const per = b.type === 'dock' ? EXPORT_PER_DOCK : EXPORT_PER_MARKET;
+    const items = orders
+      .map((o, i) => {
+        const g = GOODS[o.res];
+        const imp = o.kind === 'import';
+        const last = o.note ? `${o.moved ? `${imp ? 'Bought' : 'Sold'} ${o.moved} · ` : ''}${o.note}` : 'Waiting for the merchants';
+        const met = /target/.test(o.note ?? '');
+        return `<li class="order ${o.kind}" data-id="${o.id}">
+          <span class="grip" title="Drag to change the order" aria-label="Drag to change the order">⠿</span>
+          <span class="ord-n">${i + 1}</span>
+          <span class="ord-kind" data-tip="${imp ? 'Merchants bring this in until the stores hold the target.' : 'Merchants take this away until the stores are down to the target.'}">${imp ? 'Import' : 'Export'}</span>
+          <span class="ord-good">${ICONS[o.res] ?? ''} ${g.name}</span>
+          <button class="ord-x" data-action="order-del" data-id="${o.id}" data-tip="Strike off this order">✕</button>
+          <span class="ord-target"><small>${imp ? 'up to' : 'down to'}</small><span class="stepper"><button data-action="order-target" data-id="${o.id}" data-d="-10">−</button><b>${o.target}</b><button data-action="order-target" data-id="${o.id}" data-d="10">+</button></span><small class="have">have ${Math.floor(s.res[o.res])}</small></span>
+          <span class="ord-note ${met ? 'met' : o.note && o.moved === 0 && !met ? 'short' : ''}">${esc(last)}</span>
+        </li>`;
+      })
+      .join('');
+    return [
+      `<div class="needs-h">Trade orders</div>`,
+      `<div class="note">${cap ? `Merchants carry ${cap} goods a month here (crates add room for exports).` : `Merchants will carry ${per} goods a month here once it is staffed.`} The first order is worked first: drag to reorder.</div>`,
+      orders.length ? `<ol class="orders">${items}</ol>` : '<div class="note"><i>No orders yet.</i></div>',
+      `<div class="order-add"><button data-action="order-new" data-kind="import">＋ Import</button><button data-action="order-new" data-kind="export">＋ Export</button></div>`,
+    ];
+  }
+
+  /** Choose the good for a new order, from every good the merchants trade, in tabs by kind. */
+  private showOrderPicker(b: Building, kind: 'import' | 'export'): void {
+    const s = this.game.state;
+    const draw = () => {
+      const tab = this.tradeTab;
+      const tabs = (['food', 'materials', 'goods'] as const)
+        .map((g) => `<button data-tab="${g}" class="${g === tab ? 'active' : ''}">${GROUP_NAMES[g]}</button>`)
+        .join('');
+      const goods = (Object.keys(TRADE_PRICES) as ResourceId[])
+        .filter((r) => GOODS[r].group === tab)
+        .map((r) => {
+          const price = kind === 'import' ? `${buyPrice(s, r, 1)}c each` : `+${Math.round(exportUnitPrice(s, r) * 10) / 10}c each`;
+          return `<button class="pick" data-res="${r}">${ICONS[r] ?? ''}<b>${GOODS[r].name}</b><small>have ${Math.floor(s.res[r])} · ${price}</small></button>`;
+        })
+        .join('');
+      return `<h2>New ${kind}</h2>
+        <p class="note" style="text-align:center">${kind === 'import' ? 'Merchants will bring the good you choose until the stores hold your target.' : 'Merchants will take the good you choose until the stores are down to your target.'}</p>
+        <div class="trade-tabs">${tabs}</div>
+        <div class="pick-grid">${goods}</div>
+        <div class="row" style="justify-content:center;margin-top:10px"><button data-m="cancel">Cancel</button></div>`;
+    };
+    const m = this.openModal(draw());
+    const box = m.querySelector('.modal') as HTMLElement;
+    box.classList.add('picker-modal');
+    box.addEventListener('click', (e) => {
+      const t = e.target as HTMLElement;
+      const tabBtn = t.closest('[data-tab]') as HTMLElement | null;
+      if (tabBtn) {
+        this.tradeTab = tabBtn.dataset.tab as 'food' | 'materials' | 'goods';
+        box.innerHTML = draw();
+        return;
+      }
+      const pick = t.closest('.pick') as HTMLElement | null;
+      if (pick) {
+        addOrder(s, b, kind, pick.dataset.res as ResourceId);
+        this.sound('place');
+        this.closeModal();
+        this.lastInspectorKey = '';
+        this.update();
+        return;
+      }
+      if (t.closest('[data-m="cancel"]')) this.closeModal();
+    });
+  }
+
+  /** An order being dragged by its grip to a new place in the list. */
+  private orderDrag: { id: number; li: HTMLElement; items: HTMLElement[]; from: number; to: number; startY: number; h: number } | null = null;
+
+  private onOrderPointerDown(e: PointerEvent): void {
+    const grip = (e.target as HTMLElement).closest('.order .grip');
+    if (!grip) return;
+    const li = grip.closest('.order') as HTMLElement;
+    const items = [...li.parentElement!.querySelectorAll<HTMLElement>('.order')];
+    const from = items.indexOf(li);
+    e.preventDefault();
+    li.setPointerCapture(e.pointerId);
+    li.classList.add('dragging');
+    this.orderDrag = { id: Number(li.dataset.id), li, items, from, to: from, startY: e.clientY, h: li.getBoundingClientRect().height + 4 };
+    const move = (ev: PointerEvent) => {
+      const d = this.orderDrag;
+      if (!d) return;
+      const dy = ev.clientY - d.startY;
+      d.li.style.transform = `translateY(${dy}px)`;
+      d.to = Math.max(0, Math.min(d.items.length - 1, d.from + Math.round(dy / d.h)));
+      d.items.forEach((it, i) => {
+        if (it === d.li) return;
+        const shift = d.from < d.to && i > d.from && i <= d.to ? -d.h : d.from > d.to && i < d.from && i >= d.to ? d.h : 0;
+        it.style.transform = shift ? `translateY(${shift}px)` : '';
+      });
+    };
+    const up = () => {
+      const d = this.orderDrag;
+      li.removeEventListener('pointermove', move);
+      li.removeEventListener('pointerup', up);
+      li.removeEventListener('pointercancel', up);
+      this.orderDrag = null;
+      if (!d) return;
+      const b = this.selectedBuilding();
+      if (b && d.to !== d.from) {
+        moveOrder(b, d.id, d.to);
+        this.sound('place');
+      }
+      this.lastInspectorKey = '';
+      this.update();
+    };
+    li.addEventListener('pointermove', move);
+    li.addEventListener('pointerup', up);
+    li.addEventListener('pointercancel', up);
+  }
+
   /** Inspector rows for farms, herds, orchards, their zones and backyards. */
   /** What the town's stores of this kind hold, biggest piles first, with a quick sale of the surplus. */
   private storeRows(b: Building): string[] {
     const s = this.game.state;
     const kinds = Object.keys(STORAGE_CAPACITY[b.type] ?? {}) as StorageKind[];
-    const market = hasTrade(s);
     const rows: string[] = [];
     for (const kind of kinds) {
       const used = Math.floor(stored(s, kind));
@@ -1004,19 +1128,11 @@ export class Hud {
       const goods = RESOURCE_IDS.filter((r) => RESOURCE_STORAGE[r] === kind && s.res[r] >= 1).sort((a, c) => s.res[c] - s.res[a]);
       const list = goods
         .slice(0, 8)
-        .map((r) => {
-          const surplus = surplusOf(s, r);
-          const sell =
-            market && TRADE_PRICES[r] && surplus >= 1
-              ? `<button data-action="store-sell" data-res="${r}" data-n="${surplus}" data-tip="Sell what is above the stock target (${keepOf(s, r)}) and what building sites still need">Sell ${surplus} <small>+${sellPrice(s, r, surplus)}c</small></button>`
-              : '';
-          return `<div class="kv store-row"><span>${ICONS[r] ?? ''} ${GOODS[r].name}</span><span>${Math.floor(s.res[r])} ${sell}</span></div>`;
-        })
+        .map((r) => `<div class="kv store-row"><span>${ICONS[r] ?? ''} ${GOODS[r].name}</span><span>${Math.floor(s.res[r])}</span></div>`)
         .join('');
       rows.push(`<div class="needs-h">${kind === 'food' ? 'All granaries' : 'All storehouses'} · ${used} / ${cap}</div>
         <div class="progress"><i style="width:${Math.min(100, (used / Math.max(1, cap)) * 100)}%"></i></div>${list}`);
     }
-    if (kinds.length && !market) rows.push('<div class="note">Build a marketplace to sell surplus from here.</div>');
     return rows;
   }
 
@@ -1028,7 +1144,7 @@ export class Hud {
     if (zd) {
       const owner = s.buildings.find((o) => o.id === b.owner);
       rows.push(`<div class="kv"><span>Size</span><span>${b.w} × ${b.h} (${b.w * b.h} tiles)</span></div>`);
-      rows.push(
+      if (zd.owner !== b.type) rows.push(
         owner
           ? `<div class="kv link" data-action="goto-b" data-id="${owner.id}"><span>Tended from</span><span>${esc(buildingName(owner))}</span></div>`
           : `<div class="kv"><span>Tended from</span><span class="neg">No ${BUILDINGS[zd.owner].name} in range</span></div>`,
@@ -1179,8 +1295,8 @@ export class Hud {
     const unlocked = BUILD_ORDER.filter((b) => BUILDINGS[b].category === 'decor' && BUILDINGS[b].tier === tier && !BUILDINGS[b].charter);
     const div = document.createElement('div');
     div.className = 'banner panel';
-    div.innerHTML = `<div class="ornament">❦ ❦ ❦</div><h1>${t.name}</h1><p>${esc(t.desc)}</p>
-      ${unlocked.length ? `<div class="unlocks">${unlocked.map((b) => `<div><img src="${this.cardImage(b)}" alt=""><span>${BUILDINGS[b].name}</span></div>`).join('')}</div>` : ''}
+    div.innerHTML = `<div class="ornament">❦ ❦ ❦</div><div class="tier-sub">Your settlement is now a</div><h1>${t.name}</h1>
+      ${unlocked.length ? `<p>New decorations to build</p><div class="unlocks">${unlocked.map((b) => `<div><img src="${this.cardImage(b)}" alt=""><span>${BUILDINGS[b].name}</span></div>`).join('')}</div>` : ''}
       <button class="primary carry-on">Carry on ▶</button>`;
     this.root.appendChild(div);
     this.sound('good');
@@ -1490,9 +1606,10 @@ export class Hud {
         this.renderChipPanel();
         break;
       }
-      case 'sell': {
+      case 'stop': {
         const r = t.dataset.res as ResourceId;
-        setSell(s, r, !selling(s, r));
+        setStopped(s, r, !stoppedMaking(s, r));
+        recompute(s);
         this.renderChipPanel();
         break;
       }
@@ -1576,9 +1693,26 @@ export class Hud {
         }
         break;
       }
-      case 'trade':
-        this.showTrade();
+      case 'order-new': {
+        const b = this.selectedBuilding();
+        if (b) this.showOrderPicker(b, t.dataset.kind as 'import' | 'export');
         break;
+      }
+      case 'order-del': {
+        const b = this.selectedBuilding();
+        if (b) removeOrder(b, Number(t.dataset.id));
+        this.lastInspectorKey = '';
+        this.update();
+        break;
+      }
+      case 'order-target': {
+        const b = this.selectedBuilding();
+        const o = b?.orders?.find((x) => x.id === Number(t.dataset.id));
+        if (b && o) setOrderTarget(b, o.id, o.target + Number(t.dataset.d) * (e.shiftKey ? 5 : 1));
+        this.lastInspectorKey = '';
+        this.update();
+        break;
+      }
       case 'production':
         this.showProduction();
         break;
@@ -1661,13 +1795,6 @@ export class Hud {
         this.lastInspectorKey = '';
         break;
       }
-      case 'store-sell': {
-        const err = trade(s, t.dataset.res as ResourceId, -Number(t.dataset.n));
-        if (err) this.flash(err);
-        else this.sound('coin');
-        this.lastInspectorKey = '';
-        break;
-      }
       case 'buy-animal':
       case 'slaughter': {
         const b = s.buildings.find((o) => o.id === this.game.selected);
@@ -1678,29 +1805,6 @@ export class Hud {
         else this.sound(t.dataset.action === 'buy-animal' ? 'coin' : 'place');
         this.lastInspectorKey = '';
         this.update();
-        break;
-      }
-      case 'trade-tab':
-        this.tradeTab = t.dataset.tab as 'food' | 'materials' | 'goods';
-        this.showTrade();
-        break;
-      case 'trade-do': {
-        const err = trade(s, t.dataset.res as ResourceId, Number(t.dataset.n));
-        if (err) this.flash(err);
-        else this.sound('coin');
-        this.showTrade();
-        break;
-      }
-      case 'export-toggle': {
-        const r = t.dataset.res as ResourceId;
-        setSell(s, r, !selling(s, r));
-        this.showTrade();
-        break;
-      }
-      case 'export-keep': {
-        const r = t.dataset.res as ResourceId;
-        setKeep(s, r, Math.max(0, keepOf(s, r) + Number(t.dataset.d)));
-        this.showTrade();
         break;
       }
       case 'close-modal':
@@ -2480,7 +2584,8 @@ export class Hud {
         <p><b>Fields, pastures and orchards</b> (Farming) are drawn: click one corner, then the opposite one, near a Farmstead, Animal Farm or Orchard Keeper's Lodge. Choose each field's crop in the panel, and build a Silo to keep the grain; animals are bought at the Animal Farm once you have a Trading Post, and share its pasture room.</p>
         <p><b>Trading Post:</b> merchants come here to buy your surplus, and coins buy what you lack.</p>
         <p><b>Roads</b> are optional but villagers walk faster on them, faster on stone roads (T), and fastest on cobbled streets of dressed stone (Y) once you are a Town. Click to start, click again to plan it, keep clicking to continue; the road is laid a few tiles each day.</p>
-        <p><b>The top bar</b> shows happiness, villagers, food, materials, goods and the treasury. Hover a chip for the details, click to pin it: set how much of each good to keep and whether merchants may buy the surplus. Workers rest when their goods reach the target.</p>
+        <p><b>The top bar</b> shows happiness, villagers, food, materials, goods and the treasury. Hover a chip for the details, click to pin it: set how much of each good to keep, or stop making a good altogether. Workers rest when their goods reach the target.</p>
+        <p><b>Trade</b> goes through a Trading Post or Dock: select it and add orders to import a good up to a target or export it down to one. The merchants work through the orders from the top each month, as far as their carts allow; drag orders to change which come first.</p>
         <p><b>Workers:</b> select a workplace to choose how many villagers work there, its priority and its product. Seasonal work frees hands in the off season. Hover the villagers chip to see who is idle and where hands are short.</p>
         <p><b>The Manor</b> is optional: build it for feasts, festivals and prestige, and renovate it as the town grows into a Manor House and then a Stone Manor, which lets you lay out a manor garden, watch towers and the town walls.</p>
         <p><b>Retinue</b>: a Borough can raise men-at-arms at the manor for prestige and arms. Paid 10 coins a month, they ride out against wolves and bandits.</p>
@@ -2525,45 +2630,6 @@ export class Hud {
 
   /** Which kind of goods the trade window shows. */
   private tradeTab: 'food' | 'materials' | 'goods' = 'materials';
-
-  private showTrade(): void {
-    const s = this.game.state;
-    const staffed = s.buildings.some((b) => (b.type === 'tradingpost' || b.type === 'dock') && b.build >= 1 && b.workers > 0);
-    const budget = exportBudget(s);
-    // Every tradeable good, in tabs by kind.
-    const tab = this.tradeTab;
-    const tabs = (['food', 'materials', 'goods'] as const)
-      .map((g) => `<button data-action="trade-tab" data-tab="${g}" class="${g === tab ? 'active' : ''}">${GROUP_NAMES[g]}</button>`)
-      .join('');
-    const rows = (Object.keys(TRADE_PRICES) as ResourceId[])
-      .filter((r) => GOODS[r].group === tab)
-      .map((r) => {
-        const buy = buyPrice(s, r, 10);
-        const sell = sellPrice(s, r, 10);
-        const keep = keepOf(s, r);
-        const on = selling(s, r);
-        return `<tr><td>${ICONS[r]} ${RESOURCE_INFO[r].name}</td><td class="num">${Math.floor(s.res[r])}</td>
-          <td><button data-action="trade-do" data-res="${r}" data-n="10" ${s.res.gold < buy || roomFor(s, r) < 10 ? 'disabled' : ''}>Buy 10 <small>${buy}c</small></button></td>
-          <td><button data-action="trade-do" data-res="${r}" data-n="-10" ${s.res[r] < 10 ? 'disabled' : ''}>Sell 10 <small>+${sell}c</small></button></td>
-          <td class="export">
-            <button data-action="export-toggle" data-res="${r}" class="${on ? 'active' : ''}" data-tip="Sell surplus to visiting merchants each month">${on ? 'Exporting' : 'Export'}</button>
-            ${on ? `<span class="keep">keep <button data-action="export-keep" data-res="${r}" data-d="-10">−</button><b>${keep}</b><button data-action="export-keep" data-res="${r}" data-d="10">+</button></span>` : ''}
-          </td></tr>`;
-      })
-      .join('');
-    const wasOpen = this.modal && this.modal.querySelector('.trade');
-    const last = s.report.trade ?? 0;
-    const html = `<h2>Trading Post</h2>
-      <p>Gold: <b>${Math.floor(s.res.gold)}</b> ${ICONS.gold} · ${staffed ? `Merchants visit every month and buy up to ${budget.base} goods${budget.crated ? `, and ${budget.crated} more packed in crates` : ''}${last ? ` (last month: +${last} gold)` : ''}.` : '<span class="neg">Staff a trading post or dock so merchants will visit.</span>'}</p>
-      <div class="trade-tabs">${tabs}</div>
-      <table class="trade">${rows}</table>
-      <div class="row" style="justify-content:flex-end;margin-top:10px"><button class="primary" data-action="close-modal">Done</button></div>`;
-    if (wasOpen && this.modal) {
-      this.modal.querySelector('.modal')!.innerHTML = html;
-    } else {
-      this.openModal(html).querySelector('.modal')!.classList.add('wide');
-    }
-  }
 
   // ---------------------------------------------------------------- sound
 

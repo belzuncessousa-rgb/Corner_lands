@@ -136,6 +136,22 @@ export type Category = 'housing' | 'resources' | 'farming' | 'food' | 'industry'
 
 export type Season = 0 | 1 | 2 | 3; // spring, summer, autumn, winter
 
+/**
+ * A standing order at a trading post or dock: import up to `target` units,
+ * or export down to it. Orders are worked through from the first while the
+ * merchants still have room in their carts.
+ */
+export interface TradeOrder {
+  id: number;
+  kind: 'import' | 'export';
+  res: ResourceId;
+  target: number;
+  /** What happened at the last visit, for the inspector. */
+  note?: string;
+  /** Units moved at the last visit. */
+  moved?: number;
+}
+
 export interface Building {
   id: number;
   type: BuildingType;
@@ -218,6 +234,8 @@ export interface Building {
   barn?: Partial<Record<ResourceId, number>>;
   /** Houses: what the family keeps in the backyard. */
   yard?: string;
+  /** Trading posts and docks: what to buy or sell each month, the first order first. */
+  orders?: TradeOrder[];
   /** Houses: flower boxes along the front of the plot. */
   flowers?: boolean;
   /** Hedges and flower beds laid in one go share a group: beds in a group grow into one. */
@@ -252,6 +270,8 @@ export interface MonthReport {
   left: number;
   /** Gold earned from merchants last month. */
   trade?: number;
+  /** Gold paid to merchants for imports last month. */
+  imports?: number;
   /** Villagers fed on pottage (grain or oats boiled whole) last month. */
   pottage?: number;
   /** Villagers no market stall could serve last month. */
@@ -337,8 +357,12 @@ export interface GameState {
   exports?: Partial<Record<ResourceId, number>>;
   /** Stock targets overriding each good's default keep amount. */
   targets?: Partial<Record<ResourceId, number>>;
-  /** Goods visiting merchants may buy above their target. */
+  /** Old rule: goods merchants could buy above their target (now trade orders); migrated on load. */
   sell?: Partial<Record<ResourceId, boolean>>;
+  /** Goods no workplace makes for now, whatever the stock. */
+  stopped?: ResourceId[];
+  /** Next id for a trade order. */
+  nextOrderId?: number;
   /** Stock at the end of last month, and the change over that month. */
   lastMonth?: Partial<Record<ResourceId, number>>;
   flow?: Partial<Record<ResourceId, number>>;
