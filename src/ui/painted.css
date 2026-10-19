@@ -1212,8 +1212,8 @@ table.goods tr.stopped td:not(:last-child) {
 }
 #buildbar .road-pop .road-kind {
   min-height: 0;
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   padding: 0;
   display: flex;
   align-items: center;
@@ -1231,6 +1231,6 @@ table.goods tr.stopped td:not(:last-child) {
   border-color: var(--line);
 }
 #buildbar .road-pop .road-kind svg {
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
 }
