@@ -38,15 +38,15 @@ export const PATHS: CharterPath[] = [
 export const CHARTERS: Charter[] = [
   { id: 'metal1', path: 'metal', rank: 1, name: 'Master Smiths', desc: 'Bloomeries, blacksmiths and armouries work a quarter faster.' },
   { id: 'metal2', path: 'metal', rank: 2, name: 'Deep Veins', desc: 'Bog iron never runs out, and now and then a load of silver comes up with it.', excludes: ['nature3a', 'nature3b'] },
-  { id: 'metal3a', path: 'metal', rank: 3, name: "Jewellers' Guild", desc: 'Jewellers work twice as fast. +1 prestige a month, and +2 for each jeweller.', excludes: ['metal3b'] },
+  { id: 'metal3a', path: 'metal', rank: 3, name: "Jewellers' Guild", desc: "Opens the Jeweller's Shop, and jewellers work twice as fast. +1 prestige a month, and +2 for each jeweller.", excludes: ['metal3b'] },
   { id: 'metal3b', path: 'metal', rank: 3, name: "Armourers' Guild", desc: 'Armouries make half as many arms again, and merchants pay half again for them.', excludes: ['metal3a'] },
 
   { id: 'orchard1', path: 'orchard', rank: 1, name: 'Grafting', desc: 'Orchards and hives yield 30% more.' },
   { id: 'orchard2', path: 'orchard', rank: 2, name: 'Vines and Nurseries', desc: 'Orchards may be planted with vines for grapes, and young trees bear in a year instead of a year and a half.' },
-  { id: 'orchard3a', path: 'orchard', rank: 3, name: 'Vintners', desc: 'Wineries and cider presses make half as much again, and wine and cider sell for half again.', excludes: ['orchard3b'] },
+  { id: 'orchard3a', path: 'orchard', rank: 3, name: 'Vintners', desc: 'Opens the Winery; wineries and cider presses make half as much again, and wine and cider sell for half again.', excludes: ['orchard3b'] },
   { id: 'orchard3b', path: 'orchard', rank: 3, name: 'Meadmakers', desc: 'Hives give twice the honey; the brewhouse brews mead from it, a tavern drink and a luxury. Honey cakes cheer the town (+4 happiness).', excludes: ['orchard3a'] },
 
-  { id: 'learning1', path: 'learning', rank: 1, name: 'Scribes', desc: 'Scriptoria copy half as many books again. +1 prestige a month.' },
+  { id: 'learning1', path: 'learning', rank: 1, name: 'Scribes', desc: 'Opens the Scriptorium, and scriptoria copy half as many books again. +1 prestige a month.' },
   { id: 'learning2', path: 'learning', rank: 2, name: 'Guild Schools', desc: 'Apprentices learn their trade: every workshop that turns one good into another works 10% faster.' },
   { id: 'learning3a', path: 'learning', rank: 3, name: 'University Charter', desc: 'The University reads only one book a month, its learning makes every workplace 10% faster instead of 5%, and it brings 2 more prestige.', excludes: ['learning3b'] },
   { id: 'learning3b', path: 'learning', rank: 3, name: 'Cathedral School', desc: 'A choir and a library: +6 happiness, +2 prestige a month, and books fetch half again.', excludes: ['learning3a'] },

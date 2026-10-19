@@ -329,11 +329,11 @@ button.active {
 /* Leave room for the minimap on wide screens. */
 @media (min-width: 900px) {
   #buildbar {
-    width: min(780px, calc(100vw - 420px));
+    width: min(860px, calc(100vw - 420px));
   }
 }
 /* Too narrow for the category names: icons only (names show on hover). */
-@media (max-width: 1200px) {
+@media (max-width: 1280px) {
   #buildbar .tab span {
     display: none;
   }

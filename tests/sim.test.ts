@@ -824,13 +824,20 @@ describe('charters', () => {
 });
 
 describe('charter goods', () => {
-  it('every building is open from the start but decorations; charters still shape recipes', async () => {
+  it('every building is open from the start but decorations and charter buildings; charters still shape recipes', async () => {
     const { grantCharter } = await import('../src/game/charters');
     const { isUnlocked, chooseRecipe } = await import('../src/game/sim');
     const s = generateWorld(61);
     s.res.prestige = 2000;
-    expect(isUnlocked(s, 'scriptorium')).toBe(true);
     expect(isUnlocked(s, 'cathedral')).toBe(true);
+    // A guild's workshop only once its charter is granted.
+    expect(isUnlocked(s, 'scriptorium')).toBe(false);
+    expect(isUnlocked(s, 'jeweller')).toBe(false);
+    expect(isUnlocked(s, 'winery')).toBe(false);
+    s.tier = 2;
+    grantCharter(s, 'learning1');
+    expect(isUnlocked(s, 'scriptorium')).toBe(true);
+    s.tier = 0;
     expect(isUnlocked(s, 'maypole')).toBe(false);
     s.tier = 1;
     expect(isUnlocked(s, 'maypole')).toBe(true);

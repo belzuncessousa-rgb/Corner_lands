@@ -135,6 +135,7 @@ export const CATEGORY_ICONS: Record<string, string> = {
   industry: svg('<path d="M3 12h11l2-3H6z" fill="#5d6068"/><path d="M6 12h6v2H6z" fill="#4a4d52"/><path d="M5 14h8l1 3H4z" fill="#6d7078"/><path d="M14 4l3 3-6 6-3-3z" fill="#8a6236"/>'),
   civic: svg('<path d="M4 17V8h12v9" fill="#b0a898" stroke="#6d6558"/><path d="M3 8l7-5 7 5z" fill="#5d6670"/><path d="M10 1v4" stroke="#d8b84a" stroke-width="1.2"/><rect x="8.5" y="12" width="3" height="5" fill="#4a2f1b"/>'),
   decor: svg('<path d="M10 18v-7" stroke="#3f7a35" stroke-width="1.4"/><circle cx="10" cy="7" r="2" fill="#f2d34a"/><g fill="#e84a6a"><circle cx="10" cy="4" r="2"/><circle cx="13" cy="7" r="2"/><circle cx="10" cy="10" r="2"/><circle cx="7" cy="7" r="2"/></g><circle cx="10" cy="7" r="1.6" fill="#f2d34a"/><path d="M10 15c-3 0-4-2-4-3 2 0 4 1 4 3z" fill="#5d9a3a"/>'),
+  works: svg('<path d="M4 18V7h3v2h2V7h2v2h2V7h3v11z" fill="#b0a898" stroke="#6d6558" stroke-width=".8"/><path d="M8.5 18v-4a1.5 1.5 0 013 0v4z" fill="#4a2f1b"/><path d="M10 7V2" stroke="#6d6558" stroke-width=".9"/><path d="M10 2l4 1.3-4 1.3z" fill="#c8483a"/><path d="M6 11h1.2M12.8 11H14" stroke="#6d6558" stroke-width="1.1"/>'),
   scroll: svg('<rect x="4" y="3" width="12" height="14" rx="1.5" fill="#f1e4c3" stroke="#6b4a2b"/><path d="M7 7h6M7 10h6M7 13h4" stroke="#6b4a2b" stroke-width="1.1"/>'),
   menu: svg('<path d="M4 6h12M4 10h12M4 14h12" stroke="#3b2a1a" stroke-width="2" stroke-linecap="round"/>'),
 };

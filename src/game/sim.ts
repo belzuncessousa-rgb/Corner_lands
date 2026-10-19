@@ -190,9 +190,14 @@ export function isUnlocked(s: GameState, type: BuildingType): boolean {
   const d = BUILDINGS[type];
   if (MANOR_WORKS.includes(type)) return hasStoneManor(s);
   if (type === 'stable') return s.buildings.some((b) => b.type === 'townhall' && b.build >= 1 && b.level >= 2);
-  if (d.category !== 'decor') return true;
-  return d.tier <= s.tier && (!d.charter || hasCharter(s, d.charter));
+  // Charters gate any building; the settlement's rank only decorations and the monuments.
+  if (d.charter && !hasCharter(s, d.charter)) return false;
+  if (d.category !== 'decor' && !MONUMENTS.includes(type)) return true;
+  return d.tier <= s.tier;
 }
+
+/** Great works that, like decorations, wait for the settlement's rank. */
+export const MONUMENTS: BuildingType[] = ['statue', 'belltower'];
 
 /** What a Stone Manor lets the lord build. */
 export const MANOR_WORKS: BuildingType[] = ['manorgarden', 'watchtower', 'wall'];
@@ -1196,7 +1201,7 @@ export function totalHousing(s: GameState): number {
   return n;
 }
 
-const CATEGORY_PRIORITY: Record<Category, number> = { farming: 0, food: 0.5, resources: 1, industry: 2, civic: 3, housing: 4, decor: 5 };
+const CATEGORY_PRIORITY: Record<Category, number> = { farming: 0, food: 0.5, resources: 1, industry: 2, civic: 3, works: 3.5, housing: 4, decor: 5 };
 /** Fine ordering inside a category: staple food producers are staffed first. */
 const TYPE_PRIORITY: Partial<Record<BuildingType, number>> = {
   farm: 0,

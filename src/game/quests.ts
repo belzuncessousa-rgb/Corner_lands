@@ -226,14 +226,14 @@ export const QUESTS: Quest[] = [
   {
     id: 'cathedral',
     title: 'Raise a cathedral',
-    hint: 'The great work of a lifetime (Civic menu): a fortune in coin, dressed stone and tiles, most of a year to build. It cheers the whole town and brings prestige every month.',
+    hint: 'The great work of a lifetime (Great Works menu): a fortune in coin, dressed stone and tiles, most of a year to build. It cheers the whole town and brings prestige every month.',
     reward: { prestige: 50 },
     done: (s) => count(s, 'cathedral') >= 1,
   },
   {
     id: 'walls',
     title: 'Raise the town walls',
-    hint: 'A City may wall itself in (Civic menu: Town Wall): lay it like a road, section by section. Where it crosses a road a gate tower rises. Forty sections keep wolves and bandits out.',
+    hint: 'A City may wall itself in (Great Works menu: Town Wall): lay it like a road, section by section. Where it crosses a road a gate tower rises. Forty sections keep wolves and bandits out.',
     reward: { prestige: 40 },
     done: (s) => count(s, 'wall') >= 40,
   },

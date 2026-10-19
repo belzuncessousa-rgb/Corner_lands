@@ -105,6 +105,7 @@ import {
   yearGoalMet,
   seatOf,
   yardTotal,
+  MONUMENTS,
 } from '../game/sim';
 import type { Building, BuildingType, Category, Cost, GoodsGroup, Land, ResourceId } from '../game/types';
 import type { StorageKind } from '../game/data';
@@ -1297,12 +1298,14 @@ export class Hud {
 
   private celebrate(tier: number): void {
     const t = TIERS[tier];
-    // Only decorations wait for the town's size; everything else is open from the start.
-    const unlocked = BUILD_ORDER.filter((b) => BUILDINGS[b].category === 'decor' && BUILDINGS[b].tier === tier && !BUILDINGS[b].charter);
+    // Only decorations and monuments wait for the town's size; everything else is open from the start.
+    const sized = (b: BuildingType) => BUILDINGS[b].category === 'decor' || MONUMENTS.includes(b);
+    const unlocked = BUILD_ORDER.filter((b) => sized(b) && BUILDINGS[b].tier === tier && !BUILDINGS[b].charter);
+    const works = unlocked.some((b) => BUILDINGS[b].category === 'works');
     const div = document.createElement('div');
     div.className = 'banner panel';
     div.innerHTML = `<div class="ornament">❦ ❦ ❦</div><div class="tier-sub">Your settlement is now a</div><h1>${t.name}</h1>
-      ${unlocked.length ? `<p>New decorations to build</p><div class="unlocks">${unlocked.map((b) => `<div><img src="${this.cardImage(b)}" alt=""><span>${BUILDINGS[b].name}</span></div>`).join('')}</div>` : ''}
+      ${unlocked.length ? `<p>${works ? 'New to build' : 'New decorations to build'}</p><div class="unlocks">${unlocked.map((b) => `<div><img src="${this.cardImage(b)}" alt=""><span>${BUILDINGS[b].name}</span></div>`).join('')}</div>` : ''}
       <button class="primary carry-on">Carry on ▶</button>`;
     this.root.appendChild(div);
     this.sound('good');
@@ -1833,7 +1836,7 @@ export class Hud {
       Object.entries(c)
         .map(([k, v]) => `<span class="pg" data-tip="${GOODS[k as ResourceId].name}">${ICONS[k as ResourceId] ?? ''}${v}</span>`)
         .join('');
-    const cats: Category[] = ['resources', 'farming', 'food', 'industry', 'civic'];
+    const cats: Category[] = ['resources', 'farming', 'food', 'industry', 'civic', 'works'];
     const sections = cats
       .map((cat) => {
         const rows = BUILD_ORDER.filter((t) => BUILDINGS[t].category === cat && (BUILDINGS[t].workers > 0 || BUILDINGS[t].zone))

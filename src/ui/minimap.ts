@@ -10,6 +10,7 @@ const CAT_COLORS: Record<Category, [number, number, number]> = {
   food: [222, 196, 90],
   industry: [130, 120, 130],
   civic: [180, 60, 50],
+  works: [150, 70, 150],
   decor: [220, 120, 170],
 };
 
