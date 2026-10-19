@@ -133,6 +133,14 @@ await page.evaluate(() => {
   window.cl.recompute(s);
   window.game.hud.update();
 });
+// The first trading post brings the steward, in a puff, to explain trade; skip him here.
+await page.waitForSelector('#tutor .t-name', { timeout: 6000 }).catch(() => {});
+const tutor = await page.evaluate(() => ({ chapter: window.game.state.tutorial?.chapter, name: document.querySelector('#tutor .t-name')?.textContent, puffs: document.querySelectorAll('.t-puff').length }));
+check('the steward comes to explain trade', tutor.chapter === 'trade' && tutor.name === 'Fingamoboblius', JSON.stringify(tutor));
+await page.click('#tutor [data-t="skip"]');
+await page.waitForTimeout(200);
+check('skip the trade lesson', (await page.evaluate(() => window.game.state.tutorial?.tradeSeen)) === true);
+await page.evaluate((id) => window.game.select(id), byreId);
 await page.waitForTimeout(300);
 await page.click('#inspector [data-action="buy-animal"][data-k="cattle"]');
 await page.evaluate(() => { for (let i = 0; i < 3; i++) window.cl.stepDay(window.game.state); });

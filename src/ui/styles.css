@@ -2277,6 +2277,7 @@ table.prod td.num {
 }
 #tutor .t-guide {
   position: absolute;
+  transform-origin: 50% 90%;
   filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.35));
 }
 #tutor .t-balloon {

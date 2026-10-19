@@ -3,7 +3,7 @@ import { bCenter } from '../game/sim';
 import type { GameState } from '../game/types';
 
 /**
- * The tutorial: Fingamoblineus, an old steward with a beard, walks about the
+ * The tutorial: Fingamoboblius, an old steward with a beard, walks about the
  * screen with a little spotlight on himself and on whatever he is showing,
  * and talks in a balloon whose letters appear one by one. Some steps wait
  * for the player to do something; the rest wait for a click.
@@ -15,7 +15,7 @@ export const TUTORIAL_SEED = 209;
 type Spot = { x: number; y: number; w: number; h: number; round?: boolean };
 
 interface Step {
-  /** What Fingamoblineus says (a function to fit the moment). */
+  /** What Fingamoboblius says (a function to fit the moment). */
   say: string | ((g: Game) => string);
   /** What to light up: a selector on the interface, or a point in the land. */
   show?: string | ((g: Game) => Spot | null);
@@ -64,7 +64,7 @@ function lookAt(_g: Game, x: number, y: number): void {
 
 const START: Step[] = [
   {
-    say: 'Greetings, my liege! Welcome to your new land. I am Fingamoblineus, and I shall assist you in your task.',
+    say: 'Greetings, my liege! Welcome to your new land. I am Fingamoboblius, and I shall assist you in your task.',
     enter: (g) => g.setSpeed(0),
   },
   {
@@ -276,6 +276,79 @@ const MANOR: Step[] = [
   },
 ];
 
+/** The first trading post or dock to stand. */
+const tradeHouse = (g: Game) => g.state.buildings.find((b) => (b.type === 'tradingpost' || b.type === 'dock') && b.build >= 1);
+
+/** Keeps its order book open while he talks about it. */
+function openBook(g: Game): void {
+  const b = tradeHouse(g);
+  if (b && g.selected !== b.id) g.select(b.id);
+}
+
+/** How many orders the book held when he asked for one. */
+let ordersBefore = 0;
+
+const TRADE: Step[] = [
+  {
+    say: (g) =>
+      `A ${tradeHouse(g)?.type === 'dock' ? 'dock' : 'trading post'}, my liege! Now merchants will call on our town. Allow me to tell you how trade works.`,
+    enter: (g) => {
+      g.setSpeed(0);
+      const b = tradeHouse(g);
+      if (b) lookAt(g, b.x + 1, b.y + 1);
+    },
+    show: (g) => {
+      const b = tradeHouse(g);
+      return b ? landSpot(g, b.x + 1, b.y + 1, 70) : null;
+    },
+  },
+  {
+    say: 'Merchants do only what you bid them, and you bid them with orders. Click the building to open its order book.',
+    show: (g) => {
+      const b = tradeHouse(g);
+      return b ? landSpot(g, b.x + 1, b.y + 1, 70) : null;
+    },
+    until: (g) => g.selected !== null && g.selected === tradeHouse(g)?.id,
+  },
+  {
+    say: 'Here it is. An Import order buys a good until your stores hold the target you set. The merchants are paid from the treasury, a little above what the good is worth.',
+    show: '#inspector .order-add [data-kind="import"]',
+    enter: openBook,
+  },
+  {
+    say: 'An Export order sells a good while your stores hold more than its target, and the coins go to the treasury. Set the target high enough to keep what your own people need.',
+    show: '#inspector .order-add [data-kind="export"]',
+    enter: openBook,
+  },
+  {
+    say: 'But the carts are only so big: each month the merchants carry a set number of goods here, whatever you order. Crates nearby give them room to take more away.',
+    show: '#inspector .trade-book > .note',
+    enter: openBook,
+  },
+  {
+    say: 'So the order of the orders matters! The first is worked first, then the next, while there is room in the carts. Drag an order by its grip to move it up or down. You may even give one good two orders: import fish up to 100 at the top, say, and up to 120 further down, once the rest is done.',
+    show: '#inspector .trade-book',
+    enter: openBook,
+  },
+  {
+    say: 'Let us try. Click ＋ Import, or ＋ Export, and choose a good.',
+    show: '#inspector .order-add',
+    enter: (g) => {
+      openBook(g);
+      ordersBefore = tradeHouse(g)?.orders?.length ?? 0;
+    },
+    until: (g) => (tradeHouse(g)?.orders?.length ?? 0) > ordersBefore,
+  },
+  {
+    say: 'Splendid! Now set its target with these pegs. The merchants work it every month until it is met, and note beneath it how they fared.',
+    show: '#inspector .order:last-child .ord-target',
+    enter: openBook,
+  },
+  {
+    say: 'Each trading post and dock keeps its own book, and each one adds carts. That is all, my liege. May your coffers fill!',
+  },
+];
+
 /** The herd nearest the camp, with its index. */
 function nearestHerd(g: Game): { h: NonNullable<GameState['herds']>[number]; i: number } | null {
   const camp = g.state.buildings.find((b) => b.type === 'camp');
@@ -299,7 +372,7 @@ export class Tutor {
   private grey: HTMLDivElement;
   private shield: HTMLDivElement;
   private greyMask = '';
-  private gx = -60;
+  private gx = 0;
   private gy = 0;
   private walk = 0;
   private typed = 0;
@@ -310,6 +383,11 @@ export class Tutor {
   private waiting = false;
   /** Seconds the whole line has been on show. */
   private shown = 0;
+  /** Whether he is on screen, and for how many seconds since he popped up. */
+  private visible = false;
+  private appear = 0;
+  /** Which side of him his balloon goes, when the trade window leaves room on one side only. */
+  private side: 'left' | 'right' | null = null;
 
   constructor(private game: Game) {
     this.root = document.createElement('div');
@@ -371,7 +449,8 @@ export class Tutor {
   }
 
   private get steps(): Step[] {
-    return this.game.state.tutorial?.chapter === 'manor' ? MANOR : START;
+    const c = this.game.state.tutorial?.chapter;
+    return c === 'manor' ? MANOR : c === 'trade' ? TRADE : START;
   }
 
   /** A click or Enter: finish the line, then go on (or, on a step that waits, step aside). */
@@ -391,6 +470,8 @@ export class Tutor {
   private skip(): void {
     const t = this.game.state.tutorial;
     if (!t) return;
+    if (t.chapter === 'manor') t.manorSeen = true;
+    if (t.chapter === 'trade') t.tradeSeen = true;
     t.chapter = 'done';
     this.hide();
     this.game.setSpeed(1);
@@ -401,6 +482,7 @@ export class Tutor {
     t.step++;
     if (t.step >= this.steps.length) {
       if (t.chapter === 'manor') t.manorSeen = true;
+      if (t.chapter === 'trade') t.tradeSeen = true;
       t.chapter = 'done';
       if (this.game.speed === 0) this.game.setSpeed(1);
       t.step = 0;
@@ -409,6 +491,9 @@ export class Tutor {
   }
 
   private hide(): void {
+    // He leaves as he came, in a puff of smoke.
+    if (this.visible) puff(this.gx + 22, this.gy + 40);
+    this.visible = false;
     this.active = false;
     this.root.style.display = 'none';
     this.stepKey = '';
@@ -436,6 +521,8 @@ export class Tutor {
   /** Called every frame. */
   update(dt: number): void {
     const g = this.game;
+    // In any game, the first trading post or dock brings him to explain trade (unless tips are off).
+    if (!g.state.tutorial && !g.demo && tradeHouse(g) && tipsOn()) g.state.tutorial = { step: 0, chapter: 'done', manorSeen: true };
     const t = g.state.tutorial;
     if (!t || g.demo) {
       if (this.active) this.hide();
@@ -445,9 +532,13 @@ export class Tutor {
     if (t.chapter === 'done' && !t.manorSeen && g.state.buildings.some((b) => b.type === 'townhall' && b.build >= 1)) {
       t.chapter = 'manor';
       t.step = 0;
+    } else if (t.chapter === 'done' && !t.tradeSeen && tradeHouse(g)) {
+      t.chapter = 'trade';
+      t.step = 0;
     }
     if (t.chapter === 'done' || g.modalOpen) {
       if (this.active || this.root.style.display !== 'none') this.root.style.display = 'none';
+      this.visible = false;
       this.active = t.chapter !== 'done';
       return;
     }
@@ -490,16 +581,39 @@ export class Tutor {
       const floor = bar && bar.height ? Math.min(spot.y, bar.top) : spot.y;
       ty = below ? Math.min(H - 220, spot.y + spot.h + 16) : Math.max(70, floor - 110);
     }
-    if (this.gx < -50) {
+    // Showing something in the big trade window: he stands just outside it, his balloon on the open side.
+    this.side = null;
+    const wide = document.querySelector('#inspector.trade-wide') as HTMLElement | null;
+    const pr = wide?.offsetParent ? wide.getBoundingClientRect() : null;
+    if (spot && pr && spot.x >= pr.left - 8 && spot.x + spot.w <= pr.right + 8) {
+      const midY = Math.max(70, Math.min(H - 150, spot.y + spot.h / 2 - 40));
+      if (pr.left >= 290) {
+        tx = pr.left - 52;
+        this.side = 'left';
+      } else if (W - pr.right >= 290) {
+        tx = pr.right + 8;
+        this.side = 'right';
+      }
+      if (this.side) ty = midY;
+    }
+    // Each time he appears, he pops up where he means to stand in a puff of smoke.
+    if (!this.visible) {
+      this.visible = true;
       this.gx = tx;
       this.gy = ty;
+      this.appear = 0;
+      puff(tx + 22, ty + 40);
     }
+    this.appear += dt;
+    const popping = this.appear < POP;
     const dx = tx - this.gx;
     const dy = ty - this.gy;
     const d = Math.hypot(dx, dy);
     // He walks (at a stroll, so it reads as walking) and only talks once there.
     const walking = d > 2;
-    if (walking) {
+    if (popping) {
+      // Not a word until the smoke clears.
+    } else if (walking) {
       const v = Math.min(d, 170 * dt);
       this.gx += (dx / d) * v;
       this.gy += (dy / d) * v;
@@ -511,19 +625,19 @@ export class Tutor {
       // On a step that waits, he steps aside once he has had his say.
       if (step.until && !this.waiting && this.shown > 4) this.waiting = true;
     }
-    this.draw(spot, walking || panning, step);
+    this.draw(spot, walking || panning || popping, step, walking);
   }
 
-  private draw(spot: Spot | null, walking: boolean, step: Step): void {
+  private draw(spot: Spot | null, busy: boolean, step: Step, walking: boolean): void {
     const W = window.innerWidth;
     const H = window.innerHeight;
-    const talking = !walking && !this.waiting;
+    const talking = !busy && !this.waiting;
     // While he walks or waits nothing blocks the screen; while he talks a click anywhere goes on,
     // except on a step that waits for the player, who must be free to do it.
     this.shield.style.display = talking && !step.until ? 'block' : 'none';
     this.guide.style.pointerEvents = this.waiting ? 'auto' : 'none';
     this.guide.style.cursor = this.waiting ? 'pointer' : '';
-    this.guide.title = this.waiting ? 'Fingamoblineus: click to hear him again' : '';
+    this.guide.title = this.waiting ? 'Fingamoboblius: click to hear him again' : '';
     // The dimmed, greyed screen, with holes for him and what he shows; none while he waits.
     const holes: string[] = [`<ellipse cx="${this.gx + 22}" cy="${this.gy + 34}" rx="46" ry="52" fill="black"/>`];
     if (spot) {
@@ -551,7 +665,7 @@ export class Tutor {
       this.svg.innerHTML = `<defs><mask id="tmask"><rect width="${W}" height="${H}" fill="white"/>${holes.join('')}</mask>
         <radialGradient id="tglow"><stop offset="0" stop-color="#fff4c8" stop-opacity="0.35"/><stop offset="1" stop-color="#fff4c8" stop-opacity="0"/></radialGradient></defs>
         <rect width="${W}" height="${H}" fill="rgba(12,10,20,0.34)" mask="url(#tmask)"/>
-        <ellipse cx="${this.gx + 22}" cy="${this.gy + 40}" rx="40" ry="44" fill="url(#tglow)"/>${walking ? '' : outline}`;
+        <ellipse cx="${this.gx + 22}" cy="${this.gy + 40}" rx="40" ry="44" fill="url(#tglow)"/>${busy ? '' : outline}`;
       // The world outside the holes loses its colour (a masked backdrop filter).
       const grey = 'grayscale(0.9) brightness(0.8)';
       const mask = `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><defs><mask id="m"><rect width="${W}" height="${H}" fill="white"/>${holes.join('')}</mask></defs><rect width="${W}" height="${H}" mask="url(#m)"/></svg>`)}")`;
@@ -562,24 +676,31 @@ export class Tutor {
         this.grey.style.webkitMaskImage = mask;
       }
     }
-    // Fingamoblineus himself.
+    // Fingamoboblius himself.
     this.guide.style.left = `${this.gx}px`;
     this.guide.style.top = `${this.gy}px`;
+    // Hidden by the smoke at first, then he springs up.
+    const a = this.appear;
+    const pop = a < 0.12 ? 0 : a < POP ? 1 + Math.sin(((a - 0.12) / (POP - 0.12)) * Math.PI) * 0.18 : 1;
+    this.guide.style.opacity = a < 0.12 ? '0' : '1';
+    this.guide.style.transform = pop === 1 ? '' : `scale(${pop.toFixed(3)})`;
     this.paintGuide(walking);
     // His balloon, only while he stands and talks, beside him on the side with more room.
     this.balloon.style.display = talking ? 'block' : 'none';
     if (!talking) return;
-    const right = this.gx < W / 2;
+    const right = this.side ? this.side === 'right' : this.gx < W / 2;
     const shownText = this.text.slice(0, Math.floor(this.typed));
     const done = this.typed >= this.text.length;
     const t = this.game.state.tutorial!;
-    const html = `<div class="t-name">Fingamoblineus</div><p>${esc(shownText)}<span class="t-caret">${done ? '' : '▌'}</span></p>
-      <div class="t-foot"><span class="t-next">${done ? (step.until ? 'Over to you, my liege ▸' : 'Click or press Enter to go on ▸') : 'Click to hurry him'}</span><button data-t="skip">Skip tutorial</button></div>`;
+    const html = `<div class="t-name">Fingamoboblius</div><p>${esc(shownText)}<span class="t-caret">${done ? '' : '▌'}</span></p>
+      <div class="t-foot"><span class="t-next">${done ? (step.until ? 'Over to you, my liege ▸' : 'Click or press Enter to go on ▸') : 'Click to hurry him'}</span><button data-t="skip">${t.chapter === 'start' ? 'Skip tutorial' : 'Skip'}</button></div>`;
     if (this.balloon.dataset.html !== `${t.chapter}${t.step}:${Math.floor(this.typed)}`) {
       this.balloon.dataset.html = `${t.chapter}${t.step}:${Math.floor(this.typed)}`;
       this.balloon.innerHTML = html;
     }
-    const bw = Math.min(340, W - 24);
+    // Beside the trade window there is only so much room.
+    const room = this.side === 'left' ? this.gx - 20 : this.side === 'right' ? W - this.gx - 64 : W - 24;
+    const bw = Math.min(340, room);
     let bx = right ? this.gx + 52 : this.gx - bw - 8;
     bx = Math.max(12, Math.min(W - bw - 12, bx));
     const by = Math.max(12, Math.min(H - 150, this.gy - 30));
@@ -658,6 +779,89 @@ export class Tutor {
     c.fill();
     c.restore();
   }
+}
+
+/** Seconds from the puff until he can speak. */
+const POP = 0.42;
+
+function tipsOn(): boolean {
+  try {
+    return localStorage.getItem('cornerlands.tipsOff') !== '1';
+  } catch {
+    return true;
+  }
+}
+
+/** A cartoon puff of smoke at a point on the screen: billows swell outward and fade, with a few sparks. */
+function puff(x: number, y: number): void {
+  const S = 180;
+  const cv = document.createElement('canvas');
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  cv.width = S * dpr;
+  cv.height = S * dpr;
+  cv.className = 't-puff';
+  cv.style.cssText = `position:fixed;left:${x - S / 2}px;top:${y - S / 2}px;width:${S}px;height:${S}px;pointer-events:none;z-index:61`;
+  document.body.appendChild(cv);
+  const c = cv.getContext('2d');
+  if (!c) return cv.remove();
+  const blobs = Array.from({ length: 11 }, (_, i) => ({
+    a: (i / 11) * Math.PI * 2 + Math.random() * 0.4,
+    d: 26 + Math.random() * 20,
+    r: 12 + Math.random() * 9,
+    up: Math.random() * 10,
+  }));
+  const sparks = Array.from({ length: 7 }, (_, i) => ({ a: (i / 7) * Math.PI * 2 + Math.random(), d: 60 + Math.random() * 20 }));
+  const LIFE = 0.75;
+  const t0 = performance.now();
+  const frame = (now: number) => {
+    const t = (now - t0) / 1000 / LIFE;
+    if (t >= 1) return cv.remove();
+    const e = 1 - (1 - t) ** 3;
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.clearRect(0, 0, S, S);
+    c.globalAlpha = Math.min(1, (1 - t) * 1.6);
+    // A burst at the heart, gone in a blink.
+    if (t < 0.3) {
+      c.fillStyle = '#fffaf0';
+      c.beginPath();
+      c.arc(S / 2, S / 2, 14 + t * 90, 0, Math.PI * 2);
+      c.fill();
+    }
+    for (const pass of [0, 1, 2]) {
+      for (const b of blobs) {
+        const r = b.r * (0.6 + 0.7 * Math.sin(Math.min(1, t * 1.4) * Math.PI * 0.8)) * (1 - t * 0.5);
+        const bx = S / 2 + Math.cos(b.a) * b.d * e;
+        const by = S / 2 + Math.sin(b.a) * b.d * e * 0.8 - b.up * e;
+        c.beginPath();
+        if (pass === 0) {
+          c.fillStyle = '#6a5a48';
+          c.arc(bx, by, r + 2, 0, Math.PI * 2);
+        } else if (pass === 1) {
+          c.fillStyle = '#d8ccbc';
+          c.arc(bx, by, r, 0, Math.PI * 2);
+        } else {
+          c.fillStyle = '#f8f2e6';
+          c.arc(bx - r * 0.22, by - r * 0.25, r * 0.7, 0, Math.PI * 2);
+        }
+        c.fill();
+      }
+    }
+    for (const sp of sparks) {
+      const sx = S / 2 + Math.cos(sp.a) * sp.d * e;
+      const sy = S / 2 + Math.sin(sp.a) * sp.d * e;
+      const k = 3.5 * (1 - t);
+      c.fillStyle = '#f2d878';
+      c.beginPath();
+      c.moveTo(sx, sy - k * 1.6);
+      c.lineTo(sx + k * 0.5, sy);
+      c.lineTo(sx, sy + k * 1.6);
+      c.lineTo(sx - k * 0.5, sy);
+      c.closePath();
+      c.fill();
+    }
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
 }
 
 function esc(s: string): string {

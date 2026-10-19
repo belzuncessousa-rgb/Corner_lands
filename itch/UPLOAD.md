@@ -102,7 +102,7 @@ Remake the pictures with `node scripts/itch-art.mjs` (game server running).
 > - Your own lord or lady, with custom clothes and a coat of arms on your banners.
 > - A manor that grows into a stone manor with gardens, watchtowers and town walls.
 > - Town charters: seven paths to specialise your town, from Master Smiths to the University.
-> - A tutorial with your steward, Fingamoblineus.
+> - A tutorial with your steward, Fingamoboblius.
 > - Three difficulties, and endless random lands (meadows, river valleys and hills) with shareable seeds.
 >
 > **Controls:** left-click to build and select, drag or WASD/arrow keys to move,

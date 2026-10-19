@@ -849,6 +849,10 @@ export class Hud {
     const d = workDef(b);
     const own = BUILDINGS[b.type];
     const rows: string[] = [];
+    // A trading post's order book is a big window in the middle of the screen, its orders beside the rest.
+    const wide = (b.type === 'tradingpost' || b.type === 'dock') && b.build >= 1;
+    const orders: string[] = [];
+    box.classList.toggle('trade-wide', wide);
     const needLine = () => {
       if (!b.need) return '';
       const left = Object.entries(b.need).filter(([, v]) => (v ?? 0) > 0);
@@ -906,7 +910,7 @@ export class Hud {
         );
       }
       rows.push(...this.storeRows(b));
-      if (b.type === 'tradingpost' || b.type === 'dock') rows.push(...this.orderRows(b));
+      if (wide) orders.push(...this.orderRows(b));
       if (b.type === 'townhall') {
         const c = feastCost(s);
         const err = feastError(s);
@@ -982,13 +986,15 @@ export class Hud {
       actions.push(`<button data-action="pause-b">${b.paused ? '▶ Resume' : '❚❚ Pause'}</button>`);
     }
     if (b.type !== 'townhall') actions.push(`<button data-action="demolish-b">✖ ${b.build < 1 ? 'Cancel' : 'Demolish'}</button>`);
-    box.innerHTML = `
+    const head = `
       <button class="close" data-action="deselect">✕</button>
-      <h2>${esc(buildingName(b))}${b.trade ? ` <small>· ${esc(BUILDINGS[b.trade].name)}</small>` : ''}</h2>
+      <h2>${esc(buildingName(b))}${b.trade ? ` <small>· ${esc(BUILDINGS[b.trade].name)}</small>` : ''}</h2>`;
+    const body = `
       <div class="desc">${own.desc}</div>
       ${rows.join('')}
       <div class="status ${warn ? 'warn' : ''}">${esc(b.status || 'Idle')}</div>
       <div class="actions">${actions.join('')}</div>`;
+    box.innerHTML = wide ? `${head}<div class="trade-cols"><div class="trade-info">${body}</div><div class="trade-book">${orders.join('')}</div></div>` : head + body;
   }
 
   /**
@@ -2056,7 +2062,7 @@ export class Hud {
     const mode0 = preset?.mode ?? 'normal';
     const m = this.openModal(
       `<h2>${tutorial ? 'Tutorial' : 'New Settlement'}</h2>
-      ${tutorial ? '<p>Fingamoblineus, your steward, will show you the ropes on a land chosen for learning. Pick how hard it should be; the land is always the same.</p>' : ''}
+      ${tutorial ? '<p>Fingamoboblius, your steward, will show you the ropes on a land chosen for learning. Pick how hard it should be; the land is always the same.</p>' : ''}
       <div class="row"><label>Name</label><input id="town" value="${esc(preset?.name ?? placeName(seed))}" maxlength="40"><button data-m="rename" data-tip="Another name">🎲</button></div>
       <div class="row lord-pick"><label>Your lord</label><span class="lord-mini"></span><span class="lord-mini flag"></span><button data-m="lord">Choose looks &amp; arms…</button></div>
       <div class="land-pick" ${tutorial ? 'hidden' : ''}><p>Every map is generated from a seed. Share a seed to play the same land, or take this week's seed, the same for everyone.</p>
