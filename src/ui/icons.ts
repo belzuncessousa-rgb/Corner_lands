@@ -138,3 +138,26 @@ export const CATEGORY_ICONS: Record<string, string> = {
   scroll: svg('<rect x="4" y="3" width="12" height="14" rx="1.5" fill="#f1e4c3" stroke="#6b4a2b"/><path d="M7 7h6M7 10h6M7 13h4" stroke="#6b4a2b" stroke-width="1.1"/>'),
   menu: svg('<path d="M4 6h12M4 10h12M4 14h12" stroke="#3b2a1a" stroke-width="2" stroke-linecap="round"/>'),
 };
+
+/**
+ * Icons look painted onto the boards: one shared filter gives every icon a
+ * dark brush outline with a slight wobble, and a faint streak of grain.
+ * The stylesheet applies it (`filter: url(#ic-paint)`).
+ */
+export function installIconPaint(): void {
+  if (document.getElementById('ic-paint')) return;
+  const holder = document.createElement('div');
+  holder.innerHTML = `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+    <filter id="ic-paint" x="-25%" y="-25%" width="150%" height="150%" color-interpolation-filters="sRGB">
+      <feMorphology in="SourceAlpha" operator="dilate" radius="1.1" result="wide"/>
+      <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="1" seed="4" result="noise"/>
+      <feDisplacementMap in="wide" in2="noise" scale="1.5" xChannelSelector="R" yChannelSelector="G" result="wobble"/>
+      <feFlood flood-color="#3a2412"/>
+      <feComposite in2="wobble" operator="in" result="outline"/>
+      <feTurbulence type="fractalNoise" baseFrequency="0.06 1.6" numOctaves="2" seed="9" result="grain"/>
+      <feColorMatrix in="grain" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -0.55 0.3" result="streaks"/>
+      <feComposite in="streaks" in2="SourceGraphic" operator="in" result="grained"/>
+      <feMerge><feMergeNode in="outline"/><feMergeNode in="SourceGraphic"/><feMergeNode in="grained"/></feMerge>
+    </filter></defs></svg>`;
+  document.body.appendChild(holder.firstElementChild!);
+}

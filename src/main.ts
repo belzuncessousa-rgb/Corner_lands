@@ -62,6 +62,7 @@ import { Wildlife } from './render/wildlife';
 import { type Overlay, Renderer } from './render/renderer';
 import { Tutor } from './ui/tutorial';
 import { installWood } from './ui/wood';
+import { installIconPaint } from './ui/icons';
 import { Hud } from './ui/hud';
 
 export type Tool =
@@ -161,6 +162,7 @@ export class Game {
     this.state = makeDemoVillage();
     this.hud = new Hud(this, document.getElementById('ui')!);
     installWood();
+    installIconPaint();
     this.tutor = new Tutor(this);
     this.renderer.resize();
     this.resetView();

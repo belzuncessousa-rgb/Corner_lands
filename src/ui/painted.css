@@ -602,3 +602,12 @@ button:disabled small {
   border-color: var(--line);
   box-shadow: 0 0 0 2.5px #f6c860, 0 0 0 4.5px var(--line);
 }
+
+/* Icons painted on: a dark brush outline (see installIconPaint). */
+#ui svg[aria-hidden='true'] {
+  filter: url(#ic-paint);
+}
+/* The menu button's own padding left its icon 4px wide. */
+#menu-btn.icon-btn {
+  padding: 0;
+}
