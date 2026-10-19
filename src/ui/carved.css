@@ -1,0 +1,688 @@
+/*
+ * Hand-carved wood: every board of the interface is pale pine set in a
+ * walnut frame with an iron nail at each corner, its lettering cut into
+ * the grain. Loaded after styles.css and only restyles; the layout is
+ * styles.css's own.
+ */
+:root {
+  --ink: #2e1c0c;
+  --ink-soft: #5e4228;
+  --title: 'IM Fell English SC', 'Cinzel', Georgia, serif;
+  --serif: 'EB Garamond', Georgia, 'Times New Roman', serif;
+  /* Lettering cut into wood: a dark groove lit along its lower lip. */
+  --engrave: 0 1px 0 rgba(255, 238, 200, 0.55);
+  --engrave-dark: 0 1px 1px rgba(0, 0, 0, 0.75);
+  --frame: 7px;
+  /* An iron nail head for each corner of a frame. */
+  --nail: radial-gradient(circle at 45% 40%, #e8dcc0 0 0.8px, #8a8070 1.4px, #3c342a 2.6px, rgba(20, 12, 4, 0.6) 3.1px, transparent 3.6px);
+}
+
+/* ------------------------------------------------------------ boards */
+
+.panel {
+  border: var(--frame) solid transparent;
+  border-radius: 5px;
+  background:
+    var(--nail) left top / var(--frame) var(--frame) no-repeat border-box,
+    var(--nail) right top / var(--frame) var(--frame) no-repeat border-box,
+    var(--nail) left bottom / var(--frame) var(--frame) no-repeat border-box,
+    var(--nail) right bottom / var(--frame) var(--frame) no-repeat border-box,
+    radial-gradient(ellipse at 50% 30%, rgba(255, 244, 214, 0.32), rgba(110, 64, 24, 0.16) 90%) padding-box,
+    var(--wood-pale, #dcb985) center / 620px auto padding-box,
+    linear-gradient(180deg, rgba(255, 214, 150, 0.3), rgba(255, 214, 150, 0) 30%, rgba(0, 0, 0, 0.32)) border-box,
+    var(--wood-frame, #6b4223) center / 320px auto border-box;
+  box-shadow:
+    inset 0 0 0 1px rgba(36, 18, 4, 0.75),
+    inset 0 3px 5px rgba(36, 18, 4, 0.35),
+    inset 0 -1px 0 rgba(255, 236, 196, 0.35),
+    0 1px 0 1px #24130a,
+    0 6px 14px rgba(16, 8, 2, 0.5);
+  color: var(--ink);
+}
+.panel h1,
+.panel h2,
+.panel h3 {
+  color: #3a220c;
+  text-shadow: var(--engrave);
+}
+
+/* A carved groove under a board's title. */
+.modal h2,
+#inspector h2,
+#chip-panel h3 {
+  padding-bottom: 4px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid rgba(60, 30, 8, 0.45);
+  box-shadow: 0 1px 0 rgba(255, 236, 196, 0.5);
+}
+
+.pos {
+  color: #2f6a24;
+}
+.neg {
+  color: #9a2a1e;
+}
+
+/* ------------------------------------------------------------ buttons: little blocks of pine */
+
+button {
+  color: var(--ink);
+  text-shadow: var(--engrave);
+  background:
+    linear-gradient(180deg, rgba(255, 246, 222, 0.45), rgba(255, 246, 222, 0) 45%, rgba(90, 48, 14, 0.18)),
+    var(--wood-pale, #dcb985) center / 360px auto;
+  border: 1.5px solid #4a2a12;
+  border-radius: 4px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 248, 228, 0.7),
+    inset 0 -2px 0 rgba(96, 54, 18, 0.3),
+    0 2px 0 #3a200c,
+    0 3px 3px rgba(0, 0, 0, 0.28);
+}
+button:hover:not(:disabled) {
+  background:
+    linear-gradient(180deg, rgba(255, 250, 232, 0.65), rgba(255, 246, 222, 0.15) 45%, rgba(90, 48, 14, 0.1)),
+    var(--wood-pale, #e4c48f) center / 360px auto;
+}
+button:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 2px 3px rgba(60, 30, 8, 0.35),
+    0 0 0 #3a200c;
+}
+/* Pressed in and left there: a slot cut into darker wood. */
+button.active,
+#buildbar .tab.active {
+  color: #fff1cf;
+  text-shadow: var(--engrave-dark);
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.28), rgba(0, 0, 0, 0.05) 40%, rgba(255, 220, 160, 0.12)),
+    var(--wood-img, #a87842) center / 420px auto;
+  border-color: #2e1808;
+  box-shadow:
+    inset 0 2px 4px rgba(20, 8, 0, 0.6),
+    inset 0 -1px 0 rgba(255, 230, 180, 0.25),
+    0 1px 0 rgba(255, 236, 196, 0.45);
+  transform: translateY(1px);
+}
+button.active svg,
+#buildbar .tab.active svg {
+  filter: drop-shadow(0 0 1px rgba(255, 240, 200, 0.6));
+}
+/* The one to press: walnut with cream lettering. */
+button.primary {
+  color: #fbefd2;
+  text-shadow: var(--engrave-dark);
+  background:
+    linear-gradient(180deg, rgba(255, 220, 160, 0.25), rgba(0, 0, 0, 0.28)),
+    var(--wood-frame, #6b4223) center / 320px auto;
+  border-color: #24120a;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 230, 190, 0.35),
+    0 2px 0 #1e0f05,
+    0 3px 3px rgba(0, 0, 0, 0.35);
+}
+button.primary:hover:not(:disabled) {
+  background:
+    linear-gradient(180deg, rgba(255, 230, 180, 0.38), rgba(0, 0, 0, 0.18)),
+    var(--wood-frame, #7a5030) center / 320px auto;
+}
+.icon-btn svg {
+  filter: drop-shadow(0 1px 0 rgba(255, 238, 200, 0.6));
+}
+/* Round wooden pegs for closing a board. */
+#inspector .close,
+#chip-panel .close {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  line-height: 1;
+}
+
+/* ------------------------------------------------------------ top: hanging signboards */
+
+#topbar,
+#clock {
+  position: relative;
+  overflow: visible;
+}
+/* Each sign hangs from two cords off the top of the screen. */
+#topbar::before,
+#topbar::after,
+#clock::before,
+#clock::after {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + var(--frame) - 2px);
+  width: 4px;
+  height: 40px;
+  background: repeating-linear-gradient(160deg, #c8a46c 0 3px, #8a6a3a 3px 6px);
+  box-shadow: 1px 0 1px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+#topbar::before,
+#clock::before {
+  left: 14%;
+}
+#topbar::after,
+#clock::after {
+  right: 14%;
+}
+#top #topbar {
+  opacity: 1;
+}
+/* Chips are numbers cut into the sign; dividers are grooves. */
+.res {
+  text-shadow: var(--engrave);
+  border-radius: 3px;
+}
+.res:hover,
+#topbar .chip.open {
+  background: rgba(70, 36, 10, 0.16);
+  box-shadow: inset 0 1px 2px rgba(50, 25, 6, 0.35), 0 1px 0 rgba(255, 236, 196, 0.4);
+}
+.res.full,
+.res.low {
+  color: #9a2a1e;
+}
+.sep,
+#buildbar .divider {
+  width: 2px;
+  background: linear-gradient(90deg, rgba(50, 25, 6, 0.55) 50%, rgba(255, 236, 196, 0.5) 50%);
+}
+#topbar .chip .badge,
+.pill .count {
+  background:
+    linear-gradient(180deg, rgba(255, 220, 160, 0.2), rgba(0, 0, 0, 0.25)),
+    var(--wood-frame, #6b4223) center / 200px auto;
+  color: #fbefd2;
+  text-shadow: var(--engrave-dark);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+#clock .date {
+  text-shadow: var(--engrave);
+}
+
+/* ------------------------------------------------------------ build bar: a long plank */
+
+#buildbar {
+  background:
+    var(--nail) left top / var(--frame) var(--frame) no-repeat border-box,
+    var(--nail) right top / var(--frame) var(--frame) no-repeat border-box,
+    var(--nail) left bottom / var(--frame) var(--frame) no-repeat border-box,
+    var(--nail) right bottom / var(--frame) var(--frame) no-repeat border-box,
+    radial-gradient(ellipse at 50% 30%, rgba(255, 244, 214, 0.3), rgba(110, 64, 24, 0.16) 90%) padding-box,
+    var(--wood-pale, #dcb985) center / 620px auto padding-box,
+    linear-gradient(180deg, rgba(255, 214, 150, 0.3), rgba(0, 0, 0, 0.32)) border-box,
+    var(--wood-frame, #6b4223) center / 320px auto border-box;
+}
+#buildbar .tab {
+  border-radius: 4px;
+  text-shadow: var(--engrave);
+}
+#buildbar .tab:hover:not(.active) {
+  background: rgba(70, 36, 10, 0.14);
+  border-color: transparent;
+  box-shadow: inset 0 1px 2px rgba(50, 25, 6, 0.3);
+}
+#buildbar .cards {
+  border-bottom: none;
+  box-shadow: 0 1px 0 rgba(255, 236, 196, 0.5);
+  border-image: none;
+  position: relative;
+}
+#buildbar .cards::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background: rgba(60, 30, 8, 0.45);
+}
+/* Each building on a small tile let into the plank. */
+.card {
+  border: 1px solid rgba(60, 30, 8, 0.55);
+  border-radius: 4px;
+  background: linear-gradient(180deg, rgba(255, 246, 222, 0.42), rgba(255, 246, 222, 0.18));
+  box-shadow: inset 0 1px 3px rgba(60, 30, 8, 0.35), 0 1px 0 rgba(255, 236, 196, 0.45);
+  text-shadow: var(--engrave);
+}
+.card:hover {
+  background: linear-gradient(180deg, rgba(255, 250, 232, 0.75), rgba(255, 246, 222, 0.4));
+}
+.card.sel {
+  border-color: #6b3e12;
+  background: linear-gradient(180deg, rgba(255, 236, 170, 0.8), rgba(240, 200, 110, 0.45));
+  box-shadow: inset 0 0 0 2px #c8922e, inset 0 2px 4px rgba(60, 30, 8, 0.35);
+}
+.card .lock {
+  background: rgba(233, 205, 156, 0.9);
+}
+
+/* ------------------------------------------------------------ inspector & controls */
+
+#inspector .status {
+  background: rgba(70, 36, 10, 0.12);
+  border-radius: 3px;
+  box-shadow: inset 0 1px 2px rgba(50, 25, 6, 0.35), 0 1px 0 rgba(255, 236, 196, 0.45);
+}
+/* Low · Normal · High as one bar of pegs. */
+.seg {
+  gap: 0;
+}
+.seg button {
+  border-radius: 0;
+  margin-left: -1.5px;
+}
+.seg button:first-child {
+  border-radius: 4px 0 0 4px;
+  margin-left: 0;
+}
+.seg button:last-child {
+  border-radius: 0 4px 4px 0;
+}
+/* Worker pips: little carved figures stand in a row of notches. */
+.pips i {
+  border-radius: 3px 3px 1px 1px;
+  background: rgba(60, 30, 8, 0.2);
+  box-shadow: inset 0 1px 2px rgba(50, 25, 6, 0.45), 0 1px 0 rgba(255, 236, 196, 0.45);
+}
+.pips i.on {
+  background: linear-gradient(180deg, #7a4a24, #4a2a12);
+  box-shadow: inset 0 1px 0 rgba(255, 220, 160, 0.35), 0 1px 0 rgba(255, 236, 196, 0.45);
+}
+/* Progress: a groove that fills with honey. */
+.progress,
+.lbar,
+#chip-panel .bar {
+  background: rgba(60, 30, 8, 0.28);
+  border: none;
+  border-radius: 6px;
+  box-shadow: inset 0 1px 3px rgba(30, 15, 3, 0.6), 0 1px 0 rgba(255, 236, 196, 0.45);
+}
+.progress i,
+#chip-panel .bar i {
+  border-radius: 6px;
+  background: linear-gradient(180deg, #f4d27a, #d49a2c 60%, #a8701c);
+  box-shadow: inset 0 1px 0 rgba(255, 248, 210, 0.7);
+}
+.upgrade-box {
+  background: rgba(255, 246, 222, 0.28);
+  border: 1px solid rgba(60, 30, 8, 0.45);
+  border-radius: 4px;
+  box-shadow: inset 0 1px 3px rgba(60, 30, 8, 0.3), 0 1px 0 rgba(255, 236, 196, 0.45);
+}
+
+/* Fields to write in are cut into the board. */
+.modal input,
+input[type='text'],
+input[type='number'] {
+  background: rgba(255, 248, 230, 0.55);
+  border: 1px solid rgba(60, 30, 8, 0.6);
+  border-radius: 3px;
+  box-shadow: inset 0 2px 3px rgba(60, 30, 8, 0.35), 0 1px 0 rgba(255, 236, 196, 0.5);
+  color: var(--ink);
+  font-family: var(--serif);
+}
+
+/* ------------------------------------------------------------ notes, tags and boards */
+
+.msg {
+  --frame: 5px;
+  border-left-width: var(--frame);
+  border-left-style: solid;
+  text-shadow: var(--engrave);
+}
+/* The edge of a note is painted the colour of its news. */
+.msg.good {
+  border-left-color: #3f7a35;
+}
+.msg.bad {
+  border-left-color: #a8322d;
+}
+.msg.advice,
+.msg.tip {
+  border-left-color: #c8922e;
+}
+#tooltip,
+#hint {
+  --frame: 5px;
+  text-shadow: var(--engrave);
+}
+.modal-back {
+  background: radial-gradient(ellipse at center, rgba(20, 12, 4, 0.35), rgba(20, 12, 4, 0.7));
+}
+.modal {
+  --frame: 11px;
+  --nail: radial-gradient(circle at 45% 40%, #efe4c8 0 1px, #8a8070 2px, #3c342a 3.6px, rgba(20, 12, 4, 0.6) 4.3px, transparent 5px);
+}
+.modal h1,
+.banner h1 {
+  color: #3a220c;
+  text-shadow: var(--engrave), 0 -1px 0 rgba(40, 20, 4, 0.25);
+}
+.modal .save,
+.mode,
+.event .choice,
+table.goods tr:hover td {
+  text-shadow: var(--engrave);
+}
+.modal .save,
+.mode,
+.event .choice {
+  background: rgba(255, 246, 222, 0.3);
+  border: 1px solid rgba(60, 30, 8, 0.5);
+  box-shadow: inset 0 1px 3px rgba(60, 30, 8, 0.25), 0 1px 0 rgba(255, 236, 196, 0.45);
+}
+.banner {
+  --frame: 11px;
+  --nail: radial-gradient(circle at 45% 40%, #efe4c8 0 1px, #8a8070 2px, #3c342a 3.6px, rgba(20, 12, 4, 0.6) 4.3px, transparent 5px);
+  overflow: visible;
+}
+.banner::before,
+.banner::after {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 9px);
+  width: 5px;
+  height: 100vh;
+  background: repeating-linear-gradient(160deg, #c8a46c 0 3px, #8a6a3a 3px 6px);
+  box-shadow: 1px 0 1px rgba(0, 0, 0, 0.4);
+}
+.banner::before {
+  left: 18%;
+}
+.banner::after {
+  right: 18%;
+}
+#minimap {
+  --frame: 6px;
+}
+.chron,
+.mile {
+  text-shadow: var(--engrave);
+}
+
+/* ------------------------------------------------------------ scrollbars: a peg in a groove */
+
+::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+::-webkit-scrollbar-button {
+  display: none;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+::-webkit-scrollbar-track {
+  margin: 4px;
+  border-radius: 7px;
+  background: rgba(60, 30, 8, 0.24);
+  box-shadow: inset 0 1px 3px rgba(30, 15, 3, 0.6), inset 0 -1px 0 rgba(255, 236, 196, 0.35);
+}
+::-webkit-scrollbar-thumb {
+  border-radius: 7px;
+  border: 2px solid #3a200c;
+  background:
+    repeating-linear-gradient(180deg, rgba(50, 25, 6, 0.6) 0 1px, rgba(255, 236, 196, 0.5) 1px 2px, transparent 2px 4px) center / 6px 10px no-repeat,
+    linear-gradient(90deg, rgba(255, 236, 196, 0.45), rgba(255, 236, 196, 0) 45%, rgba(40, 20, 4, 0.3)),
+    var(--wood-img, #a87842) center / 200px auto;
+}
+::-webkit-scrollbar-thumb:horizontal {
+  background:
+    repeating-linear-gradient(90deg, rgba(50, 25, 6, 0.6) 0 1px, rgba(255, 236, 196, 0.5) 1px 2px, transparent 2px 4px) center / 10px 6px no-repeat,
+    linear-gradient(180deg, rgba(255, 236, 196, 0.45), rgba(255, 236, 196, 0) 45%, rgba(40, 20, 4, 0.3)),
+    var(--wood-img, #a87842) center / 200px auto;
+}
+::-webkit-scrollbar-thumb:hover {
+  border-color: #24120a;
+  filter: brightness(1.08);
+}
+/* Firefox draws its own; give it the colours at least. */
+@supports (-moz-appearance: none) {
+  * {
+    scrollbar-color: #8a5a32 rgba(60, 30, 8, 0.24);
+    scrollbar-width: thin;
+  }
+}
+
+/* ------------------------------------------------------------ the larger boards */
+
+.panel {
+  /* A lighter edge along the outside of the frame, as if planed. */
+  outline: 1px solid rgba(255, 222, 165, 0.28);
+  outline-offset: -1px;
+}
+.modal,
+.banner {
+  /* A carved rose at each corner instead of nails. */
+  --rose: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10.5' fill='%23704322' stroke='%2320100a' stroke-width='1.2'/%3E%3Ccircle cx='12' cy='12' r='10.5' fill='none' stroke='%23e8c890' stroke-opacity='.35' stroke-width='.8' stroke-dasharray='16 50' transform='rotate(200 12 12)'/%3E%3Cg fill='%2332180a'%3E%3Cpath d='M12 3.2c2 2.2 2 4.6 0 6.6c-2-2-2-4.4 0-6.6z'/%3E%3Cpath d='M12 20.8c2-2.2 2-4.6 0-6.6c-2 2-2 4.4 0 6.6z'/%3E%3Cpath d='M3.2 12c2.2-2 4.6-2 6.6 0c-2 2-4.4 2-6.6 0z'/%3E%3Cpath d='M20.8 12c-2.2-2-4.6-2-6.6 0c2 2 4.4 2 6.6 0z'/%3E%3C/g%3E%3Cg fill='%23a8743e'%3E%3Cpath d='M12 4.6c1.1 1.5 1.1 3 0 4.2c-1.1-1.2-1.1-2.7 0-4.2z'/%3E%3Cpath d='M12 19.4c1.1-1.5 1.1-3 0-4.2c-1.1 1.2-1.1 2.7 0 4.2z'/%3E%3Cpath d='M4.6 12c1.5-1.1 3-1.1 4.2 0c-1.2 1.1-2.7 1.1-4.2 0z'/%3E%3Cpath d='M19.4 12c-1.5-1.1-3-1.1-4.2 0c1.2 1.1 2.7 1.1 4.2 0z'/%3E%3C/g%3E%3Ccircle cx='12' cy='12' r='2.2' fill='%23d8a858' stroke='%2332180a' stroke-width='.8'/%3E%3C/svg%3E");
+  --rose-size: 26px;
+  background:
+    var(--rose) left -6px top -6px / var(--rose-size) var(--rose-size) no-repeat border-box,
+    var(--rose) right -6px top -6px / var(--rose-size) var(--rose-size) no-repeat border-box,
+    var(--rose) left -6px bottom -6px / var(--rose-size) var(--rose-size) no-repeat border-box,
+    var(--rose) right -6px bottom -6px / var(--rose-size) var(--rose-size) no-repeat border-box,
+    /* Planks laid edge to edge. */
+    repeating-linear-gradient(180deg, transparent 0 118px, rgba(70, 36, 10, 0.3) 118px 119px, rgba(255, 238, 200, 0.4) 119px 120px) padding-box,
+    radial-gradient(ellipse at 50% 30%, rgba(255, 244, 214, 0.3), rgba(110, 64, 24, 0.2) 90%) padding-box,
+    var(--wood-pale, #dcb985) center / 720px auto padding-box,
+    linear-gradient(180deg, rgba(255, 214, 150, 0.3), rgba(255, 214, 150, 0) 30%, rgba(0, 0, 0, 0.32)) border-box,
+    var(--wood-frame, #6b4223) center / 320px auto border-box;
+  background-attachment: scroll, scroll, scroll, scroll, local, scroll, local, scroll, scroll;
+}
+.modal {
+  --frame: 12px;
+  padding: 16px 24px 20px;
+}
+.banner {
+  --frame: 12px;
+}
+
+/* Each board's name on a walnut plate. */
+.modal > h2:first-child,
+.modal .event h2,
+.modal .lord-edit > h2:first-child {
+  display: table;
+  margin: 0 auto 14px;
+  padding: 5px 30px 6px;
+  font-size: 21px;
+  color: #f8e4b4;
+  text-shadow: var(--engrave-dark);
+  text-align: center;
+  border: none;
+  box-shadow: none;
+  background:
+    linear-gradient(180deg, rgba(255, 220, 160, 0.3), rgba(255, 220, 160, 0) 40%, rgba(0, 0, 0, 0.3)),
+    var(--wood-frame, #6b4223) center / 320px auto;
+  clip-path: polygon(12px 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 12px 100%, 0 50%);
+  filter: drop-shadow(0 2px 1px rgba(0, 0, 0, 0.35));
+}
+.modal h1 {
+  font-size: 40px;
+  letter-spacing: 0.06em;
+}
+.banner h1 {
+  font-size: 44px;
+}
+
+/* A carved rule in place of the printer's flowers. */
+.ornament {
+  font-size: 0;
+  height: 14px;
+  margin: 6px auto 10px;
+  width: min(260px, 80%);
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 260 14' preserveAspectRatio='none'%3E%3Cpath d='M4 7.5H112M148 7.5H256' stroke='%23fff0cc' stroke-opacity='.6' stroke-width='1'/%3E%3Cpath d='M4 6.5H112M148 6.5H256' stroke='%23462410' stroke-opacity='.7' stroke-width='1.2'/%3E%3Cpath d='M130 1.5L139 7L130 12.5L121 7Z' fill='%236b3e1a' stroke='%23fff0cc' stroke-opacity='.5' stroke-width='.8'/%3E%3Ccircle cx='114' cy='7' r='2' fill='%236b3e1a'/%3E%3Ccircle cx='146' cy='7' r='2' fill='%236b3e1a'/%3E%3C/svg%3E")
+    center / 100% 100% no-repeat;
+}
+
+/* ------------------------------------------------------------ tapestries: the story is woven */
+
+:root {
+  /* An embroidered band: gold chain stitch and diamonds on crimson, for border-image. */
+  --embroidery: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' fill='%237a1f1c'/%3E%3Crect x='2.5' y='2.5' width='43' height='43' fill='none' stroke='%23e8c060' stroke-width='1' stroke-dasharray='2 1.4'/%3E%3Crect x='13.5' y='13.5' width='21' height='21' fill='none' stroke='%23e8c060' stroke-width='1' stroke-dasharray='2 1.4'/%3E%3Cg fill='%23e8c060'%3E%3Cpath d='M24 4.2L27.8 8L24 11.8L20.2 8Z'/%3E%3Cpath d='M24 36.2L27.8 40L24 43.8L20.2 40Z'/%3E%3Cpath d='M4.2 24L8 20.2L11.8 24L8 27.8Z'/%3E%3Cpath d='M36.2 24L40 20.2L43.8 24L40 27.8Z'/%3E%3Ccircle cx='8' cy='8' r='3.4'/%3E%3Ccircle cx='40' cy='8' r='3.4'/%3E%3Ccircle cx='8' cy='40' r='3.4'/%3E%3Ccircle cx='40' cy='40' r='3.4'/%3E%3C/g%3E%3Cg fill='%23284a7a'%3E%3Ccircle cx='24' cy='8' r='1.3'/%3E%3Ccircle cx='24' cy='40' r='1.3'/%3E%3Ccircle cx='8' cy='24' r='1.3'/%3E%3Ccircle cx='40' cy='24' r='1.3'/%3E%3Ccircle cx='8' cy='8' r='1.5'/%3E%3Ccircle cx='40' cy='8' r='1.5'/%3E%3Ccircle cx='8' cy='40' r='1.5'/%3E%3Ccircle cx='40' cy='40' r='1.5'/%3E%3C/g%3E%3Cg fill='%23f6e2b0' fill-opacity='.55'%3E%3Ccircle cx='16' cy='8' r='.8'/%3E%3Ccircle cx='32' cy='8' r='.8'/%3E%3Ccircle cx='16' cy='40' r='.8'/%3E%3Ccircle cx='32' cy='40' r='.8'/%3E%3Ccircle cx='8' cy='16' r='.8'/%3E%3Ccircle cx='8' cy='32' r='.8'/%3E%3Ccircle cx='40' cy='16' r='.8'/%3E%3Ccircle cx='40' cy='32' r='.8'/%3E%3C/g%3E%3C/svg%3E");
+  /* A turned wooden rod with a knob at each end. */
+  --rod:
+    radial-gradient(circle at 50% 40%, #f0d090, #a8742c 55%, #4a2c0c 75%, transparent 78%) left center / 22px 22px no-repeat,
+    radial-gradient(circle at 50% 40%, #f0d090, #a8742c 55%, #4a2c0c 75%, transparent 78%) right center / 22px 22px no-repeat,
+    linear-gradient(180deg, transparent 4px, #e0b870 5px, #8a5a22 9px, #4a2c0c 13px, transparent 14px) center / calc(100% - 16px) 100% no-repeat;
+  /* Woollen fringe: hanging tassels of thread. */
+  --fringe:
+    repeating-linear-gradient(90deg, #c89a3a 0 1.5px, #8a2420 1.5px 3px, #e0b860 3px 4.5px, transparent 4.5px 6px);
+}
+
+/* An event is a hanging: linen field, embroidered border, rod above and fringe below. */
+.modal:has(> .event) {
+  position: relative;
+  overflow: visible;
+  margin-top: 18px;
+  border: 16px solid transparent;
+  border-image: var(--embroidery) 16 round;
+  border-radius: 0;
+  outline: none;
+  background:
+    var(--weave) 0 0 / 48px 48px,
+    radial-gradient(ellipse at 50% 40%, rgba(255, 250, 236, 0.5), rgba(160, 120, 70, 0.2) 95%),
+    #ecdcb8;
+  box-shadow: 0 10px 20px rgba(16, 8, 2, 0.55), inset 0 0 18px rgba(90, 60, 20, 0.25);
+  filter: none;
+  padding: 10px 22px 18px;
+}
+.modal:has(> .event)::before {
+  content: '';
+  position: absolute;
+  left: -30px;
+  right: -30px;
+  top: -30px;
+  height: 22px;
+  background: var(--rod);
+  filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.45));
+  pointer-events: none;
+}
+.modal:has(> .event)::after {
+  content: '';
+  position: absolute;
+  left: -14px;
+  right: -14px;
+  top: calc(100% + 16px);
+  height: 16px;
+  background: var(--fringe);
+  -webkit-mask: linear-gradient(180deg, #000 60%, transparent);
+  mask: linear-gradient(180deg, #000 60%, transparent);
+  pointer-events: none;
+}
+.event .ornament {
+  display: none;
+}
+/* The title embroidered in gold on a crimson band. */
+.modal .event h2 {
+  clip-path: none;
+  filter: none;
+  color: #f6dc96;
+  background:
+    var(--weave) 0 0 / 48px 48px,
+    #7a1f1c;
+  border: 1px dashed rgba(232, 192, 96, 0.8);
+  outline: 3px solid #7a1f1c;
+  border-radius: 1px;
+  margin: 8px auto 14px;
+  padding: 4px 26px 5px;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
+}
+/* An illuminated initial. */
+.event .initial {
+  color: #f6dc96;
+  background:
+    var(--weave) 0 0 / 48px 48px,
+    radial-gradient(circle at 50% 45%, #355c94, #1e3660);
+  border: 2px solid #c89a3a;
+  box-shadow: inset 0 0 0 1px #f0d48a, 0 1px 2px rgba(0, 0, 0, 0.35);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
+}
+.event .tale {
+  text-shadow: none;
+}
+/* Choices as patches stitched onto the linen. */
+.event .choice {
+  background:
+    var(--weave) 0 0 / 48px 48px,
+    rgba(255, 250, 236, 0.55);
+  border: 1px dashed rgba(122, 31, 28, 0.6);
+  outline: 2px solid rgba(255, 250, 236, 0.5);
+  border-radius: 2px;
+  box-shadow: 0 1px 2px rgba(60, 30, 8, 0.25);
+  text-shadow: none;
+}
+.event .choice:hover:not(:disabled) {
+  background:
+    var(--weave) 0 0 / 48px 48px,
+    #fbf0d4;
+  border-color: #7a1f1c;
+}
+
+/* ------------------------------------------------------------ the charter hangings, finer */
+
+.t-rod {
+  height: 12px;
+  width: 164px;
+  border-radius: 0;
+  background: var(--rod);
+  background-size: 14px 14px, 14px 14px, calc(100% - 10px) 100%;
+  box-shadow: none;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.5));
+}
+.t-cloth {
+  background:
+    var(--weave) 0 0 / 48px 48px,
+    linear-gradient(90deg, rgba(0, 0, 0, 0.18), transparent 12%, transparent 88%, rgba(0, 0, 0, 0.18)),
+    var(--c);
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-image: repeating-linear-gradient(180deg, #e8c060 0 3px, transparent 3px 5px) 0 5 / 0 3px round;
+}
+
+/* ------------------------------------------------------------ small things */
+
+/* The chronicle as entries cut into the board. */
+.chron {
+  background: rgba(255, 246, 222, 0.25);
+  border-left-width: 4px;
+  box-shadow: inset 0 1px 2px rgba(60, 30, 8, 0.2), 0 1px 0 rgba(255, 236, 196, 0.4);
+}
+/* Room above the signs for their cords. */
+#top {
+  top: 14px;
+}
+
+/* The guide speaks from a little board too. */
+#tutor .t-balloon {
+  border: 6px solid transparent;
+  border-radius: 6px;
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(255, 244, 214, 0.35), rgba(110, 64, 24, 0.14) 90%) padding-box,
+    var(--wood-pale, #dcb985) center / 520px auto padding-box,
+    linear-gradient(180deg, rgba(255, 214, 150, 0.3), rgba(0, 0, 0, 0.32)) border-box,
+    var(--wood-frame, #6b4223) center / 320px auto border-box;
+  box-shadow: inset 0 0 0 1px rgba(36, 18, 4, 0.7), inset 0 3px 5px rgba(36, 18, 4, 0.3), 0 1px 0 1px #24130a, 0 6px 16px rgba(0, 0, 0, 0.45);
+  text-shadow: var(--engrave);
+}
+#tutor .t-balloon::before {
+  left: -16px;
+  border-right-color: #5a361c;
+}
+#tutor .t-balloon.left::before {
+  right: -16px;
+  border-left-color: #5a361c;
+}
+#tutor .t-name {
+  font-family: var(--title);
+  font-variant: normal;
+  color: #6a2a10;
+}
