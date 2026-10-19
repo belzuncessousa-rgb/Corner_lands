@@ -150,6 +150,8 @@ export class Game {
   private dragTile: { x: number; y: number } | null = null;
   /** Where the road being laid starts; the next click finishes a segment. */
   private roadAnchor: { x: number; y: number } | null = null;
+  /** The group the hedges or flower beds being laid now belong to. */
+  private layGroup = 0;
   /** First corner of a field, pasture or orchard being drawn. */
   private zoneAnchor: { x: number; y: number } | null = null;
   private pinch: { dist: number; zoom: number } | null = null;
@@ -742,6 +744,8 @@ export class Game {
     if (!inBounds(this.state, tx, ty)) return;
     if (!this.roadAnchor) {
       this.roadAnchor = { x: tx, y: ty };
+      // Hedges and beds laid from here until the tool lets go belong together.
+      this.layGroup = this.state.nextId;
       return;
     }
     if (tx === this.roadAnchor.x && ty === this.roadAnchor.y) {
@@ -876,7 +880,13 @@ export class Game {
     if (this.tool.kind === 'road' && this.tool.wall && this.tool.lay) {
       const type = this.tool.lay;
       let placed = 0;
-      for (const t of this.roadTiles(tx, ty)) if (!placementError(s, type, t.x, t.y) && placeOrder(s, type, t.x, t.y)) placed++;
+      for (const t of this.roadTiles(tx, ty)) {
+        if (placementError(s, type, t.x, t.y)) continue;
+        const b = placeOrder(s, type, t.x, t.y);
+        if (!b) continue;
+        b.group = this.layGroup;
+        placed++;
+      }
       if (placed) this.hud.sound('place');
       return;
     }

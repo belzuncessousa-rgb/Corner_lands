@@ -52,6 +52,8 @@ import {
   HOME_TRADE_COST,
   tradeError,
   setYard,
+  setFlowers,
+  FLOWERS_COST,
   YARDS,
   zonesOf,
   zoneArea,
@@ -831,7 +833,7 @@ export class Hud {
     const plan = upgradePlan(s, b);
     const blocker = upgradeBlocker(s, b);
     const key = JSON.stringify([
-      b.id, b.status, b.workers, b.builders, b.residents, b.build.toFixed(2), b.paused, b.level, b.lastOutput, b.growth.toFixed(2), b.want, b.priority, b.recipe, b.yard, b.trade, b.herd, JSON.stringify(b.animals ?? {}), b.owner, Math.floor(b.growth),
+      b.id, b.status, b.workers, b.builders, b.residents, b.build.toFixed(2), b.paused, b.level, b.lastOutput, b.growth.toFixed(2), b.want, b.priority, b.recipe, b.yard, b.flowers, b.trade, b.herd, JSON.stringify(b.animals ?? {}), b.owner, Math.floor(b.growth),
       s.tier, blocker, b.need, (b.upProgress ?? 0).toFixed(2), b.unmet, Math.floor(yardTotal(b)), b.hauled, s.buildings.length, Math.floor(s.res.gold / 10), s.population,
       s.lastFeast, s.festivals, monthOf(s.day), b.type === 'market' ? s.day : 0, s.retinue, Math.floor(s.res.wood), Math.floor(totalFood(s)), b.barn, Math.floor(s.res.prestige), Math.floor(s.res.weapons),
       STORAGE_CAPACITY[b.type] ? RESOURCE_IDS.map((r) => (RESOURCE_STORAGE[r] ? Math.floor(s.res[r]) : 0)).join() : '',
@@ -1097,6 +1099,7 @@ export class Hud {
           return `<button data-action="yard" data-y="${o.id}" class="${(b.yard ?? '') === o.id ? 'active' : ''}" ${locked ? 'disabled' : ''} data-tip="<b>${o.name}</b><br>${esc(o.desc)}${Object.keys(o.cost).length ? `<br>Costs ${esc(costText(o.cost))}` : ''}${locked ? `<br>Unlocks at ${TIERS[o.tier].name}` : ''}">${o.id ? (ICONS[(YARD_ICON[o.id] ?? 'wood') as ResourceId] ?? '') : ''}${o.name.split(' ')[0]}</button>`;
         })
         .join('')}</span></div>`);
+      rows.push(`<div class="kv product" data-tip="<b>Flowers by the door</b><br>Flower boxes along the front of the plot, between the house and the street: the home is a little lovelier. Costs ${esc(costText(FLOWERS_COST))}."><span>Flowers</span><span class="seg"><button data-action="flowers" data-on="0" class="${b.flowers ? '' : 'active'}">None</button><button data-action="flowers" data-on="1" class="${b.flowers ? 'active' : ''}">${CATEGORY_ICONS.decor}By the door</button></span></div>`);
     }
     return rows;
   }
@@ -1519,6 +1522,17 @@ export class Hud {
         const b = this.selectedBuilding();
         if (b) {
           const err = setTrade(s, b, (t.dataset.t || undefined) as BuildingType | undefined);
+          if (err) this.flash(err);
+          else this.sound('place');
+          this.lastInspectorKey = '';
+          this.update();
+        }
+        break;
+      }
+      case 'flowers': {
+        const b = this.selectedBuilding();
+        if (b) {
+          const err = setFlowers(s, b, t.dataset.on === '1');
           if (err) this.flash(err);
           else this.sound('place');
           this.lastInspectorKey = '';
@@ -2172,22 +2186,22 @@ export class Hud {
       `<div class="swatches">${list.map((col) => `<button class="swatch ${col === cur ? 'on' : ''}" style="background:${col}" data-k="${k}" data-v="${col}" aria-label="${col}"></button>`).join('')}</div>`;
     const choices = (k: string, list: { id: string; name: string }[], cur: string | undefined) =>
       `<div class="choices">${list.map((o) => `<button class="${o.id === cur ? 'on' : ''}" data-k="${k}" data-v="${o.id}">${o.name}</button>`).join('')}</div>`;
-    const row = (label: string, body: string) => `<div class="lord-row"><label>${label}</label><div>${body}</div></div>`;
+    const row = (label: string, body: string, half = false) => `<div class="lord-row ${half ? 'half' : ''}"><label>${label}</label><div>${body}</div></div>`;
     const draw = () => {
-      m.querySelector('.lord-portrait')!.replaceChildren(lordPortrait(look, 190, arms));
-      m.querySelector('.lord-flag')!.replaceChildren(this.flagCanvas(arms, 190, 190));
+      m.querySelector('.lord-portrait')!.replaceChildren(lordPortrait(look, 165, arms));
+      m.querySelector('.lord-flag')!.replaceChildren(this.flagCanvas(arms, 165, 165));
       m.querySelectorAll<HTMLElement>('.lord-tabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
       opts.innerHTML =
         tab === 'lord'
           ? [
               row('Clothes', choices('garment', GARMENTS, look.garment) + swatches('cloth', CLOTHS, look.cloth)),
-              row('Trim', swatches('trim', TRIMS, look.trim)),
-              row('Cloak', choices('cloak', [{ id: '', name: 'None' }], look.cloak ? 'x' : '') + swatches('cloak', CLOTHS, look.cloak)),
-              row('Skin', swatches('skin', SKINS, look.skin)),
+              row('Trim', swatches('trim', TRIMS, look.trim), true),
+              row('Skin', swatches('skin', SKINS, look.skin), true),
+              row('Cloak', swatches('cloak', CLOTHS, look.cloak).replace('<div class="swatches">', `<div class="swatches"><button class="swatch none ${look.cloak ? '' : 'on'}" data-k="cloak" data-v="" aria-label="No cloak" data-tip="No cloak"></button>`)),
               row('Hair', choices('hairStyle', HAIR_STYLES, look.hairStyle) + swatches('hair', HAIRS, look.hair)),
-              row('Beard', choices('beard', BEARDS, look.beard)),
+              row('Beard', choices('beard', BEARDS, look.beard), true),
+              row('Holding', choices('held', HELD, look.held), true),
               row('Hat', choices('hat', HATS, look.hat) + (FIXED_HATS.includes(look.hat) ? '' : swatches('hatColor', CLOTHS, look.hatColor))),
-              row('Holding', choices('held', HELD, look.held)),
             ].join('')
           : [
               `<div class="sub">Flown on the manor, and on the lord's banner</div>`,

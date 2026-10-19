@@ -2528,6 +2528,22 @@ export const YARDS: Record<string, { name: string; cost: Cost; desc: string; tie
   bees: { name: 'Beehives', cost: { wood: 6, gold: 25 }, desc: 'Straw skeps: about 8 honey each late summer.', tier: 1 },
 };
 
+/** Flower boxes by a home's door: a few coins, and the home is a little lovelier. */
+export const FLOWERS_COST: Cost = { gold: 6 };
+export const FLOWERS_BEAUTY = 1;
+
+export function setFlowers(s: GameState, b: Building, on: boolean): string | null {
+  if (b.type !== 'house' || b.build < 1) return 'Only homes have flower boxes';
+  if (!!b.flowers === on) return null;
+  if (on) {
+    if (!canAfford(s, FLOWERS_COST)) return 'Cannot afford it';
+    pay(s, FLOWERS_COST);
+  }
+  b.flowers = on || undefined;
+  s.dirty = true;
+  return null;
+}
+
 export function setYard(s: GameState, b: Building, kind: string | undefined): string | null {
   if (b.type !== 'house' || b.build < 1) return 'Only homes have backyards';
   if (kind === b.yard) return null;
@@ -3247,6 +3263,7 @@ export function beautyAt(s: GameState, home: Building): number {
     const oc = bCenter(o);
     if (Math.hypot(oc.x - c.x, oc.y - c.y) <= d.radius) total += d.beauty;
   }
+  if (home.flowers) total += FLOWERS_BEAUTY;
   return Math.min(MAX_BEAUTY, total);
 }
 

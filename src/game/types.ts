@@ -218,6 +218,10 @@ export interface Building {
   barn?: Partial<Record<ResourceId, number>>;
   /** Houses: what the family keeps in the backyard. */
   yard?: string;
+  /** Houses: flower boxes along the front of the plot. */
+  flowers?: boolean;
+  /** Hedges and flower beds laid in one go share a group: beds in a group grow into one. */
+  group?: number;
   /** Units produced in the last month, for display. */
   lastOutput: number;
   output: number;

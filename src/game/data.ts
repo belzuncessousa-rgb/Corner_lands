@@ -951,7 +951,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   hedge: def({
     type: 'hedge',
     name: 'Clipped Hedge',
-    desc: 'A little box hedge or topiary. Mostly for looks: a touch lovelier right beside it.',
+    desc: 'A clipped box hedge, laid along a line like a road: hedges side by side grow into one row, with a topiary ball at each end. Mostly for looks: a touch lovelier right beside it.',
     category: 'decor',
     w: 1,
     h: 1,
@@ -963,7 +963,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   flowerbed: def({
     type: 'flowerbed',
     name: 'Flower Bed',
-    desc: 'A small bed of flowers. Mostly for looks: a touch lovelier right beside it.',
+    desc: 'A bed of flowers, laid along a line like a road: the beds you lay in one go grow into a single bed. Mostly for looks: a touch lovelier right beside it.',
     category: 'decor',
     w: 1,
     h: 1,

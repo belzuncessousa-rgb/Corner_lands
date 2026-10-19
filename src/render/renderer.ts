@@ -1069,7 +1069,16 @@ export class Renderer {
       this.drawWall(s, b);
       return;
     }
+    if (b.type === 'hedge') {
+      this.drawHedge(s, b, season);
+      return;
+    }
+    if (b.type === 'flowerbed') {
+      this.drawFlowerBed(s, b, season);
+      return;
+    }
     this.blit(sp, wx, wy);
+    if (b.type === 'house' && b.flowers) this.drawDoorFlowers(b, season);
     if (turning) {
       const [hx, hy] = iso(b.x + 1.0, b.y + 1.42, 34);
       drawSails(c, hx, hy, this.time * 0.9 + b.id, season);
@@ -1192,6 +1201,158 @@ export class Renderer {
         [0.56, 0.56],
       ]) {
         p.box(x + cx, y + cy, x + cx + 0.08, y + cy + 0.08, H + 4, 4, stone, top, 'stone');
+      }
+    }
+  }
+
+  /** The finished neighbour of a hedge or bed at (dx, dy), if it is one of `type` (and of `group`). */
+  private kin(s: GameState, b: Building, dx: number, dy: number, group?: number): boolean {
+    const nx = b.x + dx;
+    const ny = b.y + dy;
+    if (!inBounds(s, nx, ny)) return false;
+    const o = s.occ[idx(s, nx, ny)] >= 0 ? this.byId.get(s.occ[idx(s, nx, ny)]) : undefined;
+    return !!o && o.type === b.type && o.build >= 1 && (group === undefined || o.group === group);
+  }
+
+  /**
+   * Hedges grow into rows: each one reaches out to the hedges beside it, and
+   * a row ends (or a lone hedge stands) with a clipped ball on a stem.
+   */
+  private drawHedge(s: GameState, b: Building, season: Season): void {
+    const p = new Pen(this.ctx);
+    const x = b.x;
+    const y = b.y;
+    const g = season === 3 ? '#8a9a86' : '#3d6b30';
+    const top = season === 3 ? '#e8ecec' : shade(g, 1.18);
+    const H = 7;
+    const w = this.kin(s, b, -1, 0);
+    const n = this.kin(s, b, 0, -1);
+    const e = this.kin(s, b, 1, 0);
+    const so = this.kin(s, b, 0, 1);
+    const links = +w + +n + +e + +so;
+    const side = shade(g, 0.76);
+    // One bar along each line the hedge runs, without outlines, so a row reads as one hedge:
+    // the faces where it carries on into the next tile are left out.
+    const ink = shade(g, 0.5);
+    const bar = (x0: number, y0: number, x1: number, y1: number, h: number, openW: boolean, openN: boolean, openE: boolean, openS: boolean) => {
+      if (!openS) p.poly([[x0, y1, 0], [x1, y1, 0], [x1, y1, h], [x0, y1, h]], g);
+      if (!openE) p.poly([[x1, y0, 0], [x1, y1, 0], [x1, y1, h], [x1, y0, h]], side);
+      p.poly([[x0, y0, h], [x1, y0, h], [x1, y1, h], [x0, y1, h]], top);
+      // The outline: lines along the row meet their neighbours' end to end.
+      if (!openS) {
+        p.line([x0, y1, 0], [x1, y1, 0], ink, 0.7);
+        p.line([x0, y1, h], [x1, y1, h], ink, 0.6);
+      }
+      if (!openE) {
+        p.line([x1, y0, 0], [x1, y1, 0], ink, 0.7);
+        p.line([x1, y0, h], [x1, y1, h], ink, 0.6);
+        p.line([x1, y1, 0], [x1, y1, h], ink, 0.6);
+      }
+      if (!openN) p.line([x0, y0, h], [x1, y0, h], ink, 0.5);
+      if (!openW) p.line([x0, y0, h], [x0, y1, h], ink, 0.5);
+    };
+    const a = 0.35;
+    const z = 1 - a;
+    if (n || so) bar(x + a, y + (n ? 0 : a), x + z, y + (so ? 1 : z), H, false, n, false, so);
+    if (w || e || links === 0) bar(x + (w ? 0 : a), y + a, x + (e ? 1 : z), y + z, links ? H : H - 1, w, false, e, false);
+    if (season !== 3) {
+      // A few lighter leaves along the top.
+      const rand = mulberry32(x * 73856093 + y * 19349663);
+      for (let k = 0; k < 5; k++) {
+        const along = rand();
+        const span = links ? along : 0.38 + along * 0.24;
+        const [lx, ly] = w || e ? [x + span, y + 0.4 + rand() * 0.2] : [x + 0.4 + rand() * 0.2, y + span];
+        p.circle(lx, ly, H + 0.3, 1.1, shade(g, 1.3));
+      }
+    }
+    if (links <= 1) {
+      // The end of a row, or a lone hedge: a topiary ball.
+      const [tx, ty] = iso(x + 0.5, y + 0.5, H);
+      const c = this.ctx;
+      c.fillStyle = shade(g, 0.85);
+      c.fillRect(tx - 0.8, ty - 4, 1.6, 4);
+      c.fillStyle = g;
+      c.beginPath();
+      c.arc(tx, ty - 8, 4.6, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = season === 3 ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.16)';
+      c.beginPath();
+      c.arc(tx - 1.4, ty - 9.4, 2, 0, Math.PI * 2);
+      c.fill();
+    }
+  }
+
+  /**
+   * Flower beds laid in one go grow into one bed: the stone edging runs only
+   * round the outside, and the flowers carry on from tile to tile.
+   */
+  private drawFlowerBed(s: GameState, b: Building, season: Season): void {
+    const c = this.ctx;
+    const g = b.group;
+    const W = this.kin(s, b, -1, 0, g);
+    const N = this.kin(s, b, 0, -1, g);
+    const E = this.kin(s, b, 1, 0, g);
+    const S = this.kin(s, b, 0, 1, g);
+    const quad = (x0: number, y0: number, x1: number, y1: number, fill: string) => {
+      const pts = [iso(x0, y0, 0), iso(x1, y0, 0), iso(x1, y1, 0), iso(x0, y1, 0)];
+      c.fillStyle = fill;
+      c.beginPath();
+      c.moveTo(pts[0][0], pts[0][1]);
+      for (const [px, py] of pts.slice(1)) c.lineTo(px, py);
+      c.closePath();
+      c.fill();
+    };
+    const edge = 0.08;
+    const lip = 0.06;
+    const x0 = b.x + (W ? 0 : edge);
+    const x1 = b.x + 1 - (E ? 0 : edge);
+    const y0 = b.y + (N ? 0 : edge);
+    const y1 = b.y + 1 - (S ? 0 : edge);
+    quad(x0, y0, x1, y1, '#9a9288');
+    const sx0 = x0 + (W ? 0 : lip);
+    const sx1 = x1 - (E ? 0 : lip);
+    const sy0 = y0 + (N ? 0 : lip);
+    const sy1 = y1 - (S ? 0 : lip);
+    quad(sx0, sy0, sx1, sy1, season === 3 ? '#e2e7e6' : '#6a4a2c');
+    if (season === 3) return;
+    const flowers = season === 2 ? ['#d8903a', '#b8503a', '#e0c040'] : ['#e84a6a', '#f2d34a', '#b97ae0', '#f4f0e0', '#e86a3a'];
+    const rand = mulberry32(b.x * 73856093 + b.y * 19349663 + 7);
+    for (let k = 0; k < 12; k++) {
+      const [fx, fy] = iso(sx0 + 0.04 + rand() * (sx1 - sx0 - 0.08), sy0 + 0.04 + rand() * (sy1 - sy0 - 0.08), 0);
+      c.fillStyle = '#4f8a34';
+      c.beginPath();
+      c.arc(fx, fy - 0.6, 1.8, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = flowers[Math.floor(rand() * flowers.length)];
+      c.beginPath();
+      c.arc(fx, fy - 2.1, 1.3, 0, Math.PI * 2);
+      c.fill();
+    }
+  }
+
+  /** Flower boxes along the front of a home's plot, between the door and the street. */
+  private drawDoorFlowers(b: Building, season: Season): void {
+    const p = new Pen(this.ctx);
+    const wood = '#8a5a30';
+    const soil = season === 3 ? '#e8ecec' : '#6a4a2c';
+    const boxes: [number, number, number, number][] = [
+      [b.x + 0.18, b.y + 1.86, b.x + 0.9, b.y + 1.97],
+      [b.x + 1.86, b.y + 1.1, b.x + 1.97, b.y + 1.85],
+    ];
+    if (season === 3) {
+      for (const [x0, y0, x1, y1] of boxes) p.box(x0, y0, x1, y1, 0, 2.5, wood, soil);
+      return;
+    }
+    const flowers = season === 2 ? ['#d8903a', '#b8503a', '#e0c040'] : ['#e84a6a', '#f2d34a', '#b97ae0', '#f4f0e0'];
+    const rand = mulberry32(b.id * 2654435761);
+    for (const [x0, y0, x1, y1] of boxes) {
+      p.box(x0, y0, x1, y1, 0, 2.5, wood, soil);
+      const long = x1 - x0 > y1 - y0;
+      for (let t = 0.06; t < 1; t += 0.16) {
+        const fx = long ? x0 + (x1 - x0) * t : (x0 + x1) / 2;
+        const fy = long ? (y0 + y1) / 2 : y0 + (y1 - y0) * t;
+        p.circle(fx, fy, 3.4, 1.6, '#4f8a34');
+        p.circle(fx, fy, 4.6, 1.15, flowers[Math.floor(rand() * flowers.length)]);
       }
     }
   }
