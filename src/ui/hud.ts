@@ -339,28 +339,11 @@ export class Hud {
       )
       .join('');
     const tools = `<span class="divider"></span>
-      <button data-action="road" class="tab name-tip ${roading ? 'active' : ''}" data-tip="<b>Roads</b> (R)<br>Dirt by default; stone roads and cobbled streets are chosen above once the road tool is out.">${ICONS.road}<span>Road</span></button>
+      <span class="road-wrap"><button data-action="road" class="tab name-tip ${roading ? 'active' : ''}" data-tip="<b>Roads</b> (R)<br>Dirt by default; stone roads and cobbled streets are chosen above once the road tool is out.">${ICONS.road}<span>Road</span></button>${roading ? this.roadPicker() : ''}</span>
       <button data-action="grove" class="tab ${tool.kind === 'grove' ? 'active' : ''}" data-tip="<b>Protect woods</b> (P)<br>Mark a wood the woodcutters must leave standing: click one corner, then the other. Click twice inside one to lift it.">${ICONS.grove}<span>Protect</span></button>
       <button data-action="demolish" class="tab ${tool.kind === 'demolish' ? 'active' : ''}" data-tip="<b>Demolish</b> (X)<br>Remove buildings or roads. Finished buildings return half their cost.">${ICONS.demolish}<span>Demolish</span></button>`;
     let cards = '';
-    if (roading) {
-      // The road tool is out: choose the kind of road above the bar, dirt by default.
-      const kinds = [
-        { paved: false, cobbled: false, key: 'R', name: 'Dirt road', icon: ICONS.road, cost: 'Free', tip: 'Trodden earth. Click to start, click again to lay it. Roads speed up walking; buildings work without them.', open: true },
-        { paved: true, cobbled: false, key: 'T', name: 'Stone road', icon: ICONS.paved, cost: costHtml(PAVING_COST, s.res), tip: 'Gravel and broken stone: villagers walk a third faster than on dirt. 2 stone per tile; lay it over a dirt road to pave it.', open: s.tier >= PAVING_TIER },
-        { paved: false, cobbled: true, key: 'Y', name: 'Cobbled street', icon: ICONS.cobbles, cost: costHtml(COBBLE_COST, s.res), tip: 'Setts of dressed stone, the quickest going in town. 1 dressed stone per tile; lay it over a road to cobble it.', open: s.tier >= COBBLE_TIER },
-      ];
-      cards = kinds
-        .filter((k) => k.open)
-        .map((k) => {
-          const sel = tool.kind === 'road' && !!tool.paved === k.paved && !!tool.cobbled === k.cobbled;
-          return `<div class="card icon-card road-card ${sel ? 'sel' : ''}" data-action="road-kind" ${k.paved ? 'data-paved="1"' : ''} ${k.cobbled ? 'data-cobbled="1"' : ''} data-tip="${esc(`<b>${k.name}</b> (${k.key})<br>${k.tip}`)}">
-            <span class="key">${k.key}</span><span class="bicon">${k.icon}</span>
-            <div class="name">${k.name}</div><div class="cost">${k.cost}${k.paved || k.cobbled ? ' <small>a tile</small>' : ''}</div>
-          </div>`;
-        })
-        .join('');
-    } else if (this.category) {
+    if (this.category) {
       // Buildings not yet open to the town stay out of the menu until they are.
       cards = BUILD_ORDER.filter((t) => BUILDINGS[t].category === this.category && isUnlocked(s, t))
         .map((t) => {
@@ -377,9 +360,27 @@ export class Hud {
         .join('');
       if (!cards) cards = `<div class="cards-empty">Nothing here yet: more opens up as the town grows.</div>`;
     }
-    this.el.buildbar.classList.toggle('open', !!cards);
+    this.el.buildbar.classList.toggle('open', !!this.category);
     this.el.buildbar.innerHTML = `${cards ? `<div class="cards">${cards}</div>` : ''}<div class="tabs">${tabs}${tools}</div>`;
     this.buildBarKey = this.buildBarState();
+  }
+
+  /** While the road tool is out: a little row of the kinds of road above its button, dirt chosen by default. */
+  private roadPicker(): string {
+    const s = this.game.state;
+    const tool = this.game.tool;
+    const kinds = [
+      { paved: false, cobbled: false, key: 'R', name: 'Dirt road', icon: ICONS.road, cost: 'Free', open: true },
+      { paved: true, cobbled: false, key: 'T', name: 'Stone road', icon: ICONS.paved, cost: `${costHtml(PAVING_COST, s.res)} a tile`, open: s.tier >= PAVING_TIER },
+      { paved: false, cobbled: true, key: 'Y', name: 'Cobbled street', icon: ICONS.cobbles, cost: `${costHtml(COBBLE_COST, s.res)} a tile`, open: s.tier >= COBBLE_TIER },
+    ];
+    return `<span class="road-pop">${kinds
+      .filter((k) => k.open)
+      .map((k) => {
+        const sel = tool.kind === 'road' && !!tool.paved === k.paved && !!tool.cobbled === k.cobbled;
+        return `<button class="road-kind ${sel ? 'active' : ''}" data-action="road-kind" ${k.paved ? 'data-paved="1"' : ''} ${k.cobbled ? 'data-cobbled="1"' : ''} data-tip="${esc(`<b>${k.name}</b> (${k.key})<br>${k.cost}`)}" aria-label="${k.name}">${k.icon}</button>`;
+      })
+      .join('')}</span>`;
   }
 
   get categoryOpen(): boolean {

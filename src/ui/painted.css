@@ -1181,3 +1181,56 @@ table.goods tr.stopped td:not(:last-child) {
     grid-template-areas: 'grip n kind good x' 'grip n target target target' 'grip n note note note';
   }
 }
+
+/* The kinds of road: a small row of icons that pops up above the Road button while the tool is out. */
+#buildbar .road-wrap {
+  position: relative;
+  display: flex;
+}
+#buildbar .road-pop {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: #fbecc8;
+  border: 2.5px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 3px 0 rgba(40, 22, 8, 0.3);
+  z-index: 5;
+}
+#buildbar .road-pop::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -7px;
+  border: 7px solid transparent;
+  border-top-color: var(--line);
+}
+#buildbar .road-pop .road-kind {
+  min-height: 0;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: #fff6e0;
+  border: 2px solid var(--seam);
+  box-shadow: none;
+}
+#buildbar .road-pop .road-kind:hover {
+  border-color: var(--line);
+}
+#buildbar .road-pop .road-kind.active {
+  background: linear-gradient(180deg, #f6c860 0 50%, #e8a838 50%);
+  border-color: var(--line);
+}
+#buildbar .road-pop .road-kind svg {
+  width: 24px;
+  height: 24px;
+}

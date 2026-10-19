@@ -107,10 +107,10 @@ await page.keyboard.press('Escape');
 // One Road button: dirt by default, the other kinds chosen from the cards it shows.
 await page.evaluate(() => window.game.setTool({ kind: 'select' }));
 await page.click('#buildbar [data-action="road"]');
-const dirt = await page.evaluate(() => { const t = window.game.tool; return t.kind === 'road' && !t.paved && !t.cobbled && document.querySelectorAll('#buildbar .road-card').length; });
-await page.click('#buildbar .road-card[data-cobbled="1"]');
-const cob = await page.evaluate(() => window.game.tool.cobbled === true && !!document.querySelector('#buildbar .road-card.sel[data-cobbled="1"]'));
-check('road button lays dirt, cards offer stone and cobbles', dirt === 3 && cob, JSON.stringify([dirt, cob]));
+const dirt = await page.evaluate(() => { const t = window.game.tool; return t.kind === 'road' && !t.paved && !t.cobbled && document.querySelectorAll('#buildbar .road-pop .road-kind').length; });
+await page.click('#buildbar .road-kind[data-cobbled="1"]');
+const cob = await page.evaluate(() => window.game.tool.cobbled === true && !!document.querySelector('#buildbar .road-kind.active[data-cobbled="1"]'));
+check('road button lays dirt, its pop-up offers stone and cobbles', dirt === 3 && cob, JSON.stringify([dirt, cob]));
 await page.click('#buildbar [data-action="road"]');
 check('road button puts the road tool away', (await page.evaluate(() => window.game.tool.kind)) === 'select');
 // Animal farm and a pasture; switch to cattle.
