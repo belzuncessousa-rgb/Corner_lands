@@ -7,7 +7,7 @@ import { idx, inBounds } from '../game/world';
 import { type Agent, LEISURE_ACTS } from './agents';
 import { ICONS } from '../ui/icons';
 import type { Animal } from './wildlife';
-import { drawHorse } from './horse';
+import { drawHorse, drawOx } from './horse';
 import { Pen, TH, TW, iso, mix, shade, type RoofKind, type V3 } from './pen';
 import { mulberry32 } from '../game/rng';
 import { DEFAULT_HERALDRY, HERALDRY, heraldryKey } from './heraldry';
@@ -2605,6 +2605,10 @@ export class Renderer {
       this.drawCart(a);
       return;
     }
+    if (a.role.kind === 'beast') {
+      this.drawBeast(a, a.role.animal);
+      return;
+    }
     const c = this.ctx;
     const [wx, wy] = iso(a.x + a.ox * 0.25, a.y + a.oy * 0.25);
     const walking = a.phase === 'walk';
@@ -2884,6 +2888,141 @@ export class Renderer {
       }
     }
     c.lineCap = 'butt';
+  }
+
+  /**
+   * A draught animal: at work it pulls a two-wheeled cart, loaded with what
+   * it carries, its carter walking at its head; at rest it stands by the
+   * stable, the ox with its head down to graze.
+   */
+  private drawBeast(a: Agent, animal: 'horse' | 'ox'): void {
+    const c = this.ctx;
+    const [wx, wy] = iso(a.x + a.ox * 0.25, a.y + a.oy * 0.25);
+    const f = a.dir;
+    const walking = a.phase === 'walk';
+    const resting = a.act === 'graze' && !a.carry;
+    c.globalAlpha = a.fadeIn;
+    if (a.key === this.selectedAgent) {
+      c.strokeStyle = '#e8c048';
+      c.lineWidth = 1.6;
+      c.beginPath();
+      c.ellipse(wx, wy, 12, 4, 0, 0, Math.PI * 2);
+      c.stroke();
+    }
+    const working = !resting && (walking || !!a.carry);
+    if (working) {
+      // The cart behind: shafts to the animal, a wheel, the load.
+      const cx = wx - 13 * f;
+      c.fillStyle = 'rgba(20,20,10,0.25)';
+      c.beginPath();
+      c.ellipse(cx, wy, 7, 2.2, 0, 0, Math.PI * 2);
+      c.fill();
+      c.strokeStyle = '#5e4129';
+      c.lineWidth = 1;
+      c.beginPath();
+      c.moveTo(cx + 4 * f, wy - 6);
+      c.lineTo(wx - 3 * f, wy - 7.5);
+      c.stroke();
+      c.fillStyle = '#8a6236';
+      c.fillRect(cx - 6, wy - 8, 12, 3);
+      c.fillStyle = '#6e4e2c';
+      c.fillRect(cx - 6, wy - 11, 1.2, 3);
+      c.fillRect(cx + 4.8, wy - 11, 1.2, 3);
+      this.drawLoad(cx, wy - 8, a.carry);
+      c.strokeStyle = '#3e2c1e';
+      c.lineWidth = 1.2;
+      c.beginPath();
+      c.arc(cx - 0.5 * f, wy - 3.2, 3.2, 0, Math.PI * 2);
+      c.moveTo(cx - 0.5 * f - 3.2, wy - 3.2);
+      c.lineTo(cx - 0.5 * f + 3.2, wy - 3.2);
+      c.moveTo(cx - 0.5 * f, wy - 6.4);
+      c.lineTo(cx - 0.5 * f, wy);
+      c.stroke();
+    }
+    if (animal === 'horse') drawHorse(c, wx, wy, f, { coat: '#6b4a30', step: a.step, walking });
+    else drawOx(c, wx, wy, f, { step: a.step, walking, grazing: resting && Math.sin(this.time * 0.7 + hashKey(a.key)) > -0.3 });
+    if (working) {
+      // The carter at the animal's head, a switch in hand.
+      // He walks alongside, on the near side, a little ahead of the shoulder.
+      const px = wx + 3 * f;
+      const py = wy + 4.5;
+      const leg = walking ? Math.sin(a.step) * 1.8 : 0;
+      const bob = walking ? Math.abs(Math.sin(a.step)) * 1 : 0;
+      c.fillStyle = 'rgba(20,20,10,0.28)';
+      c.beginPath();
+      c.ellipse(px, py, 3.2, 1.4, 0, 0, Math.PI * 2);
+      c.fill();
+      c.strokeStyle = '#3a2c20';
+      c.lineWidth = 1.2;
+      c.beginPath();
+      c.moveTo(px - 0.8, py - 4 - bob);
+      c.lineTo(px - 0.8 + leg, py);
+      c.moveTo(px + 0.8, py - 4 - bob);
+      c.lineTo(px + 0.8 - leg, py);
+      c.stroke();
+      c.fillStyle = a.tunic;
+      c.fillRect(px - 2.2, py - 9.5 - bob, 4.4, 5.8);
+      c.fillStyle = '#e8c4a0';
+      c.beginPath();
+      c.arc(px, py - 11.6 - bob, 2, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = '#5a4630';
+      c.beginPath();
+      c.ellipse(px, py - 12.8 - bob, 2.8, 0.9, 0, 0, Math.PI * 2);
+      c.fill();
+      c.strokeStyle = '#7a5a3a';
+      c.lineWidth = 0.7;
+      c.beginPath();
+      c.moveTo(px + 1.8 * f, py - 7 - bob);
+      c.lineTo(px + 5 * f, py - 14 - bob);
+      c.stroke();
+    }
+    c.globalAlpha = 1;
+  }
+
+  /** What a cart carries, heaped on its bed: crates, logs, stone or sacks. */
+  private drawLoad(x: number, y: number, carry: ResourceId | null): void {
+    const c = this.ctx;
+    if (!carry) return;
+    if (carry === 'wood' || carry === 'planks' || carry === 'woodparts') {
+      for (let k = 0; k < 3; k++) {
+        c.fillStyle = carry === 'planks' ? (k % 2 ? '#d7b47c' : '#c8a46c') : '#7a5230';
+        c.fillRect(x - 5.5 + (k % 2) * 1.5, y - 2 - k * 1.8, 10, 1.7);
+        if (carry === 'wood') {
+          c.fillStyle = '#c8a06a';
+          c.beginPath();
+          c.arc(x + 4.5 + (k % 2) * 1.5, y - 1.2 - k * 1.8, 0.9, 0, Math.PI * 2);
+          c.fill();
+        }
+      }
+      return;
+    }
+    if (carry === 'stone' || carry === 'dressedstone' || carry === 'tiles' || carry === 'clay') {
+      const col = carry === 'tiles' ? '#b05a3a' : carry === 'clay' ? '#a8784a' : '#a7a59e';
+      for (const [dx, dy, w] of [[-4.5, 0, 4], [0, 0, 4], [-2.5, -2.6, 4]] as const) {
+        c.fillStyle = col;
+        c.fillRect(x + dx, y + dy - 2.6, w, 2.6);
+        c.fillStyle = 'rgba(0,0,0,0.18)';
+        c.fillRect(x + dx, y + dy - 0.6, w, 0.6);
+      }
+      return;
+    }
+    // Crates for the trading post, sacks for anything else.
+    if (carry === 'crates') {
+      for (const [dx, dy] of [[-5, 0], [-0.5, 0], [-2.8, -3.6]] as const) {
+        c.fillStyle = '#a07a48';
+        c.fillRect(x + dx, y + dy - 3.6, 4, 3.6);
+        c.strokeStyle = '#6e5030';
+        c.lineWidth = 0.5;
+        c.strokeRect(x + dx, y + dy - 3.6, 4, 3.6);
+      }
+      return;
+    }
+    c.fillStyle = '#d8c79c';
+    c.beginPath();
+    c.ellipse(x - 2.5, y - 2, 2.6, 2.2, 0, 0, Math.PI * 2);
+    c.ellipse(x + 2.2, y - 2, 2.6, 2.2, 0, 0, Math.PI * 2);
+    c.fill();
   }
 
   /** A merchant's covered cart pulled by a horse. */

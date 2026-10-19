@@ -589,7 +589,7 @@ export const UNITS_PER_CRATE = 10;
 export function tradeCapacity(s: GameState, b: Building): number {
   if (b.build < 1 || b.workers <= 0) return 0;
   const per = b.type === 'dock' ? EXPORT_PER_DOCK : b.type === 'tradingpost' ? EXPORT_PER_MARKET : 0;
-  return Math.floor(per * (hasCharter(s, 'trade2') ? 2 : 1) * ((s.title ?? 0) >= 3 ? 1.5 : 1));
+  return Math.floor(per * (hasCharter(s, 'trade2') ? 2 : 1) * ((s.title ?? 0) >= 3 ? 1.5 : 1) * (beastWorks(b) ? HORSE_TRADE : 1));
 }
 
 /** Crates in store above their stock target: each lets a cart carry ten more exports. */
@@ -2638,6 +2638,118 @@ export const YARDS: Record<string, { name: string; cost: Cost; desc: string; tie
   bees: { name: 'Beehives', cost: { wood: 6, gold: 25 }, desc: 'Straw skeps: about 8 honey each late summer.', tier: 1 },
 };
 
+// ---------------------------------------------------------------- draught animals
+
+/** Stalls in each draught stable. */
+export const STABLE_STALLS = 4;
+export type Draught = 'horse' | 'ox';
+/** What the drovers ask for a horse and an ox. */
+export const DRAUGHT_PRICE: Record<Draught, number> = { horse: 60, ox: 45 };
+/** A pack horse lets a trading post's carts carry half as much again. */
+export const HORSE_TRADE = 1.5;
+/** A builder's yard with its ox: sites within reach are supplied and raised half as fast again. */
+export const YARD_BOOST = 1.5;
+/** Days of carting before the ox cart has worn through a wood part. */
+export const YARD_WEAR_DAYS = 30;
+
+/** The draught animal a building can keep, if any. */
+export function draughtOf(b: Building): Draught | null {
+  return b.type === 'tradingpost' ? 'horse' : b.type === 'builderyard' ? 'ox' : null;
+}
+
+/** Stalls in the town's draught stables, and how many are taken. */
+export function stalls(s: GameState): { room: number; used: number } {
+  let room = 0;
+  let used = 0;
+  for (const b of s.buildings) {
+    if (b.type === 'draughtstable' && b.build >= 1) room += STABLE_STALLS;
+    if (b.beast) used++;
+  }
+  return { room, used };
+}
+
+export function buyDraughtError(s: GameState, b: Building): string | null {
+  const kind = draughtOf(b);
+  if (!kind || b.build < 1) return 'Nothing here needs a draught animal';
+  if (b.beast) return `It has its ${kind}`;
+  if (!hasTrade(s)) return 'Animals are bought at a trading post or dock';
+  const st = stalls(s);
+  if (!st.room) return 'Build a Draught Stable to keep it';
+  if (st.used >= st.room) return 'Every stall is taken: build another Draught Stable';
+  if (s.res.gold < DRAUGHT_PRICE[kind]) return `Needs ${DRAUGHT_PRICE[kind]} coins`;
+  return null;
+}
+
+/** Buys the building its horse or ox from the drovers; it lives in a draught stable. */
+export function buyDraught(s: GameState, b: Building): string | null {
+  const err = buyDraughtError(s, b);
+  if (err) return err;
+  s.res.gold -= DRAUGHT_PRICE[draughtOf(b)!];
+  b.beast = true;
+  b.hungry = undefined;
+  return null;
+}
+
+/** Sells the animal back to the drovers for half what it cost. */
+export function sellDraught(s: GameState, b: Building): void {
+  const kind = draughtOf(b);
+  if (!b.beast || !kind) return;
+  b.beast = undefined;
+  b.hungry = undefined;
+  s.res.gold += Math.floor(DRAUGHT_PRICE[kind] / 2);
+}
+
+/** Whether a building's draught animal is fit to work: bought and fed. */
+export function beastWorks(b: Building): boolean {
+  return !!b.beast && !b.hungry;
+}
+
+/** The working builder's yard (staffed, its ox fed, wood parts in store) that reaches a site, if any. */
+export function yardFor(s: GameState, site: Building): Building | null {
+  if (s.res.woodparts < 1) return null;
+  const c = bCenter(site);
+  for (const y of s.buildings) {
+    if (y.type !== 'builderyard' || y.build < 1 || y.workers <= 0 || !beastWorks(y) || y === site) continue;
+    const yc = bCenter(y);
+    if (Math.hypot(yc.x - c.x, yc.y - c.y) <= BUILDINGS.builderyard.radius) return y;
+  }
+  return null;
+}
+
+/** A day's carting wears the ox cart a little; every so often a wood part is used up. */
+function wearCart(s: GameState, y: Building): void {
+  if (y.carted === s.day) return;
+  y.carted = s.day;
+  y.wear = (y.wear ?? 0) + 1;
+  if (y.wear >= YARD_WEAR_DAYS && s.res.woodparts >= 1) {
+    y.wear -= YARD_WEAR_DAYS;
+    s.res.woodparts -= 1;
+  }
+}
+
+/** Each month the draught animals eat a measure of grain each; with none they rest. Animals without a stall are sold. */
+function monthlyDraught(s: GameState): void {
+  const st = stalls(s);
+  let over = Math.max(0, st.used - st.room);
+  for (const b of s.buildings) {
+    if (!b.beast) continue;
+    if (over > 0) {
+      over--;
+      const kind = draughtOf(b) ?? 'horse';
+      sellDraught(s, b);
+      log(s, `With no stall to keep it, the ${kind} of the ${BUILDINGS[b.type].name} was sold to the drovers.`, 'bad', b);
+      continue;
+    }
+    if (s.res.grain >= 1) {
+      s.res.grain -= 1;
+      if (b.hungry) b.hungry = undefined;
+    } else if (!b.hungry) {
+      b.hungry = true;
+      log(s, `No grain for the ${draughtOf(b)} of the ${BUILDINGS[b.type].name}: it will not work this month.`, 'bad', b);
+    }
+  }
+}
+
 /** Flower boxes by a home's door: a few coins, and the home is a little lovelier. */
 export const FLOWERS_COST: Cost = { gold: 6 };
 export const FLOWERS_BEAUTY = 1;
@@ -2713,6 +2825,17 @@ function passiveStatus(s: GameState, b: Building): string {
         if (Math.hypot(oc.x - c.x, oc.y - c.y) <= d.radius) homes++;
       }
       return homes ? `Cheering ${homes} home${homes > 1 ? 's' : ''} nearby` : 'No homes nearby yet';
+    }
+    case 'builderyard': {
+      if (!b.beast) return "Needs an ox: buy one here once a Draught Stable has a stall";
+      if (b.hungry) return 'The ox is hungry: no grain in store';
+      if (s.res.woodparts < 1) return 'Waiting for wood parts to mend the cart';
+      const sites = constructionSites(s).filter((o) => yardFor(s, o) === b).length;
+      return sites ? `Carting for ${sites} building site${sites > 1 ? 's' : ''}` : 'No building sites within reach';
+    }
+    case 'draughtstable': {
+      const st = stalls(s);
+      return `${st.used} of ${st.room} stalls taken in the town`;
     }
     case 'storehouse':
       return `Materials in store: ${Math.floor(stored(s, 'materials'))} / ${storageCap(s, 'materials')}`;
@@ -2902,7 +3025,9 @@ export function dailyConstruction(s: GameState): void {
       }
       // Each builder brings one load per round trip. Renovations keep their
       // own tally so they do not disturb production.
-      const carry = (n * BUILD_LOAD) / ((b.trip ?? 0) + BUILD_TRIP_DAYS);
+      const yard = yardFor(s, b);
+      if (yard) wearCart(s, yard);
+      const carry = ((n * BUILD_LOAD) / ((b.trip ?? 0) + BUILD_TRIP_DAYS)) * (yard ? YARD_BOOST : 1);
       let pool = (renovating ? (b.carry ?? 0) : b.work) + carry;
       let missing = '';
       // With no timber in store, a woodcutter's lodge is raised from trees
@@ -2941,16 +3066,19 @@ export function dailyConstruction(s: GameState): void {
       setStatus(b.paused ? 'Paused' : 'Waiting for builders');
       continue;
     }
+    const yard = yardFor(s, b);
+    if (yard) wearCart(s, yard);
+    const boost = yard ? YARD_BOOST : 1;
     if (renovating) {
       b.upNote = `Building (${n} builder${n > 1 ? 's' : ''})`;
-      b.upProgress = Math.min(1, (b.upProgress ?? 0) + (n * LABOUR_PER_BUILDER) / upgradeDays(b));
+      b.upProgress = Math.min(1, (b.upProgress ?? 0) + (n * LABOUR_PER_BUILDER * boost) / upgradeDays(b));
       if (b.upProgress >= 1) {
         b.carry = 0;
         finishUpgrade(s, b);
       }
       continue;
     }
-    b.build = Math.min(1, b.build + (n * LABOUR_PER_BUILDER) / d.buildDays);
+    b.build = Math.min(1, b.build + (n * LABOUR_PER_BUILDER * boost) / d.buildDays);
     b.status = `Raising the walls (${n} builder${n > 1 ? 's' : ''})`;
     if (b.build >= 1) {
       b.status = 'Completed';
@@ -3178,6 +3306,7 @@ export function monthly(s: GameState, rng: StateRng): void {
   supplyHomes(s);
   monthlyHerds(s, month);
   monthlyYards(s, month);
+  monthlyDraught(s);
   const merchants = runTradeOrders(s);
   report.trade = merchants.earned;
   report.imports = merchants.spent;

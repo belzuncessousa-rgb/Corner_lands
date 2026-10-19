@@ -825,6 +825,12 @@ export class Game {
       }
       // A villager under the cursor comes before the building behind them.
       const folk = this.pickAgent(sx, sy);
+      // A draught animal stands for the building it works for.
+      if (folk?.role.kind === 'beast') {
+        this.select(folk.role.id);
+        this.hud.closeCategory();
+        return;
+      }
       if (folk) {
         this.select(null);
         this.selectedAgent = folk.key;

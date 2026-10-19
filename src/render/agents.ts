@@ -1,6 +1,6 @@
 import { BUILDINGS, DAY_SECONDS, GATHER_REACH, GATHERERS, OFFROAD_TILES_PER_DAY, RESOURCE_STORAGE, ROAD_TILES_PER_DAY, STONE_ROAD_TILES_PER_DAY, COBBLE_TILES_PER_DAY, STORAGE_CAPACITY } from '../game/data';
 import { findPath, WOODS_SLOWDOWN } from '../game/path';
-import { chooseRecipe, lordRides, doorTile, forTilesInRadius, bCenter, isWinter, nearestHerd, needsMaterials, seatOf } from '../game/sim';
+import { chooseRecipe, lordRides, doorTile, forTilesInRadius, bCenter, isWinter, nearestHerd, needsMaterials, seatOf, beastWorks, constructionSites, yardFor } from '../game/sim';
 
 /** The day of each month a merchant cart sets out from the trading post. */
 const CART_DAY = 4;
@@ -15,7 +15,9 @@ export type Role =
   | { kind: 'cart'; id: number; leaving: boolean }
   /** Men-at-arms of the lord's retinue, pacing before the manor. */
   | { kind: 'guard' }
-  | { kind: 'lord'; id: number };
+  | { kind: 'lord'; id: number }
+  /** A trading post's pack horse or a builder's yard's ox: `id` is the building it works for. */
+  | { kind: 'beast'; id: number; animal: 'horse' | 'ox' };
 
 type Phase = 'walk' | 'inside' | 'act' | 'pause';
 
@@ -146,6 +148,10 @@ export class AgentSystem {
     // Once the manor stands, the lord walks out to see the town.
     const manor = s.buildings.find((b) => b.type === 'townhall' && b.build >= 1);
     if (manor) roles.push({ kind: 'lord', id: manor.id });
+    // Draught animals, each with the building it works for.
+    if (s.buildings.some((b) => b.type === 'draughtstable' && b.build >= 1)) {
+      for (const b of s.buildings) if (b.beast && b.build >= 1) roles.push({ kind: 'beast', id: b.id, animal: b.type === 'tradingpost' ? 'horse' : 'ox' });
+    }
     return roles;
   }
 
@@ -154,7 +160,7 @@ export class AgentSystem {
     const keyed = new Map<string, Role>();
     const counts = new Map<string, number>();
     for (const r of roles) {
-      const base = r.kind === 'work' || r.kind === 'build' ? `${r.kind}:${r.id}` : r.kind;
+      const base = r.kind === 'work' || r.kind === 'build' || r.kind === 'beast' ? `${r.kind}:${r.id}` : r.kind;
       const n = counts.get(base) ?? 0;
       counts.set(base, n + 1);
       keyed.set(`${base}#${n}`, r);
@@ -181,7 +187,7 @@ export class AgentSystem {
       if (keep.length >= MAX_AGENTS) break;
       i++;
       if (taken.has(key)) continue;
-      const home = role.kind === 'lord' ? role.id : (homes[i % Math.max(1, homes.length)] ?? -1);
+      const home = role.kind === 'lord' ? role.id : role.kind === 'beast' ? (stableFor(s, role.id)?.id ?? -1) : (homes[i % Math.max(1, homes.length)] ?? -1);
       const a = this.spawn(s, key, role, home);
       if (settlersToSpawn > 0 && this.sendFromEdge(s, a)) settlersToSpawn--;
       keep.push(a);
@@ -435,6 +441,10 @@ export class AgentSystem {
       this.lordsWalk(s, a);
       return;
     }
+    if (r.kind === 'beast') {
+      this.beastWork(s, a, r);
+      return;
+    }
     const b = getBuilding(s, r.id);
     if (!b) {
       a.role = { kind: 'idle' };
@@ -482,6 +492,94 @@ export class AgentSystem {
       return;
     }
     this.decideWork(s, a, b);
+  }
+
+  /**
+   * A draught animal's day: out of its stall in the morning, then to work for
+   * the building that bought it. The pack horse runs crates between the
+   * trading post and the nearest store; the ox carts timber and stone from
+   * the stores to the building sites its yard reaches. With nothing to do,
+   * or hungry, it stands outside the stable; at dusk it goes in.
+   */
+  private beastWork(s: GameState, a: Agent, r: Extract<Role, { kind: 'beast' }>): void {
+    const stable = stableFor(s, r.id) ?? getBuilding(s, a.home);
+    const owner = getBuilding(s, r.id);
+    if (!stable || !owner) return;
+    a.home = stable.id;
+    const sd = doorTile(s, stable);
+    // Out of the stall: it steps from the stable door.
+    if (a.phase === 'inside') {
+      if (this.evening) {
+        a.timer = 2 + Math.random() * 2;
+        return;
+      }
+      a.x = sd.x + 0.5;
+      a.y = sd.y + 0.5;
+      a.fadeIn = 0;
+      a.visible = true;
+    }
+    if (this.evening) {
+      a.carry = null;
+      this.walkTo(s, a, sd.x, sd.y, [stable.id], 'enter-home');
+      return;
+    }
+    const rest = () => {
+      // Graze by the stable: a free tile just in front of it.
+      a.carry = null;
+      a.act = 'graze';
+      const spot = besideFree(s, stable, r.id * 3);
+      if (spot && Math.hypot(spot.x + 0.5 - a.x, spot.y + 0.5 - a.y) > 0.6) this.walkTo(s, a, spot.x, spot.y, [stable.id], 'act');
+      else {
+        a.phase = 'act';
+        a.timer = 5 + Math.random() * 5;
+      }
+    };
+    if (!beastWorks(owner) || owner.workers <= 0) {
+      rest();
+      return;
+    }
+    if (r.animal === 'horse') {
+      // Loaded: on to the store (or back to the post); empty: to the post to load.
+      const store = nearestStore(s, owner);
+      const od = doorTile(s, owner);
+      if (!store) {
+        rest();
+        return;
+      }
+      const std = doorTile(s, store);
+      if (a.carry) {
+        this.walkTo(s, a, std.x, std.y, [store.id, owner.id], 'drop');
+      } else if (a.next === 'drop' && Math.random() < 0.5) {
+        // Back to the post with goods from the stores, now and then a rest.
+        a.want = 'crates';
+        this.walkTo(s, a, od.x, od.y, [owner.id, store.id], 'fetch');
+      } else if (Math.random() < 0.25) rest();
+      else {
+        a.want = 'crates';
+        this.walkTo(s, a, od.x, od.y, [owner.id], 'fetch');
+      }
+      return;
+    }
+    // The ox: materials from the stores to the nearest site the yard serves.
+    const site = constructionSites(s).find((o) => yardFor(s, o) === owner);
+    if (!site) {
+      rest();
+      return;
+    }
+    if (a.carry) {
+      this.goToSiteEdge(s, a, site, 'drop');
+      a.act = '';
+      return;
+    }
+    const store = nearestStore(s, site);
+    if (!store) {
+      rest();
+      return;
+    }
+    const need = site.need ? (Object.keys(site.need).find((k) => (site.need![k as ResourceId] ?? 0) > 0) as ResourceId | undefined) : undefined;
+    a.want = need ?? (Math.random() < 0.5 ? 'planks' : 'stone');
+    const std = doorTile(s, store);
+    this.walkTo(s, a, std.x, std.y, [store.id], 'fetch');
   }
 
   /** An agent resting inside a building steps out of its door first. */
@@ -841,6 +939,38 @@ export class AgentSystem {
         return null;
     }
   }
+}
+
+/** The draught stable nearest the building an animal works for. */
+function stableFor(s: GameState, id: number): Building | null {
+  const b = getBuilding(s, id);
+  if (!b) return null;
+  const c = bCenter(b);
+  let best: Building | null = null;
+  let bd = Infinity;
+  for (const o of s.buildings) {
+    if (o.type !== 'draughtstable' || o.build < 1) continue;
+    const oc = bCenter(o);
+    const d = Math.hypot(oc.x - c.x, oc.y - c.y);
+    if (d < bd) {
+      bd = d;
+      best = o;
+    }
+  }
+  return best;
+}
+
+/** A free tile just in front of a building (its lower edges on screen), for an animal to stand on. */
+function besideFree(s: GameState, b: Building, seed = 0): { x: number; y: number } | null {
+  const spots: { x: number; y: number }[] = [];
+  for (let r = 0; r < 2; r++) {
+    for (let x = b.x; x <= b.x + b.w + r; x++) spots.push({ x, y: b.y + b.h + r });
+    for (let y = b.y; y < b.y + b.h + r; y++) spots.push({ x: b.x + b.w + r, y });
+  }
+  const free = spots.filter((p) => inBounds(s, p.x, p.y) && !s.terrain[idx(s, p.x, p.y)] && s.occ[idx(s, p.x, p.y)] < 0 && !s.road[idx(s, p.x, p.y)]);
+  if (!free.length) return null;
+  // Each animal keeps mostly to its own patch, so two do not stand on one spot.
+  return free[(seed + (Math.random() < 0.7 ? 0 : Math.floor(Math.random() * 3))) % free.length];
 }
 
 function nearestStore(s: GameState, b: Building): Building | null {

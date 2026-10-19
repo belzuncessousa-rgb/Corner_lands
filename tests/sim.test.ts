@@ -2046,3 +2046,81 @@ describe('workshop inputs', () => {
     expect(pit.status).toBe('Back to work');
   });
 });
+
+describe('draught animals', () => {
+  const town = () => {
+    const s = generateWorld(33);
+    s.tier = 3;
+    s.res.gold = 5000;
+    s.res.grain = 50;
+    const post = placeNearRoad(s, 'tradingpost');
+    post.build = 1;
+    post.need = undefined;
+    recompute(s);
+    post.workers = 2;
+    return { s, post };
+  };
+
+  it('a trading post buys a pack horse only into a free stall, and carries half as much again', async () => {
+    const { buyDraught, buyDraughtError, tradeCapacity, stalls, STABLE_STALLS } = await import('../src/game/sim');
+    const { s, post } = town();
+    expect(buyDraughtError(s, post)).toMatch(/Draught Stable/);
+    const stable = placeNearRoad(s, 'draughtstable');
+    stable.build = 1;
+    stable.need = undefined;
+    const before = tradeCapacity(s, post);
+    expect(buyDraught(s, post)).toBeNull();
+    expect(tradeCapacity(s, post)).toBe(Math.floor(before * 1.5));
+    expect(stalls(s)).toEqual({ room: STABLE_STALLS, used: 1 });
+    expect(buyDraughtError(s, post)).toMatch(/has its horse/);
+  });
+
+  it('with no grain the animal goes hungry and does not work that month', async () => {
+    const { buyDraught, tradeCapacity } = await import('../src/game/sim');
+    const { s, post } = town();
+    const stable = placeNearRoad(s, 'draughtstable');
+    stable.build = 1;
+    stable.need = undefined;
+    buyDraught(s, post);
+    const fed = tradeCapacity(s, post);
+    s.res.grain = 0;
+    while (s.day % DAYS_PER_MONTH !== DAYS_PER_MONTH - 1) stepDay(s);
+    stepDay(s);
+    s.res.grain = 0;
+    expect(post.hungry).toBe(true);
+    expect(tradeCapacity(s, post)).toBeLessThan(fed);
+  });
+
+  it("a builder's yard with its ox raises sites within reach faster, wearing out wood parts", async () => {
+    const { buyDraught, yardFor } = await import('../src/game/sim');
+    const raise = (withOx: boolean) => {
+      const { s } = town();
+      const stable = placeNearRoad(s, 'draughtstable');
+      stable.build = 1;
+      stable.need = undefined;
+      const yard = placeNearRoad(s, 'builderyard');
+      yard.build = 1;
+      yard.need = undefined;
+      recompute(s);
+      yard.workers = 2;
+      if (withOx) buyDraught(s, yard);
+      s.res.woodparts = 10;
+      const site = placeNearRoad(s, 'church');
+      site.need = undefined;
+      site.builders = 2;
+      expect(!!yardFor(s, site)).toBe(withOx);
+      const parts = s.res.woodparts;
+      let days = 0;
+      while (site.build < 1 && days < 200) {
+        site.builders = 2;
+        stepDay(s);
+        days++;
+      }
+      return { days, parts: parts - s.res.woodparts };
+    };
+    const slow = raise(false);
+    const fast = raise(true);
+    expect(fast.days).toBeLessThan(slow.days);
+    expect(slow.parts).toBe(0);
+  });
+});

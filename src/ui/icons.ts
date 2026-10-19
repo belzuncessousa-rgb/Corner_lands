@@ -204,6 +204,8 @@ const B = {
 
 /** One small picture per building, for the compact build menu. */
 export const BUILDING_ICONS: Partial<Record<string, string>> = {
+  draughtstable: svg('<path d="M5 4a5 5 0 0110 0v7h-2.4V4.5a2.6 2.6 0 00-5.2 0V11H5z" transform="translate(0 4)" fill="#8a8f98" stroke="#4a4d52" stroke-width=".8"/><g fill="#4a4d52"><circle cx="6.2" cy="9" r=".6"/><circle cx="6.2" cy="12" r=".6"/><circle cx="13.8" cy="9" r=".6"/><circle cx="13.8" cy="12" r=".6"/></g>'),
+  builderyard: svg('<path d="M6 18V3" stroke="#6a4a2a" stroke-width="1.8"/><path d="M6 4l10 3" stroke="#6a4a2a" stroke-width="1.5"/><path d="M15 7v5" stroke="#3a2a1a" stroke-width=".8"/><rect x="13" y="12" width="4" height="3" fill="#b0aca4" stroke="#6d6a62" stroke-width=".6"/><circle cx="6" cy="14" r="3.4" fill="none" stroke="#8a6236" stroke-width="1.3"/><path d="M2.6 14h6.8M6 10.6v6.8" stroke="#8a6236" stroke-width=".8"/>'),
   camp: B.tent,
   townhall: B.manor,
   house: CATEGORY_ICONS.housing,

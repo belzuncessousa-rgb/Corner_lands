@@ -2750,6 +2750,80 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       }
       break;
     }
+    case 'draughtstable': {
+      // A plain plank barn: four stalls with half-doors, a hay loft in the
+      // gable, a water trough and a pile of hay before it.
+      p.shadow(0.18, 0.18, 2.88, 1.35);
+      p.box(0.22, 0.22, 2.82, 1.22, 0, 12, '#9a7448', undefined, 'plank');
+      p.timber(0.22, 0.22, 2.82, 1.22, 0, 12, BEAM);
+      for (const x of [0.4, 1.02, 1.64, 2.26]) {
+        p.wallL(1.222, x, x + 0.4, 5, 10, '#2a1c12');
+        p.wallL(1.222, x, x + 0.4, 0, 5, '#7a5634');
+        p.line([x, 1.222, 5], [x + 0.4, 1.222, 5], BEAM, 1);
+        p.line([x, 1.222, 0.4], [x + 0.4, 1.222, 4.6], BEAM, 0.7);
+        p.line([x + 0.4, 1.222, 0.4], [x, 1.222, 4.6], BEAM, 0.7);
+      }
+      p.roofX(0.22, 0.22, 2.82, 1.22, 12, 12, 'thatch', '#9a7448', 0.12);
+      // The loft door high in the gable, hay spilling from it.
+      p.wallR(2.822, 0.55, 0.88, 13, 18, '#2a1c12');
+      p.poly([[2.83, 0.5, 12.5], [2.83, 0.95, 12.5], [2.92, 0.9, 11], [2.92, 0.55, 11]], '#d8b858');
+      // Trough and hay.
+      p.box(0.5, 1.42, 1.15, 1.58, 0, 2.6, '#6e5034');
+      p.box(0.54, 1.45, 1.11, 1.55, 2.4, 0.2, '#5f9ab8');
+      p.box(2.2, 1.4, 2.62, 1.66, 0, 3.4, '#d8b858');
+      p.box(2.28, 1.46, 2.54, 1.6, 3.4, 1.6, '#e6c870');
+      // A harness collar hung by the door.
+      p.circle(1.5, 1.23, 7.5, 1.6, '#5a3a22');
+      break;
+    }
+    case 'builderyard': {
+      // An open shed, timber and stone stacked about the yard, a ladder, and
+      // a treadwheel crane with a block of stone on its rope.
+      p.shadow(0.15, 0.15, 1.9, 1.85);
+      p.box(0.2, 0.2, 1.3, 0.72, 0, 12, '#9a7448', undefined, 'plank');
+      p.wallL(0.722, 0.32, 1.18, 0, 9, '#2a1c12');
+      for (const x of [0.32, 0.75, 1.18]) p.line([x, 0.722, 0], [x, 0.722, 12], BEAM, 1.4);
+      // Planks racked inside the open front.
+      for (let k = 0; k < 4; k++) p.line([0.38, 0.7, 1.5 + k * 1.6], [1.12, 0.7, 1.5 + k * 1.6], k % 2 ? '#d7b47c' : '#c8a46c', 1.3);
+      p.roofX(0.2, 0.2, 1.3, 0.72, 12, 8, 'shingle', '#9a7448', 0.1);
+      p.logPile(1.5, 0.55, 3);
+      p.stonePile(0.45, 1.45, 4);
+      for (let i = 0; i < 3; i++) p.box(0.3, 1.05, 0.85, 1.2, i * 1.8, 1.8, i % 2 ? '#d7b47c' : '#c8a46c');
+      // A ladder against the shed.
+      p.line([1.36, 0.3, 0], [1.31, 0.3, 14], '#7a5a3a', 1);
+      p.line([1.36, 0.5, 0], [1.31, 0.5, 14], '#7a5a3a', 1);
+      for (let z = 2; z < 14; z += 3) p.line([1.35, 0.3, z], [1.35, 0.5, z], '#7a5a3a', 0.8);
+      // The crane at the front of the yard: a braced mast, a jib reaching over
+      // the stone pile with a block on its rope, and the treadwheel that winds it.
+      const MAST = '#6a4a2a';
+      p.line([1.78, 1.2, 0], [1.78, 1.2, 34], MAST, 2.2);
+      p.line([1.78, 1.2, 0], [1.78, 1.45, 0], MAST, 2);
+      p.line([1.78, 1.45, 0], [1.78, 1.2, 14], MAST, 1.2);
+      p.line([1.78, 0.95, 0], [1.78, 1.2, 14], MAST, 1.2);
+      p.line([1.78, 1.2, 32], [1.6, 1.62, 27], MAST, 1.8);
+      p.line([1.78, 1.2, 22], [1.66, 1.48, 28.5], MAST, 1);
+      p.line([1.61, 1.6, 27], [1.61, 1.6, 9], '#3a2a1a', 0.6);
+      p.box(1.55, 1.54, 1.67, 1.66, 4.5, 4.5, '#b8b5ad');
+      // The treadwheel, standing on edge beside the mast.
+      const ring = (r: number, z0: number) => {
+        const pts: [number, number, number][] = [];
+        for (let k = 0; k <= 20; k++) {
+          const t = (k / 20) * Math.PI * 2;
+          pts.push([1.42 + Math.cos(t) * r, 1.62, z0 + Math.sin(t) * r * 34]);
+        }
+        return pts;
+      };
+      const outer = ring(0.26, 9.5);
+      for (let k = 0; k < outer.length - 1; k++) p.line(outer[k], outer[k + 1], MAST, 1.6);
+      for (let k = 0; k < 4; k++) {
+        const t = (k / 4) * Math.PI;
+        p.line([1.42 + Math.cos(t) * 0.26, 1.62, 9.5 + Math.sin(t) * 8.8], [1.42 - Math.cos(t) * 0.26, 1.62, 9.5 - Math.sin(t) * 8.8], MAST, 0.7);
+      }
+      p.line([1.42, 1.62, 9.5], [1.78, 1.2, 9.5], MAST, 1);
+      p.line([1.3, 1.62, 0], [1.42, 1.62, 9.5], MAST, 1.2);
+      p.line([1.54, 1.62, 0], [1.42, 1.62, 9.5], MAST, 1.2);
+      break;
+    }
     case 'watchtower': {
       // A square stone tower with a timber gallery and a shingled cap.
       const ST = '#a8a093';

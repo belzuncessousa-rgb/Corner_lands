@@ -58,6 +58,12 @@ then fall back to the browser's localStorage.
   spare crates add room for exports); drag an order to change its place, and
   give the same good more than one order to raise its target only when the
   carts have room to spare.
+- **Draught animals** — a Draught Stable keeps four. A trading post's pack
+  horse lets its carts carry half as much again; a Builder's Yard with its ox
+  supplies and raises building sites within reach half as fast again, wearing
+  out about a wood part a month. Each eats a measure of grain a month, and
+  rests without it. You see them at work: the horse running crates between
+  the post and the stores, the ox carting timber and stone to the sites.
 - **Labour** — select a workplace to choose how many villagers work there, its
   priority and, where it has several, its product (or Auto). Seasonal work and
   workplaces whose goods are at their stock target free their workers.

@@ -108,6 +108,12 @@ import {
   seatOf,
   yardTotal,
   MONUMENTS,
+  stalls,
+  draughtOf,
+  buyDraughtError,
+  buyDraught,
+  sellDraught,
+  DRAUGHT_PRICE,
 } from '../game/sim';
 import type { Building, BuildingType, Category, Cost, GoodsGroup, Land, ResourceId } from '../game/types';
 import type { StorageKind } from '../game/data';
@@ -859,7 +865,7 @@ export class Hud {
       b.id, b.status, b.workers, b.builders, b.residents, b.build.toFixed(2), b.paused, b.level, b.lastOutput, b.growth.toFixed(2), b.want, b.priority, b.recipe, b.yard, b.flowers, b.trade, b.herd, JSON.stringify(b.animals ?? {}), b.owner, Math.floor(b.growth),
       s.tier, blocker, b.need, (b.upProgress ?? 0).toFixed(2), b.unmet, Math.floor(yardTotal(b)), b.hauled, s.buildings.length, Math.floor(s.res.gold / 10), s.population,
       s.lastFeast, s.festivals, monthOf(s.day), b.type === 'market' ? s.day : 0, s.retinue, Math.floor(s.res.wood), Math.floor(totalFood(s)), b.barn, Math.floor(s.res.prestige), Math.floor(s.res.weapons),
-      JSON.stringify(b.orders ?? []),
+      JSON.stringify(b.orders ?? []), b.beast, b.hungry, stalls(s).used, stalls(s).room,
       STORAGE_CAPACITY[b.type] ? RESOURCE_IDS.map((r) => (RESOURCE_STORAGE[r] ? Math.floor(s.res[r]) : 0)).join() : '',
     ]);
     if (key === this.lastInspectorKey || this.orderDrag) return;
@@ -930,6 +936,7 @@ export class Hud {
         );
       }
       rows.push(...this.storeRows(b));
+      rows.push(...this.draughtRows(b));
       if (wide) orders.push(...this.orderRows(b));
       if (b.type === 'townhall') {
         const c = feastCost(s);
@@ -1050,6 +1057,30 @@ export class Hud {
       orders.length ? `<ol class="orders">${items}</ol>` : '<div class="note"><i>No orders yet.</i></div>',
       `<div class="order-add"><button data-action="order-new" data-kind="import">＋ Import</button><button data-action="order-new" data-kind="export">＋ Export</button></div>`,
     ];
+  }
+
+  /** A trading post's pack horse or a builder's yard's ox; a draught stable's stalls. */
+  private draughtRows(b: Building): string[] {
+    const s = this.game.state;
+    if (b.type === 'draughtstable') {
+      const st = stalls(s);
+      const kept = s.buildings.filter((o) => o.beast);
+      const list = kept.length
+        ? kept.map((o) => `<div class="kv"><span>${draughtOf(o) === 'horse' ? 'Horse' : 'Ox'}</span><span>${esc(buildingName(o))}${o.hungry ? ' <span class="neg">· hungry</span>' : ''}</span></div>`).join('')
+        : '<div class="note"><i>No animals yet. Buy a pack horse at a trading post, or an ox at a builder\'s yard.</i></div>';
+      return [`<div class="kv"><span>Stalls in the town</span><span>${st.used} of ${st.room} taken</span></div>`, `<div class="needs-h">Kept here</div>`, list];
+    }
+    const kind = draughtOf(b);
+    if (!kind || b.build < 1) return [];
+    const what = kind === 'horse' ? `A pack horse pulls the post's own cart: merchants carry half as much again.` : `The ox pulls the cart that brings materials to building sites within reach.`;
+    const label = kind === 'horse' ? 'Pack horse' : 'Ox';
+    if (b.beast) {
+      return [`<div class="kv feast" data-tip="${esc(`${what} It eats a measure of grain a month.`)}"><span>${label}</span><span>${b.hungry ? '<span class="neg">Hungry: no grain</span>' : 'At work'} <button data-action="draught-sell" data-tip="Sell it back to the drovers for ${Math.floor(DRAUGHT_PRICE[kind] / 2)} coins">Sell</button></span></div>`];
+    }
+    const err = buyDraughtError(s, b);
+    return [`<div class="kv feast" data-tip="${esc(`${what} Kept in a Draught Stable; it eats a measure of grain a month.`)}"><span>${label}</span><span>${
+      err ? `<small class="muted">${esc(err)}</small>` : `<button data-action="draught-buy">Buy ${kind === 'horse' ? 'a horse' : 'an ox'} <small>${DRAUGHT_PRICE[kind]}c</small></button>`
+    }</span></div>`];
   }
 
   /** Choose the good for a new order, from every good the merchants trade, in tabs by kind. */
@@ -1821,6 +1852,22 @@ export class Hud {
           this.sound('good');
         }
         this.lastInspectorKey = '';
+        break;
+      }
+      case 'draught-buy':
+      case 'draught-sell': {
+        const b = s.buildings.find((o) => o.id === this.game.selected);
+        if (!b) break;
+        if (t.dataset.action === 'draught-buy') {
+          const err = buyDraught(s, b);
+          if (err) this.flash(err);
+          else this.sound('coin');
+        } else {
+          sellDraught(s, b);
+          this.sound('coin');
+        }
+        this.lastInspectorKey = '';
+        this.update();
         break;
       }
       case 'buy-animal':
@@ -2614,6 +2661,7 @@ export class Hud {
         <p><b>Roads</b> are optional but villagers walk faster on them. The Road button lays dirt; above the bar you can switch to stone roads (T), faster, or cobbled streets of dressed stone (Y), the fastest. Click to start, click again to plan it, keep clicking to continue; the road is laid a few tiles each day.</p>
         <p><b>The top bar</b> shows happiness, villagers, food, materials, goods and the treasury. Hover a chip for the details, click to pin it: set how much of each good to keep, or stop making a good altogether. Workers rest when their goods reach the target.</p>
         <p><b>Trade</b> goes through a Trading Post or Dock: select it and add orders to import a good up to a target or export it down to one. The merchants work through the orders from the top each month, as far as their carts allow; drag orders to change which come first.</p>
+        <p><b>Draught animals</b> live in a Draught Stable (four stalls each). A trading post can buy a pack horse, so its carts carry half as much again; a Builder's Yard needs an ox, and then building sites within its reach get their materials and rise half as fast again, wearing out about a wood part a month. Each animal eats a measure of grain a month, and rests if there is none.</p>
         <p><b>Workers:</b> select a workplace to choose how many villagers work there, its priority and its product. Seasonal work frees hands in the off season. Hover the villagers chip to see who is idle and where hands are short.</p>
         <p><b>The Manor</b> is optional: build it for feasts, festivals and prestige, and renovate it as the town grows into a Manor House and then a Stone Manor, which lets you lay out a manor garden, watch towers and the town walls.</p>
         <p><b>Retinue</b>: a Borough can raise men-at-arms at the manor for prestige and arms. Paid 10 coins a month, they ride out against wolves and bandits.</p>

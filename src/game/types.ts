@@ -130,7 +130,9 @@ export type BuildingType =
   | 'hedge'
   | 'shrine'
   | 'flowerbed'
-  | 'fountain';
+  | 'fountain'
+  | 'draughtstable'
+  | 'builderyard';
 
 export type Category = 'housing' | 'resources' | 'farming' | 'food' | 'industry' | 'civic' | 'manor' | 'works' | 'decor';
 
@@ -215,6 +217,13 @@ export interface Building {
   recipe?: string;
   /** Zones (fields, pastures, orchards): the workplace that tends them. */
   owner?: number;
+  /** Trading post: a pack horse; builder's yard: an ox. Bought from the drovers and kept in a draught stable. */
+  beast?: boolean;
+  /** No grain for the draught animal this month: it does not work. */
+  hungry?: boolean;
+  /** Builder's yard: wear on the ox cart, in days of carting; and the last day it carted. */
+  wear?: number;
+  carted?: number;
   /** Byres: animals in the herd, and which animal they are. */
   herd?: number;
   herdKind?: string;

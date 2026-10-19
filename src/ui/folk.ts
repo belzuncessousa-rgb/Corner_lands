@@ -20,6 +20,7 @@ const TRADE_NAMES: Partial<Record<BuildingType, string>> = {
   forester: 'Forester',
   quarry: 'Quarrier',
   mine: 'Collier',
+  builderyard: 'Carter',
   claypit: 'Potter',
   forager: 'Gatherer',
   hunter: 'Hunter',
