@@ -107,7 +107,7 @@ import type { StorageKind } from '../game/data';
 import { RESOURCE_IDS } from '../game/types';
 import { LANDS, generateWorld, idx, inBounds } from '../game/world';
 import type { Game } from '../main';
-import { CATEGORY_ICONS, ICONS, LOGO, SEASON_ICONS } from './icons';
+import { BUILDING_ICONS, CATEGORY_ICONS, ICONS, LOGO, SEASON_ICONS } from './icons';
 import { Minimap } from './minimap';
 import { Ambient } from './ambient';
 import { Music } from './music';
@@ -222,6 +222,7 @@ export class Hud {
       this.uiScale = Number(localStorage.getItem('cornerlands.uiScale')) || 1;
       this.pauseOnBad = localStorage.getItem('cornerlands.pauseOnBad') === '1';
       this.tipsOn = localStorage.getItem('cornerlands.tipsOff') !== '1';
+      this.buildIcons = localStorage.getItem('cornerlands.buildPictures') !== '1';
       this.musicOn = localStorage.getItem('cornerlands.music') !== '0';
       this.tipsSeen = new Set(JSON.parse(localStorage.getItem('cornerlands.tips') ?? '[]') as string[]);
       const lord = JSON.parse(localStorage.getItem('cornerlands.lord') ?? 'null') as { look: LordLook; arms: Heraldry } | null;
@@ -342,9 +343,9 @@ export class Hud {
           const d = BUILDINGS[t];
           const poor = !canAfford(s, d.cost);
           const sel = (tool.kind === 'build' || tool.kind === 'zone') && tool.type === t;
-          return `<div class="card ${sel ? 'sel' : ''} ${poor ? 'poor' : ''}" data-action="build" data-type="${t}" data-tip="${esc(this.buildingTip(t))}">
+          return `<div class="card ${this.buildIcons ? 'icon-card' : ''} ${sel ? 'sel' : ''} ${poor ? 'poor' : ''}" data-action="build" data-type="${t}" data-tip="${esc(this.buildingTip(t))}">
             ${d.hotkey ? `<span class="key">${d.hotkey}</span>` : ''}
-            <img src="${this.cardImage(t)}" alt="" draggable="false">
+            ${this.buildIcons ? `<span class="bicon">${BUILDING_ICONS[t] ?? CATEGORY_ICONS[d.category]}</span>` : `<img src="${this.cardImage(t)}" alt="" draggable="false">`}
             <div class="name">${d.name}</div>
             <div class="cost">${d.zone ? ZONE_COST_NOTE[t] ?? '' : costHtml(d.cost, s.res)}</div>
           </div>`;
@@ -408,6 +409,8 @@ export class Hud {
   private pauseOnBad = false;
   /** Short help shown the first time a panel or tool is opened. */
   private tipsOn = true;
+  /** The build menu shows small icons (compact) rather than pictures of the buildings. */
+  private buildIcons = true;
   private tipsSeen = new Set<string>();
 
   private applyScale(): void {
@@ -2271,6 +2274,7 @@ export class Hud {
         <button data-m="scale">Text size: ${Math.round(this.uiScale * 100)}%</button>
         <button data-m="pausebad">Pause on bad news: ${this.pauseOnBad ? 'On' : 'Off'}</button>
         <button data-m="tips">Tips: ${this.tipsOn ? 'On' : 'Off'}</button>
+        <button data-m="bicons">Build menu: ${this.buildIcons ? 'Icons' : 'Pictures'}</button>
         <button data-m="photo">Photo mode (U)</button>
         <button data-m="picture">📷 Save a picture</button>
       </div>
@@ -2327,6 +2331,16 @@ export class Hud {
       } catch {
         /* ignore */
       }
+      this.showGameMenu();
+    });
+    m.querySelector('[data-m="bicons"]')!.addEventListener('click', () => {
+      this.buildIcons = !this.buildIcons;
+      try {
+        localStorage.setItem('cornerlands.buildPictures', this.buildIcons ? '0' : '1');
+      } catch {
+        /* ignore */
+      }
+      this.renderBuildBar();
       this.showGameMenu();
     });
     m.querySelector('[data-m="tips"]')!.addEventListener('click', () => {
