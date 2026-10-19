@@ -119,6 +119,7 @@ export type BuildingType =
   | 'statue'
   | 'manorgarden'
   | 'watchtower'
+  | 'stable'
   | 'watermill'
   | 'dock'
   | 'cooper'
@@ -349,6 +350,8 @@ export interface GameState {
   /** Goods the settlement has ever held. */
   seen?: ResourceId[];
   /** Decision event waiting for the player's choice. */
+  /** The latest events and when they came, so none repeats too soon. */
+  recentEvents?: { id: string; day: number }[];
   pendingEvent?: string;
   /** Earliest day the next decision event may happen. */
   nextEventDay?: number;

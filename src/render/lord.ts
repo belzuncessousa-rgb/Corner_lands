@@ -52,17 +52,21 @@ export const DEFAULT_LORD: LordLook = {
 /**
  * Draws the figure standing at (x, y) (between the feet), `scale` times a
  * villager's size. With arms, a tabard of them is worn over the tunic.
+ * `stride` (-1 to 1) swings the legs, or the hem of a gown, mid-step;
+ * `riding` seats the figure astride (no legs below the saddle).
  */
-export function drawLord(c: CanvasRenderingContext2D, look: LordLook, x: number, y: number, scale: number, arms?: Heraldry): void {
+export function drawLord(c: CanvasRenderingContext2D, look: LordLook, x: number, y: number, scale: number, arms?: Heraldry, stride = 0, riding = false): void {
   c.save();
   c.translate(x, y);
   c.scale(scale, scale);
   c.lineJoin = 'round';
-  // Shadow.
-  c.fillStyle = 'rgba(20,20,10,0.25)';
-  c.beginPath();
-  c.ellipse(0, 0, 4.5, 1.8, 0, 0, Math.PI * 2);
-  c.fill();
+  // Shadow (a rider's falls under the horse).
+  if (!riding) {
+    c.fillStyle = 'rgba(20,20,10,0.25)';
+    c.beginPath();
+    c.ellipse(0, 0, 4.5, 1.8, 0, 0, Math.PI * 2);
+    c.fill();
+  }
   // Hair falling behind the back.
   c.fillStyle = look.hair;
   if (look.hairStyle === 'long') {
@@ -76,10 +80,12 @@ export function drawLord(c: CanvasRenderingContext2D, look: LordLook, x: number,
   }
   if (look.garment === 'dress') {
     // A gown flaring down to the ground.
+    // The hem sways with each step.
+    const sway = stride * 0.9;
     c.fillStyle = look.cloth;
     c.beginPath();
-    c.moveTo(-4.2, 0);
-    c.lineTo(4.2, 0);
+    c.moveTo(-4.2 + sway, 0);
+    c.lineTo(4.2 + sway, 0);
     c.lineTo(2.3, -10.5);
     c.lineTo(-2.3, -10.5);
     c.closePath();
@@ -92,10 +98,22 @@ export function drawLord(c: CanvasRenderingContext2D, look: LordLook, x: number,
     c.strokeStyle = '#3a2c20';
     c.lineWidth = 1.4;
     c.beginPath();
-    c.moveTo(-1, -4);
-    c.lineTo(-1.1, 0);
-    c.moveTo(1, -4);
-    c.lineTo(1.1, 0);
+    if (riding) {
+      // Seated: the near leg bent at the knee down the horse's side, the foot in the stirrup.
+      c.lineWidth = 1.6;
+      c.moveTo(0.2, -4.2);
+      c.lineTo(2.6, -3.4);
+      c.lineTo(2.1, 0.4);
+      c.stroke();
+      c.fillStyle = '#2a1e14';
+      c.fillRect(1.4, 0, 2.2, 1);
+      c.beginPath();
+    } else {
+      c.moveTo(-1, -4);
+      c.lineTo(-1.1 + stride * 1.8, 0);
+      c.moveTo(1, -4);
+      c.lineTo(1.1 - stride * 1.8, 0);
+    }
     c.stroke();
     c.fillStyle = look.cloth;
     c.beginPath();

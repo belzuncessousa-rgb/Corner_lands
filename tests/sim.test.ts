@@ -1900,3 +1900,26 @@ describe('farming audit', () => {
     expect(fields.reduce((n, f) => n + f.lastOutput, 0)).toBeGreaterThan(0);
   });
 });
+
+describe('events audit', () => {
+  it('no event comes up again within the next three', async () => {
+    const { rollEvent, autoResolve } = await import('../src/game/events');
+    const { StateRng } = await import('../src/game/rng');
+    const s = generateWorld(71);
+    s.population = 60;
+    s.tier = 2;
+    const rng = new StateRng(s);
+    const seen: string[] = [];
+    for (let k = 0; k < 50; k++) {
+      s.nextEventDay = s.day;
+      const id = rollEvent(s, rng, k % 12);
+      if (id) {
+        seen.push(id);
+        autoResolve(s, rng);
+      }
+      s.day += 90;
+    }
+    expect(seen.length).toBeGreaterThan(20);
+    for (let i = 1; i < seen.length; i++) expect(seen.slice(Math.max(0, i - 3), i)).not.toContain(seen[i]);
+  });
+});

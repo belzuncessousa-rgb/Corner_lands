@@ -1339,11 +1339,21 @@ export function getEvent(id: string): DecisionEvent | undefined {
 }
 
 /** At the start of a month, maybe raise a decision event for the player. */
+/** An event does not come back until this many others have passed... */
+const RECENT_EVENTS = 3;
+/** ...nor within this many days of itself. */
+const EVENT_COOLDOWN = Math.round(DAYS_PER_YEAR * 1.5);
+
 export function rollEvent(s: GameState, rng: StateRng, month: number): string | null {
   if (s.pendingEvent) return null;
   s.nextEventDay ??= Math.round(DAYS_PER_YEAR * 0.4) + rng.int(GAP_MAX - GAP_MIN);
   if (s.day < s.nextEventDay) return null;
-  const options = EVENTS.map((e) => ({ e, w: e.weight(s, month) })).filter((o) => o.w > 0);
+  // No tale twice in a row: an event waits out the next few others, and a year and a half.
+  const recent = s.recentEvents ?? [];
+  const fresh = (id: string) => !recent.slice(-RECENT_EVENTS).some((r) => r.id === id) && !recent.some((r) => r.id === id && s.day - r.day < EVENT_COOLDOWN);
+  let options = EVENTS.map((e) => ({ e, w: fresh(e.id) ? e.weight(s, month) : 0 })).filter((o) => o.w > 0);
+  // Should nothing fresh fit, any but the last one will do.
+  if (!options.length) options = EVENTS.map((e) => ({ e, w: e.id !== recent.at(-1)?.id ? e.weight(s, month) : 0 })).filter((o) => o.w > 0);
   const total = options.reduce((a, o) => a + o.w, 0);
   if (!total) return null;
   let r = rng.next() * total;
@@ -1351,6 +1361,7 @@ export function rollEvent(s: GameState, rng: StateRng, month: number): string | 
     r -= o.w;
     if (r > 0) continue;
     s.pendingEvent = o.e.id;
+    s.recentEvents = [...recent, { id: o.e.id, day: s.day }].slice(-12);
     s.nextEventDay = s.day + GAP_MIN + rng.int(GAP_MAX - GAP_MIN);
     return o.e.id;
   }

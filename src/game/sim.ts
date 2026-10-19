@@ -189,6 +189,7 @@ export function footprintClear(s: GameState, x: number, y: number, w: number, h:
 export function isUnlocked(s: GameState, type: BuildingType): boolean {
   const d = BUILDINGS[type];
   if (MANOR_WORKS.includes(type)) return hasStoneManor(s);
+  if (type === 'stable') return s.buildings.some((b) => b.type === 'townhall' && b.build >= 1 && b.level >= 2);
   if (d.category !== 'decor') return true;
   return d.tier <= s.tier && (!d.charter || hasCharter(s, d.charter));
 }
@@ -205,6 +206,7 @@ export function lockReason(s: GameState, type: BuildingType): string | null {
   const d = BUILDINGS[type];
   if (isUnlocked(s, type)) return null;
   if (MANOR_WORKS.includes(type)) return 'Requires the Stone Manor';
+  if (type === 'stable') return 'Requires the Manor House';
   if (d.tier > s.tier) return `Requires ${TIERS[d.tier].name}`;
   if (d.charter && !hasCharter(s, d.charter)) return `Requires the ${CHARTERS.find((c) => c.id === d.charter)?.name ?? d.charter} charter`;
   return null;
@@ -224,6 +226,7 @@ export function placementError(s: GameState, type: BuildingType, x: number, y: n
   if (type === 'guildhall' && s.buildings.some((b) => b.type === 'guildhall')) return 'Your town has its guildhall';
   if (type === 'belltower' && s.buildings.some((b) => b.type === 'belltower')) return 'Your town has its bell tower';
   if (type === 'manorgarden' && s.buildings.some((b) => b.type === 'manorgarden')) return 'Your manor has its garden';
+  if (type === 'stable' && s.buildings.some((b) => b.type === 'stable')) return 'Your manor has its stable';
   if (type === 'university' && s.buildings.some((b) => b.type === 'university')) return 'Your town has its university';
   if ((d.cost.gold ?? 0) > s.res.gold) return 'Not enough coins';
   return null;
@@ -2561,6 +2564,8 @@ function passiveStatus(s: GameState, b: Building): string {
       if (b.residents < cap) return `Home to ${b.residents}, room for ${cap - b.residents} more`;
       return `Home to ${b.residents} villagers`;
     }
+    case 'stable':
+      return "The groom keeps the lord's horse saddled";
     case 'well':
     case 'garden':
     case 'maypole':
@@ -3079,6 +3084,7 @@ export function prestigeIncome(s: GameState): number {
     else if (b.type === 'belltower') n += 2;
     else if (b.type === 'manorgarden') n += 4;
     else if (b.type === 'watchtower') n += 0.5;
+    else if (b.type === 'stable') n += 0.5;
     else if (b.type === 'university') n += s.universityOk ? (hasCharter(s, 'learning3a') ? 6 : 4) : 0;
     else if (b.type === 'publicgarden') n += 0.5;
     else if (b.type === 'guildhall') n += 4;
@@ -3125,6 +3131,11 @@ export const UNIVERSITY_BOOKS = 2;
 /** The university's learning: every workplace a little more productive while it is fed books. */
 export function learningYield(s: GameState): number {
   return s.universityOk ? (hasCharter(s, 'learning3a') ? 1.1 : 1.05) : 1;
+}
+
+/** Whether the lord rides out on horseback: a stable with its groom at work. */
+export function lordRides(s: GameState): boolean {
+  return s.buildings.some((b) => b.type === 'stable' && b.build >= 1 && b.workers > 0);
 }
 
 /** Whether a watchman stands on a watch tower. */

@@ -1,6 +1,6 @@
 import { BUILDINGS, DAY_SECONDS, GATHER_REACH, GATHERERS, OFFROAD_TILES_PER_DAY, RESOURCE_STORAGE, ROAD_TILES_PER_DAY, STONE_ROAD_TILES_PER_DAY, COBBLE_TILES_PER_DAY, STORAGE_CAPACITY } from '../game/data';
 import { findPath, WOODS_SLOWDOWN } from '../game/path';
-import { chooseRecipe, doorTile, forTilesInRadius, bCenter, isWinter, nearestHerd, needsMaterials, seatOf } from '../game/sim';
+import { chooseRecipe, lordRides, doorTile, forTilesInRadius, bCenter, isWinter, nearestHerd, needsMaterials, seatOf } from '../game/sim';
 
 /** The day of each month a merchant cart sets out from the trading post. */
 const CART_DAY = 4;
@@ -47,6 +47,8 @@ export interface Agent {
   gone?: boolean;
   /** Where a visiting cart entered the map. */
   edge?: { x: number; y: number };
+  /** Where a fisher's float lies: a point over the water beside the bank (tiles). */
+  cast?: { x: number; y: number };
   /** The ring a dancer circles: centre and radius in tiles. */
   ring?: { x: number; y: number; r: number; t: number };
 }
@@ -307,7 +309,7 @@ export class AgentSystem {
     if (a.fadeIn < 1) a.fadeIn = Math.min(1, a.fadeIn + dt * 2);
     if (a.phase === 'walk') {
       const here = idx(s, Math.floor(a.x), Math.floor(a.y));
-      let move = dt * (s.road[here] === 3 ? COBBLE_SPEED : s.road[here] === 2 ? PAVED_SPEED : s.road[here] ? ROAD_SPEED : s.trees[here] ? OFFROAD_SPEED / WOODS_SLOWDOWN : OFFROAD_SPEED) * (a.carry ? 0.85 : 1);
+      let move = (a.role.kind === 'lord' && lordRides(s) ? 1.8 : 1) * dt * (s.road[here] === 3 ? COBBLE_SPEED : s.road[here] === 2 ? PAVED_SPEED : s.road[here] ? ROAD_SPEED : s.trees[here] ? OFFROAD_SPEED / WOODS_SLOWDOWN : OFFROAD_SPEED) * (a.carry ? 0.85 : 1);
       while (move > 0 && a.path.length) {
         const t = a.path[0];
         const tx = (t % s.width) + 0.5;
@@ -713,6 +715,7 @@ export class AgentSystem {
     if (target) {
       this.exitAt(a, door);
       a.act = target.act;
+      a.cast = target.act === 'fish' ? castFrom(s, target.x, target.y) : undefined;
       a.carry = null;
       this.walkTo(s, a, target.x, target.y, [b.id], 'act');
       return;
@@ -903,4 +906,35 @@ function carryFor(type: string): ResourceId | null {
       return (out as ResourceId) ?? null;
     }
   }
+}
+
+/**
+ * Where a fisher standing on a bank tile casts: out over the water beside
+ * it, toward whichever side has the most open water.
+ */
+function castFrom(s: GameState, x: number, y: number): { x: number; y: number } | undefined {
+  const water = (xx: number, yy: number) => inBounds(s, xx, yy) && s.terrain[idx(s, xx, yy)] === 1;
+  let best: { x: number; y: number } | undefined;
+  let most = 0;
+  for (const [dx, dy] of [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+    [1, 1],
+    [-1, -1],
+    [1, -1],
+    [-1, 1],
+  ]) {
+    if (!water(x + dx, y + dy)) continue;
+    // How far the water runs that way.
+    let n = 1;
+    while (n < 3 && water(x + dx * (n + 1), y + dy * (n + 1))) n++;
+    if (n > most) {
+      most = n;
+      const reach = Math.min(n, 2) * 0.75 + 0.35;
+      best = { x: x + 0.5 + dx * reach, y: y + 0.5 + dy * reach };
+    }
+  }
+  return best;
 }

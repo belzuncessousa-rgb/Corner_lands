@@ -15,6 +15,7 @@ const FIRST = [
 ];
 const PLACE = ['Atwood', 'Brook', 'Hill', 'Green', 'Marsh', 'Ford', 'Lane', 'Underhill', 'Westbrook', 'Ashby', 'Holt', 'Dale'];
 const TRADE_NAMES: Partial<Record<BuildingType, string>> = {
+  stable: 'Groom',
   woodcutter: 'Woodward',
   forester: 'Forester',
   quarry: 'Quarrier',

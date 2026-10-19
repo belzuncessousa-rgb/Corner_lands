@@ -1,13 +1,14 @@
 import { BUILDINGS, DAYS_PER_MONTH, DAYS_PER_YEAR, RESOURCE_STORAGE, STORAGE_CAPACITY, type StorageKind } from '../game/data';
 import { MANOR_SIZE, marketStalls, upgradeBlocker } from '../game/levels';
 import { hasCharter } from '../game/charters';
-import { ANIMAL_KINDS, HOME_TRADES, animalsOf, deliveredTo, hasProblem, herdTotal, monthOf, nearestShoal, orchardMaturity, seasonOf, seatOf, storageCap, stored } from '../game/sim';
+import { ANIMAL_KINDS, HOME_TRADES, animalsOf, deliveredTo, hasProblem, herdTotal, lordRides, monthOf, nearestShoal, orchardMaturity, seasonOf, seatOf, storageCap, stored } from '../game/sim';
 import type { Building, BuildingType, GameState, ResourceId, Season } from '../game/types';
 import { idx, inBounds } from '../game/world';
 import { type Agent, LEISURE_ACTS } from './agents';
 import { ICONS } from '../ui/icons';
 import type { Animal } from './wildlife';
-import { Pen, TH, TW, iso, mix, shade } from './pen';
+import { drawHorse } from './horse';
+import { Pen, TH, TW, iso, mix, shade, type RoofKind, type V3 } from './pen';
 import { mulberry32 } from '../game/rng';
 import { DEFAULT_HERALDRY, HERALDRY, heraldryKey } from './heraldry';
 import { DEFAULT_LORD, type LordLook, drawLord } from './lord';
@@ -94,6 +95,8 @@ export class Renderer {
   private particles: Particle[] = [];
   private smokeTimer = 0;
   private boost = new Int32Array(0);
+  /** Whether the lord rides out on horseback (a staffed stable). */
+  private lordRides = false;
   private buckets: number[][] = [];
   time = 0;
   /** Show the little problem markers over buildings. */
@@ -233,6 +236,7 @@ export class Renderer {
   // ---------------------------------------------------------------- main
 
   render(s: GameState, agents: Agent[], ov: Overlay, dt: number, animals: Animal[] = []): void {
+    this.lordRides = lordRides(s);
     const started = performance.now();
     try {
       this.renderFrame(s, agents, ov, dt, animals);
@@ -2087,66 +2091,218 @@ export class Renderer {
     c.fillText(glyph, x, y + 0.5);
   }
 
+  /**
+   * A building site in three stages: the ground pegged out and footings laid;
+   * the frame (or, for stone buildings, the walls) going up in scaffolding;
+   * then the walls closed and the roof raised, rafters first and the covering
+   * creeping up from the eaves.
+   */
   private drawConstruction(b: Building, sp: Sprite, wx: number, wy: number): void {
+    void sp;
+    void wx;
+    void wy;
     const c = this.ctx;
     const p = new Pen(c);
-    // Dirt foundation.
+    const d = BUILDINGS[b.type];
+    const prog = Math.max(0, Math.min(1, b.build));
+    const stage = prog < 1 / 3 ? 0 : prog < 2 / 3 ? 1 : 2;
+    const within = Math.min(1, (prog - stage / 3) * 3);
+    const x0 = b.x + 0.28;
+    const y0 = b.y + 0.28;
+    const x1 = b.x + b.w - 0.28;
+    const y1 = b.y + b.h - 0.28;
+    const big = Math.max(b.w, b.h);
+    const wallH = Math.min(30, 9 + big * 3.5);
+    const roofH = wallH * 0.75;
+    const stoneCost = (d.cost.stone ?? 0) + (d.cost.dressedstone ?? 0);
+    const stone = stoneCost > 0 && stoneCost >= (d.cost.wood ?? 0) * 0.6;
+    const BEAM = '#7b5a36';
+    // Trodden earth over the whole plot.
     p.poly(
       [
-        [b.x + 0.15, b.y + 0.15, 0],
-        [b.x + b.w - 0.15, b.y + 0.15, 0],
-        [b.x + b.w - 0.15, b.y + b.h - 0.15, 0],
-        [b.x + 0.15, b.y + b.h - 0.15, 0],
+        [b.x + 0.1, b.y + 0.1, 0],
+        [b.x + b.w - 0.1, b.y + 0.1, 0],
+        [b.x + b.w - 0.1, b.y + b.h - 0.1, 0],
+        [b.x + 0.1, b.y + b.h - 0.1, 0],
       ],
-      '#9a7a50',
-      '#6e5434',
+      '#a08a62',
+      '#7a6440',
       1,
     );
-    // The finished building rising from the ground.
-    const groundY = sp.ay + (b.w + b.h) * (TH / 2);
-    const prog = Math.max(0, (b.build - 0.15) / 0.85);
-    if (prog > 0) {
-      const visibleH = groundY * prog;
-      const sy = groundY - visibleH;
-      c.save();
-      c.globalAlpha = 0.85;
-      c.drawImage(sp.canvas, 0, sy * 2, sp.w * 2, (sp.h - sy) * 2, wx - sp.ax, wy - sp.ay + sy, sp.w, sp.h - sy);
-      c.restore();
+    if (b.type === 'wall') {
+      // A stretch of town wall: courses of stone rising.
+      p.box(x0, y0, x1, y1, 0, Math.max(1, 16 * prog), '#b9ae98', undefined, 'stone');
+      p.stonePile(b.x + 0.2, b.y + b.h - 0.3, 2);
+      return;
     }
-    // Scaffolding posts.
-    const h = 14 + 22 * Math.min(1, b.build * 1.3);
+    // Pegs at the corners and the string line between them.
     const corners: [number, number][] = [
-      [b.x + 0.2, b.y + 0.2],
-      [b.x + b.w - 0.2, b.y + 0.2],
-      [b.x + b.w - 0.2, b.y + b.h - 0.2],
-      [b.x + 0.2, b.y + b.h - 0.2],
+      [x0, y0],
+      [x1, y0],
+      [x1, y1],
+      [x0, y1],
     ];
-    for (const [x, y] of corners) p.line([x, y, 0], [x, y, h], '#7b5a36', 1.6);
-    for (const zz of [h * 0.5, h]) {
+    if (stage === 0) {
+      for (const [x, y] of corners) p.line([x, y, 0], [x, y, 4], '#6e5030', 1.2);
       for (let k = 0; k < 4; k++) {
         const a = corners[k];
-        const bb = corners[(k + 1) % 4];
-        p.line([a[0], a[1], zz], [bb[0], bb[1], zz], '#8a6a44', 1);
+        const n = corners[(k + 1) % 4];
+        p.line([a[0], a[1], 3], [n[0], n[1], 3], 'rgba(240,232,210,0.9)', 0.6);
+      }
+    }
+    // The footings, laid round the plot (the back sides first), then whole.
+    const sides: [V3, V3][] = [
+      [[x0, y0, 0], [x1, y0, 0]],
+      [[x0, y0, 0], [x0, y1, 0]],
+      [[x1, y0, 0], [x1, y1, 0]],
+      [[x0, y1, 0], [x1, y1, 0]],
+    ];
+    const footing = stage === 0 ? within : 1;
+    const sill = stone ? '#a8a08c' : '#8a6a44';
+    sides.forEach(([a, e], k) => {
+      const f = Math.max(0, Math.min(1, footing * 4 - k));
+      if (f <= 0) return;
+      const ex = a[0] + (e[0] - a[0]) * f;
+      const ey = a[1] + (e[1] - a[1]) * f;
+      // A dark trench, and the sill or stone footing in it.
+      p.box(Math.min(a[0], ex) - 0.06, Math.min(a[1], ey) - 0.06, Math.max(a[0], ex) + 0.06, Math.max(a[1], ey) + 0.06, 0, 2.2, sill, undefined, stone ? 'stone' : undefined);
+    });
+    if (stage >= 1) {
+      // Walls or frame: how high they stand.
+      const rise = stage === 1 ? within : 1;
+      const back = () => {
+        if (stone) {
+          p.box(x0, y0, x1, y0 + 0.14, 2, (wallH - 2) * rise, '#b9ae98', undefined, 'stone');
+          p.box(x0, y0, x0 + 0.14, y1, 2, (wallH - 2) * rise, '#b9ae98', undefined, 'stone');
+        }
+      };
+      const front = () => {
+        if (stone) {
+          p.box(x0, y1 - 0.14, x1, y1, 2, (wallH - 2) * rise, '#c4b9a3', undefined, 'stone');
+          p.box(x1 - 0.14, y0, x1, y1, 2, (wallH - 2) * rise, '#c4b9a3', undefined, 'stone');
+        }
+      };
+      // Timber posts, set one after another, back ones first.
+      const posts: [number, number][] = [];
+      const step = (a: number, e: number) => Math.max(1, Math.round((e - a) / 0.55));
+      for (let k = 0, n = step(x0, x1); k <= n; k++) posts.push([x0 + ((x1 - x0) * k) / n, y0]);
+      for (let k = 1, n = step(y0, y1); k <= n; k++) posts.push([x0, y0 + ((y1 - y0) * k) / n]);
+      for (let k = 1, n = step(y0, y1); k <= n; k++) posts.push([x1, y0 + ((y1 - y0) * k) / n]);
+      for (let k = 1, n = step(x0, x1); k < n; k++) posts.push([x0 + ((x1 - x0) * k) / n, y1]);
+      posts.sort((u, v) => u[0] + u[1] - (v[0] + v[1]));
+      const shown = stone ? 4 : stage === 1 ? Math.ceil(posts.length * Math.min(1, within * 1.4)) : posts.length;
+      const frame = stone ? corners.map(([x, y]) => [x, y] as [number, number]) : posts.slice(0, shown);
+      back();
+      // In the last stage the walls are closed with wattle and daub, from the back.
+      const infill = !stone && stage === 2 ? Math.min(1, within * 1.8) : 0;
+      if (infill > 0) {
+        p.wallL(y0, x0, x1, 2, 2 + (wallH - 2) * infill, '#cdb994');
+        p.wallR(x0, y0, y1, 2, 2 + (wallH - 2) * infill, '#c2ad86');
+      }
+      if (!stone) for (const [x, y] of frame.filter(([x, y]) => y === y0 || x === x0)) p.line([x, y, 2], [x, y, wallH], BEAM, 1.6);
+      // Top plates once the corners stand.
+      if (!stone && (stage === 2 || within > 0.75)) {
+        p.line([x0, y0, wallH], [x1, y0, wallH], BEAM, 1.4);
+        p.line([x0, y0, wallH], [x0, y1, wallH], BEAM, 1.4);
+      }
+      // Rafters and the ridge, then the covering from the eaves up.
+      if (stage === 2) {
+        const alongX = b.w >= b.h;
+        const ym = (y0 + y1) / 2;
+        const xm = (x0 + x1) / 2;
+        const rafters = within > 0.15 ? Math.ceil(Math.min(1, (within - 0.15) * 3) * (alongX ? (x1 - x0) / 0.4 : (y1 - y0) / 0.4)) : 0;
+        const kind: RoofKind = stone ? 'tile' : d.cost.planks ? 'shingle' : 'thatch';
+        const col = kind === 'thatch' ? '#c9a95e' : kind === 'tile' ? '#a8553a' : '#7a5a3a';
+        const cover = Math.max(0, (within - 0.55) / 0.45);
+        // The back slope's covering goes on first.
+        if (cover > 0) {
+          const back: V3[] = alongX
+            ? [[x0 - 0.08, y0 - 0.08, wallH], [x1 + 0.08, y0 - 0.08, wallH], [x1 + 0.08, y0 + (ym - y0) * cover, wallH + roofH * cover], [x0 - 0.08, y0 + (ym - y0) * cover, wallH + roofH * cover]]
+            : [[x0 - 0.08, y0 - 0.08, wallH], [x0 - 0.08, y1 + 0.08, wallH], [x0 + (xm - x0) * cover, y1 + 0.08, wallH + roofH * cover], [x0 + (xm - x0) * cover, y0 - 0.08, wallH + roofH * cover]];
+          p.poly(back, shade(col, 0.82), shade(col, 0.5));
+        }
+        for (let k = 0; k <= rafters; k++) {
+          if (alongX) {
+            const x = Math.min(x1, x0 + k * 0.4);
+            p.line([x, y0, wallH], [x, ym, wallH + roofH], BEAM, 1.1);
+            p.line([x, y1, wallH], [x, ym, wallH + roofH], BEAM, 1.1);
+          } else {
+            const y = Math.min(y1, y0 + k * 0.4);
+            p.line([x0, y, wallH], [xm, y, wallH + roofH], BEAM, 1.1);
+            p.line([x1, y, wallH], [xm, y, wallH + roofH], BEAM, 1.1);
+          }
+        }
+        if (rafters > 1) {
+          if (alongX) p.line([x0, ym, wallH + roofH], [x0 + Math.min(x1 - x0, rafters * 0.4), ym, wallH + roofH], BEAM, 1.4);
+          else p.line([xm, y0, wallH + roofH], [xm, y0 + Math.min(y1 - y0, rafters * 0.4), wallH + roofH], BEAM, 1.4);
+        }
+        if (infill > 0) {
+          p.wallL(y1, x0, x1, 2, 2 + (wallH - 2) * infill, '#dcc8a2');
+          p.wallR(x1, y0, y1, 2, 2 + (wallH - 2) * infill, '#cfba92');
+        }
+        if (cover > 0) {
+          const front: V3[] = alongX
+            ? [[x0 - 0.08, y1 + 0.08, wallH], [x1 + 0.08, y1 + 0.08, wallH], [x1 + 0.08, y1 - (y1 - ym) * cover, wallH + roofH * cover], [x0 - 0.08, y1 - (y1 - ym) * cover, wallH + roofH * cover]]
+            : [[x1 + 0.08, y0 - 0.08, wallH], [x1 + 0.08, y1 + 0.08, wallH], [x1 - (x1 - xm) * cover, y1 + 0.08, wallH + roofH * cover], [x1 - (x1 - xm) * cover, y0 - 0.08, wallH + roofH * cover]];
+          p.poly(front, col, shade(col, 0.5));
+        }
+      } else if (infill > 0) {
+        p.wallL(y1, x0, x1, 2, 2 + (wallH - 2) * infill, '#dcc8a2');
+        p.wallR(x1, y0, y1, 2, 2 + (wallH - 2) * infill, '#cfba92');
+      }
+      front();
+      if (!stone) {
+        for (const [x, y] of frame.filter(([x, y]) => !(y === y0 || x === x0))) p.line([x, y, 2], [x, y, wallH], BEAM, 1.6);
+        if (stage === 2 || within > 0.75) {
+          p.line([x1, y0, wallH], [x1, y1, wallH], BEAM, 1.4);
+          p.line([x0, y1, wallH], [x1, y1, wallH], BEAM, 1.4);
+          // A brace in the front corner.
+          p.line([x1, y1 - 0.45, 2], [x1, y1, wallH * 0.6], BEAM, 1);
+        }
+      }
+      // Scaffolding along the front, and a ladder leaning on it.
+      const sh = Math.min(wallH, 4 + (wallH - 4) * (stage === 1 ? within : 1));
+      for (const [x, y] of [
+        [x0 - 0.12, y1 + 0.22],
+        [(x0 + x1) / 2, y1 + 0.22],
+        [x1 + 0.22, y1 + 0.22],
+        [x1 + 0.22, (y0 + y1) / 2],
+        [x1 + 0.22, y0 - 0.12],
+      ] as const)
+        p.line([x, y, 0], [x, y, sh + 4], '#8a6a44', 1.2);
+      // The walkway boards, once the walls are worth climbing.
+      if (sh >= 10) {
+        p.box(x0 - 0.12, y1 + 0.14, x1 + 0.22, y1 + 0.3, sh * 0.6, 0.6, '#c8a46c');
+        p.box(x1 + 0.14, y0 - 0.12, x1 + 0.3, y1 + 0.22, sh * 0.6, 0.6, '#c8a46c');
+      }
+      if (stage === 2) {
+        const lx = x0 + (x1 - x0) * 0.3;
+        for (const dx of [0, 0.16]) p.line([lx + dx, y1 + 0.55, 0], [lx + dx, y1 + 0.05, wallH * 0.85], '#6e5030', 1);
+        for (let k = 1; k < 6; k++) {
+          const t = k / 6;
+          p.line([lx, y1 + 0.55 - 0.5 * t, wallH * 0.85 * t], [lx + 0.16, y1 + 0.55 - 0.5 * t, wallH * 0.85 * t], '#6e5030', 0.8);
+        }
       }
     }
     // Materials delivered so far, stacked beside the site.
     const got = deliveredTo(b);
     const wood = got.wood ?? 0;
-    const stone = got.stone ?? 0;
+    const stoneN = (got.stone ?? 0) + (got.dressedstone ?? 0);
     const planks = got.planks ?? 0;
     if (wood > 0) p.logPile(b.x + b.w - 0.1, b.y + b.h - 0.6, Math.min(3, 1 + Math.floor(wood / 8)));
-    if (stone > 0) p.stonePile(b.x + 0.15, b.y + b.h - 0.35, Math.min(6, 1 + Math.floor(stone / 6)));
+    if (stoneN > 0) p.stonePile(b.x + 0.15, b.y + b.h - 0.35, Math.min(6, 1 + Math.floor(stoneN / 6)));
     if (planks > 0) {
       for (let i = 0; i < Math.min(4, 1 + Math.floor(planks / 6)); i++) {
         p.box(b.x + b.w - 0.7, b.y + 0.15, b.x + b.w - 0.25, b.y + 0.35, i * 2.2, 2, i % 2 ? '#d7b47c' : '#c8a46c');
       }
     }
     // Progress bar.
-    const [bx, by] = iso(b.x + b.w / 2, b.y + b.h / 2, h + 18);
+    const top = stage === 2 ? wallH + roofH : stage === 1 ? wallH : 6;
+    const [bx, by] = iso(b.x + b.w / 2, b.y + b.h / 2, top + 16);
     c.fillStyle = 'rgba(40,28,16,0.75)';
     c.fillRect(bx - 18, by - 3, 36, 6);
     c.fillStyle = '#e8c860';
-    c.fillRect(bx - 17, by - 2, 34 * b.build, 4);
+    c.fillRect(bx - 17, by - 2, 34 * prog, 4);
   }
 
   private drawGhost(s: GameState, g: Ghost, season: Season): void {
@@ -2191,6 +2347,9 @@ export class Renderer {
     const walking = a.phase === 'walk';
     let bob = walking ? Math.abs(Math.sin(a.step)) * 1.2 : 0;
     let legA = walking ? Math.sin(a.step) * 2 : 0;
+    // A fisher faces the water he has cast into.
+    const casting = a.phase === 'act' && a.act === 'fish' && a.cast ? iso(a.cast.x, a.cast.y) : null;
+    if (casting && Math.abs(casting[0] - wx) > 0.5) a.dir = casting[0] > wx ? 1 : -1;
     // Leisure: dancing round the maypole, kneeling in prayer, sitting a while, a mug raised.
     const leisure = a.phase === 'act' && LEISURE_ACTS.has(a.act) ? a.act : '';
     const lh = hashKey(a.key);
@@ -2231,12 +2390,24 @@ export class Renderer {
       c.fillRect(lx - 1.4, ly - 2.4, 2.8, 0.7);
     }
     if (a.role.kind === 'lord') {
-      // The lord, as the player dressed them, in a tabard of their arms.
-      c.save();
-      c.translate(wx, wy - bob);
-      if (a.dir < 0) c.scale(-1, 1);
-      drawLord(c, this.lordLook, 0, 0, 1.05, HERALDRY.current);
-      c.restore();
+      // The lord, as the player dressed them, in a tabard of their arms;
+      // with a stable and a groom, on horseback.
+      if (this.lordRides) {
+        drawHorse(c, wx, wy, a.dir, { coat: '#5e3e28', step: a.step, walking, cloth: this.lordLook.cloth });
+        const lift = walking ? Math.abs(Math.sin(a.step * 1.4)) * 0.6 : 0;
+        c.save();
+        // The lord's hips (4 units above the feet) rest in the saddle.
+        c.translate(wx - 0.8 * a.dir, wy - 8.6 - lift);
+        if (a.dir < 0) c.scale(-1, 1);
+        drawLord(c, this.lordLook, 0, 0, 0.95, HERALDRY.current, 0, true);
+        c.restore();
+      } else {
+        c.save();
+        c.translate(wx, wy - bob);
+        if (a.dir < 0) c.scale(-1, 1);
+        drawLord(c, this.lordLook, 0, 0, 1.05, HERALDRY.current, walking ? Math.sin(a.step) : 0);
+        c.restore();
+      }
       c.globalAlpha = 1;
       return;
     }
@@ -2314,8 +2485,9 @@ export class Renderer {
     c.arc(wx, wy - 13.2 - bob, 2.2, Math.PI, 0);
     c.fill();
     if (leisure) this.drawLeisure(a, leisure, wx, wy, bob, lh);
+    if (casting) this.drawFishing(a, wx, wy, casting);
     // Tool animation while acting.
-    if (a.phase === 'act' && !leisure) {
+    else if (a.phase === 'act' && !leisure) {
       const swing = Math.sin(a.step * 1.6);
       const ang = -0.6 + swing * 0.9;
       const hx = wx + a.dir * 2;
@@ -2332,14 +2504,6 @@ export class Renderer {
         c.fillStyle = '#a8adb2';
         c.fillRect(tx - 1.5, ty - 1.5, 3, 3);
       }
-      if (a.act === 'fish') {
-        c.strokeStyle = 'rgba(240,240,240,0.7)';
-        c.lineWidth = 0.5;
-        c.beginPath();
-        c.moveTo(tx, ty);
-        c.lineTo(tx + a.dir * 6, wy + 4);
-        c.stroke();
-      }
     }
     // Carried goods.
     if (a.carry) {
@@ -2352,6 +2516,50 @@ export class Renderer {
       c.restore();
     }
     c.globalAlpha = 1;
+  }
+
+  /**
+   * A rod held out over the water, the line sagging to a float that bobs
+   * where it was cast, with rings spreading now and then. Drawn inside the
+   * villager's scaled frame, so the float's point is scaled back to match.
+   */
+  private drawFishing(a: Agent, wx: number, wy: number, at: [number, number]): void {
+    const c = this.ctx;
+    const fx = wx + (at[0] - wx) / FOLK_SCALE;
+    const fy = wy + (at[1] - wy) / FOLK_SCALE + Math.sin(this.time * 2.6 + a.step) * 0.5;
+    const hx = wx + a.dir * 2;
+    const hy = wy - 8;
+    const tx = hx + a.dir * 8;
+    const ty = hy - 7 + Math.sin(this.time * 1.3 + a.step) * 0.6;
+    c.strokeStyle = '#6b4a2e';
+    c.lineWidth = 1.2;
+    c.beginPath();
+    c.moveTo(hx, hy);
+    c.lineTo(tx, ty);
+    c.stroke();
+    c.strokeStyle = 'rgba(240,240,240,0.75)';
+    c.lineWidth = 0.5;
+    c.beginPath();
+    c.moveTo(tx, ty);
+    c.quadraticCurveTo((tx + fx) / 2, Math.max(ty, fy) + 2, fx, fy);
+    c.stroke();
+    // Rings on the water now and then.
+    const ring = (this.time * 0.7 + a.step) % 2.5;
+    if (ring < 1.2) {
+      c.strokeStyle = `rgba(235,245,250,${0.5 * (1 - ring / 1.2)})`;
+      c.lineWidth = 0.6;
+      c.beginPath();
+      c.ellipse(fx, fy + 0.6, 1.5 + ring * 3.5, 0.7 + ring * 1.6, 0, 0, Math.PI * 2);
+      c.stroke();
+    }
+    c.fillStyle = '#c8402c';
+    c.beginPath();
+    c.arc(fx, fy - 0.3, 0.9, Math.PI, 0);
+    c.fill();
+    c.fillStyle = '#f2ece0';
+    c.beginPath();
+    c.arc(fx, fy - 0.3, 0.9, 0, Math.PI);
+    c.fill();
   }
 
   /** Arms and props for a villager at leisure. */

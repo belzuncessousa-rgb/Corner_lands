@@ -1,3 +1,4 @@
+import { drawHorse } from './horse';
 import { mulberry32 } from '../game/rng';
 import { HERALDRY } from './heraldry';
 import { HOME_TRADES } from '../game/sim';
@@ -2538,6 +2539,53 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       for (const [x, col] of [[0.7, '#9a2a2a'], [3.3, '#2a4a8a']] as [number, string][]) {
         p.line([x, 3.8, 20], [x, 3.8, 92], '#4a3a2a', 1.2);
         p.wallL(3.802, x, x + 0.25, 80, 92, col);
+      }
+      break;
+    }
+    case 'stable': {
+      // A long timber stable with half-doors to the stalls, a horse looking
+      // out of one, and a fenced paddock with a horse, a trough and hay.
+      p.shadow(0.2, 0.2, 2.9, 1.2);
+      p.box(0.25, 0.22, 2.85, 1.05, 0, 13, WOOD, undefined, 'plank');
+      p.timber(0.25, 0.22, 2.85, 1.05, 0, 13, BEAM);
+      for (const x of [0.55, 1.35, 2.15]) {
+        // The stall door: dark above, a closed half-door below.
+        p.wallL(1.052, x, x + 0.42, 5.5, 11, '#2e2014');
+        p.wallL(1.052, x, x + 0.42, 0, 5.5, '#8a6440');
+        p.line([x, 1.052, 5.5], [x + 0.42, 1.052, 5.5], BEAM, 1);
+        p.line([x, 1.052, 0.3], [x + 0.42, 1.052, 5.2], BEAM, 0.8);
+      }
+      p.roofX(0.25, 0.22, 2.85, 1.05, 13, 11, 'shingle', WOOD, 0.12);
+      {
+        // A head over the middle door.
+        const [hx, hy] = iso(1.56, 1.1, 8.5);
+        const c = p.ctx;
+        c.fillStyle = '#6b4a30';
+        c.beginPath();
+        c.moveTo(hx - 1.5, hy + 1);
+        c.lineTo(hx - 0.6, hy - 4);
+        c.lineTo(hx + 2.6, hy - 2.6);
+        c.lineTo(hx + 2.8, hy - 1);
+        c.lineTo(hx + 0.6, hy - 0.8);
+        c.lineTo(hx + 0.8, hy + 1.4);
+        c.closePath();
+        c.fill();
+        c.fillStyle = '#2e2014';
+        c.fillRect(hx - 0.7, hy - 5, 0.8, 1.4);
+      }
+      // The paddock.
+      const fence = '#8a6a44';
+      p.fence([0.3, 1.25], [2.85, 1.25], fence);
+      p.fence([0.3, 1.25], [0.3, 1.9], fence);
+      p.fence([2.85, 1.25], [2.85, 1.9], fence);
+      p.fence([0.3, 1.9], [1.3, 1.9], fence);
+      p.fence([1.75, 1.9], [2.85, 1.9], fence);
+      p.box(2.2, 1.4, 2.65, 1.55, 0, 2.6, '#7a5a3a');
+      p.box(2.24, 1.43, 2.61, 1.52, 2.4, 0.2, '#5f9ab8');
+      p.box(0.5, 1.4, 0.8, 1.62, 0, 3.2, '#d8b858');
+      {
+        const [hx, hy] = iso(1.55, 1.6, 0);
+        drawHorse(p.ctx, hx, hy, -1, { coat: '#8a5a32' });
       }
       break;
     }
