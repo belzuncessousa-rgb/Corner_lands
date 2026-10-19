@@ -303,6 +303,7 @@ export class Renderer {
     this.mark('ground');
     this.drawWaterShimmer(s, visible);
     this.drawFields(s, season, ov.selected);
+    this.drawBedGround(s, season, visible);
     this.drawFootpaths(s, agents, season, dt, visible);
     // Roads on top of ground: all edges first so joints blend.
     for (const layer of ['edge', 'fill'] as const) {
@@ -1282,17 +1283,28 @@ export class Renderer {
     }
   }
 
-  /**
-   * Flower beds laid in one go grow into one bed: the stone edging runs only
-   * round the outside, and the flowers carry on from tile to tile.
-   */
-  private drawFlowerBed(s: GameState, b: Building, season: Season): void {
-    const c = this.ctx;
+  /** Where a flower bed's soil lies on its tile: to the tile's edge where the bed carries on. */
+  private bedBounds(s: GameState, b: Building) {
     const g = b.group;
     const W = this.kin(s, b, -1, 0, g);
     const N = this.kin(s, b, 0, -1, g);
     const E = this.kin(s, b, 1, 0, g);
     const S = this.kin(s, b, 0, 1, g);
+    const edge = 0.08;
+    const lip = 0.06;
+    const x0 = b.x + (W ? 0 : edge);
+    const x1 = b.x + 1 - (E ? 0 : edge);
+    const y0 = b.y + (N ? 0 : edge);
+    const y1 = b.y + 1 - (S ? 0 : edge);
+    return { x0, x1, y0, y1, sx0: x0 + (W ? 0 : lip), sx1: x1 - (E ? 0 : lip), sy0: y0 + (N ? 0 : lip), sy1: y1 - (S ? 0 : lip) };
+  }
+
+  /**
+   * The ground of the flower beds, laid with the fields under everything
+   * else: beds laid in one go share one stone edging round the outside.
+   */
+  private drawBedGround(s: GameState, season: Season, visible: (x: number, y: number) => boolean): void {
+    const c = this.ctx;
     const quad = (x0: number, y0: number, x1: number, y1: number, fill: string) => {
       const pts = [iso(x0, y0, 0), iso(x1, y0, 0), iso(x1, y1, 0), iso(x0, y1, 0)];
       c.fillStyle = fill;
@@ -1302,31 +1314,53 @@ export class Renderer {
       c.closePath();
       c.fill();
     };
-    const edge = 0.08;
-    const lip = 0.06;
-    const x0 = b.x + (W ? 0 : edge);
-    const x1 = b.x + 1 - (E ? 0 : edge);
-    const y0 = b.y + (N ? 0 : edge);
-    const y1 = b.y + 1 - (S ? 0 : edge);
-    quad(x0, y0, x1, y1, '#9a9288');
-    const sx0 = x0 + (W ? 0 : lip);
-    const sx1 = x1 - (E ? 0 : lip);
-    const sy0 = y0 + (N ? 0 : lip);
-    const sy1 = y1 - (S ? 0 : lip);
-    quad(sx0, sy0, sx1, sy1, season === 3 ? '#e2e7e6' : '#6a4a2c');
+    const beds = s.buildings.filter((b) => b.type === 'flowerbed' && b.build >= 1 && visible(...iso(b.x + 0.5, b.y + 0.5)));
+    for (const b of beds) {
+      const r = this.bedBounds(s, b);
+      quad(r.x0, r.y0, r.x1, r.y1, '#9a9288');
+    }
+    for (const b of beds) {
+      const r = this.bedBounds(s, b);
+      quad(r.sx0, r.sy0, r.sx1, r.sy1, season === 3 ? '#e2e7e6' : '#5a3e24');
+    }
+  }
+
+  /**
+   * Flower beds laid in one go grow into one bed: their ground is laid with
+   * the fields (drawBedGround); here the plants stand on it, thick enough to
+   * hide the soil, the flowers carrying on from tile to tile.
+   */
+  private drawFlowerBed(s: GameState, b: Building, season: Season): void {
     if (season === 3) return;
-    const flowers = season === 2 ? ['#d8903a', '#b8503a', '#e0c040'] : ['#e84a6a', '#f2d34a', '#b97ae0', '#f4f0e0', '#e86a3a'];
+    const c = this.ctx;
+    const r = this.bedBounds(s, b);
+    const flowers = season === 2 ? ['#d8903a', '#b8503a', '#e0c040', '#c86a2a'] : ['#e84a6a', '#f2d34a', '#b97ae0', '#f4f0e0', '#e86a3a', '#6a8ad8'];
+    const leaf = season === 2 ? ['#6a7a34', '#7a8a3a'] : ['#3f7a2c', '#4f8a34', '#5e9a3e'];
     const rand = mulberry32(b.x * 73856093 + b.y * 19349663 + 7);
-    for (let k = 0; k < 12; k++) {
-      const [fx, fy] = iso(sx0 + 0.04 + rand() * (sx1 - sx0 - 0.08), sy0 + 0.04 + rand() * (sy1 - sy0 - 0.08), 0);
-      c.fillStyle = '#4f8a34';
+    // Plants on a grid (jittered), drawn back to front so nearer ones overlap.
+    const step = 0.13;
+    const spots: [number, number][] = [];
+    for (let y = r.sy0 + step / 2; y < r.sy1; y += step) {
+      for (let x = r.sx0 + step / 2; x < r.sx1; x += step) spots.push([x + (rand() - 0.5) * step * 0.8, y + (rand() - 0.5) * step * 0.8]);
+    }
+    spots.sort((a, b2) => a[0] + a[1] - (b2[0] + b2[1]));
+    for (const [px, py] of spots) {
+      const [fx, fy] = iso(Math.min(r.sx1 - 0.02, Math.max(r.sx0 + 0.02, px)), Math.min(r.sy1 - 0.02, Math.max(r.sy0 + 0.02, py)), 0);
+      c.fillStyle = leaf[Math.floor(rand() * leaf.length)];
       c.beginPath();
-      c.arc(fx, fy - 0.6, 1.8, 0, Math.PI * 2);
+      c.ellipse(fx, fy - 1.2, 3.2, 2.2, 0, 0, Math.PI * 2);
       c.fill();
-      c.fillStyle = flowers[Math.floor(rand() * flowers.length)];
-      c.beginPath();
-      c.arc(fx, fy - 2.1, 1.3, 0, Math.PI * 2);
-      c.fill();
+      if (rand() < 0.75) {
+        c.fillStyle = flowers[Math.floor(rand() * flowers.length)];
+        c.beginPath();
+        c.arc(fx + (rand() - 0.5) * 2, fy - 3, 1.35, 0, Math.PI * 2);
+        c.fill();
+        if (rand() < 0.4) {
+          c.beginPath();
+          c.arc(fx + (rand() - 0.5) * 3, fy - 2.2, 1.1, 0, Math.PI * 2);
+          c.fill();
+        }
+      }
     }
   }
 
