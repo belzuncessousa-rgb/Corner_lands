@@ -1747,6 +1747,49 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       p.line([1.85, 0.85, 0], [1.85, 0.85, 6], '#5e4129', 1);
       p.box(1.6, 0.55, 1.75, 0.85, 7.5, 2, '#8a3b2e');
       p.box(1.76, 0.55, 1.88, 0.85, 7.5, 2, '#4a6a9a');
+      // A gown of woad-blue with gold trim on the dress form at the door.
+      {
+        const [gx, gy] = iso(1.62, 1.55, 0);
+        const c = p.ctx;
+        c.fillStyle = 'rgba(30,24,12,0.22)';
+        c.beginPath();
+        c.ellipse(gx + 1, gy, 4.5, 1.8, 0, 0, Math.PI * 2);
+        c.fill();
+        c.strokeStyle = '#5e4129';
+        c.lineWidth = 1;
+        c.beginPath();
+        c.moveTo(gx, gy);
+        c.lineTo(gx, gy - 3);
+        c.stroke();
+        c.fillStyle = '#2f4fa8';
+        c.beginPath();
+        c.moveTo(gx - 1.6, gy - 15);
+        c.lineTo(gx + 1.6, gy - 15);
+        c.lineTo(gx + 1.2, gy - 11);
+        c.lineTo(gx + 4, gy - 3);
+        c.lineTo(gx - 4, gy - 3);
+        c.lineTo(gx - 1.2, gy - 11);
+        c.closePath();
+        c.fill();
+        c.fillStyle = 'rgba(0,0,30,0.25)';
+        c.beginPath();
+        c.moveTo(gx + 0.4, gy - 11);
+        c.lineTo(gx + 1.2, gy - 11);
+        c.lineTo(gx + 4, gy - 3);
+        c.lineTo(gx + 1.2, gy - 3);
+        c.closePath();
+        c.fill();
+        c.strokeStyle = '#e0b840';
+        c.lineWidth = 0.8;
+        c.beginPath();
+        c.moveTo(gx - 1.3, gy - 11);
+        c.lineTo(gx + 1.3, gy - 11);
+        c.moveTo(gx - 4, gy - 3.2);
+        c.lineTo(gx + 4, gy - 3.2);
+        c.stroke();
+        c.fillStyle = '#8a6440';
+        c.fillRect(gx - 0.6, gy - 16.6, 1.2, 1.8);
+      }
       break;
     }
     case 'apothecary': {
@@ -2605,6 +2648,123 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       p.ctx.fill();
       break;
     }
+    case 'monastery': {
+      // A chapel with windows of coloured glass, a cloister walk round a
+      // quiet garth with its well, the monks' range, and their herbs and bees.
+      const winter = season === 3;
+      const ST = '#b6ae9f';
+      p.shadow(0.2, 0.2, 3.9, 3.9);
+      // The garth: lawn quartered by paths, a well where they cross.
+      p.poly([[0.4, 1.4, 0], [2.85, 1.4, 0], [2.85, 3.45, 0], [0.4, 3.45, 0]], winter ? '#e4e8e8' : '#7aa84a');
+      p.poly([[1.68, 1.65, 0], [1.88, 1.65, 0], [1.88, 3.45, 0], [1.68, 3.45, 0]], winter ? '#d4d8d8' : '#d2c6a6');
+      p.poly([[0.7, 2.45, 0], [2.85, 2.45, 0], [2.85, 2.65, 0], [0.7, 2.65, 0]], winter ? '#d4d8d8' : '#d2c6a6');
+      if (!winter) {
+        for (const [x, y] of [[1.0, 1.95], [2.3, 1.95], [1.0, 3.05], [2.3, 3.05]]) {
+          p.poly([[x - 0.22, y - 0.17, 0], [x + 0.22, y - 0.17, 0], [x + 0.22, y + 0.17, 0], [x - 0.22, y + 0.17, 0]], '#6a4a2e');
+          for (let k = 0; k < 5; k++) p.bush(x - 0.16 + k * 0.08, y + ((k % 2) - 0.5) * 0.12, 1.6, k % 2 ? '#5a8a4a' : '#7a9a5a');
+        }
+      }
+      {
+        const [wx, wy] = iso(1.78, 2.55, 0);
+        const c = p.ctx;
+        c.fillStyle = '#8a8478';
+        c.beginPath();
+        c.ellipse(wx, wy, 5, 2.4, 0, 0, Math.PI);
+        c.lineTo(wx - 5, wy - 4);
+        c.ellipse(wx, wy - 4, 5, 2.4, 0, Math.PI, 0, true);
+        c.closePath();
+        c.fill();
+        c.fillStyle = '#c8c2b6';
+        c.beginPath();
+        c.ellipse(wx, wy - 4, 5, 2.4, 0, 0, Math.PI * 2);
+        c.fill();
+        c.fillStyle = '#2a3a4a';
+        c.beginPath();
+        c.ellipse(wx, wy - 4, 3.4, 1.5, 0, 0, Math.PI * 2);
+        c.fill();
+      }
+      // The chapel along the north side, buttressed, its lancets glowing with colour.
+      p.box(0.3, 0.3, 2.85, 1.35, 0, 26, ST, undefined, 'stone');
+      for (const x of [0.62, 1.22, 1.82, 2.42]) lancetL(p, 1.352, x, 0.16, 15, 21, winter);
+      for (const x of [0.5, 1.1, 1.7, 2.3]) p.box(x - 0.04, 1.35, x + 0.04, 1.42, 12, 12, '#a49c8e', undefined, 'stone');
+      p.roofX(0.3, 0.3, 2.85, 1.35, 26, 18, 'slate', ST, 0.1);
+      // A little bell turret astride the ridge.
+      p.box(0.5, 0.62, 0.82, 1.02, 37, 15, ST, undefined, 'stone');
+      p.wallL(1.022, 0.58, 0.74, 42, 50, '#2a2522');
+      p.wallR(0.822, 0.7, 0.86, 42, 50, '#221e1b');
+      {
+        const [bx, by] = iso(0.66, 1.022, 44);
+        p.ctx.fillStyle = '#c89a38';
+        p.ctx.beginPath();
+        p.ctx.moveTo(bx - 2.2, by + 2);
+        p.ctx.quadraticCurveTo(bx - 2, by - 3, bx, by - 3);
+        p.ctx.quadraticCurveTo(bx + 2, by - 3, bx + 2.2, by + 2);
+        p.ctx.fill();
+      }
+      p.roofPyramid(0.5, 0.62, 0.82, 1.02, 52, 14, 'slate');
+      p.line([0.66, 0.82, 66], [0.66, 0.82, 74], '#d8b84a', 1.3);
+      p.line([0.62, 0.86, 71], [0.7, 0.78, 71], '#d8b84a', 1.3);
+      // The cloister walks on the north and west sides of the garth.
+      p.box(0.3, 1.35, 0.4, 3.45, 0, 12, ST, undefined, 'stone');
+      p.wallL(1.352, 0.4, 2.85, 0, 11, '#6e665a');
+      p.wallR(0.402, 1.35, 3.45, 0, 11, '#7a7266');
+      // Lean-to roofs of tile over the walks, the arches in front of their eaves.
+      p.poly([[0.38, 1.33, 15], [0.74, 1.72, 11], [0.74, 3.47, 11], [0.38, 3.47, 15]], '#b4503f', '#7a3428', 0.5);
+      p.poly([[0.38, 1.33, 15], [2.85, 1.33, 15], [2.85, 1.72, 11], [0.74, 1.72, 11]], '#a8483a', '#7a3428', 0.5);
+      for (let k = 1; k < 4; k++) {
+        const t = k / 4;
+        const y = 1.33 + t * 0.39;
+        p.line([0.38 + t * 0.36, y, 15 - t * 4], [2.85, y, 15 - t * 4], 'rgba(90,30,20,0.45)', 0.5);
+        p.line([0.38 + t * 0.36, y, 15 - t * 4], [0.38 + t * 0.36, 3.47, 15 - t * 4], 'rgba(90,30,20,0.45)', 0.5);
+      }
+      arcade(p, [0.74, 1.72], [2.85, 1.72], 7, 9.5, '#c8c2b6');
+      arcade(p, [0.74, 1.72], [0.74, 3.47], 6, 9.5, '#c8c2b6');
+      // The monks' range on the east side: dormitory above, refectory below.
+      p.box(2.85, 0.3, 3.75, 3.45, 0, 21, ST, undefined, 'stone');
+      for (const y of [0.55, 1.05, 1.55, 2.05]) {
+        p.windowR(3.75, y, 4, 0.14, 6, winter);
+        p.windowR(3.75, y, 13, 0.12, 5);
+      }
+      p.windowR(3.75, 3.0, 13, 0.12, 5);
+      p.doorR(3.75, 2.6, 0.22, 11);
+      p.windowL(3.45, 3.05, 5, 0.14, 6, winter);
+      p.windowL(3.45, 3.4, 5, 0.14, 6, winter);
+      p.roofY(2.85, 0.3, 3.75, 3.45, 21, 15, 'tile', ST, 0.1);
+      smoke.push(p.chimney(3.25, 1.2, 30, 10));
+      // A low wall closes the garth, with a gate onto the herb garden.
+      p.box(0.3, 3.45, 1.6, 3.6, 0, 5, '#a49c8e', undefined, 'stone');
+      p.box(1.96, 3.45, 2.85, 3.6, 0, 5, '#a49c8e', undefined, 'stone');
+      if (!winter) {
+        for (const [x, y] of [[0.65, 3.8], [1.15, 3.8], [2.4, 3.8]]) {
+          p.poly([[x - 0.18, y - 0.1, 0], [x + 0.18, y - 0.1, 0], [x + 0.18, y + 0.1, 0], [x - 0.18, y + 0.1, 0]], '#6a4a2e');
+          for (let k = 0; k < 4; k++) p.bush(x - 0.12 + k * 0.08, y, 1.8, ['#6a9a4a', '#9a7ac0', '#5a8a4a', '#d8c060'][(k + Math.round(x * 3)) % 4]);
+        }
+      }
+      // Straw bee skeps on a bench.
+      p.box(3.0, 3.62, 3.6, 3.78, 4, 1.2, '#8a6440');
+      for (const x of [3.1, 3.3, 3.5]) {
+        const [sx, sy] = iso(x, 3.7, 5.2);
+        const c = p.ctx;
+        c.fillStyle = '#c8a050';
+        c.beginPath();
+        c.moveTo(sx - 3, sy);
+        c.quadraticCurveTo(sx - 3.2, sy - 6, sx, sy - 6.5);
+        c.quadraticCurveTo(sx + 3.2, sy - 6, sx + 3, sy);
+        c.closePath();
+        c.fill();
+        c.strokeStyle = '#9a7a38';
+        c.lineWidth = 0.5;
+        for (const h of [1.8, 3.6, 5]) {
+          c.beginPath();
+          c.moveTo(sx - 3 + h * 0.15, sy - h);
+          c.lineTo(sx + 3 - h * 0.15, sy - h);
+          c.stroke();
+        }
+        c.fillStyle = '#3a2a1a';
+        c.fillRect(sx - 0.6, sy - 1.2, 1.2, 1.2);
+      }
+      break;
+    }
     case 'wall': {
       // A short stretch with a merlon, for the build card and the building site.
       p.shadow(0.1, 0.3, 0.9, 0.7);
@@ -3229,8 +3389,23 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
         bottle(0.45 + k * 0.14, 1.55, 8, glassCols[(k + 1) % 4]);
       }
       // Panes leaning against the wall.
+      // A finished window of stained glass, leaded and propped against the wall.
+      {
+        const x = 1.5;
+        p.poly([[x, 1.36, 0], [x, 1.62, 0], [x + 0.06, 1.62, 13], [x + 0.06, 1.36, 13]], '#3a3a44');
+        const cols = ['#3a62c4', '#c42b3a', '#d8a838', '#4f8a3c'];
+        const f = (z: number) => x + (z / 13) * 0.06;
+        for (let k = 0; k < 4; k++) {
+          for (let j = 0; j < 2; j++) {
+            const z0 = 1 + k * 2.8;
+            const ya = 1.385 + j * 0.11;
+            const yb = ya + 0.1;
+            p.poly([[f(z0), ya, z0], [f(z0), yb, z0], [f(z0 + 2.5), yb, z0 + 2.5], [f(z0 + 2.5), ya, z0 + 2.5]], cols[(k * 2 + j * 3 + (k >> 1)) % 4]);
+          }
+        }
+      }
       for (let k = 0; k < 3; k++) {
-        const x = 1.58 + k * 0.05;
+        const x = 1.66 + k * 0.05;
         p.poly([[x, 1.35, 0], [x, 1.6, 0], [x + 0.06, 1.6, 10], [x + 0.06, 1.35, 10]], 'rgba(170,225,215,0.55)', 'rgba(70,130,120,0.8)', 0.5);
       }
       break;
@@ -5080,6 +5255,57 @@ export function oreHeap(p: Pen, x: number, y: number, n = 5): void {
 }
 
 /** Squared, freshly cut blocks of pale stone, stacked. */
+/** A pointed window of coloured glass in a wall facing +y, its panes leaded in bands. */
+function lancetL(p: Pen, y: number, x: number, w: number, z0: number, z1: number, lit: boolean): void {
+  p.wallL(y, x - 0.025, x + w + 0.025, z0 - 1, z1, '#3a3a44');
+  p.poly([[x - 0.025, y, z1], [x + w + 0.025, y, z1], [x + w / 2, y, z1 + 5]], '#3a3a44');
+  const cols = lit ? ['#e8b850', '#f0c860', '#e0a840', '#e8b850'] : ['#3a62c4', '#c42b3a', '#4f8a3c', '#d8a838'];
+  const n = 4;
+  for (let k = 0; k < n; k++) p.wallL(y + 0.001, x, x + w, z0 + ((z1 - z0) * k) / n, z0 + ((z1 - z0) * (k + 1)) / n, cols[k % 4]);
+  p.poly([[x, y + 0.001, z1], [x + w, y + 0.001, z1], [x + w / 2, y + 0.001, z1 + 3.6]], cols[1]);
+  p.line([x + w / 2, y + 0.002, z0], [x + w / 2, y + 0.002, z1 + 3], 'rgba(40,40,50,0.8)', 0.5);
+}
+
+/** A row of round arches on slim columns from a to b (local tiles), as round a cloister. */
+function arcade(p: Pen, a: [number, number], b: [number, number], n: number, h: number, stone: string): void {
+  const c = p.ctx;
+  const at = (t: number, z: number) => iso(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, z);
+  for (let i = 0; i < n; i++) {
+    const t0 = i / n;
+    const t1 = (i + 1) / n;
+    const [x0, y0] = at(t0, h - 3);
+    const [xm, ym] = at((t0 + t1) / 2, h + 1.4);
+    const [x1, y1] = at(t1, h - 3);
+    const [x0t, y0t] = at(t0, h + 1.5);
+    const [x1t, y1t] = at(t1, h + 1.5);
+    c.fillStyle = stone;
+    c.beginPath();
+    c.moveTo(x0, y0);
+    c.lineTo(x0t, y0t);
+    c.lineTo(x1t, y1t);
+    c.lineTo(x1, y1);
+    c.quadraticCurveTo(xm * 2 - (x0 + x1) / 2, ym * 2 - (y0 + y1) / 2, x0, y0);
+    c.fill();
+  }
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    const [x, y] = at(t, 0);
+    const [xt, yt] = at(t, h - 2.6);
+    c.strokeStyle = stone;
+    c.lineWidth = 1.5;
+    c.beginPath();
+    c.moveTo(x, y);
+    c.lineTo(xt, yt);
+    c.stroke();
+    c.strokeStyle = 'rgba(60,50,40,0.35)';
+    c.lineWidth = 0.5;
+    c.beginPath();
+    c.moveTo(x + 0.7, y);
+    c.lineTo(xt + 0.7, yt);
+    c.stroke();
+  }
+}
+
 /** A soft heap of loose stuff (sand, charcoal), lit from the left. */
 function mound(p: Pen, x: number, y: number, r: number, light: string, dark: string): void {
   const [hx, hy] = iso(x, y, 0);

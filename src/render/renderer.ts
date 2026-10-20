@@ -4494,6 +4494,17 @@ function drawGood(p: Pen, id: ResourceId, x: number, y: number): void {
       p.crate(x - 0.1, y - 0.1, 0.2);
       for (let i = 0; i < 3; i++) p.ellipse(x - 0.06 + i * 0.06, y + 0.02, 1.6, 2.4, 9, 'rgba(140,210,190,0.9)');
       break;
+    case 'stainedglass': {
+      // Finished windows crated upright, their coloured panes showing.
+      p.crate(x - 0.12, y - 0.1, 0.22);
+      const cols = ['#3a62c4', '#c42b3a', '#d8a838'];
+      for (let i = 0; i < 3; i++) p.wallL(y + 0.13, x - 0.1 + i * 0.07, x - 0.04 + i * 0.07, 6, 13, cols[i]);
+      break;
+    }
+    case 'fineclothes':
+      for (let i = 0; i < 3; i++) p.box(x - 0.16, y - 0.12, x + 0.16, y + 0.12, i * 2.6, 2.4, i % 2 ? '#24408e' : '#2f4fa8');
+      p.line([x - 0.16, y + 0.12, 7.6], [x + 0.16, y + 0.12, 7.6], '#e0b840', 0.8);
+      break;
     case 'woad':
     case 'dyes': {
       if (id === 'dyes') {
@@ -4695,6 +4706,8 @@ const CARRY_SHAPES: Partial<Record<ResourceId, CarryShape>> = {
   glass: 'crate',
   woad: 'basket',
   dyes: 'cask',
+  stainedglass: 'crate',
+  fineclothes: 'bundle',
 };
 const GOOD_COLORS: Partial<Record<ResourceId, string>> = {
   firewood: '#9a6a3a',
@@ -4735,6 +4748,8 @@ const GOOD_COLORS: Partial<Record<ResourceId, string>> = {
   glass: '#9ad4c8',
   woad: '#5f8f86',
   dyes: '#2f4fa8',
+  stainedglass: '#c42b3a',
+  fineclothes: '#2f4fa8',
 };
 
 /**

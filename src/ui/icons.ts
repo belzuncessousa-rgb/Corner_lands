@@ -40,6 +40,9 @@ export const ICONS: Record<ResourceId | 'people' | 'happy' | 'materials' | 'good
   prestige: svg(
     '<path d="M4 15l-1-9 4 3 3-5 3 5 4-3-1 9z" fill="#c8a038" stroke="#7a5a18" stroke-width=".8"/><path d="M4 15h12v2H4z" fill="#8a2a3a"/><circle cx="10" cy="11" r="1.4" fill="#c42b3a"/><circle cx="6.5" cy="12" r=".9" fill="#3a6ab0"/><circle cx="13.5" cy="12" r=".9" fill="#3a6ab0"/>',
   ),
+  knowledge: svg(
+    '<path d="M10 6c-2-1.4-4.6-1.6-7-1v10c2.4-.6 5-.4 7 1 2-1.4 4.6-1.6 7-1V5c-2.4-.6-5-.4-7 1z" fill="#f4ecd8" stroke="#7a5a3a" stroke-width=".8"/><path d="M10 6v10" stroke="#7a5a3a" stroke-width=".8"/><path d="M4.6 7.4c1.3-.2 2.6 0 3.8.5M4.6 9.6c1.3-.2 2.6 0 3.8.5M11.6 7.9c1.2-.5 2.5-.7 3.8-.5M11.6 10.1c1.2-.5 2.5-.7 3.8-.5" stroke="#a89878" stroke-width=".6"/><path d="M13 3.5l2.5 8" stroke="#3a6ab0" stroke-width="1"/><path d="M12.6 2.2c1.6.4 2.4 1.4 2.4 2.8l-1.4.4z" fill="#e8f0f8" stroke="#3a6ab0" stroke-width=".4"/>',
+  ),
   firewood: svg(
     '<path d="M4 15l6-9 6 9z" fill="none"/><rect x="3" y="12" width="14" height="3.4" rx="1.2" fill="#8a5a30"/><rect x="5" y="8.6" width="10" height="3.4" rx="1.2" fill="#9a6a3a"/><rect x="7" y="5.2" width="6" height="3.4" rx="1.2" fill="#8a5a30"/><g fill="#d8b47c"><circle cx="3.8" cy="13.7" r="1.1"/><circle cx="5.8" cy="10.3" r="1.1"/><circle cx="7.8" cy="6.9" r="1.1"/></g>',
   ),
@@ -90,12 +93,14 @@ export const ICONS: Record<ResourceId | 'people' | 'happy' | 'materials' | 'good
   wine: svg('<path d="M8 2h4v4c2 1 3 3 3 5v6c0 1-1 1-1 1H6s-1 0-1-1v-6c0-2 1-4 3-5z" fill="#5a1a2a" stroke="#2a0a14" stroke-width=".7"/><path d="M8 2h4" stroke="#7a5a3a" stroke-width="1.6"/><rect x="7" y="10" width="6" height="4" fill="#e8dcc4"/>'),
   woad: svg('<path d="M10 18V9" stroke="#5a7a5a" stroke-width="1"/><path d="M10 15c-4 0-6-2-6-5 3 0 5 2 6 5zM10 13c4 0 6-2 6-5-3 0-5 2-6 5z" fill="#5f8f86"/><path d="M10 11c-2-1-2-4 0-6 2 2 2 5 0 6z" fill="#6aa098"/><g fill="#e8cf3a"><circle cx="8.5" cy="4" r="1.1"/><circle cx="11.5" cy="3.6" r="1.1"/><circle cx="10" cy="2.4" r="1"/></g>'),
   dyes: svg('<path d="M4 8h12v8a2 2 0 01-2 2H6a2 2 0 01-2-2z" fill="#8a6236" stroke="#5a3a20" stroke-width=".8"/><ellipse cx="10" cy="8" rx="6" ry="1.8" fill="#2f4fa8" stroke="#5a3a20" stroke-width=".7"/><path d="M4 11.5h12" stroke="#5a3a20" stroke-width=".6"/><path d="M13 7.6c1-2.5 3-3 4-5" stroke="#3a62c4" stroke-width="1.4" fill="none" stroke-linecap="round"/><ellipse cx="8.5" cy="7.8" rx="1.6" ry=".5" fill="#6a8ae0"/>'),
+  fineclothes: svg('<path d="M7 3h6l1 3-2 1 4 11H4l4-11-2-1z" fill="#2f4fa8" stroke="#1a2a60" stroke-width=".7"/><path d="M7 3c1 1.6 5 1.6 6 0" fill="none" stroke="#d8a838" stroke-width="1"/><path d="M8 7h4" stroke="#d8a838" stroke-width="1.1"/><path d="M4.4 17.2h11.2" stroke="#d8a838" stroke-width="1"/><path d="M10 7v10" stroke="#4a6ac8" stroke-width=".7"/><circle cx="10" cy="9.4" r=".7" fill="#e8c860"/>'),
   paper: svg('<path d="M5 3h8l3 3v11H5z" fill="#f4ecd8" stroke="#a89878" stroke-width=".7"/><path d="M13 3v3h3" fill="none" stroke="#a89878" stroke-width=".7"/><path d="M7 9h7M7 11.5h7M7 14h5" stroke="#c8b898" stroke-width=".7"/>'),
   crates: svg('<path d="M3 7l7-3 7 3v8l-7 3-7-3z" fill="#b8894e" stroke="#6a4a26" stroke-width=".8"/><path d="M3 7l7 3 7-3M10 10v8M5 9.5l3 1.3v5M15 9.5l-3 1.3v5" stroke="#6a4a26" stroke-width=".7" fill="none"/>'),
   sand: svg('<path d="M2 16c2-5 5-8 8-8s6 3 8 8z" fill="#e2c98a"/><path d="M5 14c2-3 4-4.5 6-4.5" stroke="#f2e0aa" stroke-width="1.1" fill="none"/><g fill="#b89a5a"><circle cx="8" cy="13" r=".5"/><circle cx="12" cy="12" r=".5"/><circle cx="14" cy="14.5" r=".5"/><circle cx="10" cy="15" r=".5"/></g>'),
   mortar: svg('<path d="M3 12h14l-1.5 5h-11z" fill="#8a6a44" stroke="#5a4028" stroke-width=".7"/><path d="M3.6 12c1-2.5 3-3.5 6.4-3.5s5.4 1 6.4 3.5z" fill="#e8e4d8" stroke="#a8a294" stroke-width=".6"/><path d="M12 9.5l5-6.5" stroke="#6a4a2a" stroke-width="1.2" stroke-linecap="round"/><path d="M10 10.6c1.4-.6 3-.6 4.2.2" stroke="#c8c2b4" stroke-width=".7" fill="none"/>'),
   charcoal: svg('<g stroke="#121212" stroke-width=".5"><path d="M3 15l4-3 4 1 1 3-4 2z" fill="#2c2a28"/><path d="M9 12l4-4 4 2-1 4-4 1z" fill="#3a3734"/><path d="M5 11l2-4 3 1-1 3z" fill="#24221f"/></g><path d="M10 10l2-2M5 15l3-1" stroke="#6a6560" stroke-width=".6"/><circle cx="14" cy="11" r=".7" fill="#e8742a"/>'),
   glass: svg('<path d="M7 3h6v3l2 3v8H5V9l2-3z" fill="#9ad4c8" fill-opacity=".75" stroke="#4a8a80" stroke-width=".8"/><path d="M7 3h6" stroke="#4a8a80" stroke-width="1.2"/><path d="M7 10v5" stroke="#e6faf4" stroke-width="1.2" stroke-linecap="round"/><path d="M5.6 12.5h8.8" stroke="#6ab0a4" stroke-width=".5"/>'),
+  stainedglass: svg('<path d="M5 18V8a5 5 0 0110 0v10z" fill="#5a5a60"/><path d="M6.2 17V8.2a3.8 3.8 0 017.6 0V17z" fill="#3a62c4"/><path d="M6.6 9a3.4 3.4 0 016.8 0z" fill="#d8a838"/><path d="M6.2 9.6h7.6v3.6H6.2z" fill="#c42b3a"/><path d="M8.6 13.2h2.8V17H8.6z" fill="#4f8a3c"/><path d="M10 4.4V17M6.2 9.6h7.6M6.2 13.2h7.6" stroke="#2a2a30" stroke-width=".7"/><circle cx="10" cy="11.4" r="1.1" fill="#f2d34a" stroke="#2a2a30" stroke-width=".5"/>'),
   pottery: svg('<path d="M7 3h6l-1 2c3 1 4 4 3 8-1 3-3 4-5 4s-4-1-5-4c-1-4 0-7 3-8z" fill="#b8583a" stroke="#6a2a18" stroke-width=".7"/><path d="M5.2 10h9.6" stroke="#e8c070" stroke-width="1.4"/><path d="M14 7c2 0 2 4 0 4" stroke="#6a2a18" stroke-width=".9" fill="none"/>'),
   books: svg('<rect x="3" y="5" width="4" height="12" fill="#8a3b2e"/><rect x="7.5" y="3" width="4" height="14" fill="#3a5a8a"/><rect x="12" y="6" width="5" height="11" fill="#3d7a3a" transform="rotate(8 14 11)"/><path d="M3 8h4M7.5 6h4M3 14h4M7.5 14h4" stroke="#d8b84a" stroke-width=".8"/>'),
   jewellery: svg('<circle cx="10" cy="11" r="5" fill="none" stroke="#d8a838" stroke-width="2.2"/><path d="M7 5l3-3 3 3-3 3z" fill="#6ab0e8" stroke="#3a6a9a" stroke-width=".6"/><circle cx="8" cy="9" r=".7" fill="#fff8d8"/>'),
@@ -266,6 +271,7 @@ export const BUILDING_ICONS: Partial<Record<string, string>> = {
   markethall: B.hall,
   tradingpost: B.scales,
   church: CATEGORY_ICONS.civic,
+  monastery: svg('<path d="M2 18V9h16v9z" fill="#b8b4aa"/><path d="M1.5 9.5L10 5l8.5 4.5z" fill="#a8483a"/><path d="M9 5V2.5h2V5" fill="#8a8478"/><path d="M9.4 3.4h1.2v1.2H9.4z" fill="#d8a838"/><g fill="#4a3a2a"><path d="M3.4 18v-4.4a1.6 1.6 0 013.2 0V18z"/><path d="M8.4 18v-4.4a1.6 1.6 0 013.2 0V18z"/><path d="M13.4 18v-4.4a1.6 1.6 0 013.2 0V18z"/></g><path d="M2 18h16" stroke="#6d6a62"/>'),
   cathedral: B.cathedral,
   guildhall: B.guild,
   wall: B.wall,

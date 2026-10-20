@@ -72,6 +72,7 @@ export const GOODS: Record<ResourceId, GoodDef> = {
   mortar: good('Mortar', 'materials', 8, 'Lime burned from stone and mixed with sand, to bind the dressed stone of the finest buildings.', { keep: 60 }),
   charcoal: good('Charcoal', 'materials', 4, 'Timber slow-burned under turf: the hot, clean fire a glass furnace needs.', { keep: 60 }),
   glass: good('Glass', 'materials', 20, 'Melted from sand over a charcoal fire, for the windows of the grandest buildings.', { keep: 30 }),
+  stainedglass: good('Stained Glass', 'materials', 60, 'Panes of coloured glass leaded into pictures, for the windows of the church and the cathedral.', { keep: 20 }),
   silver: good('Silver', 'materials', 15, 'Precious ore turned up by deep miners, for the jeweller.', { keep: 40 }),
 
   bread: good('Bread', 'food', 3, 'Baked from flour. Filling: feeds one and a half.', { food: 1.5, foodGroup: 'grain' }),
@@ -111,14 +112,16 @@ export const GOODS: Record<ResourceId, GoodDef> = {
   tools: good('Tools', 'goods', 14, 'Needed for upgrades and grand buildings.', { keep: 40 }),
   woad: good('Woad', 'goods', 2, 'Leaves of the dye plant, crushed and fermented for the dyer.'),
   dyes: good('Dyes', 'goods', 10, "Blue steeped from woad in the dyer's vats."),
+  fineclothes: good('Fine Clothes', 'goods', 30, 'Gowns and cloaks of dyed cloth from the tailor. A luxury for the finest homes, and a rich export.', { keep: 30 }),
   paper: good('Paper', 'goods', 6, 'Pressed from flax at the scriptorium.', { keep: 40 }),
-  books: good('Books', 'goods', 40, 'Copied and bound at the scriptorium. A luxury for Townhouses; universities need them.', { keep: 20 }),
+  books: good('Books', 'goods', 40, 'Copied and bound at the scriptorium, or bought from merchants. A luxury for Townhouses; universities and monasteries read them.', { keep: 20 }),
   jewellery: good('Jewellery', 'goods', 60, 'Rings and brooches of silver. The finest luxury.', { keep: 20 }),
   pottery: good('Fine Pottery', 'goods', 14, 'Glazed jugs and dishes from the potter: a luxury the finest homes want.', { keep: 40 }),
   weapons: good('Arms', 'goods', 20, "Bows, pikes and armour. The lord's retinue needs them; merchants pay well.", { keep: 30 }),
 
   gold: good('Coins', 'currency', 0, 'Collected from taxes and trade.'),
   prestige: good('Prestige', 'currency', 0, 'The renown of your house. Earned from a fine manor and a thriving town; spent on charters, titles (Baron, Earl, Duke) and works of art.'),
+  knowledge: good('Knowledge', 'currency', 0, 'What your people have learned: taught by the church and the monks, kept in the homes of the well-to-do, copied in scriptoria and argued over at the university.'),
 };
 
 /** Edible goods, in the order villagers reach for them. */
@@ -525,7 +528,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   tailor: def({
     type: 'tailor',
     name: 'Tailor & Cobbler',
-    desc: 'Sews cloth into clothes and stitches leather into boots. Timber Houses need clothes, Townhouses boots.',
+    desc: 'Sews cloth into clothes and stitches leather into boots. Timber Houses need clothes, Townhouses boots. With dyes, it cuts fine clothes for the well-to-do.',
     category: 'industry',
     cost: { wood: 15, planks: 10 },
     workers: 2,
@@ -536,6 +539,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     recipes: [
       { id: 'clothes', name: 'Clothes', inputs: { cloth: 2 }, outputs: { clothes: 2 } },
       { id: 'boots', name: 'Boots', inputs: { leather: 2 }, outputs: { boots: 2 } },
+      { id: 'fineclothes', name: 'Fine clothes', inputs: { cloth: 2, dyes: 1 }, outputs: { fineclothes: 1 } },
     ],
   }),
   apothecary: def({
@@ -639,7 +643,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   glassworks: def({
     type: 'glassworks',
     name: 'Glassworks',
-    desc: 'A furnace roaring on charcoal melts sand into glass, blown and spread into panes.',
+    desc: 'A furnace roaring on charcoal melts sand into glass, blown and spread into panes. With dyes, the glaziers colour it and lead it into stained glass.',
     category: 'industry',
     cost: { stone: 25, planks: 10, gold: 40 },
     buildDays: 14,
@@ -648,6 +652,10 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     inputs: { sand: 3, charcoal: 2 },
     outputs: { glass: 1 },
     tier: 2,
+    recipes: [
+      { id: 'glass', name: 'Glass', inputs: { sand: 3, charcoal: 2 }, outputs: { glass: 1 } },
+      { id: 'stainedglass', name: 'Stained glass', inputs: { glass: 2, dyes: 1 }, outputs: { stainedglass: 1 } },
+    ],
   }),
   dyer: def({
     type: 'dyer',
@@ -768,7 +776,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   scriptorium: def({
     type: 'scriptorium',
     name: 'Scriptorium',
-    desc: 'Monks press flax into paper, and copy and bind books with leather covers. Books are a luxury and a fine export.',
+    desc: 'Monks press flax into paper, and copy and bind books with leather covers. Books are a luxury and a fine export, and the scribes add to the town’s knowledge.',
     category: 'civic',
     cost: { dressedstone: 15, planks: 15, gold: 30 },
     buildDays: 16,
@@ -888,7 +896,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   university: def({
     type: 'university',
     name: 'University',
-    desc: 'Masters and scholars in a cloistered college. Fed two books a month, it brings prestige, and its learning makes every workshop and farm in town a little more productive (+5%). One per town.',
+    desc: 'Masters and scholars in a cloistered college. Fed two books a month, it brings prestige and much knowledge, and its learning makes every workshop and farm in town a little more productive (+5%). One per town.',
     category: 'works',
     w: 4,
     h: 4,
@@ -924,7 +932,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   church: def({
     type: 'church',
     name: 'Church',
-    desc: 'A place of worship, first raised in timber. Greatly raises happiness in a wide area. Once the settlement is a Town it can be rebuilt in stone, which brings more prestige.',
+    desc: 'A place of worship, first raised in timber. Greatly raises happiness in a wide area, and the priest teaches the children their letters (knowledge). Once the settlement is a Town it can be rebuilt in stone, which brings more prestige and knowledge.',
     category: 'civic',
     w: 3,
     h: 4,
@@ -932,6 +940,18 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     buildDays: 20,
     workers: 1,
     radius: 16,
+    tier: 2,
+  }),
+  monastery: def({
+    type: 'monastery',
+    name: 'Monastery',
+    desc: 'Monks at prayer and study round a quiet cloister. Each month they read a book, bought from merchants if the town copies none, and in return teach (knowledge), bring the lord a little prestige and comfort the whole town.',
+    category: 'civic',
+    w: 4,
+    h: 4,
+    cost: { stone: 40, planks: 30, tiles: 20, gold: 120 },
+    buildDays: 30,
+    workers: 2,
     tier: 2,
   }),
   cathedral: def({
@@ -1209,6 +1229,7 @@ export const BUILD_ORDER: BuildingType[] = [
   'apothecary',
   'scriptorium',
   'church',
+  'monastery',
   'garden',
   'flowerbed',
   'hedge',

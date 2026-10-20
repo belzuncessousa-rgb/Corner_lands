@@ -47,6 +47,10 @@ import {
   moodYield,
   lockReason,
   prestigeIncome,
+  knowledgeIncome,
+  knowledgeOf,
+  knowledgeSources,
+  MONASTERY_KNOWLEDGE,
   setTrade,
   workDef,
   HOME_TRADES,
@@ -484,7 +488,7 @@ export class Hud {
       chip('materials', matFull ? 'full' : '', `${ICONS.materials}${sum('materials')}`),
       chip('goods', '', `${ICONS.goods}${sum('goods')}`),
       '<div class="sep"></div>',
-      chip('treasury', '', `${ICONS.gold}${Math.floor(s.res.gold)}${s.res.prestige > 0 || s.tier >= 1 ? `<span class="prestige">${ICONS.prestige}${Math.floor(s.res.prestige)}</span>` : ''}`),
+      chip('treasury', '', `${ICONS.gold}${Math.floor(s.res.gold)}${s.res.prestige > 0 || s.tier >= 1 ? `<span class="prestige">${ICONS.prestige}${Math.floor(s.res.prestige)}</span>` : ''}${s.res.knowledge > 0 ? `<span class="prestige">${ICONS.knowledge}${Math.floor(s.res.knowledge)}</span>` : ''}`),
     ].join('');
     setHTML(this.el.topbar, html);
   }
@@ -599,7 +603,8 @@ export class Hud {
     return COMMISSIONS.map((c) => {
       const done = s.commissions?.includes(c.id);
       const err = commissionError(s, c.id);
-      const tip = `<b>${c.name}</b><br>${esc(c.desc)}. +${c.happiness} happiness for good.<br>Costs ${c.prestige} prestige`;
+      const goods = Object.entries(c.goods ?? {}).map(([id, n]) => `${n} ${GOODS[id as ResourceId].name.toLowerCase()}`);
+      const tip = `<b>${c.name}</b><br>${esc(c.desc)}. +${c.happiness} happiness for good.<br>Costs ${c.prestige} prestige${goods.map((g) => ` and ${g}`).join('')}`;
       return `<div class="kv feast" data-tip="${esc(tip)}"><span>${c.name}</span><span>${
         done ? '<span class="pos">Made ✓</span>' : `<button data-action="commission" data-id="${c.id}" ${err ? `disabled title="${esc(err)}"` : ''}>Commission <small>${c.prestige} ${ICONS.prestige}</small></button>`
       }</span></div>`;
@@ -632,6 +637,7 @@ export class Hud {
       ).join('')}</div>
       <div class="kv" style="margin-top:8px"><span>${ICONS.prestige} Prestige</span><b>${Math.floor(s.res.prestige)}</b></div>
       <p class="note">${esc(GOODS.prestige.desc)}</p>
+      ${this.knowledgeRows()}
       ${
         s.tier >= FAIR_TIER
           ? `<div class="kv feast" data-tip="Once a year, endow a fair: merchants, jugglers and a tournament. Each fair is grander and dearer than the last. Brings prestige and +8 happiness for a season."><span>Fair</span><span>${
@@ -941,6 +947,7 @@ export class Hud {
       rows.push(...this.storeRows(b));
       rows.push(...this.draughtRows(b));
       rows.push(...this.upkeepRows(b));
+      rows.push(...this.learningRows(b));
       if (wide) orders.push(...this.orderRows(b));
       if (b.type === 'townhall') {
         const c = feastCost(s);
@@ -1069,6 +1076,31 @@ export class Hud {
   }
 
   /** What a workplace wears out a month, and a warning when it is working with worn gear. */
+  /** What the town learns each month, and from where. */
+  private knowledgeRows(): string {
+    const s = this.game.state;
+    const src = knowledgeSources(s);
+    if (!src.length && s.res.knowledge <= 0) return '';
+    const tip = src.length ? src.map((x) => `${x.label}: +${x.value.toFixed(1)}`).join('<br>') : 'Nothing teaches yet';
+    return `<div class="kv" style="margin-top:8px" data-tip="${esc(`<b>Knowledge a month</b><br>${tip}`)}"><span>${ICONS.knowledge} Knowledge</span><b>${Math.floor(s.res.knowledge)} <small class="pos">+${knowledgeIncome(s).toFixed(1)}/month</small></b></div>
+      <p class="note">${esc(GOODS.knowledge.desc)}</p>`;
+  }
+
+  /** A monastery's book for the month, and what learning a building brings. */
+  private learningRows(b: Building): string[] {
+    const s = this.game.state;
+    if (b.build < 1) return [];
+    if (b.type === 'monastery') {
+      const tip = `The monks read a book each month. With it they bring +${MONASTERY_KNOWLEDGE} knowledge, +0.5 prestige and +3 happiness for the whole town. Buy books at a trading post if no scriptorium copies them.`;
+      return [
+        `<div class="kv" data-tip="${esc(tip)}"><span>This month's book</span><span class="${b.reading ? 'pos' : 'neg'}">${b.reading ? 'At their books ✓' : s.res.books >= 1 ? 'Waiting for the month' : 'No books to read'}</span></div>`,
+        `<div class="kv"><span>Books in store</span><span>${Math.floor(s.res.books)}</span></div>`,
+      ];
+    }
+    const k = knowledgeOf(s, b);
+    return k ? [`<div class="kv" data-tip="What the town learns: see it in the treasury."><span>${ICONS.knowledge} Knowledge</span><span class="pos">+${k} a month</span></div>`] : [];
+  }
+
   private upkeepRows(b: Building): string[] {
     const wear = UPKEEP[b.type];
     if (!wear || b.build < 1) return [];

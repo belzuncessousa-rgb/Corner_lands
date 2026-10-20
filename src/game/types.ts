@@ -16,6 +16,7 @@ export const RESOURCE_IDS = [
   'mortar',
   'charcoal',
   'glass',
+  'stainedglass',
   // Food
   'bread',
   'meat',
@@ -54,6 +55,7 @@ export const RESOURCE_IDS = [
   'paper',
   'woad',
   'dyes',
+  'fineclothes',
   'books',
   'jewellery',
   'pottery',
@@ -61,6 +63,7 @@ export const RESOURCE_IDS = [
   // Currency
   'gold',
   'prestige',
+  'knowledge',
 ] as const;
 
 export type ResourceId = (typeof RESOURCE_IDS)[number];
@@ -143,7 +146,8 @@ export type BuildingType =
   | 'limekiln'
   | 'collier'
   | 'glassworks'
-  | 'dyer';
+  | 'dyer'
+  | 'monastery';
 
 export type Category = 'housing' | 'resources' | 'farming' | 'food' | 'industry' | 'civic' | 'manor' | 'works' | 'decor';
 
@@ -263,6 +267,8 @@ export interface Building {
   orders?: TradeOrder[];
   /** Houses: flower boxes along the front of the plot. */
   flowers?: boolean;
+  /** Monasteries: whether the monks had their book this month. */
+  reading?: boolean;
   /** Hedges and flower beds laid in one go share a group: beds in a group grow into one. */
   group?: number;
   /** Units produced in the last month, for display. */
@@ -420,7 +426,7 @@ export interface GameState {
   festivals?: Record<string, number>;
   festivalDay?: { id: string; day: number };
   /** This year's tally for the year-end page of the chronicle. */
-  year?: { pop: number; gold: number; prestige: number; arrived: number; left: number; built: number; harvest: number; stock?: Partial<Record<ResourceId, number>>; hungry?: number };
+  year?: { pop: number; gold: number; prestige: number; knowledge?: number; arrived: number; left: number; built: number; harvest: number; stock?: Partial<Record<ResourceId, number>>; hungry?: number };
   /** Tiles cleared by woodcutters and the day the last tree fell (stumps on the map). */
   stumps?: Record<number, number>;
   /** Herds of game that keep to their part of the woods. */

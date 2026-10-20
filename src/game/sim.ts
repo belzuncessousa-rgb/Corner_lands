@@ -243,7 +243,7 @@ export function placementError(s: GameState, type: BuildingType, x: number, y: n
 /** Materials of a cost that builders must carry (gold is paid up front). */
 export function materialsOf(cost: Cost): Cost {
   const out: Cost = {};
-  for (const k in cost) if (k !== 'gold' && k !== 'prestige') out[k as ResourceId] = cost[k as ResourceId];
+  for (const k in cost) if (GOODS[k as ResourceId].group !== 'currency') out[k as ResourceId] = cost[k as ResourceId];
   return out;
 }
 
@@ -521,7 +521,7 @@ export function demolish(s: GameState, b: Building): boolean {
   const add = (c: Cost, f = 1) => {
     for (const k in c) {
       const id = k as ResourceId;
-      if (id === 'gold' || id === 'prestige') s.res[id] += Math.floor((c[id] ?? 0) * f);
+      if (GOODS[id].group === 'currency') s.res[id] += Math.floor((c[id] ?? 0) * f);
       else back[id] = (back[id] ?? 0) + Math.floor((c[id] ?? 0) * f);
     }
   };
@@ -867,7 +867,7 @@ export function hasSupply(s: GameState, b: Building, id: ResourceId): boolean {
 }
 
 /** Luxuries Townhouses enjoy (one at a time): they lift spirits and taxes. */
-export const LUXURIES: ResourceId[] = ['jewellery', 'books', 'wine', 'mead'];
+export const LUXURIES: ResourceId[] = ['jewellery', 'fineclothes', 'books', 'wine', 'mead'];
 
 export function hasLuxury(s: GameState, b: Building): boolean {
   return LUXURIES.some((id) => (b.supply?.[id] ?? -1) > s.day);
@@ -924,7 +924,7 @@ export function enoughOf(s: GameState, out: Cost): ResourceId | null {
   let first: ResourceId | null = null;
   for (const k in out) {
     const id = k as ResourceId;
-    if (id === 'gold' || id === 'prestige') return null;
+    if (GOODS[id].group === 'currency') return null;
     // A good the town has stopped making counts as enough, whatever the stock.
     if (stoppedMaking(s, id)) {
       first ??= id;
@@ -2325,7 +2325,7 @@ function yearInReview(s: GameState): void {
     log(s, `The year's goal is met: ${g.title.toLowerCase()}. +25 prestige, and the town is merry for a season.`, 'good');
   }
   const y = s.year;
-  s.year = { pop: s.population, gold: s.res.gold, prestige: s.res.prestige, arrived: 0, left: 0, built: 0, harvest: 0, stock: stockSnapshot(s) };
+  s.year = { pop: s.population, gold: s.res.gold, prestige: s.res.prestige, knowledge: s.res.knowledge, arrived: 0, left: 0, built: 0, harvest: 0, stock: stockSnapshot(s) };
   if (!y) return;
   const done = yearOf(s.day) - 1;
   const parts: string[] = [];
@@ -2340,6 +2340,8 @@ function yearInReview(s: GameState): void {
   parts.push(`the treasury ${gold >= 0 ? 'gained' : 'lost'} ${Math.abs(gold)} coins`);
   const prestige = Math.round(s.res.prestige - y.prestige);
   if (prestige) parts.push(`${prestige > 0 ? '+' : ''}${prestige} prestige`);
+  const learned = Math.round(s.res.knowledge - (y.knowledge ?? s.res.knowledge));
+  if (learned) parts.push(`+${learned} knowledge`);
   let stock = '';
   if (y.stock) {
     const up = stockChanges(s, y.stock, 1);
@@ -2926,6 +2928,10 @@ function passiveStatus(s: GameState, b: Building): string {
       }
       return homes ? `Cheering ${homes} home${homes > 1 ? 's' : ''} nearby` : 'No homes nearby yet';
     }
+    case 'monastery':
+      if (b.workers === 0) return 'No monks: the cloister stands empty';
+      if (b.reading) return 'The monks are at their books';
+      return s.res.books >= 1 ? 'The monks will take a book at the turn of the month' : 'No books: the monks only pray';
     case 'builderyard': {
       if (!b.beast) return "Needs an ox: buy one here once a Draught Stable has a stall";
       if (b.hungry) return 'The ox is hungry: no grain in store';
@@ -3479,6 +3485,7 @@ export function prestigeIncome(s: GameState): number {
     else if (b.type === 'publicgarden') n += 0.5;
     else if (b.type === 'guildhall') n += 4;
     else if (b.type === 'maypole') n += 0.5;
+    else if (b.type === 'monastery') n += b.reading ? 0.5 : 0;
     else if (b.type === 'house' && b.level >= 3) n += b.level >= 4 ? 0.5 : 0.2;
     else if (b.type === 'hunter' && hasCharter(s, 'nature3b')) n += 1;
   }
@@ -3489,6 +3496,71 @@ export function prestigeIncome(s: GameState): number {
   // Town walls: renown grows with every twenty sections, up to six a month.
   n += Math.min(6, walls / 20);
   return n;
+}
+
+/** Knowledge the monks give each month for every monastery that had its book. */
+export const MONASTERY_KNOWLEDGE = 3;
+
+/**
+ * Knowledge: what the town learns each month. The church teaches the
+ * children, the well-to-do keep books and tutors, scribes copy, and the
+ * monks and the university masters study.
+ */
+export function knowledgeOf(s: GameState, b: Building): number {
+  if (b.build < 1) return 0;
+  switch (b.type) {
+    case 'church':
+      return b.level >= 2 ? 1 : 0.5;
+    case 'cathedral':
+      return 3;
+    case 'monastery':
+      return b.reading ? MONASTERY_KNOWLEDGE : 0;
+    case 'scriptorium':
+      return b.workers > 0 ? 1 : 0;
+    case 'university':
+      return s.universityOk ? 5 : 0;
+    case 'house':
+      return b.level >= 3 && b.residents > 0 ? (b.level >= 4 ? 0.25 : 0.1) : 0;
+    default:
+      return 0;
+  }
+}
+
+const KNOWLEDGE_LABELS: Partial<Record<BuildingType, string>> = {
+  church: 'The church school',
+  cathedral: 'The cathedral',
+  monastery: 'Monasteries at their books',
+  scriptorium: 'Scribes at work',
+  university: 'The university',
+  house: 'Well-to-do homes',
+};
+
+/** Where this month's knowledge comes from, by kind of building. */
+export function knowledgeSources(s: GameState): { label: string; value: number }[] {
+  const out = new Map<string, number>();
+  for (const b of s.buildings) {
+    const v = knowledgeOf(s, b);
+    if (v) out.set(KNOWLEDGE_LABELS[b.type]!, (out.get(KNOWLEDGE_LABELS[b.type]!) ?? 0) + v);
+  }
+  return [...out].map(([label, value]) => ({ label, value }));
+}
+
+export function knowledgeIncome(s: GameState): number {
+  return knowledgeSources(s).reduce((a, x) => a + x.value, 0);
+}
+
+/** Each monastery reads a book a month; without one the monks only pray. */
+function monthlyMonasteries(s: GameState): void {
+  for (const b of s.buildings) {
+    if (b.type !== 'monastery') continue;
+    b.reading = b.build >= 1 && b.workers > 0 && s.res.books >= 1;
+    if (b.reading) s.res.books -= 1;
+  }
+}
+
+/** Whether any monastery had its book this month: their prayers comfort the town. */
+export function monksReading(s: GameState): boolean {
+  return s.buildings.some((b) => b.type === 'monastery' && b.reading);
 }
 
 // ---------------------------------------------------------------- retinue
@@ -3579,7 +3651,9 @@ function payRetinue(s: GameState): void {
 }
 
 function monthlyPrestige(s: GameState): void {
+  monthlyMonasteries(s);
   s.res.prestige += prestigeIncome(s);
+  s.res.knowledge += knowledgeIncome(s);
   payRetinue(s);
   // The university's masters need books to teach: two a month.
   const uni = s.buildings.some((b) => b.type === 'university' && b.build >= 1 && b.workers > 0);
@@ -3698,6 +3772,7 @@ export function updateHappiness(s: GameState): void {
   if (s.commissions?.includes('glass')) factors.push({ label: 'The cathedral glass', value: 3 });
   if ((s.title ?? 0) >= 2) factors.push({ label: `Proud to serve ${(s.title ?? 0) >= 3 ? 'a Duke' : 'an Earl'}`, value: 3 });
   if (s.buildings.some((b) => b.type === 'guildhall' && b.build >= 1)) factors.push({ label: 'Pride in the guildhall', value: 3 });
+  if (monksReading(s)) factors.push({ label: 'The prayers of the monks', value: 3 });
   if (wallSections(s) >= WALL_SAFE) factors.push({ label: 'Safe behind the town walls', value: 4 });
   else if (watchKept(s)) factors.push({ label: 'A watch on the towers', value: 2 });
   if (s.retinue) factors.push({ label: "The lord's guard", value: 2 });
@@ -3917,7 +3992,7 @@ export function seatOf(s: GameState): Building | undefined {
 
 export function stepDay(s: GameState): void {
   const rng = new StateRng(s);
-  s.year ??= { pop: s.population, gold: s.res.gold, prestige: s.res.prestige, arrived: 0, left: 0, built: 0, harvest: 0, stock: stockSnapshot(s) };
+  s.year ??= { pop: s.population, gold: s.res.gold, prestige: s.res.prestige, knowledge: s.res.knowledge, arrived: 0, left: 0, built: 0, harvest: 0, stock: stockSnapshot(s) };
   recompute(s);
   dailyConstruction(s);
   dailyUpkeep(s);

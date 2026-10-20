@@ -54,6 +54,7 @@ const TRADE_NAMES: Partial<Record<BuildingType, string>> = {
   apothecary: 'Leech',
   scriptorium: 'Scrivener',
   church: 'Clerk',
+  monastery: 'Monk',
   cathedral: 'Canon',
   guildhall: 'Alderman',
 };

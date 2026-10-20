@@ -1,7 +1,7 @@
-import { DAYS_PER_MONTH, DAYS_PER_YEAR } from './data';
+import { DAYS_PER_MONTH, DAYS_PER_YEAR, GOODS } from './data';
 import type { StateRng } from './rng';
 import { checkMilestones, log, store, totalHousing, wallSections, watchKept, WALL_SAFE } from './sim';
-import type { BuildingType, GameState, MessageKind, ResourceId } from './types';
+import type { BuildingType, Cost, GameState, MessageKind, ResourceId } from './types';
 import { FOOD_IDS } from './data';
 
 /**
@@ -202,8 +202,8 @@ export function takeTitle(s: GameState): string | null {
 
 /** Works of art bought with prestige once the great buildings stand: each lifts spirits for good. */
 export const COMMISSIONS = [
-  { id: 'tapestry', name: 'Great tapestry', desc: 'A tapestry of your house\'s deeds for the manor hall', prestige: 300, happiness: 2, needs: 'townhall' as const },
-  { id: 'glass', name: 'Stained-glass windows', desc: 'Windows of coloured glass for the cathedral', prestige: 600, happiness: 3, needs: 'cathedral' as const },
+  { id: 'tapestry', name: 'Great tapestry', desc: 'A tapestry of your house\'s deeds for the manor hall', prestige: 300, happiness: 2, needs: 'townhall' as const, goods: undefined as Cost | undefined },
+  { id: 'glass', name: 'Stained-glass windows', desc: 'Windows of coloured glass for the cathedral', prestige: 600, happiness: 3, needs: 'cathedral' as const, goods: { stainedglass: 12 } as Cost | undefined },
 ];
 
 /** Why a commission cannot be made, or null. */
@@ -214,6 +214,7 @@ export function commissionError(s: GameState, id: string): string | null {
   if (!s.buildings.some((b) => b.type === c.needs && b.build >= 1)) return c.needs === 'cathedral' ? 'Needs a cathedral' : 'Needs the manor';
   if (s.tier < 3) return 'Needs a Borough';
   if (s.res.prestige < c.prestige) return `Needs ${c.prestige} prestige`;
+  for (const [id, n] of Object.entries(c.goods ?? {}) as [ResourceId, number][]) if (s.res[id] < n) return `Needs ${n} ${GOODS[id].name.toLowerCase()}`;
   return null;
 }
 
@@ -223,6 +224,7 @@ export function commission(s: GameState, id: string): string | null {
   if (err) return err;
   const c = COMMISSIONS.find((x) => x.id === id)!;
   s.res.prestige -= c.prestige;
+  for (const [id, n] of Object.entries(c.goods ?? {}) as [ResourceId, number][]) s.res[id] -= n;
   (s.commissions ??= []).push(id);
   log(s, `${c.desc} is finished, and the whole town comes to see it.`, 'good');
   return null;

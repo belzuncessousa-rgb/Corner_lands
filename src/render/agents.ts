@@ -110,6 +110,7 @@ const YARD_WORK: Partial<Record<string, string[]>> = {
   stonemason: ['chisel'],
   tanner: ['scrape'],
   dyer: ['stir'],
+  monastery: ['hoe'],
   limekiln: ['mix'],
   collier: ['shovel'],
 };

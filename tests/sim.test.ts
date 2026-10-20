@@ -2229,3 +2229,53 @@ describe('alehouse and tavern, and fields far from their farm', () => {
     expect(zoneEfficiency(s, farm)).toBeLessThan(close);
   });
 });
+
+describe('knowledge and the monastery', () => {
+  it('a monastery reads a book a month for knowledge, prestige and the prayers that cheer the town', async () => {
+    const { knowledgeIncome, prestigeIncome, updateHappiness, MONASTERY_KNOWLEDGE } = await import('../src/game/sim');
+    const s = generateWorld(77);
+    s.tier = 2;
+    s.res.gold = 9999;
+    const m = placeNearRoad(s, 'monastery');
+    m.build = 1;
+    m.need = undefined;
+    m.workers = 2;
+    const k0 = knowledgeIncome(s);
+    const p0 = prestigeIncome(s);
+    s.res.books = 1;
+    // Step to the turn of the month, when the monks take their book.
+    while (s.day % DAYS_PER_MONTH !== DAYS_PER_MONTH - 1) stepDay(s);
+    m.workers = 2;
+    const known = s.res.knowledge;
+    stepDay(s);
+    expect(m.reading).toBe(true);
+    expect(s.res.books).toBe(0);
+    expect(knowledgeIncome(s)).toBe(k0 + MONASTERY_KNOWLEDGE);
+    expect(prestigeIncome(s)).toBeCloseTo(p0 + 0.5);
+    expect(s.res.knowledge).toBeGreaterThanOrEqual(known + MONASTERY_KNOWLEDGE);
+    updateHappiness(s);
+    expect(s.happinessFactors.some((f) => f.label.includes('monks'))).toBe(true);
+    // No book next month: the monks only pray, and teach nothing.
+    for (let i = 0; i < DAYS_PER_MONTH; i++) stepDay(s);
+    expect(m.reading).toBe(false);
+    expect(knowledgeIncome(s)).toBe(k0);
+  });
+
+  it('the church teaches, and so do the homes of the well-to-do', async () => {
+    const { knowledgeIncome } = await import('../src/game/sim');
+    const s = generateWorld(78);
+    s.tier = 3;
+    s.res.gold = 9999;
+    expect(knowledgeIncome(s)).toBe(0);
+    const c = placeNearRoad(s, 'church');
+    c.build = 1;
+    expect(knowledgeIncome(s)).toBe(0.5);
+    c.level = 2;
+    expect(knowledgeIncome(s)).toBe(1);
+    const h = placeNearRoad(s, 'house');
+    h.build = 1;
+    h.level = 4;
+    h.residents = 5;
+    expect(knowledgeIncome(s)).toBe(1.25);
+  });
+});
