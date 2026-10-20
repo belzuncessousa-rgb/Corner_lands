@@ -354,7 +354,10 @@ function shop(s: GameState): void {
   // Granaries full of what no one eats (barley waiting for the brewer).
   if (stored(s, 'food') > storageCap(s, 'food') * 0.8 && s.res.barley >= 60) trade(s, 'barley', -Math.floor(s.res.barley / 2));
   if (s.res.wood < 30) buy('wood', 20, 80);
+  // Spare tools and wood parts for the workplaces' upkeep: a few always, more once the town is big.
   if (s.res.tools < 6 && s.tier >= 2) buy('tools', 5, 150);
+  else if (s.res.tools < 3) buy('tools', 3, 60);
+  if (s.res.woodparts < 2) buy('woodparts', 2, 60);
   if (totalFood(s) < s.population * 2) buy('bread', 20, 80);
   if (s.res.stone < 30) buy('stone', 20, 120);
   // Finer homes and the tavern use up wares; buy them when our own run short.
@@ -475,6 +478,8 @@ export function act(s: GameState, rand: () => number): void {
   const idle = pop - s.buildings.reduce((a, b) => a + b.workers, 0);
   const foodMakers = count(s, 'forager') + count(s, 'hunter') + count(s, 'fisher') + count(s, 'bakery') * 2;
   const wants: BuildingType[] = [];
+  // Gear wearing out with nothing to mend it: a trading post to buy tools comes first.
+  if (count(s, 'tradingpost') === 0 && count(s, 'dock') === 0 && (s.res.tools < 2 || s.buildings.filter((b) => b.worn).length >= 2)) wants.push('tradingpost');
   // Key buildings for progression come first once unlocked.
   if (s.tier >= 1) {
     for (const t of ['sawmill', 'carpenter', 'windmill', 'bakery', 'tradingpost', 'stonemason'] as BuildingType[]) {

@@ -3,6 +3,13 @@
  * something worth telling returning players goes in; the number only grows.
  */
 export const NEWS: { n: number; text: string }[] = [
+  { n: 31, text: 'Workplaces wear out tools and wood parts; an Alehouse that grows into a Tavern; no more ranges for workplaces: long walks slow them, and a footprints sign shows which' },
+  { n: 30, text: 'Villagers walk up to the door and step inside, and the door opens for them; every trade works with its own tools: axes, scythes, saws, bows and crooks' },
+  { n: 29, text: 'A Draught Stable for pack horses and oxen, and a Builder\'s Yard whose ox cart speeds up building; a bear now and then, and turtles on quiet shores' },
+  { n: 28, text: 'Trade orders: tell each trading post or dock what to import and export, and drag them into order. Fingamoboblius explains trade when the first post stands' },
+  { n: 27, text: 'New build tabs for the Manor and the Great Works, one Road button with dirt, stone and cobbles, and guild buildings only once their charter is granted' },
+  { n: 26, text: 'Hedges join into rows, flower beds into one bed, and homes can have flowers by the door; a compact build menu of painted icons; more for your lord and arms' },
+  { n: 25, text: 'A new look: painted wooden boards, woven tapestries for events, new lettering and icons painted onto the wood' },
   { n: 24, text: 'Choose your land on New Settlement: meadows, a river valley with fords and islands, or stony hills. Villagers go home at dusk' },
   { n: 23, text: 'Herds: buy each sheep, cow or pig at the trading post; kinds share the pastures; no oats, no breeding, slaughter when you choose' },
   { n: 22, text: "A new start: the settlers' camp. Towns grow by themselves when they have the people and places for it; the manor is built by choice and grows into a castle" },
