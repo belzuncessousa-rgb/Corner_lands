@@ -76,6 +76,17 @@ const ADVICE: Advice[] = [
     text: () => 'Steward: our people can only get their food and goods at a market. Lay out a Marketplace near the homes (Civic): it is free, and the cart we came with will not last past the second month.',
   },
   {
+    id: 'worn-gear',
+    when: (s) => s.buildings.filter((b) => b.worn).length >= 2,
+    text: (s) => {
+      const worn = s.buildings.filter((b) => b.worn);
+      const tools = worn.some((b) => (b.upkeep?.tools ?? 0) >= 1);
+      const parts = worn.some((b) => (b.upkeep?.woodparts ?? 0) >= 1);
+      const what = [tools ? 'tools' : '', parts ? 'wood parts' : ''].filter(Boolean).join(' and ');
+      return `Steward: ${worn.length} workplaces are working with worn-out gear and go a quarter slower. We need ${what}: a ${tools ? 'Blacksmith' : "Carpenter's Workshop"} would make them, or the merchants can bring some.`;
+    },
+  },
+  {
     id: 'unserved',
     when: (s) => (s.report.unserved ?? 0) > 0,
     text: (s) => `Steward: ${s.report.unserved} villagers have no market stall to buy their goods at. Each open stall serves ten households: lay out another Marketplace, a bigger one, or see that the stalls have vendors.`,

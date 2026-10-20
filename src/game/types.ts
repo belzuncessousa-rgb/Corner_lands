@@ -217,6 +217,9 @@ export interface Building {
   recipe?: string;
   /** Zones (fields, pastures, orchards): the workplace that tends them. */
   owner?: number;
+  /** Wear on the workplace's tools and wood parts, in parts; and whether it is working with worn gear for want of new. */
+  upkeep?: Partial<Record<'tools' | 'woodparts', number>>;
+  worn?: boolean;
   /** Trading post: a pack horse; builder's yard: an ox. Bought from the drovers and kept in a draught stable. */
   beast?: boolean;
   /** No grain for the draught animal this month: it does not work. */
@@ -281,6 +284,8 @@ export interface MonthReport {
   trade?: number;
   /** Gold paid to merchants for imports last month. */
   imports?: number;
+  /** Crates worn out on the merchants' carts this month. */
+  cratesWorn?: number;
   /** Villagers fed on pottage (grain or oats boiled whole) last month. */
   pottage?: number;
   /** Villagers no market stall could serve last month. */

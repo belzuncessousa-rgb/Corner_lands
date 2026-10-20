@@ -257,6 +257,9 @@ export function generateWorld(seed: number, opts: { relaxed?: boolean; hardy?: b
   s.res.berries = 40;
   s.res.meat = 20;
   s.res.gold = 100;
+  // The settlers bring a few tools and spare cart parts.
+  s.res.tools = 6;
+  s.res.woodparts = 2;
   if (opts.relaxed) {
     s.relaxed = true;
     for (const k of ['wood', 'stone', 'berries', 'meat', 'gold'] as const) s.res[k] *= 2;

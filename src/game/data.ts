@@ -65,7 +65,7 @@ export const GOODS: Record<ResourceId, GoodDef> = {
   tiles: good('Roof Tiles', 'materials', 6, 'Fired clay tiles. Townhouses want a tiled roof.', { keep: 80 }),
   ore: good('Bog Iron', 'materials', 3, 'Rusty lumps of iron ore dug from boggy ground, smelted in a bloomery.'),
   iron: good('Iron', 'materials', 9, 'Iron for the blacksmith.', { keep: 60 }),
-  crates: good('Crates', 'materials', 7, 'Nailed boxes from the cooper. Wine is packed in them, and merchants carry ten more goods for every crate in store above its stock target, up to half as much again.', { keep: 40 }),
+  crates: good('Crates', 'materials', 7, 'Nailed boxes from the cooper. Wine is packed in them, and merchants carry ten more goods for every crate in store above its stock target, up to half as much again; a quarter of the crates used come back too worn to use.', { keep: 40 }),
   silver: good('Silver', 'materials', 15, 'Precious ore turned up by deep miners, for the jeweller.', { keep: 40 }),
 
   bread: good('Bread', 'food', 3, 'Baked from flour. Filling: feeds one and a half.', { food: 1.5, foodGroup: 'grain' }),
@@ -842,7 +842,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     type: 'markethall',
     name: 'Covered Market Hall',
     desc: 'A great hall on stone arches: ten stalls under one roof in a small space, each serving ten households like the stalls of an open market.',
-    category: 'civic',
+    category: 'works',
     w: 4,
     h: 3,
     cost: { dressedstone: 30, planks: 25, tiles: 20, gold: 250 },
@@ -1139,7 +1139,6 @@ export const BUILD_ORDER: BuildingType[] = [
   'market',
   'tradingpost',
   'dock',
-  'markethall',
   'draughtstable',
   'builderyard',
   'tavern',
@@ -1160,10 +1159,46 @@ export const BUILD_ORDER: BuildingType[] = [
   'manorgarden',
   'statue',
   'belltower',
+  'markethall',
   'cathedral',
   'university',
   'guildhall',
 ];
+
+/**
+ * Tools and wood parts a workplace wears out in a month with a full crew, by
+ * how much gear its work takes: axes, picks and saws for the rough trades,
+ * gears and presses for the mills, carts and boats for the traders. Simple
+ * crafts (baking, dairying, brewing in a copper) need none.
+ */
+export const UPKEEP: Partial<Record<BuildingType, Partial<Record<'tools' | 'woodparts', number>>>> = {
+  woodcutter: { tools: 0.15 },
+  forester: { tools: 0.05 },
+  quarry: { tools: 0.2 },
+  mine: { tools: 0.25 },
+  claypit: { tools: 0.05 },
+  farm: { tools: 0.1 },
+  orchardist: { tools: 0.05 },
+  windmill: { woodparts: 0.25 },
+  watermill: { woodparts: 0.3 },
+  brewhouse: { woodparts: 0.05 },
+  winery: { woodparts: 0.15 },
+  sawmill: { tools: 0.15 },
+  carpenter: { tools: 0.1 },
+  cooper: { tools: 0.1 },
+  stonemason: { tools: 0.2 },
+  kiln: { tools: 0.05 },
+  bloomery: { tools: 0.1 },
+  smithy: { tools: 0.1 },
+  armoury: { tools: 0.15 },
+  jeweller: { tools: 0.1 },
+  potter: { woodparts: 0.1 },
+  tanner: { tools: 0.05 },
+  weaver: { woodparts: 0.1 },
+  tailor: { tools: 0.05 },
+  tradingpost: { woodparts: 0.1 },
+  dock: { woodparts: 0.2 },
+};
 
 export const CATEGORY_NAMES: Record<Category, string> = {
   housing: 'Housing',

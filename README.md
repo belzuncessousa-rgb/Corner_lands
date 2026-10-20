@@ -58,6 +58,13 @@ then fall back to the browser's localStorage.
   spare crates add room for exports); drag an order to change its place, and
   give the same good more than one order to raise its target only when the
   carts have room to spare.
+- **Upkeep** — workplaces wear out tools or wood parts as they work, by how
+  much gear the trade takes: axes and picks for the woodcutters and quarries,
+  gears for the mills, carts and boats for the traders (simple crafts like
+  baking need none). Each is replaced from the stores; with none left the
+  crew works a quarter slower until some come. The settlers bring six tools
+  and two wood parts. Crates that carry extra exports come back with the
+  carts, a quarter of them too worn to use again.
 - **Draught animals** — a Draught Stable keeps four. A trading post's pack
   horse lets its carts carry half as much again; a Builder's Yard with its ox
   supplies and raises building sites within reach half as fast again, wearing

@@ -2124,3 +2124,47 @@ describe('draught animals', () => {
     expect(slow.parts).toBe(0);
   });
 });
+
+describe('upkeep and crates', () => {
+  it('a workplace wears out its tools, and works slower once none are left to replace them', async () => {
+    const { dailyUpkeep, wornYield, WORN_YIELD } = await import('../src/game/sim');
+    const s = generateWorld(35);
+    const q = placeNearRoad(s, 'quarry');
+    q.build = 1;
+    q.need = undefined;
+    q.workers = BUILDINGS.quarry.workers;
+    s.res.tools = 3;
+    // 0.2 tools a month with a full crew: five months wear out one.
+    for (let d = 0; d < DAYS_PER_MONTH * 5; d++) dailyUpkeep(s);
+    expect(s.res.tools).toBe(2);
+    expect(q.worn).toBeFalsy();
+    s.res.tools = 0;
+    for (let d = 0; d < DAYS_PER_MONTH * 5; d++) dailyUpkeep(s);
+    expect(q.worn).toBe(true);
+    expect(wornYield(q)).toBe(WORN_YIELD);
+    s.res.tools = 5;
+    dailyUpkeep(s);
+    expect(q.worn).toBeFalsy();
+    expect(s.res.tools).toBe(4);
+  });
+
+  it('crates that carried extra exports come back, a quarter of them worn out', async () => {
+    const { addOrder, runTradeOrders, tradeCapacity, CRATE_WEAR } = await import('../src/game/sim');
+    const s = generateWorld(36);
+    s.tier = 4;
+    const post = placeNearRoad(s, 'tradingpost');
+    post.build = 1;
+    post.need = undefined;
+    recompute(s);
+    post.workers = 2;
+    const cap = tradeCapacity(s, post);
+    s.res.stone = 1000;
+    s.res.crates = 40 + 20;
+    addOrder(s, post, 'export', 'stone', 0);
+    runTradeOrders(s);
+    // Half the load again went out in crates: cap / 2 goods, a crate per ten.
+    const used = Math.ceil(cap / 2 / 10);
+    expect(1000 - s.res.stone).toBe(cap + Math.floor(cap / 2));
+    expect(60 - s.res.crates).toBe(Math.max(1, Math.round(used * CRATE_WEAR)));
+  });
+});

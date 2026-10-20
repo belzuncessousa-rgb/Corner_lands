@@ -28,6 +28,7 @@ import {
   TAX_LEVELS,
   TIERS,
   TRADE_PRICES,
+  UPKEEP,
 } from './data';
 import { advise } from './advisor';
 import { CHARTERS, hasCharter, onPath } from './charters';
@@ -581,6 +582,44 @@ export function surplusOf(s: GameState, id: ResourceId): number {
 
 /** Units each crate lets the merchants carry on top of their usual load. */
 export const UNITS_PER_CRATE = 10;
+/** Share of the crates used on a trip that come back too worn to use again. */
+export const CRATE_WEAR = 0.25;
+
+// ---------------------------------------------------------------- upkeep
+
+/** How fast a workplace works with its gear worn out and nothing to mend it with. */
+export const WORN_YIELD = 0.75;
+
+export function wornYield(b: Building): number {
+  return b.worn ? WORN_YIELD : 1;
+}
+
+/**
+ * Each working day a workplace wears its tools and wood parts a little, by
+ * how much gear its trade takes and how many work there; once a whole one is
+ * worn out it is replaced from the stores. With none in store the crew makes
+ * do with worn gear, and works slower until one comes.
+ */
+export function dailyUpkeep(s: GameState): void {
+  for (const b of s.buildings) {
+    const wear = UPKEEP[b.type];
+    if (!wear || b.build < 1 || b.workers <= 0 || b.paused || isBlocked(b)) continue;
+    const crew = b.workers / Math.max(1, workersOf(b));
+    for (const k in wear) {
+      const id = k as 'tools' | 'woodparts';
+      const acc = (b.upkeep ??= {});
+      acc[id] = (acc[id] ?? 0) + ((wear[id] ?? 0) * crew) / DAYS_PER_MONTH;
+      if ((acc[id] ?? 0) < 1) continue;
+      if (s.res[id] >= 1) {
+        s.res[id] -= 1;
+        acc[id] = (acc[id] ?? 0) - 1;
+      } else acc[id] = 1;
+    }
+    // Worn gear: a whole one is due and none was there to replace it.
+    const worn = Object.keys(wear).some((k) => (b.upkeep?.[k as 'tools'] ?? 0) >= 1);
+    if (worn !== !!b.worn) b.worn = worn || undefined;
+  }
+}
 
 /**
  * Goods the merchants carry each month at one staffed trading post or dock,
@@ -641,6 +680,7 @@ export function moveOrder(b: Building, id: number, to: number): void {
 export function runTradeOrders(s: GameState): { earned: number; spent: number } {
   let earned = 0;
   let spent = 0;
+  let cratesWorn = 0;
   let crates = spareCrates(s);
   const sold: string[] = [];
   const bought: string[] = [];
@@ -711,17 +751,21 @@ export function runTradeOrders(s: GameState): { earned: number; spent: number } 
         bought.push(`${n} ${GOODS[id].name.toLowerCase()}`);
       }
     }
-    // The crates go with the goods carried beyond the usual load.
+    // The crates that carried the goods beyond the usual load come back with
+    // the carts, but knocked about: some wear out on every trip.
     const used = Math.ceil(extraUsed / UNITS_PER_CRATE);
     if (used) {
-      s.res.crates = Math.max(0, s.res.crates - used);
+      const worn = Math.max(1, Math.round(used * CRATE_WEAR));
+      s.res.crates = Math.max(0, s.res.crates - worn);
       crates -= used;
+      cratesWorn += worn;
     }
   }
   earned = Math.floor(earned);
   s.res.gold += earned;
   if (sold.length) log(s, `Merchants bought ${sold.join(', ')} for ${earned} coins.`, 'info');
   if (bought.length) log(s, `Merchants brought ${bought.join(', ')} for ${spent} coins.`, 'info');
+  s.report.cratesWorn = cratesWorn || undefined;
   return { earned, spent };
 }
 
@@ -2311,7 +2355,7 @@ function stepFarm(s: GameState, b: Building): void {
     return;
   }
   if (month <= 5) {
-    const grow = b.workers > 0 ? (b.workers * (hasCharter(s, 'farm2') ? 1.5 : 1)) / (area * TEND_PER_TILE) : 0;
+    const grow = b.workers > 0 ? (b.workers * (hasCharter(s, 'farm2') ? 1.5 : 1) * wornYield(b)) / (area * TEND_PER_TILE) : 0;
     for (const f of fields) {
       f.growth = Math.min(1, f.growth + grow);
       f.status = b.workers ? (month < 3 ? `Sowing ${cropOf(f)}` : `${cap(cropOf(f))} growing`) : 'Untended';
@@ -2579,7 +2623,7 @@ function stepOrchardist(s: GameState, b: Building): void {
     b.blocked = BLOCK_SEASONAL;
     return;
   }
-  let pick = (b.workers * PICK_PER_DAY * (b.efficiency ?? 1)) / (onPath(s, 'orchard') ? 1.33 : 1);
+  let pick = (b.workers * PICK_PER_DAY * (b.efficiency ?? 1) * wornYield(b)) / (onPath(s, 'orchard') ? 1.33 : 1);
   let full = false;
   for (const o of orchards) {
     if (pick <= 0) break;
@@ -2928,7 +2972,7 @@ export function dailyProduction(s: GameState, rng: StateRng): void {
     b.hauled = servedByHaulers(s, b);
     b.efficiency = workEfficiency(b);
     // Time spent on the household's errands is time not spent at work.
-    b.work += ((b.workers / d.workers) * b.efficiency * moodYield(s) * learningYield(s) * (1 - (s.report.errands ?? 0))) / d.cycle;
+    b.work += ((b.workers / d.workers) * b.efficiency * moodYield(s) * learningYield(s) * (1 - (s.report.errands ?? 0)) * wornYield(b)) / d.cycle;
     let status: string | null = null;
     let tried = false;
     while (b.work >= 1) {
@@ -3818,6 +3862,7 @@ export function stepDay(s: GameState): void {
   s.year ??= { pop: s.population, gold: s.res.gold, prestige: s.res.prestige, arrived: 0, left: 0, built: 0, harvest: 0, stock: stockSnapshot(s) };
   recompute(s);
   dailyConstruction(s);
+  dailyUpkeep(s);
   dailyOrchards(s);
   dailyProduction(s, rng);
   dailyHaul(s);

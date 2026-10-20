@@ -22,6 +22,7 @@ import {
   YARD_STORE,
   EXPORT_PER_DOCK,
   EXPORT_PER_MARKET,
+  UPKEEP,
 } from '../game/data';
 import { commission, commissionError, COMMISSIONS, nextTitle, takeTitle, titleError, TITLES, fairCost, fairError, fairPrestige, FAIR_TIER, feastCost, feastError, FESTIVALS, festivalError, getEvent, holdFair, holdFeast, holdFestival, resolveEvent } from '../game/events';
 import { CHARTERS, CHARTER_TIER, PATHS, charterCost, charterError, grantCharter, hasCharter } from '../game/charters';
@@ -865,7 +866,7 @@ export class Hud {
       b.id, b.status, b.workers, b.builders, b.residents, b.build.toFixed(2), b.paused, b.level, b.lastOutput, b.growth.toFixed(2), b.want, b.priority, b.recipe, b.yard, b.flowers, b.trade, b.herd, JSON.stringify(b.animals ?? {}), b.owner, Math.floor(b.growth),
       s.tier, blocker, b.need, (b.upProgress ?? 0).toFixed(2), b.unmet, Math.floor(yardTotal(b)), b.hauled, s.buildings.length, Math.floor(s.res.gold / 10), s.population,
       s.lastFeast, s.festivals, monthOf(s.day), b.type === 'market' ? s.day : 0, s.retinue, Math.floor(s.res.wood), Math.floor(totalFood(s)), b.barn, Math.floor(s.res.prestige), Math.floor(s.res.weapons),
-      JSON.stringify(b.orders ?? []), b.beast, b.hungry, stalls(s).used, stalls(s).room,
+      JSON.stringify(b.orders ?? []), b.worn, b.beast, b.hungry, stalls(s).used, stalls(s).room,
       STORAGE_CAPACITY[b.type] ? RESOURCE_IDS.map((r) => (RESOURCE_STORAGE[r] ? Math.floor(s.res[r]) : 0)).join() : '',
     ]);
     if (key === this.lastInspectorKey || this.orderDrag) return;
@@ -937,6 +938,7 @@ export class Hud {
       }
       rows.push(...this.storeRows(b));
       rows.push(...this.draughtRows(b));
+      rows.push(...this.upkeepRows(b));
       if (wide) orders.push(...this.orderRows(b));
       if (b.type === 'townhall') {
         const c = feastCost(s);
@@ -1053,9 +1055,20 @@ export class Hud {
       .join('');
     return [
       `<div class="needs-h">Trade orders</div>`,
-      `<div class="note">${cap ? `Merchants carry ${cap} goods a month here (crates add room for exports).` : `Merchants will carry ${per} goods a month here once it is staffed.`} The first order is worked first: drag to reorder.</div>`,
+      `<div class="note">${cap ? `Merchants carry ${cap} goods a month here (spare crates add room for exports; a quarter of those used wear out each trip).` : `Merchants will carry ${per} goods a month here once it is staffed.`} The first order is worked first: drag to reorder.</div>`,
       orders.length ? `<ol class="orders">${items}</ol>` : '<div class="note"><i>No orders yet.</i></div>',
       `<div class="order-add"><button data-action="order-new" data-kind="import">＋ Import</button><button data-action="order-new" data-kind="export">＋ Export</button></div>`,
+    ];
+  }
+
+  /** What a workplace wears out a month, and a warning when it is working with worn gear. */
+  private upkeepRows(b: Building): string[] {
+    const wear = UPKEEP[b.type];
+    if (!wear || b.build < 1) return [];
+    const names = Object.entries(wear).map(([k, v]) => `${v} ${GOODS[k as ResourceId].name.toLowerCase()}`);
+    const what = Object.keys(wear).map((k) => GOODS[k as ResourceId].name.toLowerCase()).join(' and ');
+    return [
+      `<div class="kv" data-tip="${esc(`With a full crew the work wears out ${names.join(' and ')} a month; each is taken from the stores as it goes. With none in store the crew makes do with worn gear and works a quarter slower.`)}"><span>Upkeep</span><span class="${b.worn ? 'neg' : ''}">${b.worn ? `Worn out: needs ${what}` : `${names.join(' · ')} a month`}</span></div>`,
     ];
   }
 
@@ -2661,6 +2674,7 @@ export class Hud {
         <p><b>Roads</b> are optional but villagers walk faster on them. The Road button lays dirt; above the bar you can switch to stone roads (T), faster, or cobbled streets of dressed stone (Y), the fastest. Click to start, click again to plan it, keep clicking to continue; the road is laid a few tiles each day.</p>
         <p><b>The top bar</b> shows happiness, villagers, food, materials, goods and the treasury. Hover a chip for the details, click to pin it: set how much of each good to keep, or stop making a good altogether. Workers rest when their goods reach the target.</p>
         <p><b>Trade</b> goes through a Trading Post or Dock: select it and add orders to import a good up to a target or export it down to one. The merchants work through the orders from the top each month, as far as their carts allow; drag orders to change which come first.</p>
+        <p><b>Upkeep</b>: workplaces wear out tools or wood parts as they work (see Upkeep when you select one). Keep some in store, from a Blacksmith or a Carpenter's Workshop or the merchants; with none, the crew works a quarter slower.</p>
         <p><b>Draught animals</b> live in a Draught Stable (four stalls each). A trading post can buy a pack horse, so its carts carry half as much again; a Builder's Yard needs an ox, and then building sites within its reach get their materials and rise half as fast again, wearing out about a wood part a month. Each animal eats a measure of grain a month, and rests if there is none.</p>
         <p><b>Workers:</b> select a workplace to choose how many villagers work there, its priority and its product. Seasonal work frees hands in the off season. Hover the villagers chip to see who is idle and where hands are short.</p>
         <p><b>The Manor</b> is optional: build it for feasts, festivals and prestige, and renovate it as the town grows into a Manor House and then a Stone Manor, which lets you lay out a manor garden, watch towers and the town walls.</p>
