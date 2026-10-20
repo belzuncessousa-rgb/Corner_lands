@@ -29,6 +29,7 @@ import {
   TIERS,
   TRADE_PRICES,
   UPKEEP,
+  NEAR_HINT,
 } from './data';
 import { advise } from './advisor';
 import { CHARTERS, hasCharter, onPath } from './charters';
@@ -45,6 +46,7 @@ import {
   workersOf,
   buildingName,
   marketStalls,
+  reachOf,
 } from './levels';
 import { Heap, tileCost } from './path';
 import { checkQuests } from './quests';
@@ -323,7 +325,7 @@ function assignOwners(s: GameState): void {
       if (o.type !== zd.owner || o.build < 1) continue;
       const oc = bCenter(o);
       const d = Math.hypot(oc.x - c.x, oc.y - c.y);
-      if (d <= BUILDINGS[o.type].radius + Math.max(z.w, z.h) / 2 && d < bestD) {
+      if (d <= GATHER_REACH + Math.max(z.w, z.h) / 2 && d < bestD) {
         bestD = d;
         best = o;
       }
@@ -823,7 +825,7 @@ export function serveAle(s: GameState): void {
     let bd = Infinity;
     for (const t of taverns) {
       const d = Math.hypot(bCenter(t).x - hc.x, bCenter(t).y - hc.y);
-      if (d <= BUILDINGS.tavern.radius && d < bd) {
+      if (d <= reachOf(t) && d < bd) {
         bd = d;
         best = t;
       }
@@ -1032,19 +1034,19 @@ export function resourceInRange(s: GameState, type: BuildingType, c: { x: number
   const d = BUILDINGS[type];
   switch (d.gathers) {
     case 'trees':
-      return countInRadius(s, c, d.radius, (i) => s.trees[i] > 0 && !inGrove(s, i));
+      return countInRadius(s, c, NEAR_HINT, (i) => s.trees[i] > 0 && !inGrove(s, i));
     case 'forest':
       // Game: the animals of the herds within a fair walk.
       return Math.floor((s.herds ?? []).reduce((n, h) => n + (Math.hypot(h.x - c.x, h.y - c.y) <= GATHER_REACH / 2 ? h.n : 0), 0));
     case 'rock':
-      return countInRadius(s, c, d.radius, (i) => s.rock[i] > 0);
+      return countInRadius(s, c, NEAR_HINT, (i) => s.rock[i] > 0);
     case 'ore':
-      return countInRadius(s, c, d.radius, (i) => s.ore[i] > 0);
+      return countInRadius(s, c, NEAR_HINT, (i) => s.ore[i] > 0);
     case 'berries':
-      return countInRadius(s, c, d.radius, (i) => s.berriesMax[i] > 0);
+      return countInRadius(s, c, NEAR_HINT, (i) => s.berriesMax[i] > 0);
     case 'water':
       if (type === 'fisher') return Math.floor((s.shoals ?? []).reduce((n, h) => n + (Math.hypot(h.x - c.x, h.y - c.y) <= GATHER_REACH / 2 ? h.n : 0), 0));
-      return countInRadius(s, c, d.radius, (i) => s.terrain[i] === 1);
+      return countInRadius(s, c, CLAY_BANK, (i) => s.terrain[i] === 1);
     default:
       return 0;
   }
@@ -1064,7 +1066,7 @@ export function coveredBy(s: GameState, b: Building, type: BuildingType): boolea
     if (!serves || o.build < 1) continue;
     if (BUILDINGS[o.type].workers > 0 && (o.workers === 0 || o.blocked === BLOCK_PROBLEM)) continue;
     const oc = bCenter(o);
-    if (Math.hypot(oc.x - c.x, oc.y - c.y) <= BUILDINGS[o.type].radius) return true;
+    if (Math.hypot(oc.x - c.x, oc.y - c.y) <= reachOf(o)) return true;
   }
   return false;
 }
@@ -1294,13 +1296,49 @@ export function starvedSite(s: GameState, b: Building): boolean {
   return true;
 }
 
+/** Workplaces that work out in fields, pastures or orchards of their own. */
+export const ZONE_OWNERS: ReadonlySet<BuildingType> = new Set<BuildingType>(['farm', 'byre', 'orchardist']);
+/** Walking (in dirt-road tiles) to its fields that costs a farm nothing; and the walk that halves its work. */
+const ZONE_FREE_WALK = 8;
+const ZONE_HALF_WALK = 40;
+/** Tiles round a clay pit counted as its bank. */
+export const CLAY_BANK = 4;
+/** Below this a workplace loses so much to walking that it is flagged on the map. */
+export const LOW_EFFICIENCY = 0.6;
+
+/**
+ * Share of a farm's (animal farm's, orchard keeper's) time spent working its
+ * fields rather than walking out to them: the further they lie, the less gets
+ * done. Fields within a short walk cost nothing.
+ */
+export function zoneEfficiency(s: GameState, b: Building): number {
+  const zones = zonesOf(s, b);
+  if (!zones.length || b.build < 1) return 1;
+  const f = walkFrom(s, b);
+  let walk = 0;
+  let area = 0;
+  for (const z of zones) {
+    const c = bCenter(z);
+    let d = walkToPoint(f, s, c.x, c.y, Math.max(z.w, z.h) / 2 + 1);
+    // Out of the walking field: by the crow's flight, over rough ground.
+    if (!Number.isFinite(d)) d = Math.hypot(c.x - bCenter(b).x, c.y - bCenter(b).y) * (ROAD_TILES_PER_DAY / OFFROAD_TILES_PER_DAY);
+    walk += d * z.w * z.h;
+    area += z.w * z.h;
+  }
+  const avg = walk / Math.max(1, area);
+  return ZONE_HALF_WALK / (ZONE_HALF_WALK + Math.max(0, avg - ZONE_FREE_WALK));
+}
+
 /** Re-runs connectivity, distributes residents and assigns jobs. */
 export function recompute(s: GameState): void {
   if (s.dirty) {
     mapVersion++;
     assignOwners(s);
     travelField(s, true);
-    for (const b of s.buildings) b.trip = tripDays(s, b);
+    for (const b of s.buildings) {
+      b.trip = tripDays(s, b);
+      if (ZONE_OWNERS.has(b.type)) b.efficiency = zoneEfficiency(s, b);
+    }
     s.dirty = false;
   }
   // Residents.
@@ -1946,15 +1984,18 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
       return null;
     }
     case 'forester': {
-      // Plant on open ground about the lodge, wherever there is room.
-      const c = bCenter(b);
+      // Plant on the nearest open ground, wherever there is room: the further
+      // the foresters must walk to find it, the slower the planting.
+      const f = walkFrom(s, b);
       const spots: number[] = [];
-      forTilesInRadius(s, c, d.radius, (i) => {
-        if (s.terrain[i] || s.occ[i] >= 0 || s.road[i] || s.rock[i] || s.ore[i] || s.berriesMax[i] || s.trees[i] >= 4) return;
+      for (const i of f.order) {
+        if (s.terrain[i] || s.occ[i] >= 0 || s.road[i] || s.rock[i] || s.ore[i] || s.berriesMax[i] || s.trees[i] >= 4) continue;
         spots.push(i);
-      });
-      if (!spots.length) return 'The woods are full';
+        if (spots.length >= 12) break;
+      }
+      if (!spots.length) return 'No open ground to plant';
       const i = spots[Math.floor(rng.next() * spots.length)];
+      b.resDist = f.cost[i];
       s.trees[i]++;
       b.output++;
       return null;
@@ -2015,7 +2056,7 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
       return null;
     }
     case 'claypit': {
-      const water = countInRadius(s, bCenter(b), d.radius, (i) => s.terrain[i] === 1);
+      const water = countInRadius(s, bCenter(b), CLAY_BANK, (i) => s.terrain[i] === 1);
       if (water < 2) return 'No riverbank nearby';
       const amount = Math.max(1, Math.round((d.outputs.clay ?? 0) * Math.min(1, water / 10) * (season === 3 ? 0.4 : 1)));
       if (!canHold(s, b, { clay: amount })) return 'Storage full';
@@ -2355,7 +2396,7 @@ function stepFarm(s: GameState, b: Building): void {
     return;
   }
   if (month <= 5) {
-    const grow = b.workers > 0 ? (b.workers * (hasCharter(s, 'farm2') ? 1.5 : 1) * wornYield(b)) / (area * TEND_PER_TILE) : 0;
+    const grow = b.workers > 0 ? (b.workers * (hasCharter(s, 'farm2') ? 1.5 : 1) * wornYield(b) * (b.efficiency ?? 1)) / (area * TEND_PER_TILE) : 0;
     for (const f of fields) {
       f.growth = Math.min(1, f.growth + grow);
       f.status = b.workers ? (month < 3 ? `Sowing ${cropOf(f)}` : `${cap(cropOf(f))} growing`) : 'Untended';
@@ -2573,7 +2614,7 @@ function stepByre(s: GameState, b: Building): void {
   const crew = b.workers / workersOf(b);
   const cows = a.cattle ?? 0;
   if (cows > 0 && month >= 1 && month <= 8) {
-    b.work += cows * 0.12 * crew * (hasCharter(s, 'herd1') ? 1.3 : 1);
+    b.work += cows * 0.12 * crew * (hasCharter(s, 'herd1') ? 1.3 : 1) * (b.efficiency ?? 1);
     const n = Math.floor(b.work);
     if (n > 0) {
       b.work -= n;
@@ -2900,7 +2941,7 @@ export function workEfficiency(b: Building): number {
   const d = workDef(b);
   if (!d.cycle) return 1;
   // resDist is the walking time to the resource, in dirt-road tiles.
-  const toResource = d.gathers && b.type !== 'claypit' ? (2 * (b.resDist ?? (d.radius / 2) * (ROAD_TILES_PER_DAY / OFFROAD_TILES_PER_DAY))) / ROAD_TILES_PER_DAY : 0;
+  const toResource = (d.gathers || b.type === 'forester') && b.type !== 'claypit' ? (2 * (b.resDist ?? (NEAR_HINT / 2) * (ROAD_TILES_PER_DAY / OFFROAD_TILES_PER_DAY))) / ROAD_TILES_PER_DAY : 0;
   // Served by haulers, the workers no longer carry their goods to storage.
   const walking = ((b.hauled ? 0 : (b.trip ?? 0)) + toResource) / Math.max(1, d.workers);
   return d.cycle / (d.cycle + TRAVEL_WEIGHT * walking);

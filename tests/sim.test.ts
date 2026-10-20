@@ -1450,7 +1450,8 @@ describe('protected woods', () => {
         for (let dx = -r; dx <= r && !at; dx++) if (!placementError(s, 'woodcutter', hall.x + dx, hall.y + dy)) at = { x: hall.x + dx, y: hall.y + dy };
     const wc = placeOrder(s, 'woodcutter', at!.x, at!.y)!;
     wc.build = 1;
-    const R = BUILDINGS.woodcutter.radius + 2;
+    // A wood all round the lodge, nine tiles each way.
+    const R = 9;
     expect(protectGrove(s, wc.x - R, wc.y - R, wc.x + R, wc.y + R)).toBeNull();
     expect(protectGrove(s, 0, 0, 0, 0)).toMatch(/at least/);
     const before = Array.from(s.trees).reduce((a, t, i) => a + (inGrove(s, i) ? t : 0), 0);
@@ -2166,5 +2167,65 @@ describe('upkeep and crates', () => {
     const used = Math.ceil(cap / 2 / 10);
     expect(1000 - s.res.stone).toBe(cap + Math.floor(cap / 2));
     expect(60 - s.res.crates).toBe(Math.max(1, Math.round(used * CRATE_WEAR)));
+  });
+});
+
+describe('alehouse and tavern, and fields far from their farm', () => {
+  it('an alehouse enlarged into a tavern keeps a second tapster and reaches twice as far', async () => {
+    const { reachOf, workersOf, buildingName, upgradePlan, finishUpgrade } = await import('../src/game/levels');
+    const s = generateWorld(37);
+    s.tier = 1;
+    const t = placeNearRoad(s, 'tavern');
+    t.build = 1;
+    t.need = undefined;
+    expect(buildingName(t)).toBe('Alehouse');
+    expect(workersOf(t)).toBe(1);
+    const r = reachOf(t);
+    const plan = upgradePlan(s, t);
+    expect(plan?.name).toBe('Tavern');
+    t.level = plan!.to;
+    finishUpgrade(s, t);
+    expect(buildingName(t)).toBe('Tavern');
+    expect(workersOf(t)).toBe(2);
+    expect(reachOf(t)).toBe(r * 2);
+    // Saves from before the alehouse: their taverns are full taverns.
+    const old = JSON.parse(serialize(s));
+    old.version = 2;
+    for (const b of old.buildings) if (b.type === 'tavern') b.level = 1;
+    expect(deserialize(JSON.stringify(old)).buildings.find((b) => b.type === 'tavern')!.level).toBe(2);
+  });
+
+  it('a field far from its farm is still tended, but the walk costs the farm', async () => {
+    const { zoneEfficiency } = await import('../src/game/sim');
+    const s = generateWorld(38);
+    s.tier = 1;
+    const farm = placeNearRoad(s, 'farm');
+    farm.build = 1;
+    farm.need = undefined;
+    const c = { x: farm.x + 1, y: farm.y + 1 };
+    // The nearest and the furthest free 3x3 plots within 20 tiles.
+    const plots: { x: number; y: number; d: number }[] = [];
+    for (let y = 2; y < s.height - 5; y++)
+      for (let x = 2; x < s.width - 5; x++) {
+        const d = Math.hypot(x + 1.5 - c.x, y + 1.5 - c.y);
+        if (d < 3 || d > 20) continue;
+        let free = true;
+        for (let yy = y; yy < y + 3 && free; yy++) for (let xx = x; xx < x + 3 && free; xx++) free = s.terrain[idx(s, xx, yy)] === 0 && s.occ[idx(s, xx, yy)] < 0 && !s.trees[idx(s, xx, yy)] && !s.rock[idx(s, xx, yy)] && !s.road[idx(s, xx, yy)];
+        if (free) plots.push({ x, y, d });
+      }
+    plots.sort((a, b) => a.d - b.d);
+    const near = placeZone(s, 'field', plots[0].x, plots[0].y, plots[0].x + 2, plots[0].y + 2)!;
+    s.dirty = true;
+    recompute(s);
+    expect(near.owner).toBe(farm.id);
+    const close = zoneEfficiency(s, farm);
+    demolish(s, near);
+    const fp = plots.filter((p) => p.d > 14).pop()!;
+    const far = placeZone(s, 'field', fp.x, fp.y, fp.x + 2, fp.y + 2)!;
+    s.dirty = true;
+    recompute(s);
+    // Beyond the old twelve-tile reach, and still the farm's.
+    expect(far.owner).toBe(farm.id);
+    expect(zoneEfficiency(s, farm)).toBeLessThan(close);
   });
 });

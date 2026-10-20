@@ -1,7 +1,7 @@
 import './ui/styles.css';
 import './ui/painted.css';
 import { deleteSave, listSaves, loadGame, saveGame } from './api';
-import { BUILDINGS, BUILD_ORDER, DAY_SECONDS, GATHERERS, MONTH_NAMES, TIERS } from './game/data';
+import { BUILDINGS, BUILD_ORDER, DAY_SECONDS, GATHER_REACH, GATHERERS, MONTH_NAMES, TIERS } from './game/data';
 import { playBot } from './game/autoplay';
 import { autoResolve, TITLES } from './game/events';
 import { placeName, townName } from './game/names';
@@ -59,6 +59,7 @@ import { demolishWithUndo } from './game/undo';
 import type { Agent } from './render/agents';
 import { AgentSystem } from './render/agents';
 import { buildingDoor } from './render/sprites';
+import { reachOf } from './game/levels';
 import { Wildlife } from './render/wildlife';
 import { type Overlay, Renderer } from './render/renderer';
 import { Tutor } from './ui/tutorial';
@@ -422,7 +423,7 @@ export class Game {
       const circles = s.buildings
         .filter((b) => (b.type === type || (type === 'church' && b.type === 'cathedral')) && b.build >= 1)
         .filter((b) => BUILDINGS[b.type].workers === 0 || (b.workers > 0 && !hasProblem(b)))
-        .map((b) => ({ cx: bCenter(b).x, cy: bCenter(b).y, r: BUILDINGS[b.type].radius }))
+        .map((b) => ({ cx: bCenter(b).x, cy: bCenter(b).y, r: reachOf(b) }))
         .filter((c) => c.r > 0);
       const homes = new Map<number, boolean>();
       for (const b of s.buildings) if (b.type === 'house' && b.build >= 1) homes.set(b.id, coveredBy(s, b, type));
@@ -433,9 +434,10 @@ export class Game {
       const b = s.buildings.find((o) => o.id === this.selected);
       if (b) {
         const d = BUILDINGS[b.type];
-        if (d.radius && !GATHERERS.has(b.type)) {
+        // Only services reach: workplaces walk as far as they must.
+        if (d.radius) {
           const c = bCenter(b);
-          ov.range = { cx: c.x, cy: c.y, r: d.radius, highlight: rangeHighlighter(s, b.type) };
+          ov.range = { cx: c.x, cy: c.y, r: reachOf(b), highlight: rangeHighlighter(s, b.type) };
         }
       } else {
         this.selected = null;
@@ -454,7 +456,7 @@ export class Game {
       const err = placementError(s, tool.type, p.x, p.y);
       ov.ghost = { type: tool.type, x: p.x, y: p.y, ok: !err };
       const d = BUILDINGS[tool.type];
-      if (d.radius && !GATHERERS.has(tool.type)) {
+      if (d.radius) {
         const c = centerOf(p.x, p.y, d.w, d.h);
         ov.range = { cx: c.x, cy: c.y, r: d.radius, highlight: rangeHighlighter(s, tool.type) };
       }
@@ -477,24 +479,22 @@ export class Game {
       const d = BUILDINGS[tool.type];
       const owner = d.zone!.owner;
       const ownerName = BUILDINGS[owner].name;
-      // Show the reach of the workplaces that would tend it.
+      // Tended from the nearest workplace of its kind, however far; the walk only slows them.
       // A marketplace tends itself: show the homes it would serve instead.
       const selfTended = owner === tool.type;
-      const near = selfTended ? true : s.buildings.find((o) => o.type === owner && o.build >= 1 && Math.hypot(bCenter(o).x - (x0 + w / 2), bCenter(o).y - (y0 + h / 2)) <= BUILDINGS[owner].radius + Math.max(w, h) / 2);
-      const any = selfTended ? undefined : s.buildings.find((o) => o.type === owner);
-      if (selfTended) {
-        if (d.radius) ov.range = { cx: x0 + w / 2, cy: y0 + h / 2, r: d.radius, highlight: rangeHighlighter(s, tool.type) };
-      } else if (near || any) {
-        const c = bCenter((near as Building | undefined) ?? any!);
-        ov.range = { cx: c.x, cy: c.y, r: BUILDINGS[owner].radius };
-      }
+      const zc = { x: x0 + w / 2, y: y0 + h / 2 };
+      const tenders = s.buildings.filter((o) => o.type === owner && Math.hypot(bCenter(o).x - zc.x, bCenter(o).y - zc.y) <= GATHER_REACH + Math.max(w, h) / 2);
+      const nearest = tenders.sort((a, b) => Math.hypot(bCenter(a).x - zc.x, bCenter(a).y - zc.y) - Math.hypot(bCenter(b).x - zc.x, bCenter(b).y - zc.y))[0];
+      const near = selfTended ? true : !!nearest;
+      if (selfTended && d.radius) ov.range = { cx: zc.x, cy: zc.y, r: d.radius, highlight: rangeHighlighter(s, tool.type) };
       const cost = zoneCost(tool.type, w, h);
       const costText = cost.wood ? ` · ${cost.wood} timber for fences` : cost.gold ? ` · ${cost.gold} coins for saplings` : '';
       const stalls = tool.type === 'market' ? ` · room for ${Math.max(1, Math.min(6, Math.floor((w * h) / 6)))} stalls` : '';
       if (!this.zoneAnchor) {
         this.hud.setHint(`${d.name}: click one corner, then the opposite corner · ${d.zone!.min}–${d.zone!.max} tiles a side${selfTended ? ' · free' : ''}`, false);
       } else {
-        const where = near ? '' : ` · no ${ownerName} in range: nobody will tend it`;
+        const far = nearest ? Math.round(Math.hypot(bCenter(nearest).x - zc.x, bCenter(nearest).y - zc.y)) : 0;
+        const where = selfTended ? '' : nearest ? ` · tended from the ${ownerName}, ${far} tiles away${far > 8 ? ' (a long walk: slower work)' : ''}` : ` · no ${ownerName} yet: nobody will tend it`;
         // Fields care about the soil: say how rich the ground under the plan is.
         let soil = '';
         if (tool.type === 'field' && !err) {

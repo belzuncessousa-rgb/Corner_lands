@@ -81,6 +81,11 @@ export function deserialize(json: string): GameState {
     }
     delete s.exports;
   }
+  // Version 3 brought the alehouse: the taverns already standing were full taverns.
+  if ((s.version ?? 1) < 3) {
+    for (const b of s.buildings) if (b.type === 'tavern') b.level = Math.max(b.level, 2);
+    s.version = 3;
+  }
   // Goods once sold above their target become export orders at the first trading post or dock.
   if (s.sell) {
     const post = s.buildings.find((b) => b.type === 'tradingpost' || b.type === 'dock');
@@ -108,7 +113,7 @@ export function deserialize(json: string): GameState {
       }
     }
     // Workplaces are no longer expanded.
-    if (b.type !== 'house' && b.type !== 'townhall' && b.type !== 'market' && b.type !== 'church') {
+    if (b.type !== 'house' && b.type !== 'townhall' && b.type !== 'market' && b.type !== 'church' && b.type !== 'tavern') {
       if (b.level > 1) b.level = 1;
       if (b.upgrading && !b.craftTo) {
         b.upgrading = undefined;

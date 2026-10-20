@@ -26,7 +26,7 @@ import {
 } from '../game/data';
 import { commission, commissionError, COMMISSIONS, nextTitle, takeTitle, titleError, TITLES, fairCost, fairError, fairPrestige, FAIR_TIER, feastCost, feastError, FESTIVALS, festivalError, getEvent, holdFair, holdFeast, holdFestival, resolveEvent } from '../game/events';
 import { CHARTERS, CHARTER_TIER, PATHS, charterCost, charterError, grantCharter, hasCharter } from '../game/charters';
-import { CHURCH_LEVELS, HOUSE_LEVELS, MANOR_LEVELS, buildingName, houseNeeds, marketStalls, startUpgrade, upgradeBlocker, upgradePlan, workersOf } from '../game/levels';
+import { CHURCH_LEVELS, TAVERN_LEVELS, HOUSE_LEVELS, MANOR_LEVELS, buildingName, houseNeeds, marketStalls, startUpgrade, upgradeBlocker, upgradePlan, workersOf } from '../game/levels';
 import { activeQuests } from '../game/quests';
 import { StateRng } from '../game/rng';
 import {
@@ -109,6 +109,8 @@ import {
   seatOf,
   yardTotal,
   MONUMENTS,
+  ZONE_OWNERS,
+  LOW_EFFICIENCY,
   stalls,
   draughtOf,
   buyDraughtError,
@@ -980,8 +982,11 @@ export class Hud {
         const m = moodYield(s);
         if (Math.abs(m - 1) >= 0.02) rows.push(`<div class="kv" data-tip="Happy villagers work a little harder (up to +10%), unhappy ones slower (down to -10%)."><span>Mood of the workers</span><span class="${m < 1 ? 'neg' : 'pos'}">${m > 1 ? '+' : ''}${Math.round((m - 1) * 100)}%</span></div>`);
       }
-      if (d.cycle && b.efficiency !== undefined && b.efficiency < 0.97) {
-        rows.push(`<div class="kv" data-tip="Time lost walking to storage and to resources. Build closer to a storehouse or granary, or lay roads."><span>Walking time</span><span class="${b.efficiency < 0.7 ? 'neg' : ''}">${Math.round(b.efficiency * 100)}% efficient</span></div>`);
+      if ((d.cycle || ZONE_OWNERS.has(b.type)) && b.efficiency !== undefined && b.efficiency < 0.97) {
+        const tip = ZONE_OWNERS.has(b.type)
+          ? 'Time lost walking out to its fields, pastures or orchards. Lay them out close by, or lay roads to them.'
+          : 'Time lost walking to storage and to what it gathers. Build closer to a storehouse or granary and to the woods, rocks or bushes, or lay roads.';
+        rows.push(`<div class="kv" data-tip="${tip}"><span>Walking time</span><span class="${b.efficiency < LOW_EFFICIENCY ? 'neg' : ''}">${Math.round(b.efficiency * 100)}% efficient</span></div>`);
       }
       if (!d.recipes && Object.keys(d.inputs).length) rows.push(`<div class="kv"><span>Consumes</span><span class="costline">${costHtml(d.inputs)}</span></div>`);
       if (!d.recipes && Object.keys(d.outputs).length) rows.push(`<div class="kv"><span>Produces</span><span class="costline">${costHtml(d.outputs)}</span></div>`);
@@ -1002,7 +1007,9 @@ export class Hud {
             ? `More storage and prestige${plan.to >= 3 ? ', and the grounds grow' : ''}.`
             : b.type === 'house'
               ? `Houses ${HOUSE_LEVELS[plan.to].housing} villagers and pays more taxes.`
-              : `Room for ${Math.ceil(d.workers / 2)} more worker${Math.ceil(d.workers / 2) > 1 ? 's' : ''}.`;
+              : b.type === 'tavern'
+                ? 'Twice the reach, and room for a second tapster.'
+                : `Room for ${Math.ceil(d.workers / 2)} more worker${Math.ceil(d.workers / 2) > 1 ? 's' : ''}.`;
         rows.push(`<div class="upgrade-box"><b>${label}</b><div class="desc">${what}</div>
           <div class="reqs">${plan.reqs.map((r) => `<span class="${r.met ? 'met' : 'unmet'}">${r.met ? '✓' : '✗'} ${esc(r.label)}</span>`).join('')}</div>
           <div class="costline">${costHtml(plan.cost, s.res)}</div>
@@ -1239,7 +1246,7 @@ export class Hud {
       const fields = zonesOf(s, b);
       const area = zoneArea(fields);
       const hands = Math.round((workersOf(b) * 60) / TEND_PER_TILE);
-      rows.push(`<div class="kv" data-tip="Draw fields within the farm's reach (Food menu). ${workersOf(b)} farmers can sow and tend about ${hands} tiles."><span>Fields</span><span class="${area > hands ? 'neg' : ''}">${fields.length} · ${area} of ~${hands} tiles</span></div>`);
+      rows.push(`<div class="kv" data-tip="Draw fields nearby (Farming menu): the further away, the more time is lost walking. ${workersOf(b)} farmers can sow and tend about ${hands} tiles."><span>Fields</span><span class="${area > hands ? 'neg' : ''}">${fields.length} · ${area} of ~${hands} tiles</span></div>`);
       if (b.barn) {
         const held = Object.entries(b.barn)
           .map(([k, v]) => `${Math.floor(v ?? 0)} ${GOODS[k as ResourceId].name.toLowerCase()}`)
@@ -2833,6 +2840,7 @@ function upgradeName(b: Building): string {
   const to = b.upgrading ?? b.level + 1;
   if (b.type === 'house') return HOUSE_LEVELS[to]?.name ?? '';
   if (b.type === 'church') return CHURCH_LEVELS[to]?.name ?? '';
+  if (b.type === 'tavern') return TAVERN_LEVELS[to]?.name ?? '';
   return MANOR_LEVELS[to]?.name ?? '';
 }
 

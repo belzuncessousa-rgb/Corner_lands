@@ -1,7 +1,7 @@
 import { BUILDINGS, DAYS_PER_MONTH, DAYS_PER_YEAR, RESOURCE_STORAGE, STORAGE_CAPACITY, type StorageKind } from '../game/data';
 import { MANOR_SIZE, marketStalls, upgradeBlocker } from '../game/levels';
 import { hasCharter } from '../game/charters';
-import { ANIMAL_KINDS, animalsOf, deliveredTo, hasProblem, herdTotal, lordRides, monthOf, nearestShoal, orchardMaturity, seasonOf, seatOf, storageCap, stored } from '../game/sim';
+import { ANIMAL_KINDS, LOW_EFFICIENCY, animalsOf, deliveredTo, hasProblem, herdTotal, lordRides, monthOf, nearestShoal, orchardMaturity, seasonOf, seatOf, storageCap, stored } from '../game/sim';
 import type { Building, BuildingType, GameState, ResourceId, Season } from '../game/types';
 import { idx, inBounds } from '../game/world';
 import { type Agent, LEISURE_ACTS } from './agents';
@@ -1203,6 +1203,9 @@ export class Renderer {
     if (!this.showMarkers) return;
     if (hasProblem(b)) {
       this.drawMarker(b, '#e0a030', '?', b.lack);
+    } else if (b.workers > 0 && !b.paused && (b.efficiency ?? 1) < LOW_EFFICIENCY) {
+      // Losing much of the day to walking: select it to see how much.
+      this.drawMarker(b, '#b8683a', 'walk');
     } else if ((b.type === 'house' || b.type === 'townhall') && this.canUpgrade(s, b)) {
       this.drawMarker(b, b.type === 'townhall' ? '#c89a38' : '#4f8a3a', '↑');
     }
@@ -2398,6 +2401,23 @@ export class Renderer {
     c.stroke();
     if (icon) {
       c.drawImage(icon, x - 7.5, y - 7.5, 15, 15);
+      return;
+    }
+    if (glyph === 'walk') {
+      // Two footprints, one ahead of the other.
+      c.fillStyle = '#fff';
+      for (const [fx, fy, rot] of [[-2.2, 1.6, -0.25], [2.2, -1.8, 0.25]] as const) {
+        c.save();
+        c.translate(x + fx, y + fy);
+        c.rotate(rot);
+        c.beginPath();
+        c.ellipse(0, 0.6, 1.6, 2.6, 0, 0, Math.PI * 2);
+        c.fill();
+        c.beginPath();
+        c.ellipse(0, -2.9, 1.1, 1, 0, 0, Math.PI * 2);
+        c.fill();
+        c.restore();
+      }
       return;
     }
     c.fillStyle = '#fff';

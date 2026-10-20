@@ -15,6 +15,8 @@ export const OFFROAD_TILES_PER_DAY = 12;
  * the walk, which costs them working time. Beyond this they will not go.
  */
 export const GATHER_REACH = 26;
+/** How far around a spot the build hint counts trees, rocks or bushes (workers walk further if they must). */
+export const NEAR_HINT = 8;
 /** Workplaces that go out for what they gather. */
 export const GATHERERS: ReadonlySet<BuildingType> = new Set<BuildingType>(['woodcutter', 'quarry', 'mine', 'forager', 'hunter', 'fisher']);
 
@@ -270,7 +272,6 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     category: 'resources',
     cost: { wood: 15 },
     workers: 2,
-    radius: 7,
     cycle: 2,
     outputs: { wood: 4 },
     gathers: 'trees',
@@ -287,7 +288,6 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     category: 'resources',
     cost: { wood: 8 },
     workers: 1,
-    radius: 6,
     cycle: 2,
     gathers: undefined,
   }),
@@ -298,7 +298,6 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     category: 'resources',
     cost: { wood: 20 },
     workers: 2,
-    radius: 5,
     cycle: 3,
     outputs: { stone: 3 },
     gathers: 'rock',
@@ -311,7 +310,6 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     category: 'food',
     cost: { wood: 10 },
     workers: 2,
-    radius: 7,
     cycle: 2,
     outputs: { berries: 5 },
     gathers: 'berries',
@@ -330,7 +328,6 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     category: 'food',
     cost: { wood: 15 },
     workers: 1,
-    radius: 8,
     cycle: 3,
     outputs: { meat: 5 },
     gathers: 'forest',
@@ -342,7 +339,6 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     category: 'food',
     cost: { wood: 15 },
     workers: 2,
-    radius: 4,
     cycle: 3,
     outputs: { fish: 5 },
     gathers: 'water',
@@ -356,7 +352,6 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     buildDays: 12,
     workers: 3,
     tier: 1,
-    radius: 12,
     months: [0, 1, 2, 3, 4, 5, 7],
   }),
   field: def({
@@ -384,7 +379,6 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     buildDays: 12,
     workers: 2,
     tier: 1,
-    radius: 12,
   }),
   pasture: def({
     type: 'pasture',
@@ -406,7 +400,6 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     buildDays: 10,
     workers: 2,
     tier: 1,
-    radius: 12,
     months: [5, 6],
   }),
   orchard: def({
@@ -570,7 +563,6 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     cost: { wood: 30, planks: 10 },
     buildDays: 14,
     workers: 3,
-    radius: 4,
     cycle: 3,
     outputs: { ore: 4 },
     gathers: 'ore',
@@ -596,7 +588,6 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     category: 'resources',
     cost: { wood: 15 },
     workers: 2,
-    radius: 4,
     cycle: 2,
     outputs: { clay: 4 },
     gathers: 'water',
@@ -788,13 +779,13 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   }),
   tavern: def({
     type: 'tavern',
-    name: 'Tavern',
-    desc: 'Ale, cider and good company. Homes nearby are happier and Timber Houses need one. Each month it pours a cask for every eight villagers it serves.',
+    name: 'Alehouse',
+    desc: 'A plain room with a fire, benches and a barrel of ale. Homes nearby are happier and Timber Houses need one. Each month it pours a cask for every eight villagers it serves. It can be enlarged into a Tavern, with twice the reach.',
     category: 'civic',
     w: 3,
     h: 3,
-    cost: { wood: 25, planks: 10 },
-    buildDays: 12,
+    cost: { wood: 15, planks: 4 },
+    buildDays: 8,
     workers: 1,
     radius: 10,
     tier: 1,

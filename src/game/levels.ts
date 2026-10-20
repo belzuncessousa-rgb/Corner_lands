@@ -51,6 +51,19 @@ export const CHURCH_LEVELS: { name: string; cost?: Cost; days?: number; tier?: n
   { name: 'Stone Church', cost: { planks: 20, dressedstone: 30, stone: 20, tools: 5, gold: 80 }, days: 25, tier: 2 },
 ];
 
+/** The alehouse, and the tavern it can be enlarged into: a second tapster, and twice the reach. */
+export const TAVERN_LEVELS: { name: string; cost?: Cost; days?: number; tier?: number }[] = [
+  { name: '' },
+  { name: 'Alehouse' },
+  { name: 'Tavern', cost: { wood: 20, planks: 15, stone: 10 }, days: 14, tier: 1 },
+];
+
+/** How far a service reaches, in tiles: an enlarged tavern twice as far as an alehouse. */
+export function reachOf(b: Building): number {
+  const r = BUILDINGS[b.type].radius;
+  return b.type === 'tavern' && b.level >= 2 ? r * 2 : r;
+}
+
 /** The manor's last step: once it stands, the lord may build what befits it. */
 export const STONE_MANOR = 3;
 
@@ -83,6 +96,8 @@ export function workersOf(b: Building): number {
   if (b.type === 'market' || b.type === 'markethall') return marketStalls(b);
   // A family craft is worked by as many of the household as the workshop needs.
   if (b.trade) return Math.min(BUILDINGS[b.trade].workers, b.residents);
+  // A tavern keeps a second tapster.
+  if (b.type === 'tavern' && b.level >= 2) return 2;
   return BUILDINGS[b.type].workers;
 }
 
@@ -90,6 +105,7 @@ export function buildingName(b: Building): string {
   if (b.type === 'house') return HOUSE_LEVELS[b.level]?.name || 'Cottage';
   if (b.type === 'townhall') return MANOR_LEVELS[b.level]?.name || 'Manor Hall';
   if (b.type === 'church') return CHURCH_LEVELS[b.level]?.name || 'Wooden Church';
+  if (b.type === 'tavern') return TAVERN_LEVELS[b.level]?.name || 'Alehouse';
   return BUILDINGS[b.type].name;
 }
 
@@ -107,7 +123,7 @@ export function houseNeeds(s: GameState, b: Building, level: number): Need[] {
   if (level >= 2) {
     out.push({ label: 'A well nearby', met: coveredBy(s, b, 'well') });
     out.push({ label: 'A market nearby', met: coveredBy(s, b, 'market') });
-    out.push({ label: 'A tavern with drink', met: coveredBy(s, b, 'tavern') });
+    out.push({ label: 'An alehouse or tavern with drink', met: coveredBy(s, b, 'tavern') });
     out.push({ label: 'Two food groups', met: s.report.variety >= 2 });
     out.push({ label: 'Clothes', met: hasSupply(s, b, 'clothes') });
   }
@@ -142,6 +158,12 @@ export function upgradePlan(s: GameState, b: Building): UpgradePlan | null {
     // A house can only grow once the needs of the next level are met.
     reqs.push(...houseNeeds(s, b, b.level + 1).slice(2));
     return { to: b.level + 1, name: next.name, cost: next.cost, days: 6 + b.level * 3, reqs };
+  }
+  if (b.type === 'tavern') {
+    const next = TAVERN_LEVELS[Math.max(1, b.level) + 1];
+    if (!next?.cost) return null;
+    const tier = next.tier ?? 0;
+    return { to: Math.max(1, b.level) + 1, name: next.name, cost: next.cost, days: next.days ?? 14, reqs: [{ label: `Settlement is a ${TIERS[tier].name}`, met: s.tier >= tier }] };
   }
   if (b.type === 'church') {
     const next = CHURCH_LEVELS[b.level + 1];
@@ -193,6 +215,7 @@ export function upgradeDays(b: Building): number {
   if (b.craftTo) return HOME_TRADE_DAYS;
   if (b.type === 'townhall') return MANOR_LEVELS[b.upgrading ?? 2]?.days ?? 20;
   if (b.type === 'church') return CHURCH_LEVELS[b.upgrading ?? 2]?.days ?? 20;
+  if (b.type === 'tavern') return TAVERN_LEVELS[b.upgrading ?? 2]?.days ?? 14;
   return 6 + (b.upgrading ?? 2) * 3;
 }
 
@@ -201,6 +224,7 @@ export function upgradeCost(b: Building): Cost {
   if (b.craftTo) return HOME_TRADE_COST;
   if (b.type === 'townhall') return MANOR_LEVELS[b.upgrading ?? 2]?.cost ?? {};
   if (b.type === 'church') return CHURCH_LEVELS[b.upgrading ?? 2]?.cost ?? {};
+  if (b.type === 'tavern') return TAVERN_LEVELS[b.upgrading ?? 2]?.cost ?? {};
   return HOUSE_LEVELS[b.upgrading ?? 2]?.cost ?? {};
 }
 

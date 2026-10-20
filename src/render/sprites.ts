@@ -2202,6 +2202,29 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       break;
     }
     case 'tavern': {
+      if (level < 2) {
+        // The alehouse: a low thatched cottage, an ale-stake (a bush on a pole)
+        // over the door to say there is ale, a bench, a barrel and a trestle.
+        p.shadow(0.5, 0.45, 2.3, 1.75);
+        p.poly([[0.4, 1.75, 0], [2.6, 1.75, 0], [2.6, 2.6, 0], [0.4, 2.6, 0]], season === 3 ? '#d4d8d6' : '#b0a07a');
+        p.box(0.55, 0.5, 2.25, 1.65, 0, 12, PLASTER);
+        p.timber(0.55, 0.5, 2.25, 1.65, 0, 12, BEAM);
+        p.doorL(1.65, 1.15, 0.22, 10);
+        p.windowL(1.65, 0.72, 4, 0.18, 4, true);
+        p.windowL(1.65, 1.75, 4, 0.18, 4, true);
+        p.windowR(2.25, 0.85, 4, 0.16, 4);
+        p.roofX(0.55, 0.5, 2.25, 1.65, 12, 10, 'thatch', PLASTER, 0.1);
+        smoke.push(p.chimney(1.95, 0.75, 16, 10));
+        // The ale-stake, leaning out from the wall over the door.
+        p.line([1.32, 1.66, 11], [1.32, 2.05, 15], '#5e4129', 1.2);
+        p.circle(1.32, 2.08, 15.5, 2.6, season === 3 ? '#5a6a50' : '#4f7a34');
+        // Bench against the wall, a barrel by the door, a trestle table outside.
+        p.box(1.6, 1.7, 2.15, 1.82, 0, 3, '#7a5a3a');
+        p.barrel(0.85, 1.95);
+        p.box(1.5, 2.15, 2.25, 2.4, 4, 1, '#8a6440');
+        for (const [x, y] of [[1.55, 2.2], [2.2, 2.2], [1.55, 2.35], [2.2, 2.35]] as const) p.line([x, y, 0], [x, y, 4], '#5e4129', 0.8);
+        break;
+      }
       p.shadow(0.3, 0.3, 2.5, 1.9);
       // Beer garden in front.
       p.poly(
