@@ -12,6 +12,10 @@ export const RESOURCE_IDS = [
   'iron',
   'silver',
   'crates',
+  'sand',
+  'mortar',
+  'charcoal',
+  'glass',
   // Food
   'bread',
   'meat',
@@ -48,6 +52,8 @@ export const RESOURCE_IDS = [
   'medicine',
   'tools',
   'paper',
+  'woad',
+  'dyes',
   'books',
   'jewellery',
   'pottery',
@@ -132,7 +138,12 @@ export type BuildingType =
   | 'flowerbed'
   | 'fountain'
   | 'draughtstable'
-  | 'builderyard';
+  | 'builderyard'
+  | 'sandpit'
+  | 'limekiln'
+  | 'collier'
+  | 'glassworks'
+  | 'dyer';
 
 export type Category = 'housing' | 'resources' | 'farming' | 'food' | 'industry' | 'civic' | 'manor' | 'works' | 'decor';
 

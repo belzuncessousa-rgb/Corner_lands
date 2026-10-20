@@ -1137,6 +1137,9 @@ const DOOR_SPOTS: Partial<Record<BuildingType, PenDoor>> = {
   kiln: { face: 'R', plane: 1.15, a: 0.8, b: 1.05, h: 7, open: true },
   builderyard: { face: 'L', plane: 0.722, a: 0.5, b: 1.0, h: 9, open: true },
   markethall: { face: 'L', plane: 2.85, a: 1.6, b: 2.2, h: 14, open: true },
+  sandpit: { face: 'L', plane: 0.75, a: 0.6, b: 0.9, h: 9, open: true },
+  limekiln: { face: 'L', plane: 1.5, a: 1.3, b: 1.7, h: 10, open: true },
+  collier: { face: 'L', plane: 0.75, a: 0.3, b: 0.5, h: 9, open: true },
 };
 
 const DOORS = new Map<string, PenDoor | null>();
@@ -2924,6 +2927,361 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       p.line([1.42, 1.62, 9.5], [1.78, 1.2, 9.5], MAST, 1);
       p.line([1.3, 1.62, 0], [1.42, 1.62, 9.5], MAST, 1.2);
       p.line([1.54, 1.62, 0], [1.42, 1.62, 9.5], MAST, 1.2);
+      break;
+    }
+    case 'sandpit': {
+      // A sandy scrape by the water, heaps of sand, a riddle on legs and a barrow.
+      const snow = season === 3;
+      p.poly([[0.25, 0.9, 0], [1.4, 0.9, 0], [1.4, 1.8, 0], [0.25, 1.8, 0]], snow ? '#dcd6cc' : '#dcc288');
+      p.poly([[0.4, 1.05, 0], [1.25, 1.05, 0], [1.25, 1.65, 0], [0.4, 1.65, 0]], snow ? '#c8c0b4' : '#c6a46a');
+      for (let k = 0; k < 4; k++) p.line([0.48, 1.13 + k * 0.14, 0], [1.17, 1.13 + k * 0.14, 0], 'rgba(120,90,48,0.35)', 0.6);
+      p.line([0.62, 1.42, 0], [0.82, 1.25, 10], '#6b4a2e', 1.2);
+      mound(p, 1.62, 1.28, 12, snow ? '#eeeae4' : '#eed69a', snow ? '#c8c4bc' : '#c09a5a');
+      mound(p, 1.75, 1.62, 8, snow ? '#eeeae4' : '#e8cc8c', snow ? '#c8c4bc' : '#b89052');
+      p.line([1.66, 1.3, 8], [1.7, 1.26, 19], '#6b4a2e', 1.2);
+      p.poly([[1.62, 1.3, 3], [1.72, 1.3, 3], [1.72, 1.3, 9], [1.62, 1.3, 9]], '#7a7e84');
+      // The riddle: a sloping wire screen the sand is thrown through, a little heap of fine sand beneath.
+      mound(p, 0.78, 0.72, 7, '#f2dea8', '#c8a466');
+      for (const [x, y, h] of [[0.4, 0.4, 14], [1.1, 0.4, 14], [0.4, 0.68, 6], [1.1, 0.68, 6]] as const) p.line([x, y, 0], [x, y, h], '#5e4129', 1.4);
+      p.poly([[0.36, 0.38, 14], [1.14, 0.38, 14], [1.14, 0.7, 6], [0.36, 0.7, 6]], 'rgba(90,70,40,0.25)', '#6b4a2e', 1.3);
+      for (let k = 1; k < 6; k++) p.line([0.36 + k * 0.13, 0.38, 14], [0.36 + k * 0.13, 0.7, 6], 'rgba(70,60,50,0.55)', 0.4);
+      for (let k = 1; k < 4; k++) p.line([0.36, 0.38 + k * 0.08, 14 - k * 2], [1.14, 0.38 + k * 0.08, 14 - k * 2], 'rgba(70,60,50,0.55)', 0.4);
+      // A wheelbarrow of sand.
+      p.line([1.42, 0.62, 3], [1.82, 0.62, 6], '#5e4129', 1.2);
+      p.line([1.42, 0.82, 3], [1.82, 0.82, 6], '#5e4129', 1.2);
+      p.box(1.4, 0.6, 1.66, 0.84, 3, 5, '#8a6440');
+      p.poly([[1.42, 0.62, 8], [1.64, 0.62, 8], [1.64, 0.82, 8], [1.42, 0.82, 8]], '#e2c68a');
+      p.ctx.strokeStyle = '#4a3020';
+      p.ctx.lineWidth = 1.2;
+      {
+        const [wx, wy] = iso(1.36, 0.72, 3);
+        p.ctx.beginPath();
+        p.ctx.ellipse(wx, wy, 2.6, 3, 0, 0, Math.PI * 2);
+        p.ctx.stroke();
+      }
+      break;
+    }
+    case 'limekiln': {
+      p.shadow(0.2, 0.2, 1.75, 1.75);
+      // A squat round kiln of rough stone, the fire glowing in its draw-arch.
+      const [kx, ky] = iso(0.85, 0.85, 0);
+      const r = 23;
+      const H = 30;
+      const c = p.ctx;
+      const body = () => {
+        c.beginPath();
+        c.moveTo(kx - r, ky - H);
+        c.lineTo(kx - r - 3, ky);
+        c.ellipse(kx, ky, r + 3, (r + 3) * 0.5, 0, Math.PI, 0, true);
+        c.lineTo(kx + r, ky - H);
+        c.closePath();
+      };
+      body();
+      const g = c.createLinearGradient(kx - r, 0, kx + r, 0);
+      g.addColorStop(0, '#c4bdb0');
+      g.addColorStop(0.55, '#aaa294');
+      g.addColorStop(1, '#7e776c');
+      c.fillStyle = g;
+      c.fill();
+      c.save();
+      body();
+      c.clip();
+      const rand = mulberry32(31);
+      c.strokeStyle = 'rgba(60,54,46,0.5)';
+      c.lineWidth = 0.6;
+      for (let k = 1; k < 8; k++) {
+        const y = ky - H + k * 4.2;
+        const w = r + (k * 3) / 8;
+        c.beginPath();
+        c.ellipse(kx, y, w, w * 0.5, 0, 0, Math.PI);
+        c.stroke();
+        for (let j = 0; j < 7; j++) {
+          const t = (j + (k % 2) * 0.5 + rand() * 0.3) / 7;
+          const jx = kx - w + t * 2 * w;
+          const jy = y + w * 0.5 * Math.sqrt(Math.max(0, 1 - ((jx - kx) / w) ** 2));
+          c.beginPath();
+          c.moveTo(jx, jy);
+          c.lineTo(jx, jy - 4.2);
+          c.stroke();
+        }
+      }
+      c.restore();
+      // The open top, a ring of lime-white stone round a red glow.
+      c.fillStyle = '#d8d2c4';
+      c.beginPath();
+      c.ellipse(kx, ky - H, r, r * 0.5, 0, 0, Math.PI * 2);
+      c.fill();
+      const glow = c.createRadialGradient(kx, ky - H, 1, kx, ky - H, r * 0.7);
+      glow.addColorStop(0, '#ffd27a');
+      glow.addColorStop(0.5, '#e0602a');
+      glow.addColorStop(1, '#4a2a1c');
+      c.fillStyle = glow;
+      c.beginPath();
+      c.ellipse(kx, ky - H, r * 0.7, r * 0.34, 0, 0, Math.PI * 2);
+      c.fill();
+      smoke.push([0.85, 0.85, H + 4]);
+      // The draw-arch on the side towards us, burning.
+      const ax = kx - 9;
+      const ay = ky + 9;
+      c.fillStyle = '#5a5248';
+      c.beginPath();
+      c.moveTo(ax - 8, ay);
+      c.lineTo(ax - 8, ay - 9);
+      c.ellipse(ax, ay - 9, 8, 7, 0, Math.PI, 0);
+      c.lineTo(ax + 8, ay);
+      c.closePath();
+      c.fill();
+      c.fillStyle = '#1e140e';
+      c.beginPath();
+      c.moveTo(ax - 5, ay);
+      c.lineTo(ax - 5, ay - 8);
+      c.ellipse(ax, ay - 8, 5, 5, 0, Math.PI, 0);
+      c.lineTo(ax + 5, ay);
+      c.closePath();
+      c.fill();
+      const fire = c.createLinearGradient(0, ay - 7, 0, ay);
+      fire.addColorStop(0, '#f8c040');
+      fire.addColorStop(1, '#d04a1a');
+      c.fillStyle = fire;
+      c.beginPath();
+      c.moveTo(ax - 4, ay);
+      c.quadraticCurveTo(ax - 3, ay - 5, ax - 1, ay - 7);
+      c.quadraticCurveTo(ax, ay - 4, ax + 1.5, ay - 6);
+      c.quadraticCurveTo(ax + 3, ay - 3, ax + 4, ay);
+      c.closePath();
+      c.fill();
+      // A lean-to over the slaking trough, white with lime, and the sacks of mortar.
+      for (const [x, y] of [[1.25, 1.2], [1.85, 1.2], [1.25, 1.75], [1.85, 1.75]]) p.line([x, y, 0], [x, y, 12], '#5e4129', 1.6);
+      p.box(1.32, 1.3, 1.75, 1.5, 0, 4, '#7b5a36');
+      p.poly([[1.34, 1.32, 4], [1.73, 1.32, 4], [1.73, 1.48, 4], [1.34, 1.48, 4]], '#ece8dc');
+      p.sack(1.4, 1.68, '#efece4');
+      p.sack(1.6, 1.68, '#e6e2d6');
+      p.roofY(1.2, 1.15, 1.9, 1.8, 12, 5, 'plank', WOOD, 0.06);
+      p.stonePile(0.25, 1.45, 4);
+      p.logPile(0.7, 1.75, 2);
+      break;
+    }
+    case 'collier': {
+      // Turf-covered clamps smouldering in a clearing, a bark hut and the black harvest.
+      const clamp = (x: number, y: number, rx: number, hgt: number, burning: boolean) => {
+        const [cx, cy] = iso(x, y, 0);
+        const c = p.ctx;
+        c.fillStyle = 'rgba(20,16,10,0.3)';
+        c.beginPath();
+        c.ellipse(cx + 3, cy + 1, rx * 1.1, rx * 0.5, 0, 0, Math.PI * 2);
+        c.fill();
+        c.beginPath();
+        c.ellipse(cx, cy, rx, rx * 0.5, 0, 0, Math.PI);
+        c.ellipse(cx, cy, rx, hgt, 0, Math.PI, 0);
+        const g = c.createLinearGradient(cx - rx, cy - hgt, cx + rx, cy);
+        g.addColorStop(0, season === 3 ? '#e8e6e0' : '#6e7a44');
+        g.addColorStop(0.6, season === 3 ? '#c8c6c0' : '#4e5a32');
+        g.addColorStop(1, '#3a3424');
+        c.fillStyle = g;
+        c.fill();
+        // Bare patches of blackened earth between the turves.
+        const rand = mulberry32(Math.round(x * 50 + y * 7));
+        for (let k = 0; k < 7; k++) {
+          const a = Math.PI + rand() * Math.PI;
+          const d = 0.3 + rand() * 0.55;
+          c.fillStyle = k % 2 ? '#3a2e20' : '#4a3a26';
+          c.beginPath();
+          c.ellipse(cx + Math.cos(a) * rx * d, cy + Math.sin(a) * hgt * d, 2.4, 1.3, 0, 0, Math.PI * 2);
+          c.fill();
+        }
+        if (burning) {
+          for (const [dx, dy] of [[-0.35, -0.55], [0.3, -0.45], [0, -0.85]]) {
+            c.fillStyle = '#e8742a';
+            c.beginPath();
+            c.ellipse(cx + dx * rx, cy + dy * hgt, 1.6, 1, 0, 0, Math.PI * 2);
+            c.fill();
+          }
+          smoke.push([x - 0.05, y - 0.05, hgt + 2]);
+          smoke.push([x + 0.15, y - 0.1, hgt * 0.6]);
+        }
+      };
+      clamp(1.35, 0.5, 22, 20, true);
+      // A conical hut of poles and bark where the collier watches the burn.
+      {
+        const [hx, hy] = iso(0.45, 0.65, 0);
+        const c = p.ctx;
+        c.fillStyle = 'rgba(20,16,10,0.25)';
+        c.beginPath();
+        c.ellipse(hx + 3, hy + 1, 14, 6, 0, 0, Math.PI * 2);
+        c.fill();
+        c.fillStyle = '#7a5a3a';
+        c.beginPath();
+        c.moveTo(hx - 13, hy);
+        c.lineTo(hx, hy - 30);
+        c.lineTo(hx + 13, hy);
+        c.quadraticCurveTo(hx, hy + 5, hx - 13, hy);
+        c.fill();
+        c.fillStyle = 'rgba(30,18,8,0.3)';
+        c.beginPath();
+        c.moveTo(hx, hy - 30);
+        c.lineTo(hx + 13, hy);
+        c.quadraticCurveTo(hx + 6, hy + 3.5, hx + 2, hy + 4);
+        c.fill();
+        c.strokeStyle = '#4a3420';
+        c.lineWidth = 0.6;
+        for (let k = -3; k <= 3; k++) {
+          c.beginPath();
+          c.moveTo(hx, hy - 30);
+          c.lineTo(hx + k * 4, hy + 2 - Math.abs(k) * 0.4);
+          c.stroke();
+        }
+        c.strokeStyle = '#3a2a18';
+        c.lineWidth = 1;
+        c.beginPath();
+        c.moveTo(hx - 2, hy - 34);
+        c.lineTo(hx + 1, hy - 26);
+        c.moveTo(hx + 2, hy - 34);
+        c.lineTo(hx - 1, hy - 26);
+        c.stroke();
+        c.fillStyle = '#20160e';
+        c.beginPath();
+        c.moveTo(hx - 7, hy + 3);
+        c.lineTo(hx - 3.5, hy - 11);
+        c.lineTo(hx + 0.5, hy + 4);
+        c.closePath();
+        c.fill();
+      }
+      // A clamp being built: billets stood on end round the centre pole.
+      {
+        const [bx, by] = iso(1.55, 1.3, 0);
+        const c = p.ctx;
+        c.fillStyle = 'rgba(20,16,10,0.25)';
+        c.beginPath();
+        c.ellipse(bx + 2, by + 1, 15, 7, 0, 0, Math.PI * 2);
+        c.fill();
+        for (let row = 0; row < 3; row++) {
+          const w = 13 - row * 4;
+          for (let k = -3; k <= 3; k++) {
+            const t = k / 3.5;
+            const lx = bx + t * w;
+            const ly = by - row * 6 + Math.sqrt(Math.max(0, 1 - t * t)) * w * 0.45;
+            c.fillStyle = (k + row) % 2 ? '#8a6236' : '#a07446';
+            c.fillRect(lx - 1.6, ly - 7, 3.2, 7);
+            c.fillStyle = '#c8a06a';
+            c.beginPath();
+            c.ellipse(lx, ly - 7, 1.6, 0.8, 0, 0, Math.PI * 2);
+            c.fill();
+          }
+        }
+        c.strokeStyle = '#5e4129';
+        c.lineWidth = 1.2;
+        c.beginPath();
+        c.moveTo(bx, by - 14);
+        c.lineTo(bx, by - 26);
+        c.stroke();
+      }
+      p.logPile(1.2, 1.9, 3);
+      // The charcoal itself, raked out in a black heap.
+      mound(p, 0.5, 1.55, 11, '#4a4642', '#1c1a18');
+      for (const [dx, dy] of [[-3, -3], [2, -5], [4, -2], [-1, -6]]) {
+        const [mx, my] = iso(0.5, 1.55, 0);
+        p.ctx.fillStyle = '#6a6560';
+        p.ctx.fillRect(mx + dx, my + dy, 1.2, 0.8);
+      }
+      break;
+    }
+    case 'glassworks': {
+      p.shadow(0.25, 0.25, 1.65, 1.5);
+      // A stone furnace house with a tall stack, its working ports glowing white-hot.
+      p.box(0.3, 0.3, 1.45, 1.3, 0, 17, STONE, undefined, 'stone');
+      p.doorL(1.3, 1.1, 0.18, 11);
+      p.windowL(1.3, 0.75, 6, 0.16, 6, season === 3);
+      for (const y of [0.5, 0.9]) {
+        p.wallR(1.452, y, y + 0.18, 3, 9, '#3a2418');
+        p.wallR(1.453, y + 0.03, y + 0.15, 3.5, 8, '#f8b040');
+        p.wallR(1.454, y + 0.06, y + 0.12, 4, 6.5, '#fff0b0');
+      }
+      p.roofX(0.3, 0.3, 1.45, 1.3, 17, 13, 'tile', STONE, 0.1);
+      p.box(0.95, 0.5, 1.2, 0.75, 22, 20, '#8a7d70', undefined, 'stone');
+      p.box(0.93, 0.48, 1.22, 0.77, 40, 2, '#6e645a');
+      smoke.push([1.075, 0.625, 46]);
+      // Sand heaped by the door, charcoal sacks, and a rack of new glass.
+      mound(p, 1.75, 0.55, 9, '#eed69a', '#c09a5a');
+      p.sack(1.72, 0.95, '#3e3a36');
+      p.sack(1.85, 1.1, '#46423e');
+      p.box(0.3, 1.5, 0.95, 1.6, 7, 1, '#8a6440');
+      p.box(0.3, 1.5, 0.95, 1.6, 0, 1, '#8a6440');
+      for (const x of [0.32, 0.93]) p.line([x, 1.58, 0], [x, 1.58, 8], BEAM, 1);
+      const bottle = (x: number, y: number, z: number, col: string) => {
+        const [bx, by] = iso(x, y, z);
+        const c = p.ctx;
+        c.fillStyle = col;
+        c.beginPath();
+        c.moveTo(bx - 0.8, by - 6);
+        c.lineTo(bx - 0.8, by - 4);
+        c.quadraticCurveTo(bx - 2.6, by - 3, bx - 2.2, by);
+        c.lineTo(bx + 2.2, by);
+        c.quadraticCurveTo(bx + 2.6, by - 3, bx + 0.8, by - 4);
+        c.lineTo(bx + 0.8, by - 6);
+        c.closePath();
+        c.fill();
+        c.fillStyle = 'rgba(255,255,255,0.7)';
+        c.fillRect(bx - 1.4, by - 3, 0.7, 2.2);
+      };
+      const glassCols = ['rgba(120,200,170,0.85)', 'rgba(90,150,200,0.85)', 'rgba(160,210,150,0.85)', 'rgba(200,220,210,0.85)'];
+      for (let k = 0; k < 4; k++) {
+        bottle(0.4 + k * 0.15, 1.55, 1, glassCols[k % 4]);
+        bottle(0.45 + k * 0.14, 1.55, 8, glassCols[(k + 1) % 4]);
+      }
+      // Panes leaning against the wall.
+      for (let k = 0; k < 3; k++) {
+        const x = 1.58 + k * 0.05;
+        p.poly([[x, 1.35, 0], [x, 1.6, 0], [x + 0.06, 1.6, 10], [x + 0.06, 1.35, 10]], 'rgba(170,225,215,0.55)', 'rgba(70,130,120,0.8)', 0.5);
+      }
+      break;
+    }
+    case 'dyer': {
+      p.shadow(0.25, 0.25, 1.4, 1.1);
+      // A workshop by its vats, blue cloth drying on the racks.
+      p.box(0.3, 0.3, 1.3, 1.0, 0, 14, PLASTER);
+      p.timber(0.3, 0.3, 1.3, 1.0, 0, 14, BEAM);
+      p.doorL(1.0, 0.95, 0.18, 10);
+      p.windowL(1.0, 0.5, 5, 0.16, 5, season === 3);
+      p.roofX(0.3, 0.3, 1.3, 1.0, 14, 12, 'thatch', PLASTER, 0.1);
+      // A copper over a fire, steaming.
+      {
+        const [cx, cy] = iso(1.72, 1.12, 0);
+        const c = p.ctx;
+        c.fillStyle = '#7a7268';
+        c.fillRect(cx - 8, cy - 6, 16, 6);
+        c.fillStyle = '#2a1a10';
+        c.fillRect(cx - 3, cy - 5, 6, 5);
+        c.fillStyle = '#f0902a';
+        c.fillRect(cx - 2, cy - 3, 4, 3);
+        c.fillStyle = '#b06a3a';
+        c.beginPath();
+        c.moveTo(cx - 9, cy - 6);
+        c.quadraticCurveTo(cx - 9, cy - 13, cx, cy - 13);
+        c.quadraticCurveTo(cx + 9, cy - 13, cx + 9, cy - 6);
+        c.closePath();
+        c.fill();
+        c.fillStyle = '#2f4fa8';
+        c.beginPath();
+        c.ellipse(cx, cy - 12.5, 8, 3, 0, 0, Math.PI * 2);
+        c.fill();
+        c.strokeStyle = '#d8945a';
+        c.lineWidth = 0.8;
+        c.beginPath();
+        c.ellipse(cx, cy - 12.5, 8, 3, 0, 0, Math.PI * 2);
+        c.stroke();
+        smoke.push([1.72, 1.12, 16]);
+      }
+      // Steeping vats of woad, the scum on top a coppery blue.
+      for (const [x, y, liq] of [[0.45, 1.3, '#2a4a9a'], [0.82, 1.38, '#35589e'], [0.6, 1.7, '#3a6a8a']] as [number, number, string][]) tub(p, x, y, 8.5, 8, liq);
+      // Drying rack with hanging lengths of blue.
+      for (const y of [0.25, 0.85]) p.line([1.75, y, 0], [1.75, y, 17], '#5e4129', 1.5);
+      p.line([1.75, 0.25, 17], [1.75, 0.85, 17], '#5e4129', 1);
+      for (const [a, b2, col] of [[0.28, 0.42, '#2a4a9a'], [0.46, 0.6, '#4a6ab8'], [0.64, 0.8, '#203c80']] as [number, number, string][]) {
+        p.wallR(1.75, a, b2, 5, 16.5, col);
+        p.line([1.751, a, 5], [1.751, b2, 5], 'rgba(255,255,255,0.18)', 0.6);
+      }
+      // A basket of fresh woad leaves.
+      tub(p, 1.15, 1.7, 5, 4, '#5f8f6a', '#9a7a4a');
       break;
     }
     case 'watchtower': {
@@ -4722,6 +5080,65 @@ export function oreHeap(p: Pen, x: number, y: number, n = 5): void {
 }
 
 /** Squared, freshly cut blocks of pale stone, stacked. */
+/** A soft heap of loose stuff (sand, charcoal), lit from the left. */
+function mound(p: Pen, x: number, y: number, r: number, light: string, dark: string): void {
+  const [hx, hy] = iso(x, y, 0);
+  const c = p.ctx;
+  c.fillStyle = 'rgba(40,30,16,0.22)';
+  c.beginPath();
+  c.ellipse(hx + 2, hy + 1, r * 1.1, r * 0.45, 0, 0, Math.PI * 2);
+  c.fill();
+  const g = c.createLinearGradient(hx - r, 0, hx + r, 0);
+  g.addColorStop(0, light);
+  g.addColorStop(1, dark);
+  c.fillStyle = g;
+  c.beginPath();
+  c.moveTo(hx - r, hy);
+  c.quadraticCurveTo(hx - r * 0.5, hy - r * 0.9, hx, hy - r * 0.85);
+  c.quadraticCurveTo(hx + r * 0.6, hy - r * 0.8, hx + r, hy);
+  c.quadraticCurveTo(hx, hy + r * 0.35, hx - r, hy);
+  c.fill();
+}
+
+/** A round wooden tub or basket, its contents showing on top. */
+function tub(p: Pen, x: number, y: number, r: number, hgt: number, fill: string, wood = '#7a5230'): void {
+  const [tx, ty] = iso(x, y, 0);
+  const c = p.ctx;
+  c.fillStyle = 'rgba(30,24,12,0.22)';
+  c.beginPath();
+  c.ellipse(tx + 1.5, ty + 0.5, r * 1.1, r * 0.45, 0, 0, Math.PI * 2);
+  c.fill();
+  c.fillStyle = wood;
+  c.beginPath();
+  c.moveTo(tx - r, ty - hgt);
+  c.lineTo(tx - r * 0.9, ty);
+  c.ellipse(tx, ty, r * 0.9, r * 0.4, 0, Math.PI, 0, true);
+  c.lineTo(tx + r, ty - hgt);
+  c.closePath();
+  c.fill();
+  c.fillStyle = 'rgba(30,16,6,0.28)';
+  c.fillRect(tx + r * 0.3, ty - hgt, r * 0.65, hgt + r * 0.2);
+  c.strokeStyle = '#3c2a1a';
+  c.lineWidth = 0.8;
+  for (const t of [0.3, 0.75]) {
+    c.beginPath();
+    c.ellipse(tx, ty - hgt * (1 - t), r * (0.95 - t * 0.05), r * 0.42, 0, 0, Math.PI);
+    c.stroke();
+  }
+  c.fillStyle = shade(wood, 0.75);
+  c.beginPath();
+  c.ellipse(tx, ty - hgt, r, r * 0.45, 0, 0, Math.PI * 2);
+  c.fill();
+  c.fillStyle = fill;
+  c.beginPath();
+  c.ellipse(tx, ty - hgt, r * 0.82, r * 0.34, 0, 0, Math.PI * 2);
+  c.fill();
+  c.fillStyle = 'rgba(255,255,255,0.22)';
+  c.beginPath();
+  c.ellipse(tx - r * 0.25, ty - hgt - r * 0.06, r * 0.3, r * 0.09, 0, 0, Math.PI * 2);
+  c.fill();
+}
+
 /** Curved roof tiles stacked on a pallet, their rounded ends towards us. */
 function tileStack(p: Pen, x: number, y: number, rows = 3): void {
   p.box(x, y, x + 0.42, y + 0.26, 0, 1.6, '#7b5a36');

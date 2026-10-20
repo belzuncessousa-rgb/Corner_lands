@@ -730,7 +730,7 @@ export class Renderer {
     else if (month === 6 && b.growth > 0) stage = 'ripe';
     else if (month === 7) stage = 'stooks';
     else if (month === 8) stage = 'stubble';
-    if (crop === 'flax' && stage === 'full' && month >= 3) stage = 'flower';
+    if ((crop === 'flax' || crop === 'woad') && stage === 'full' && month >= 3) stage = 'flower';
     const key = `${b.x},${b.y},${b.w},${b.h},${crop},${stage},${season}`;
     let hit = this.fieldCache.get(b.id);
     if (!hit || hit.key !== key) {
@@ -3201,6 +3201,34 @@ export class Renderer {
         line(fx - 2.4 * f, ky, fx + 1.8 * f, ky, IRON, 0.9);
         break;
       }
+      case 'stir':
+      case 'mix': {
+        // A tub at the feet, a long paddle worked round and round in it: woad in the vat, or lime and sand for mortar.
+        const tx = wx + 6.2 * f;
+        const ty = wy - 0.6;
+        c.fillStyle = '#7a5230';
+        c.beginPath();
+        c.moveTo(tx - 4, ty - 4.6);
+        c.lineTo(tx - 3.4, ty);
+        c.ellipse(tx, ty, 3.4, 1.4, 0, Math.PI, 0, true);
+        c.lineTo(tx + 4, ty - 4.6);
+        c.closePath();
+        c.fill();
+        c.fillStyle = act === 'stir' ? '#2f4fa8' : '#e8e4d8';
+        c.beginPath();
+        c.ellipse(tx, ty - 4.6, 4, 1.6, 0, 0, Math.PI * 2);
+        c.fill();
+        const ang = t * 1.4;
+        const px = tx + Math.cos(ang) * 2.2;
+        const py = ty - 4.6 + Math.sin(ang) * 0.8;
+        const gx = px - 2.4 * f;
+        const gy = py - 9;
+        line(px, py, gx - 0.8 * f, gy - 1.5, HANDLE, 1);
+        armTo(gx, gy);
+        line(sx - 0.5 * f, sy + 0.4, (gx + px) / 2, (gy + py) / 2, arm, 1.3);
+        hand((gx + px) / 2, (gy + py) / 2);
+        break;
+      }
       default: {
         // Any other work: busy hands at the bench.
         armTo(wx + 3.5 * f, sy + 2 + Math.sin(t) * 0.8);
@@ -4449,6 +4477,43 @@ function drawGood(p: Pen, id: ResourceId, x: number, y: number): void {
       p.sack(x - 0.08, y, id === 'flour' ? '#efe6d4' : '#d8c890');
       p.sack(x + 0.08, y + 0.05, id === 'flour' ? '#e8dcc4' : '#cdbb8e');
       break;
+    case 'sand':
+      p.ellipse(x, y, 10, 5, 1.5, '#c8a868');
+      p.ellipse(x - 0.02, y - 0.02, 7.5, 3.6, 3.5, '#e2c98a');
+      p.ellipse(x - 0.04, y - 0.04, 4, 2, 5, '#eed69a');
+      break;
+    case 'charcoal':
+      p.sack(x - 0.08, y, '#3e3a36');
+      p.sack(x + 0.08, y + 0.05, '#34302c');
+      break;
+    case 'mortar':
+      p.sack(x - 0.08, y, '#efece4');
+      p.sack(x + 0.08, y + 0.05, '#e4e0d4');
+      break;
+    case 'glass':
+      p.crate(x - 0.1, y - 0.1, 0.2);
+      for (let i = 0; i < 3; i++) p.ellipse(x - 0.06 + i * 0.06, y + 0.02, 1.6, 2.4, 9, 'rgba(140,210,190,0.9)');
+      break;
+    case 'woad':
+    case 'dyes': {
+      if (id === 'dyes') {
+        p.barrel(x - 0.06, y);
+        p.barrel(x + 0.1, y + 0.08);
+        p.ellipse(x + 0.1, y + 0.08, 2.6, 1.1, 10.5, '#3a5ac0');
+        p.ellipse(x - 0.06, y, 2.6, 1.1, 10.5, '#3a5ac0');
+        break;
+      }
+      const [bx, by] = iso(x, y, 0);
+      p.ctx.fillStyle = '#a07a40';
+      p.ctx.beginPath();
+      p.ctx.ellipse(bx, by - 3, 5, 4, 0, 0, Math.PI);
+      p.ctx.fill();
+      p.ctx.fillStyle = '#5f8f86';
+      p.ctx.beginPath();
+      p.ctx.ellipse(bx, by - 3.5, 4.8, 2.4, 0, 0, Math.PI * 2);
+      p.ctx.fill();
+      break;
+    }
     case 'cheese':
       p.ellipse(x, y, 7, 3.4, 2.2, '#e8c040');
       p.ellipse(x + 0.05, y + 0.06, 7, 3.4, 4.6, '#f0c850');
@@ -4624,6 +4689,12 @@ const CARRY_SHAPES: Partial<Record<ResourceId, CarryShape>> = {
   clothes: 'bundle',
   flax: 'bundle',
   paper: 'bundle',
+  sand: 'sack',
+  mortar: 'sack',
+  charcoal: 'sack',
+  glass: 'crate',
+  woad: 'basket',
+  dyes: 'cask',
 };
 const GOOD_COLORS: Partial<Record<ResourceId, string>> = {
   firewood: '#9a6a3a',
@@ -4658,6 +4729,12 @@ const GOOD_COLORS: Partial<Record<ResourceId, string>> = {
   weapons: '#8a8e94',
   medicine: '#6aa0a0',
   boots: '#6a3e22',
+  sand: '#e2c98a',
+  mortar: '#e8e4d8',
+  charcoal: '#2c2a28',
+  glass: '#9ad4c8',
+  woad: '#5f8f86',
+  dyes: '#2f4fa8',
 };
 
 /**
@@ -4689,6 +4766,10 @@ function drawFieldPicture(p: Pen, b: Building, crop: string, stage: string, seas
     p.line([a, y + 0.06, 0], [z, y + 0.06, 0], winter ? '#b8bebe' : '#5e4129', 1.2);
     p.line([a, y - 0.04, 0], [z, y - 0.04, 0], winter ? '#dde2e2' : '#8a6a46', 0.8);
     if (!h || winter) continue;
+    if (crop === 'woad') {
+      k = woadRow(p, a, z, y, stage, k, rand);
+      continue;
+    }
     for (let x = a; x < z; x += 0.055) {
       k++;
       const jx = x + (rand(k) - 0.5) * 0.03;
@@ -4752,7 +4833,24 @@ function drawFieldPicture(p: Pen, b: Building, crop: string, stage: string, seas
       }
     }
   }
-  if (stage === 'stooks' && !winter) {
+  if (stage === 'stooks' && !winter && crop === 'woad') {
+    // The cut leaves piled in heaps along the rows, to be carted to the dyer.
+    for (let yy = 0.6; yy < b.h - 0.3; yy += 1.2) {
+      for (let xx = 0.6; xx < b.w - 0.3; xx += 1.1) {
+        const [sx, sy] = iso(xx + ((b.id + Math.floor(yy)) % 2) * 0.3, yy);
+        c.fillStyle = 'rgba(30,20,10,0.2)';
+        c.beginPath();
+        c.ellipse(sx + 1, sy, 6, 2.2, 0, 0, Math.PI * 2);
+        c.fill();
+        for (let j = 0; j < 7; j++) {
+          c.fillStyle = j % 2 ? '#4f7e74' : '#62948a';
+          c.beginPath();
+          c.ellipse(sx - 3.5 + (j % 4) * 2.4, sy - 1.5 - Math.floor(j / 4) * 2.4, 2.4, 1.2, (j - 3) * 0.4, 0, Math.PI * 2);
+          c.fill();
+        }
+      }
+    }
+  } else if (stage === 'stooks' && !winter) {
     // Sheaves stooked to dry in rows after the harvest.
     for (let yy = 0.6; yy < b.h - 0.3; yy += 1.2) {
       for (let xx = 0.6; xx < b.w - 0.3; xx += 1.1) {
@@ -4784,6 +4882,69 @@ function drawFieldPicture(p: Pen, b: Building, crop: string, stage: string, seas
       }
     }
   }
+}
+
+/**
+ * One row of woad: rosettes of long blue-green leaves that grow broad by
+ * summer, then send up stems of tiny yellow flowers. Returns the running seed.
+ */
+function woadRow(p: Pen, a: number, z: number, y: number, stage: string, k: number, rand: (k: number) => number): number {
+  const c = p.ctx;
+  const size: Record<string, number> = { sprout: 1.6, young: 2.4, tall: 3.2, full: 3.8, flower: 3.8, ripe: 4, stubble: 1 };
+  const r = size[stage] ?? 0;
+  for (let x = a + 0.05; x < z; x += 0.15) {
+    k++;
+    const [sx, sy] = iso(x + (rand(k) - 0.5) * 0.03, y);
+    const rr = r * (0.85 + rand(k + 7) * 0.3);
+    if (stage === 'stubble') {
+      c.fillStyle = '#6a7a58';
+      c.fillRect(sx - 0.8, sy - 1.2, 1.6, 1.2);
+      continue;
+    }
+    c.fillStyle = 'rgba(30,20,10,0.3)';
+    c.beginPath();
+    c.ellipse(sx + 0.6, sy, rr * 1.1, rr * 0.45, 0, 0, Math.PI * 2);
+    c.fill();
+    const leaf = stage === 'ripe' ? '#4a7468' : stage === 'sprout' ? '#7aa890' : '#5f8f86';
+    const leaves = stage === 'sprout' ? 3 : 5;
+    // Long leaves fanning up and out from the crown, the back ones darker.
+    for (let j = 0; j < leaves; j++) {
+      const t = j / (leaves - 1) - 0.5;
+      const ang = -Math.PI / 2 + t * 2.4 + (rand(k + j) - 0.5) * 0.3;
+      const len = rr * (1.1 - Math.abs(t) * 0.4);
+      const lx = sx + Math.cos(ang) * len * 0.6;
+      const ly = sy - 0.5 + Math.sin(ang) * len * 0.6;
+      c.fillStyle = Math.abs(t) < 0.2 ? shade(leaf, 0.85) : j % 2 ? leaf : shade(leaf, 1.12);
+      c.beginPath();
+      c.ellipse(lx, ly, len * 0.62, len * 0.24, ang, 0, Math.PI * 2);
+      c.fill();
+    }
+    c.strokeStyle = shade(leaf, 1.4);
+    c.lineWidth = 0.35;
+    c.beginPath();
+    c.moveTo(sx, sy - 0.5);
+    c.lineTo(sx - rr * 0.7, sy - rr * 0.55);
+    c.moveTo(sx, sy - 0.5);
+    c.lineTo(sx + rr * 0.7, sy - rr * 0.55);
+    c.stroke();
+    if (stage === 'flower' && rand(k + 40) < 0.7) {
+      // A branching stem crowned with a haze of little yellow flowers.
+      const top = sy - rr - 7 - rand(k + 3) * 3;
+      c.strokeStyle = '#4a6a4a';
+      c.lineWidth = 0.6;
+      c.beginPath();
+      c.moveTo(sx, sy - rr * 0.4);
+      c.lineTo(sx, top + 2);
+      c.stroke();
+      for (let j = 0; j < 5; j++) {
+        c.fillStyle = j % 3 ? '#f0d43a' : '#e0b828';
+        c.beginPath();
+        c.arc(sx + (rand(k + 20 + j) - 0.5) * 5, top + (rand(k + 30 + j) - 0.5) * 3, 0.9, 0, Math.PI * 2);
+        c.fill();
+      }
+    }
+  }
+  return k;
 }
 
 /**

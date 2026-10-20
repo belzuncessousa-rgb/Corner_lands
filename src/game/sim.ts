@@ -226,7 +226,7 @@ export function placementError(s: GameState, type: BuildingType, x: number, y: n
   if (!isUnlocked(s, type)) return lockReason(s, type);
   const clear = footprintClear(s, x, y, d.w, d.h, type === 'dock');
   if (clear) return clear;
-  if ((type === 'fisher' || type === 'claypit' || type === 'watermill' || type === 'dock') && countInRadius(s, centerOf(x, y, d.w, d.h), 2.5, (i) => s.terrain[i] === 1) < 2) {
+  if ((type === 'fisher' || type === 'claypit' || type === 'sandpit' || type === 'watermill' || type === 'dock') && countInRadius(s, centerOf(x, y, d.w, d.h), 2.5, (i) => s.terrain[i] === 1) < 2) {
     return 'Must be next to water';
   }
   if (type === 'cathedral' && s.buildings.some((b) => b.type === 'cathedral')) return 'Your town has its cathedral';
@@ -2068,12 +2068,14 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
       if (h.kind === 'deer' && rng.next() < 0.5) produced(s, 'hides', 1);
       return null;
     }
-    case 'claypit': {
+    case 'claypit':
+    case 'sandpit': {
+      const id = b.type === 'claypit' ? 'clay' : 'sand';
       const water = countInRadius(s, bCenter(b), CLAY_BANK, (i) => s.terrain[i] === 1);
       if (water < 2) return 'No riverbank nearby';
-      const amount = Math.max(1, Math.round((d.outputs.clay ?? 0) * Math.min(1, water / 10) * (season === 3 ? 0.4 : 1)));
-      if (!canHold(s, b, { clay: amount })) return 'Storage full';
-      addOutput(s, b, { clay: amount });
+      const amount = Math.max(1, Math.round((d.outputs[id] ?? 0) * Math.min(1, water / 10) * (season === 3 ? 0.4 : 1)));
+      if (!canHold(s, b, { [id]: amount })) return 'Storage full';
+      addOutput(s, b, { [id]: amount });
       return null;
     }
     case 'fisher': {
@@ -2954,7 +2956,7 @@ export function workEfficiency(b: Building): number {
   const d = workDef(b);
   if (!d.cycle) return 1;
   // resDist is the walking time to the resource, in dirt-road tiles.
-  const toResource = (d.gathers || b.type === 'forester') && b.type !== 'claypit' ? (2 * (b.resDist ?? (NEAR_HINT / 2) * (ROAD_TILES_PER_DAY / OFFROAD_TILES_PER_DAY))) / ROAD_TILES_PER_DAY : 0;
+  const toResource = (d.gathers || b.type === 'forester') && b.type !== 'claypit' && b.type !== 'sandpit' ? (2 * (b.resDist ?? (NEAR_HINT / 2) * (ROAD_TILES_PER_DAY / OFFROAD_TILES_PER_DAY))) / ROAD_TILES_PER_DAY : 0;
   // Served by haulers, the workers no longer carry their goods to storage.
   const walking = ((b.hauled ? 0 : (b.trip ?? 0)) + toResource) / Math.max(1, d.workers);
   return d.cycle / (d.cycle + TRAVEL_WEIGHT * walking);

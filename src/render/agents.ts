@@ -109,6 +109,9 @@ const YARD_WORK: Partial<Record<string, string[]>> = {
   cooper: ['hammer'],
   stonemason: ['chisel'],
   tanner: ['scrape'],
+  dyer: ['stir'],
+  limekiln: ['mix'],
+  collier: ['shovel'],
 };
 
 /** Leisure acts (no tools in hand). */
@@ -1000,7 +1003,8 @@ export class AgentSystem {
         return h ? nearHerd(h.x, h.y, 'hunt') : null;
       }
       case 'fisher':
-      case 'claypit': {
+      case 'claypit':
+      case 'sandpit': {
         // A dry tile next to water.
         return pick((i) => {
           if (!open(i)) return false;
@@ -1015,7 +1019,7 @@ export class AgentSystem {
             if (inBounds(s, x + dx, y + dy) && s.terrain[idx(s, x + dx, y + dy)] === 1) return true;
           }
           return false;
-        }, b.type === 'claypit' ? 'shovel' : 'fish');
+        }, b.type === 'fisher' ? 'fish' : 'shovel');
       }
       case 'farm':
       case 'byre':
