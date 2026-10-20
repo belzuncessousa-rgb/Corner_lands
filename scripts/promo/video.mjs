@@ -1,7 +1,8 @@
 // Records the trailer frame by frame on a virtual clock, then encodes it with
 // the score. Expects the game at http://localhost:3001 and ffmpeg on the path.
 //   node scripts/promo/audio.mjs && node scripts/promo/video.mjs
-// Writes promo-out/corner-lands-trailer.mp4 (1920x1080, 30 fps).
+// Writes promo-out/corner-lands-trailer.mp4 (1920x1080, 30 fps). STILLS=1 saves one picture a
+// second of each scene into promo-out/stills instead, to check the scenes quickly.
 import { chromium } from 'playwright';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, rmSync } from 'node:fs';
@@ -11,19 +12,22 @@ const FPS = 30;
 const SCENES = [
   ['title', 4.5],
   ['found', 6.5],
-  ['grow', 8],
-  ['life', 9],
-  ['seasons', 8],
-  ['dusk', 6],
-  ['manor', 5],
-  ['charters', 5],
-  ['tutorial', 4],
-  ['end', 5],
+  ['life', 5.5],
+  ['village', 9],
+  ['industry', 10],
+  ['manor', 12],
+  ['tutorial', 6.5],
+  ['end', 7],
 ];
 const only = process.env.ONLY; // a scene name, to try one out
+const stills = !!process.env.STILLS; // one picture a second into promo-out/stills, no video
 const frames = 'promo-out/frames';
 rmSync(frames, { recursive: true, force: true });
 mkdirSync(frames, { recursive: true });
+if (stills) {
+  rmSync('promo-out/stills', { recursive: true, force: true });
+  mkdirSync('promo-out/stills', { recursive: true });
+}
 
 const browser = await chromium.launch({ executablePath: process.env.CHROME || '/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell' });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1.5 });
@@ -67,7 +71,6 @@ for (const [name, secs] of SCENES) {
     await page.click('[data-m="go"]');
     await step(10);
   }
-  if (name === 'life') await page.evaluate(() => { window.cl.playBot(window.game.state, 3, 9); window.game.state.pendingEvent = null; });
   if (only && only !== name) {
     for (let i = 0; i < count; i++) await page.evaluate(([name, i, count]) => window.promo[name](i, count), [name, i, count]);
     continue;
@@ -75,12 +78,15 @@ for (const [name, secs] of SCENES) {
   for (let i = 0; i < count; i++) {
     await page.evaluate(([name, i, count]) => window.promo[name](i, count), [name, i, count]);
     await step();
-    await shoot();
+    if (stills) {
+      if (i % 30 === 0 || i === count - 1) await page.screenshot({ path: `promo-out/stills/${name}-${String(i).padStart(3, '0')}.jpg`, type: 'jpeg', quality: 80 });
+    } else await shoot();
   }
   console.log(`${name}: ${count} frames (${n} total)`);
 }
 await browser.close();
 if (errors.length) console.log('page errors:', errors);
+if (stills) process.exit(0);
 
 const out = only ? `promo-out/scene-${only}.mp4` : 'promo-out/corner-lands-trailer.mp4';
 const audio = only ? [] : ['-i', 'promo-out/soundtrack.wav'];

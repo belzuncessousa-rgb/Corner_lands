@@ -31,7 +31,7 @@ const view = async (day, zoom, dx, dy, w, h) => {
     const m = s.buildings.find((b) => b.type === 'townhall') ?? s.buildings.find((b) => b.type === 'camp');
     g.renderer.centerOn(m.x + 2 + dx, m.y + 2 + dy);
     g.renderer.cam.zoom = zoom;
-    document.querySelectorAll('.banner, .msg, #season-banner, .modal-back').forEach((b) => b.remove());
+    document.querySelectorAll('.banner, .msg, #season-banner, .modal-back, #tutor').forEach((b) => b.remove());
   }, [day, zoom, dx, dy]);
   await page.waitForTimeout(2500);
   return (await page.screenshot({ type: 'jpeg', quality: 92 })).toString('base64');

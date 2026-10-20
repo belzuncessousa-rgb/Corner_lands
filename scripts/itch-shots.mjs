@@ -56,6 +56,7 @@ await page.screenshot({ path: 'itch/5-charters.png' });
 await page.evaluate(() => window.game.hud.closeModal());
 // The cover: a close view of the town with the title over it.
 await season(52, 1.7, false, 1, 1);
+await page.evaluate(() => document.getElementById('tutor')?.remove());
 await clean();
 await page.waitForTimeout(2500);
 const bg = (await page.screenshot({ type: 'jpeg', quality: 92 })).toString('base64');
