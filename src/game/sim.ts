@@ -1337,7 +1337,14 @@ export function recompute(s: GameState): void {
     travelField(s, true);
     for (const b of s.buildings) {
       b.trip = tripDays(s, b);
-      if (ZONE_OWNERS.has(b.type)) b.efficiency = zoneEfficiency(s, b);
+      // The walk out to the fields is worked out again only when the fields themselves change (and monthly).
+      if (ZONE_OWNERS.has(b.type)) {
+        const key = zonesOf(s, b).map((z) => z.id).join(',');
+        if (key !== b.zoneKey) {
+          b.zoneKey = key;
+          b.efficiency = zoneEfficiency(s, b);
+        }
+      }
     }
     s.dirty = false;
   }
@@ -1986,16 +1993,22 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
     case 'forester': {
       // Plant on the nearest open ground, wherever there is room: the further
       // the foresters must walk to find it, the slower the planting.
-      const f = walkFrom(s, b);
+      // Ring by ring outward from the lodge: cheap, and no limit short of a long walk.
+      const c = bCenter(b);
       const spots: number[] = [];
-      for (const i of f.order) {
-        if (s.terrain[i] || s.occ[i] >= 0 || s.road[i] || s.rock[i] || s.ore[i] || s.berriesMax[i] || s.trees[i] >= 4) continue;
-        spots.push(i);
-        if (spots.length >= 12) break;
+      for (let r = 1; r <= GATHER_REACH && spots.length < 12; r++) {
+        for (let y = Math.floor(c.y) - r; y <= Math.floor(c.y) + r; y++)
+          for (let x = Math.floor(c.x) - r; x <= Math.floor(c.x) + r; x++) {
+            if (Math.max(Math.abs(x - Math.floor(c.x)), Math.abs(y - Math.floor(c.y))) !== r || !inBounds(s, x, y)) continue;
+            const i = idx(s, x, y);
+            if (s.terrain[i] || s.occ[i] >= 0 || s.road[i] || s.rock[i] || s.ore[i] || s.berriesMax[i] || s.trees[i] >= 4) continue;
+            spots.push(i);
+          }
       }
       if (!spots.length) return 'No open ground to plant';
       const i = spots[Math.floor(rng.next() * spots.length)];
-      b.resDist = f.cost[i];
+      // Planting is done over rough ground: walking there counts at the off-road pace.
+      b.resDist = Math.hypot((i % s.width) + 0.5 - c.x, Math.floor(i / s.width) + 0.5 - c.y) * (ROAD_TILES_PER_DAY / OFFROAD_TILES_PER_DAY);
       s.trees[i]++;
       b.output++;
       return null;
@@ -3392,6 +3405,8 @@ export function monthly(s: GameState, rng: StateRng): void {
   monthlyHerds(s, month);
   monthlyYards(s, month);
   monthlyDraught(s);
+  // New roads shorten the walk out to the fields: measured again each season.
+  if (month % 3 === 0) for (const b of s.buildings) if (ZONE_OWNERS.has(b.type)) b.efficiency = zoneEfficiency(s, b);
   const merchants = runTradeOrders(s);
   report.trade = merchants.earned;
   report.imports = merchants.spent;

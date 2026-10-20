@@ -220,6 +220,8 @@ export interface Building {
   /** Wear on the workplace's tools and wood parts, in parts; and whether it is working with worn gear for want of new. */
   upkeep?: Partial<Record<'tools' | 'woodparts', number>>;
   worn?: boolean;
+  /** Farms and the like: the fields last measured for the walk out to them. */
+  zoneKey?: string;
   /** Trading post: a pack horse; builder's yard: an ox. Bought from the drovers and kept in a draught stable. */
   beast?: boolean;
   /** No grain for the draught animal this month: it does not work. */
