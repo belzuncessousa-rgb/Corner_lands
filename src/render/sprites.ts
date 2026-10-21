@@ -6788,7 +6788,7 @@ function drawPalace(p: Pen, season: Season, smoke: V3[]): void {
     [2.7, 0.45, 3.7, 2.6, 0.35],
     [0.3, 2.6, 1.3, 3.3, 0.45],
     [2.7, 2.6, 3.7, 3.3, 0.45],
-    [1.5, 2.6, 2.5, 2.95, 0.15],
+    [1.5, 2.6, 2.2, 2.95, 0.15],
   ]);
   // The forecourt: gravel, with a round basin in the middle.
   sandPatch(p, [[1.1, 2.95], [2.9, 2.95], [3.0, 3.95], [1.0, 3.95]], winter ? '#d8dcda' : '#d2c4a0', 4, 1.6);
@@ -6835,20 +6835,22 @@ function drawPalace(p: Pen, season: Season, smoke: V3[]): void {
   p.roofY(2.7, 0.45, 3.7, 2.6, 36, 22, ROOFC, ST, 0.08);
   smoke.push(p.chimney(3.2, 0.8, 52, 12, '#a8a093'));
   pavilion(0.3);
-  pavilion(2.7);
   // The door and the hangings in the lord's colours, on the wall behind the portico.
-  p.wallL(2.602, 1.86, 2.14, 2.5, 18, '#4a2f1b');
-  p.wallL(2.604, 1.62, 1.7, 14, 26, arms.field);
-  p.wallL(2.604, 2.3, 2.38, 14, 26, arms.field);
-  // The portico: four columns under a pediment carved with the arms.
-  p.box(1.5, 2.6, 2.5, 2.95, 0, 2.5, '#c4bcac');
-  for (const x of [1.58, 1.84, 2.16, 2.42]) {
+  p.wallL(2.602, 1.73, 1.97, 2.5, 18, '#4a2f1b');
+  p.wallL(2.604, 1.58, 1.64, 14, 26, arms.field);
+  p.wallL(2.604, 2.06, 2.12, 14, 26, arms.field);
+  // The portico: four columns under a pediment carved with the arms, narrow
+  // enough to stand clear of the towers either side of the court.
+  p.box(1.5, 2.6, 2.2, 2.95, 0, 2.5, '#c4bcac');
+  for (const x of [1.56, 1.76, 1.94, 2.14]) {
     p.line([x, 2.9, 2.5], [x, 2.9, 30], '#efe9dc', 2.4);
     p.line([x + 0.03, 2.9, 2.5], [x + 0.03, 2.9, 30], 'rgba(120,110,95,0.35)', 0.8);
   }
-  p.box(1.5, 2.6, 2.5, 2.95, 30, 3, '#e2dccd');
-  p.poly([[1.5, 2.95, 33], [2.5, 2.95, 33], [2.0, 2.95, 43]], '#e8e2d4', '#b8b0a0', 0.8);
-  p.circle(2.0, 2.952, 37, 2.6, arms.field);
+  p.box(1.5, 2.6, 2.2, 2.95, 30, 3, '#e2dccd');
+  p.poly([[1.5, 2.95, 33], [2.2, 2.95, 33], [1.85, 2.95, 41]], '#e8e2d4', '#b8b0a0', 0.8);
+  p.circle(1.85, 2.952, 36.5, 2.2, arms.field);
+  // The right tower stands in front of the portico, so it comes last.
+  pavilion(2.7);
 }
 
 /** Ground tile for building yards drawn under some buildings. */
