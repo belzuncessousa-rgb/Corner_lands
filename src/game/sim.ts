@@ -985,6 +985,7 @@ export function trade(s: GameState, id: ResourceId, amount: number): string | nu
     s.res[id] -= n;
     s.res.gold += sellPrice(s, id, n);
   }
+  s.tradedEver = (s.tradedEver ?? 0) + Math.abs(amount);
   return null;
 }
 
@@ -4147,8 +4148,14 @@ export function prestigeIncome(s: GameState): number {
 
 /** Knowledge the monks give each month for every monastery that had its book. */
 export const MONASTERY_KNOWLEDGE = 3;
-/** What the elders teach every month, from the first day (tuned in the balance pass). */
-export const ELDERS_LORE = 0.5;
+/**
+ * What the settlement's own lore brings every month, by its rank: a bigger
+ * place knows more (tuned so the whole board is learned a few years after City).
+ */
+export const RANK_LORE = [0.5, 1, 1.5, 2, 3];
+export function eldersLore(s: GameState): number {
+  return RANK_LORE[s.tier] ?? RANK_LORE[RANK_LORE.length - 1];
+}
 
 /**
  * Knowledge: what the town learns each month. The church teaches the
@@ -4207,7 +4214,7 @@ const KNOWLEDGE_LABELS: Partial<Record<BuildingType, string>> = {
 export function knowledgeSources(s: GameState): { label: string; value: number }[] {
   const out = new Map<string, number>();
   // The settlers' elders teach what they know, from the first day.
-  out.set("The elders' lore", ELDERS_LORE);
+  out.set(`Lore of the ${TIERS[s.tier].name.toLowerCase()}`, eldersLore(s));
   const art = artBoons(s).knowledge;
   if (art) out.set('Works of art', art);
   for (const b of s.buildings) {

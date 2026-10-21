@@ -2287,12 +2287,12 @@ describe('knowledge and the monastery', () => {
   });
 
   it('the church teaches, and so do the homes of the well-to-do', async () => {
-    const { knowledgeIncome, ELDERS_LORE } = await import('../src/game/sim');
+    const { knowledgeIncome, eldersLore } = await import('../src/game/sim');
     const s = generateWorld(78);
     s.tier = 3;
     s.res.gold = 9999;
     const base = knowledgeIncome(s);
-    expect(base).toBe(ELDERS_LORE);
+    expect(base).toBe(eldersLore(s));
     const c = placeNearRoad(s, 'church');
     c.build = 1;
     expect(knowledgeIncome(s)).toBe(base + 0.25);

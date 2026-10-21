@@ -566,6 +566,10 @@ export function act(s: GameState, rand: () => number): void {
   }
   if (s.tier >= 2) {
     for (const t of ['smithy'] as BuildingType[]) if (count(s, t) === 0) wants.push(t);
+    // A public school once the town can spare the hands; past ninety souls, a watch.
+    if (pop >= 60 && count(s, 'school') < 1) wants.push('school');
+    if (s.tier >= 3 && pop >= 85 && count(s, 'courthouse') < Math.ceil(pop / 150)) wants.unshift('courthouse');
+    if (s.tier >= 3 && pop >= 120 && count(s, 'bathhouse') < 1) wants.push('bathhouse');
     // Villagers past the manor clerk's reach pay nothing: a tax office for them.
     if ((s.report.untaxed ?? 0) > 10 && count(s, 'taxoffice') < 1 + Math.floor((s.report.untaxed ?? 0) / 40)) wants.unshift('taxoffice');
   }

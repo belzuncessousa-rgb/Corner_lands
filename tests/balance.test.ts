@@ -5,12 +5,19 @@ import { playBot } from '../src/game/autoplay';
 
 describe('balance', () => {
   it('a simple strategy grows from Hamlet to Borough', { timeout: 60000 }, () => {
+    const learned: number[] = [];
     const results = [101, 202, 303].map((seed) => {
       const s = generateWorld(seed);
       const rep = playBot(s, 12, seed);
-      if (process.env.BALANCE_LOG) console.log(`seed ${seed}\n${rep.log.join('\n')}\n`, rep);
+      learned.push(s.learned?.length ?? 0);
+      if (process.env.BALANCE_LOG) console.log(`seed ${seed}\n${rep.log.join('\n')}\n`, rep, s.learned?.length);
       return rep;
     });
+    // Knowledge comes slowly but steadily: by year twelve a good part of the board is learned, not all of it.
+    for (const n of learned) {
+      expect(n).toBeGreaterThan(45);
+      expect(n).toBeLessThan(110);
+    }
     for (const r of results) {
       expect(r.villageYear).not.toBeNull();
       expect(r.villageYear!).toBeLessThan(5);

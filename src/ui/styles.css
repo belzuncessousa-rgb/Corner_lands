@@ -2834,3 +2834,11 @@ button.plaque-btn.small {
 .lb-patch:active:not(:disabled) {
   transform: rotate(0deg) scale(1.04);
 }
+#buildbar .cards .card.locked {
+  filter: grayscale(0.85) brightness(0.92);
+  opacity: 0.72;
+}
+#buildbar .cards .card.locked:hover {
+  filter: grayscale(0.3);
+  opacity: 1;
+}
