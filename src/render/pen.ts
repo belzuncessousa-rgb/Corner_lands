@@ -53,19 +53,6 @@ export const ROOF_COLORS: Record<RoofKind, string> = {
 };
 
 /** Draws 3D primitives in isometric projection onto a 2D context. */
-/** A door on a building's front wall: which wall (L: the plane y = plane; R: x = plane), its span along it, its height. */
-export interface PenDoor {
-  face: 'L' | 'R';
-  plane: number;
-  a: number;
-  b: number;
-  h: number;
-  /** Raised doors (up steps): the sill's height. */
-  z0?: number;
-  /** An open doorway or shed with no door to swing: villagers just step into the dark. */
-  open?: boolean;
-}
-
 export class Pen {
   snow = false;
   /** Optional tint mixed into roof colours for variety. */
@@ -578,24 +565,9 @@ export class Pen {
     }
   }
 
-  /**
-   * Doors drawn on the front walls, in the order drawn: from doorL/doorR, and
-   * any dark, door-sized panel standing on the ground (hand-drawn doorways).
-   */
-  doors: PenDoor[] = [];
-  doorish: PenDoor[] = [];
-
-  private noteDoorish(face: 'L' | 'R', plane: number, a: number, b: number, za: number, zb: number, fill: string): void {
-    const w = Math.abs(b - a);
-    if (za > 2.5 || zb - za < 6 || zb > 22 || w < 0.1 || w > 0.75 || !/^#[0-9a-f]{6}$/i.test(fill)) return;
-    const [r, g, bl] = hexToRgb(fill);
-    if ((0.3 * r + 0.59 * g + 0.11 * bl) / 255 > 0.42) return;
-    this.doorish.push({ face, plane, a: Math.min(a, b), b: Math.max(a, b), h: zb, z0: za > 0.6 ? za : undefined });
-  }
 
   /** Quad on the front-left wall (plane y = y). */
   wallL(y: number, xa: number, xb: number, za: number, zb: number, fill: string): void {
-    this.noteDoorish('L', y, xa, xb, za, zb, fill);
     this.poly(
       [
         [xa, y, za],
@@ -609,7 +581,6 @@ export class Pen {
 
   /** Quad on the front-right wall (plane x = x). */
   wallR(x: number, ya: number, yb: number, za: number, zb: number, fill: string): void {
-    this.noteDoorish('R', x, ya, yb, za, zb, fill);
     this.poly(
       [
         [x, ya, za],
@@ -660,13 +631,11 @@ export class Pen {
   }
 
   doorL(y: number, x: number, w = 0.18, hgt = 11): void {
-    this.doors.push({ face: 'L', plane: y, a: x, b: x + w, h: hgt });
     this.wallL(y + 0.002, x, x + w, 0, hgt, '#5b3a22');
     this.line([x + w / 2, y + 0.003, 0], [x + w / 2, y + 0.003, hgt], '#3d2614', 0.6);
   }
 
   doorR(x: number, y: number, w = 0.18, hgt = 11): void {
-    this.doors.push({ face: 'R', plane: x, a: y, b: y + w, h: hgt });
     this.wallR(x + 0.002, y, y + w, 0, hgt, '#4a2f1b');
   }
 

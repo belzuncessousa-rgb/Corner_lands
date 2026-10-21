@@ -4,7 +4,7 @@ import { mulberry32 } from '../game/rng';
 import { HERALDRY } from './heraldry';
 import { HOME_TRADES } from '../game/sim';
 import type { BuildingType, Season } from '../game/types';
-import { type Material, Pen, type PenDoor, ROOF_COLORS, TH, TW, iso, mix, shade, type V3 } from './pen';
+import { type Material, Pen, ROOF_COLORS, TH, TW, iso, mix, shade, type V3 } from './pen';
 import type { Building, GameState } from '../game/types';
 
 /** Supersampling factor so sprites stay crisp when zoomed in. */
@@ -20,7 +20,6 @@ export interface Sprite {
   /** Chimney tops in local 3D coordinates, for smoke. */
   smoke: V3[];
   /** The door villagers go in and out by, in local tile coordinates, if it has one. */
-  door?: PenDoor;
 }
 
 export function makeSprite(w: number, h: number, ax: number, ay: number, draw: (ctx: CanvasRenderingContext2D) => V3[] | void): Sprite {
@@ -1157,68 +1156,12 @@ export function buildingSprite(type: BuildingType, w: number, h: number, level: 
   const top = 200;
   const sw = (w + h) * (TW / 2) + 30;
   const sh = (w + h) * (TH / 2) + top + 14;
-  let door: PenDoor | undefined;
-  const sp = makeSprite(sw, sh, h * (TW / 2) + 15, top, (ctx) => {
+  return makeSprite(sw, sh, h * (TW / 2) + 15, top, (ctx) => {
     const p = new Pen(ctx);
     p.snow = season === 3;
     p.matFor = wallMaterial;
-    const smoke = drawBuilding(p, type, level, season, variant);
-    door = pickDoor(p, w, h, type);
-    return smoke;
+    return drawBuilding(p, type, level, season, variant);
   });
-  sp.door = door;
-  return sp;
-}
-
-/**
- * The door to use from those drawn: the first proper door on a front wall,
- * else the front-most dark doorway standing on the ground. Doors on inner
- * walls (a porch, a lean-to) count only if they face out from the building.
- */
-function pickDoor(p: Pen, w: number, h: number, type: BuildingType): PenDoor | undefined {
-  if (DOOR_SPOTS[type]) return DOOR_SPOTS[type];
-  const front = (d: PenDoor) => (d.face === 'L' ? d.plane > h * 0.4 : d.plane > w * 0.4);
-  const real = p.doors.filter(front);
-  if (real.length) return real[0];
-  const rough = p.doorish.filter(front).sort((a, b) => b.plane - a.plane || (b.b - b.a) - (a.b - a.a));
-  return rough[0];
-}
-
-/**
- * Doors the pictures draw in their own way (stall doors, tent flaps, a raised
- * granary door, the cathedral's portal), and the spot under the roof where
- * open sheds are entered.
- */
-const DOOR_SPOTS: Partial<Record<BuildingType, PenDoor>> = {
-  camp: { face: 'R', plane: 1.1, a: 1.65, b: 1.95, h: 11, open: true },
-  cathedral: { face: 'L', plane: 5.752, a: 2.26, b: 2.74, h: 20 },
-  granary: { face: 'L', plane: 1.722, a: 0.62, b: 0.92, h: 23, z0: 9 },
-  stable: { face: 'L', plane: 1.052, a: 1.35, b: 1.77, h: 11, open: true },
-  draughtstable: { face: 'L', plane: 1.222, a: 1.02, b: 1.42, h: 10, open: true },
-  byre: { face: 'L', plane: 1.202, a: 0.85, b: 1.2, h: 11, open: true },
-  stonemason: { face: 'L', plane: 1.0, a: 0.7, b: 1.0, h: 9, open: true },
-  bloomery: { face: 'L', plane: 1.15, a: 0.7, b: 1.0, h: 9, open: true },
-  tanner: { face: 'L', plane: 0.95, a: 0.7, b: 1.0, h: 9, open: true },
-  kiln: { face: 'R', plane: 1.15, a: 0.8, b: 1.05, h: 7, open: true },
-  builderyard: { face: 'L', plane: 0.722, a: 0.5, b: 1.0, h: 9, open: true },
-  markethall: { face: 'L', plane: 2.85, a: 1.6, b: 2.2, h: 14, open: true },
-  sandpit: { face: 'L', plane: 0.75, a: 0.6, b: 0.9, h: 9, open: true },
-  limekiln: { face: 'L', plane: 1.5, a: 1.3, b: 1.7, h: 10, open: true },
-  collier: { face: 'L', plane: 0.75, a: 0.3, b: 0.5, h: 9, open: true },
-};
-
-const DOORS = new Map<string, PenDoor | null>();
-
-/** Where a building's door is drawn (local tile coordinates), for villagers to walk in by; cached. */
-export function buildingDoor(s: GameState, b: Building): PenDoor | null {
-  const v = variantOf(s, b);
-  const key = `${b.type}:${b.w}:${b.h}:${b.level}:${v}`;
-  let d = DOORS.get(key);
-  if (d === undefined) {
-    d = buildingSprite(b.type, b.w, b.h, b.level, 0, v).door ?? null;
-    DOORS.set(key, d);
-  }
-  return d;
 }
 
 /** Which look a building's picture takes: the house forms and colours, the dock's side, the cathedral's glass. */
