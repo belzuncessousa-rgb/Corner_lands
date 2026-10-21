@@ -5939,6 +5939,10 @@ function drawManor(p: Pen, level: number, season: Season, smoke: V3[]): void {
     p.bush(0.85, 2.35, 3.5, '#4f6f34');
     return;
   }
+  if (level >= 4) {
+    drawPalace(p, season, smoke);
+    return;
+  }
   // Stone Manor: three storeys of dressed stone, a matching wing and a
   // corner tower, on grounds of 4x4.
   const ST = '#b6ae9f';
@@ -5989,6 +5993,70 @@ function drawManor(p: Pen, level: number, season: Season, smoke: V3[]): void {
   p.box(1.55, 2.9, 2.1, 3.15, 0, 2, '#9b9284');
   p.wallL(2.905, 1.48, 1.57, 17, 28, arms.field);
   p.wallL(2.905, 2.09, 2.18, 17, 28, arms.field);
+}
+
+/**
+ * The Palace: a pale stone house of state round a gravelled forecourt, two
+ * wings ending in corner pavilions, a columned portico under a pediment and a
+ * copper dome over the hall, the lord's banner flying from its lantern.
+ */
+function drawPalace(p: Pen, season: Season, smoke: V3[]): void {
+  const winter = season === 3;
+  const arms = HERALDRY.current;
+  const ST = '#d4ccbc';
+  const ROOFC = 'slate';
+  p.shadow(0.2, 0.2, 3.85, 3.3);
+  // The forecourt: gravel, with a round basin in the middle.
+  p.poly([[1.1, 2.95, 0], [2.9, 2.95, 0], [3.0, 3.95, 0], [1.0, 3.95, 0]], winter ? '#d8dcda' : '#d2c4a0');
+  p.ellipse(2.0, 3.45, 1, 13, 6.5, '#a8a093');
+  p.ellipse(2.0, 3.45, 2, 11, 5.4, winter ? '#dde8ee' : '#5a8ab0');
+  p.line([2.0, 3.45, 2], [2.0, 3.45, 9], '#bab3a6', 1.6);
+  // Left wing, ridge front to back.
+  p.box(0.3, 0.45, 1.3, 2.95, 0, 36, ST, undefined, 'stone');
+  for (const z of [5, 19]) p.windowL(2.95, 0.55, z, 0.16, 9, winter && z === 5);
+  p.roofY(0.3, 0.45, 1.3, 2.95, 36, 22, ROOFC, ST, 0.08);
+  // The central block of state rooms.
+  p.box(1.3, 0.6, 2.7, 2.6, 0, 46, ST, undefined, 'stone');
+  for (const z of [6, 22]) for (const x of [1.45, 1.75, 2.25, 2.55]) p.windowL(2.6, x, z, 0.14, z === 22 ? 12 : 9, winter && z === 6);
+  for (const x of [1.45, 1.75, 2.0, 2.25, 2.55]) p.windowL(2.6, x - 0.04, 37, 0.12, 5);
+  // A balustrade along the top, and a low hipped roof behind it.
+  p.wallL(2.603, 1.3, 2.7, 43, 46, '#c4bcac');
+  p.roofPyramid(1.3, 0.6, 2.7, 2.6, 46, 12, ROOFC, 0.02);
+  // The dome over the great hall, its lantern and the lord's banner.
+  p.box(1.72, 1.32, 2.28, 1.88, 52, 8, ST);
+  p.ellipse(2.0, 1.6, 60, 22, 11, winter ? '#e6ecee' : '#5f9a86');
+  p.ellipse(2.0, 1.6, 66, 16, 8, winter ? '#f2f6f8' : '#6faa94');
+  p.ellipse(2.0, 1.6, 71, 9, 5, winter ? '#f6f9fa' : '#7cb8a2');
+  p.box(1.94, 1.54, 2.06, 1.66, 74, 6, ST);
+  p.lordFlag(2.0, 1.6, 80, 20);
+  smoke.push(p.chimney(1.45, 0.85, 50, 10, '#a8a093'));
+  // Right wing, ridge front to back.
+  p.box(2.7, 0.45, 3.7, 2.95, 0, 36, ST, undefined, 'stone');
+  for (const y of [0.75, 1.35, 1.95, 2.55]) for (const z of [5, 19]) p.windowR(3.7, y, z, 0.15, 9, winter && z === 5 && y === 1.35);
+  for (const z of [5, 19]) p.windowL(2.95, 3.25, z, 0.16, 9);
+  p.roofY(2.7, 0.45, 3.7, 2.95, 36, 22, ROOFC, ST, 0.08);
+  smoke.push(p.chimney(3.2, 0.8, 52, 12, '#a8a093'));
+  // Corner pavilions at the front of each wing, a storey higher, under tall roofs.
+  for (const x0 of [0.22, 3.08]) {
+    p.box(x0, 2.45, x0 + 0.7, 3.15, 0, 50, ST, undefined, 'stone');
+    for (const z of [6, 22, 38]) p.windowL(3.15, x0 + 0.27, z, 0.15, 9);
+    p.windowR(x0 + 0.7, 2.72, 22, 0.14, 9);
+    p.roofPyramid(x0, 2.45, x0 + 0.7, 3.15, 50, 26, ROOFC, 0.05);
+    p.line([x0 + 0.35, 2.8, 76], [x0 + 0.35, 2.8, 84], '#d8b84a', 1.2);
+  }
+  // The portico: four columns under a pediment carved with the arms.
+  p.box(1.5, 2.6, 2.5, 2.95, 0, 2.5, '#c4bcac');
+  for (const x of [1.58, 1.84, 2.16, 2.42]) {
+    p.line([x, 2.9, 2.5], [x, 2.9, 30], '#efe9dc', 2.4);
+    p.line([x + 0.03, 2.9, 2.5], [x + 0.03, 2.9, 30], 'rgba(120,110,95,0.35)', 0.8);
+  }
+  p.box(1.5, 2.6, 2.5, 2.95, 30, 3, '#e2dccd');
+  p.poly([[1.5, 2.95, 33], [2.5, 2.95, 33], [2.0, 2.95, 43]], '#e8e2d4', '#b8b0a0', 0.8);
+  p.circle(2.0, 2.952, 37, 2.6, arms.field);
+  p.wallL(2.602, 1.86, 2.14, 2.5, 18, '#4a2f1b');
+  // Hangings in the lord's colours either side of the door.
+  p.wallL(2.604, 1.62, 1.7, 14, 26, arms.field);
+  p.wallL(2.604, 2.3, 2.38, 14, 26, arms.field);
 }
 
 /** Ground tile for building yards drawn under some buildings. */

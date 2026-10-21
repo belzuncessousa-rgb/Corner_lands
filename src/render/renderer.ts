@@ -3,7 +3,7 @@ import { MANOR_SIZE, marketStalls, upgradeBlocker } from '../game/levels';
 import { knows } from '../game/unlocks';
 import { optionOn } from '../game/options';
 import { drawImprovements } from './props';
-import { ANIMAL_KINDS, LOW_EFFICIENCY, animalsOf, deliveredTo, hasProblem, herdTotal, lordRides, monthOf, nearestShoal, orchardMaturity, seasonOf, seatOf, storageCap, stored } from '../game/sim';
+import { estateTiles, ANIMAL_KINDS, LOW_EFFICIENCY, animalsOf, deliveredTo, hasProblem, herdTotal, lordRides, monthOf, nearestShoal, orchardMaturity, seasonOf, seatOf, storageCap, stored } from '../game/sim';
 import type { Building, BuildingType, GameState, ResourceId, Season } from '../game/types';
 import { idx, inBounds } from '../game/world';
 import { type Agent, LEISURE_ACTS } from './agents';
@@ -336,6 +336,37 @@ export class Renderer {
       }
     }
 
+    // Silver veins the prospectors found: a grey outcrop glinting with ore.
+    for (const i of s.silver ?? []) {
+      if (s.occ[i] >= 0) continue;
+      const x = i % W;
+      const y = (i / W) | 0;
+      const [wx, wy] = iso(x + 0.5, y + 0.5);
+      if (!visible(wx, wy)) continue;
+      this.blit(this.sprite(`k:silver:${season === 3}`, () => rockSprite(false, 1, season === 3 ? 3 : 0)), wx, wy);
+      const c = this.ctx;
+      // Veins of bright metal threading the rock.
+      c.strokeStyle = '#dfe6ee';
+      c.lineWidth = 1.2;
+      c.beginPath();
+      c.moveTo(wx - 12, wy - 3);
+      c.lineTo(wx - 7, wy - 7);
+      c.lineTo(wx - 3, wy - 5);
+      c.moveTo(wx - 4, wy - 1);
+      c.lineTo(wx + 1, wy - 5);
+      c.stroke();
+      const tw = 0.5 + 0.5 * Math.sin(this.time * 3 + i);
+      c.fillStyle = `rgba(240,248,255,${0.5 + 0.5 * tw})`;
+      for (const [dx, dy] of [
+        [-8, -6],
+        [-2, -3],
+        [-6, -9],
+      ]) {
+        c.beginPath();
+        c.arc(wx + dx, wy + dy, 0.8 + tw * 0.5, 0, Math.PI * 2);
+        c.fill();
+      }
+    }
     this.mark('shimmer+fields+roads');
     this.drawGroundOverlays(s, ov);
     this.mark('overlays');
@@ -673,7 +704,30 @@ export class Renderer {
     c.globalAlpha = 1;
   }
 
+  private estateCache = { key: '', tiles: [] as number[] };
+
+  /** The manor's grounds: the grass under the manor and its buildings worn into one gravelled shape. */
+  private drawGrounds(s: GameState, season: Season): void {
+    const key = `${s.buildings.length}:${s.nextId}:${s.buildings.find((b) => b.type === 'townhall')?.w ?? 0}`;
+    if (this.estateCache.key !== key) this.estateCache = { key, tiles: [...estateTiles(s)] };
+    const c = this.ctx;
+    c.fillStyle = season === 3 ? 'rgba(205,200,190,0.55)' : 'rgba(168,146,104,0.5)';
+    c.beginPath();
+    for (const i of this.estateCache.tiles) {
+      const x = i % s.width;
+      const y = (i / s.width) | 0;
+      // Each tile a little overgrown so neighbours run together.
+      const g = 0.12;
+      const pts = [iso(x - g, y - g), iso(x + 1 + g, y - g), iso(x + 1 + g, y + 1 + g), iso(x - g, y + 1 + g)];
+      c.moveTo(pts[0][0], pts[0][1]);
+      for (const [px, py] of pts.slice(1)) c.lineTo(px, py);
+      c.closePath();
+    }
+    c.fill();
+  }
+
   private drawFields(s: GameState, season: Season, selected?: number): void {
+    this.drawGrounds(s, season);
     const p = new Pen(this.ctx);
     const month = monthOf(s.day);
     const herds = new Map<number, number>();
@@ -695,6 +749,8 @@ export class Renderer {
         this.drawField(p, b, season, month);
       } else if (b.type === 'pasture') {
         this.drawPasture(p, s, b, season, herds);
+      } else if (b.type === 'deerpark') {
+        this.drawDeerPark(p, b, season);
       } else if (b.type === 'orchard') {
         // Mown grass between the rows.
         p.poly(
@@ -750,6 +806,54 @@ export class Renderer {
     }
     const [wx, wy] = iso(b.x, b.y);
     this.blit(hit.sp, wx, wy);
+  }
+
+  /** The deer park: rough grass inside a paling fence, a few trees, and the deer grazing. */
+  private drawDeerPark(p: Pen, b: Building, season: Season): void {
+    const x0 = b.x;
+    const y0 = b.y;
+    const x1 = b.x + b.w;
+    const y1 = b.y + b.h;
+    const winter = season === 3;
+    p.poly(
+      [
+        [x0, y0, 0],
+        [x1, y0, 0],
+        [x1, y1, 0],
+        [x0, y1, 0],
+      ],
+      winter ? 'rgba(240,244,246,0.3)' : 'rgba(70,110,40,0.28)',
+    );
+    const post = '#6b4a2e';
+    p.fence([x0 + 0.05, y0 + 0.05], [x1 - 0.05, y0 + 0.05], post);
+    p.fence([x0 + 0.05, y0 + 0.05], [x0 + 0.05, y1 - 0.05], post);
+    const rand = mulberry32(b.id * 13 + 1);
+    // A few old trees inside the paling, drawn from back to front.
+    const trees: [number, number][] = [];
+    for (let k = 0; k < Math.max(2, Math.floor((b.w * b.h) / 6)); k++) trees.push([x0 + 0.6 + rand() * (b.w - 1.2), y0 + 0.6 + rand() * (b.h - 1.2)]);
+    // The deer: a few grazing, wandering slowly about the park.
+    const deer = Math.min(8, Math.max(2, Math.floor((b.w * b.h) / 4)));
+    const items: { x: number; y: number; tree?: boolean; j?: number }[] = trees.map(([x, y]) => ({ x, y, tree: true }));
+    for (let j = 0; j < deer; j++) {
+      const r1 = rand();
+      const r2 = rand();
+      const t = this.time * 0.04 + r1 * 10;
+      items.push({ x: x0 + 0.4 + (b.w - 0.8) * (0.5 + 0.45 * Math.sin(r1 * 6.283 + t * 0.5)), y: y0 + 0.4 + (b.h - 0.8) * (0.5 + 0.45 * Math.sin(r2 * 6.283 + t * 0.4)), j });
+    }
+    items.sort((a, c) => a.x + a.y - (c.x + c.y));
+    for (const it of items) {
+      if (it.tree) {
+        const tv = Math.floor(it.x * 7 + it.y * 3) % TREE_VARIANTS;
+        const sp = this.sprite(`t:oak:${season}:${tv}`, () => treeSprite('oak', season, tv));
+        const [wx, wy] = iso(it.x, it.y);
+        this.blit(sp, wx, wy, 1, TREE_SCALE * 0.9);
+      } else {
+        const [sx, sy] = iso(it.x, it.y);
+        drawDeer(p.ctx, sx, sy, Math.sin(this.time * 0.02 + it.j!) > 0 ? 1 : -1, it.j! % 3 === 0);
+      }
+    }
+    p.fence([x1 - 0.05, y0 + 0.05], [x1 - 0.05, y1 - 0.05], post);
+    p.fence([x0 + 0.05, y1 - 0.05], [x1 - 0.05, y1 - 0.05], post);
   }
 
   private drawPasture(p: Pen, s: GameState, b: Building, season: Season, herds: Map<number, number>): void {
@@ -4414,6 +4518,56 @@ function drawBeast(c: CanvasRenderingContext2D, x: number, y: number, f: number,
     c.beginPath();
     c.moveTo(x + (len + 0.5) * f, y - tall - 2.2);
     c.lineTo(x + (len - 0.6) * f, y - tall - 3.8);
+    c.stroke();
+  }
+}
+
+/** A fallow deer: dappled back, white rump, a stag with antlers. */
+function drawDeer(c: CanvasRenderingContext2D, x: number, y: number, f: number, stag: boolean): void {
+  const len = 4.6;
+  const tall = 4.6;
+  c.fillStyle = 'rgba(20,20,10,0.22)';
+  c.beginPath();
+  c.ellipse(x, y, len + 0.8, 1.5, 0, 0, Math.PI * 2);
+  c.fill();
+  c.strokeStyle = '#5a3a20';
+  c.lineWidth = 0.9;
+  c.beginPath();
+  for (const lx of [-len * 0.6, len * 0.55]) {
+    c.moveTo(x + lx, y - tall);
+    c.lineTo(x + lx, y);
+  }
+  c.stroke();
+  c.fillStyle = '#a8683a';
+  c.beginPath();
+  c.ellipse(x, y - tall - 1.8, len, 2.3, 0, 0, Math.PI * 2);
+  c.fill();
+  c.fillStyle = '#f2ead8';
+  c.beginPath();
+  c.ellipse(x - len * 0.85 * f, y - tall - 1.6, 1.1, 1.4, 0, 0, Math.PI * 2);
+  c.fill();
+  for (const dx of [-1.6, 0, 1.6]) c.fillRect(x + dx, y - tall - 2.8, 0.7, 0.7);
+  const hx = x + (len + 0.4) * f;
+  const hy = y - tall - 4.4;
+  c.fillStyle = '#a8683a';
+  c.beginPath();
+  c.moveTo(x + (len - 1.4) * f, y - tall - 2.4);
+  c.lineTo(hx, hy + 0.8);
+  c.lineTo(hx - 0.6 * f, hy + 2.2);
+  c.closePath();
+  c.fill();
+  c.beginPath();
+  c.ellipse(hx + 0.6 * f, hy + 0.4, 1.5, 1, 0.3 * f, 0, Math.PI * 2);
+  c.fill();
+  if (stag) {
+    c.strokeStyle = '#d8c4a0';
+    c.lineWidth = 0.7;
+    c.beginPath();
+    c.moveTo(hx, hy - 0.4);
+    c.lineTo(hx - 1 * f, hy - 3.4);
+    c.lineTo(hx - 2.4 * f, hy - 4);
+    c.moveTo(hx - 0.6 * f, hy - 2.2);
+    c.lineTo(hx + 0.6 * f, hy - 3.6);
     c.stroke();
   }
 }
