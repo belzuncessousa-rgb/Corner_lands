@@ -495,7 +495,7 @@ export interface GameState {
   /** Months in a row of hunger or deep gloom (villagers leave from the second). */
   gloom?: number;
   /** Where the tutorial has got to, when this is the tutorial game. */
-  tutorial?: { step: number; chapter: 'start' | 'manor' | 'trade' | 'done'; manorSeen?: boolean; tradeSeen?: boolean };
+  tutorial?: { step: number; chapter: 'start' | 'manor' | 'trade' | 'learn' | 'done'; manorSeen?: boolean; tradeSeen?: boolean; learnSeen?: boolean };
   /** The player's lord or lady, as they chose to look. */
   lord?: import('../render/lord').LordLook;
   /** The lord's arms, flown on the manor's flags. */
