@@ -40,6 +40,8 @@ import {
   footprintClear,
   PAVING_COST,
   COBBLE_COST,
+  ROYAL_COST,
+  ROYAL_TIER,
   stepDay,
   updateHappiness,
   yearOf,
@@ -70,7 +72,7 @@ import { Hud } from './ui/hud';
 export type Tool =
   | { kind: 'select' }
   | { kind: 'build'; type: BuildingType }
-  | { kind: 'road'; paved?: boolean; cobbled?: boolean; wall?: boolean; lay?: BuildingType }
+  | { kind: 'road'; paved?: boolean; cobbled?: boolean; royal?: boolean; wall?: boolean; lay?: BuildingType }
   | { kind: 'zone'; type: BuildingType }
   | { kind: 'demolish' }
   | { kind: 'grove' };
@@ -561,15 +563,24 @@ export class Game {
         !!err,
       );
     } else if (tool.kind === 'road') {
-      const grade = tool.cobbled ? 3 : tool.paved ? 2 : 1;
+      const grade = tool.royal ? 4 : tool.cobbled ? 3 : tool.paved ? 2 : 1;
       const paved = grade === 2;
-      const tiles = this.roadTiles(tx, ty);
+      const tiles = grade === 4 ? widen(this.roadTiles(tx, ty)) : this.roadTiles(tx, ty);
       const done = (t: { x: number; y: number }) => s.road[idx(s, t.x, t.y)] >= grade;
       ov.tiles = tiles.map((t) => ({ ...t, ok: !roadError(s, t.x, t.y, grade) || done(t) }));
       ov.tileColor = 'road';
       const fresh = tiles.filter((t) => !done(t));
       const n = fresh.filter((t) => !roadError(s, t.x, t.y, grade)).length;
-      if (grade === 3) {
+      if (grade === 4) {
+        this.hud.setHint(
+          s.tier < ROYAL_TIER
+            ? 'The Royal Road comes to Boroughs'
+            : this.roadAnchor
+              ? `Royal Road: ${n} tiles, two abreast · ${n * (ROYAL_COST.stone ?? 0)} stone, ${n * (ROYAL_COST.dressedstone ?? 0)} dressed stone (bridges three times) · keep clicking to continue · ${s.royalLinked ? 'joined edge to edge ✓' : 'join two opposite edges of the land for its trade'}`
+              : 'Click where the Royal Road starts: it runs two tiles wide, and pays once it joins two opposite edges of the land',
+          s.tier < ROYAL_TIER,
+        );
+      } else if (grade === 3) {
         const ds = n * (COBBLE_COST.dressedstone ?? 0);
         this.hud.setHint(
           !knows(s, 'x:cobbles')
@@ -906,8 +917,8 @@ export class Game {
       if (placed) this.hud.sound('stone');
       return;
     }
-    const grade = this.tool.kind === 'road' ? (this.tool.cobbled ? 3 : this.tool.paved ? 2 : 1) : 1;
-    for (const t of this.roadTiles(tx, ty)) if (planRoad(s, t.x, t.y, grade)) n++;
+    const grade = this.tool.kind === 'road' ? (this.tool.royal ? 4 : this.tool.cobbled ? 3 : this.tool.paved ? 2 : 1) : 1;
+    for (const t of grade === 4 ? widen(this.roadTiles(tx, ty)) : this.roadTiles(tx, ty)) if (planRoad(s, t.x, t.y, grade)) n++;
     if (n) {
       recompute(s);
       this.hud.sound('road');
@@ -1088,6 +1099,8 @@ export class Game {
         this.setTool({ kind: 'road', paved: true });
       } else if (k === 'y') {
         this.setTool({ kind: 'road', cobbled: true });
+      } else if (k === 'k') {
+        this.setTool({ kind: 'road', royal: true });
       } else if (k === 'v') {
         this.cycleCoverage();
       } else if (k === 'u') {
@@ -1198,4 +1211,25 @@ function download(blob: Blob, name: string): void {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/** The Royal Road runs two abreast: each tile of the path with its neighbour beside it. */
+function widen(path: { x: number; y: number }[]): { x: number; y: number }[] {
+  const out: { x: number; y: number }[] = [];
+  const seen = new Set<string>();
+  const add = (x: number, y: number) => {
+    const k = `${x},${y}`;
+    if (!seen.has(k)) {
+      seen.add(k);
+      out.push({ x, y });
+    }
+  };
+  path.forEach((t, k) => {
+    const o = path[k + 1] ?? path[k - 1] ?? t;
+    add(t.x, t.y);
+    // Along x, the second lane is the next row; along y, the next column.
+    if (o.x !== t.x) add(t.x, t.y + 1);
+    else add(t.x + 1, t.y);
+  });
+  return out;
 }

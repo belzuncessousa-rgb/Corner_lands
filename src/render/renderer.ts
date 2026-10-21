@@ -33,6 +33,7 @@ import {
   homeWindow,
   pavedTile,
   cobbleTile,
+  royalTile,
   rockSprite,
   bogSprite,
   stallSprite,
@@ -323,6 +324,8 @@ export class Renderer {
           const sp =
             s.terrain[i] === 1
               ? this.sprite(`br:${season}:${mask}:${layer}`, () => bridgeTile(season, mask, layer))
+              : s.road[i] === 4
+                ? this.sprite(`ry:${season}:${mask}:${layer}`, () => royalTile(season, mask, layer))
               : s.road[i] === 3
                 ? this.sprite(`rc:${season}:${mask}:${layer}`, () => cobbleTile(season, mask, layer))
               : s.road[i] === 2
@@ -1986,8 +1989,8 @@ export class Renderer {
     c.setLineDash([3, 3]);
     c.lineWidth = 1.2;
     for (let k = 0; k < plan.length; k++) {
-      const i = plan[k] >> 2;
-      const paved = (plan[k] & 3) >= 2;
+      const i = plan[k] >> 3;
+      const paved = (plan[k] & 7) >= 2;
       const x = i % W;
       const y = (i / W) | 0;
       const [cx, cy] = iso(x + 0.5, y + 0.5);

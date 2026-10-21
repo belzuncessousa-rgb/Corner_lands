@@ -89,6 +89,8 @@ import {
   coveredBy,
   PAVING_COST,
   COBBLE_COST,
+  ROYAL_COST,
+  ROYAL_TIER,
   setWorkers,
   setPriority,
   setRecipe,
@@ -392,12 +394,13 @@ export class Hud {
       { paved: false, cobbled: false, key: 'R', name: 'Dirt road', icon: ICONS.road, cost: 'Free', open: true },
       { paved: true, cobbled: false, key: 'T', name: 'Stone road', icon: ICONS.paved, cost: `${costHtml(PAVING_COST, s.res)} a tile`, open: knows(s, 'x:stoneroad') },
       { paved: false, cobbled: true, key: 'Y', name: 'Cobbled street', icon: ICONS.cobbles, cost: `${costHtml(COBBLE_COST, s.res)} a tile`, open: knows(s, 'x:cobbles') },
+      { paved: false, cobbled: false, royal: true, key: 'K', name: 'The Royal Road', icon: ICONS.royalroad, cost: `${costHtml(ROYAL_COST, s.res)} a tile, two abreast; joined from one edge of the land to the other it is a Great Work: 30% quicker than cobbles, and every bargain 0.15 better`, open: s.tier >= ROYAL_TIER },
     ];
     return `<span class="road-pop">${kinds
       .filter((k) => k.open)
       .map((k) => {
-        const sel = tool.kind === 'road' && !!tool.paved === k.paved && !!tool.cobbled === k.cobbled;
-        return `<button class="road-kind ${sel ? 'active' : ''}" data-action="road-kind" ${k.paved ? 'data-paved="1"' : ''} ${k.cobbled ? 'data-cobbled="1"' : ''} data-tip="${esc(`<b>${k.name}</b> (${k.key})<br>${k.cost}`)}" aria-label="${k.name}">${k.icon}</button>`;
+        const sel = tool.kind === 'road' && !!tool.paved === k.paved && !!tool.cobbled === k.cobbled && !!tool.royal === !!k.royal;
+        return `<button class="road-kind ${sel ? 'active' : ''}" data-action="road-kind" ${k.paved ? 'data-paved="1"' : ''} ${k.cobbled ? 'data-cobbled="1"' : ''} ${k.royal ? 'data-royal="1"' : ''} data-tip="${esc(`<b>${k.name}</b> (${k.key})<br>${k.cost}`)}" aria-label="${k.name}">${k.icon}</button>`;
       })
       .join('')}</span>`;
   }
@@ -986,6 +989,9 @@ export class Hud {
                 ? `<small class="muted">${esc(err)}</small>`
                 : `<button data-action="retinue">Raise <small>${costHtml(RETINUE_COST)}</small></button>`
           }</span></div>`);
+        }
+        if (s.buildings.some((o) => o.type === 'stable' && o.build >= 1)) {
+          rows.push(`<div class="kv feast" data-tip="With a groom at the stable the lord rides about the land, quicker than on foot."><span>The lord goes</span><span class="seg"><button data-action="lord-walk" data-on="0" class="${s.lordWalks ? '' : 'on'}">🐎 Riding</button><button data-action="lord-walk" data-on="1" class="${s.lordWalks ? 'on' : ''}">🚶 On foot</button></span></div>`);
         }
       }
       const cap = housingOf(b);
@@ -1705,7 +1711,7 @@ export class Hud {
         g.setTool(g.tool.kind === 'road' && !g.tool.wall ? { kind: 'select' } : { kind: 'road' });
         break;
       case 'road-kind':
-        g.setTool({ kind: 'road', paved: !!t.dataset.paved, cobbled: !!t.dataset.cobbled });
+        g.setTool({ kind: 'road', paved: !!t.dataset.paved, cobbled: !!t.dataset.cobbled, royal: !!t.dataset.royal });
         break;
       case 'grove':
         this.category = null;
@@ -1841,6 +1847,12 @@ export class Hud {
           this.lastInspectorKey = '';
           this.update();
         }
+        break;
+      }
+      case 'lord-walk': {
+        s.lordWalks = t.dataset.on === '1' || undefined;
+        this.lastInspectorKey = '';
+        this.update();
         break;
       }
       case 'option': {

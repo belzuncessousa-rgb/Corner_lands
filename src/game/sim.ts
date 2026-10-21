@@ -472,8 +472,13 @@ export const PAVING_COST: Cost = { stone: 2 };
 /** Dressed stone for each tile of cobbled street. Both are learned (x:stoneroad, x:cobbles). */
 export const COBBLE_COST: Cost = { dressedstone: 2 };
 
-/** Road grades: 1 dirt, 2 stone (gravel and stone), 3 cobbled street. */
-export type RoadGrade = 1 | 2 | 3;
+/** Slabs for each tile of the Royal Road (three times over water). */
+export const ROYAL_COST: Cost = { stone: 2, dressedstone: 1 };
+/** The rank (Borough) from which the Royal Road may be built. */
+export const ROYAL_TIER = 3;
+
+/** Road grades: 1 dirt, 2 stone (gravel and stone), 3 cobbled street, 4 the Royal Road. */
+export type RoadGrade = 1 | 2 | 3 | 4;
 export function gradeOf(paved: boolean | RoadGrade): RoadGrade {
   return paved === true ? 2 : paved === false ? 1 : paved;
 }
@@ -487,6 +492,12 @@ export function roadError(s: GameState, x: number, y: number, paved: boolean | R
   if (s.occ[i] >= 0) return 'Occupied';
   if (s.rock[i]) return 'Rocky ground';
   if (s.ore[i]) return 'Boggy ground';
+  if (grade === 4) {
+    if (s.tier < ROYAL_TIER) return 'The Royal Road comes to Boroughs';
+    if (s.road[i] === 4) return 'Already the Royal Road';
+    if (!canAfford(s, royalCost(s, i))) return s.terrain[i] === 1 ? 'Not enough stone for a stone bridge (three times the cost)' : 'Not enough stone and dressed stone';
+    return null;
+  }
   if (grade === 3) {
     if (!knows(s, 'x:cobbles')) return 'Learn cobbled streets first';
     if (s.road[i] === 3) return 'Already cobbled';
@@ -510,10 +521,12 @@ export function roadError(s: GameState, x: number, y: number, paved: boolean | R
 export function buildRoad(s: GameState, x: number, y: number, paved: boolean | RoadGrade = false): boolean {
   if (roadError(s, x, y, paved)) return false;
   const grade = gradeOf(paved);
-  if (grade === 3) pay(s, COBBLE_COST);
+  if (grade === 4) pay(s, royalCost(s, idx(s, x, y)));
+  else if (grade === 3) pay(s, COBBLE_COST);
   else if (grade === 2) pay(s, PAVING_COST);
   else if (isBridge(s, x, y)) pay(s, BRIDGE_COST);
   setRoad(s, x, y, true, grade);
+  if (grade === 4) s.royalLinked = royalLinked(s);
   return true;
 }
 
@@ -523,8 +536,8 @@ export function removeRoad(s: GameState, x: number, y: number): boolean {
   if (plannedRoad(s, i)) {
     // An unlaid tile is simply struck from the plan, and what was paid comes back.
     for (let k = s.roadPlan!.length - 1; k >= 0; k--) {
-      if (s.roadPlan![k] >> 2 !== i) continue;
-      refundRoad(s, i, s.roadPlan![k] & 3);
+      if (s.roadPlan![k] >> 3 !== i) continue;
+      refundRoad(s, i, s.roadPlan![k] & 7);
       s.roadPlan!.splice(k, 1);
     }
     return true;
@@ -541,12 +554,13 @@ export const PAVE_LAY_PER_DAY = 6;
 /** The kind of road planned on a tile and not laid yet (0 if none). */
 export function plannedRoad(s: GameState, i: number): number {
   if (!s.roadPlan?.length) return 0;
-  for (const c of s.roadPlan) if (c >> 2 === i) return c & 3;
+  for (const c of s.roadPlan) if (c >> 3 === i) return c & 7;
   return 0;
 }
 
 function refundRoad(s: GameState, i: number, kind: number): void {
-  if (kind === 3) refund(s, COBBLE_COST, 1);
+  if (kind === 4) refund(s, royalCost(s, i), 1);
+  else if (kind === 3) refund(s, COBBLE_COST, 1);
   else if (kind === 2) refund(s, PAVING_COST, 1);
   else if (s.terrain[i] === 1) refund(s, BRIDGE_COST, 1);
 }
@@ -558,19 +572,75 @@ function refundRoad(s: GameState, i: number, kind: number): void {
 export function planRoad(s: GameState, x: number, y: number, paved: boolean | RoadGrade = false): boolean {
   if (roadError(s, x, y, paved)) return false;
   const grade = gradeOf(paved);
-  if (grade === 3) pay(s, COBBLE_COST);
+  const i = idx(s, x, y);
+  if (grade === 4) pay(s, royalCost(s, i));
+  else if (grade === 3) pay(s, COBBLE_COST);
   else if (grade === 2) pay(s, PAVING_COST);
   else if (isBridge(s, x, y)) pay(s, BRIDGE_COST);
-  const i = idx(s, x, y);
   // One plan to a tile: a better road planned over a lesser one takes its place.
-  const k = (s.roadPlan ??= []).findIndex((c) => c >> 2 === i);
+  const k = (s.roadPlan ??= []).findIndex((c) => c >> 3 === i);
   if (k >= 0) {
-    refundRoad(s, i, s.roadPlan[k] & 3);
+    refundRoad(s, i, s.roadPlan[k] & 7);
     s.roadPlan.splice(k, 1);
   }
-  s.roadPlan.push(i * 4 + grade);
+  s.roadPlan.push(i * 8 + grade);
   return true;
 }
+
+/** What a tile of Royal Road costs: three times over water, as a stone bridge. */
+export function royalCost(s: GameState, i: number): Cost {
+  const k = s.terrain[i] === 1 ? 3 : 1;
+  return { stone: (ROYAL_COST.stone ?? 0) * k, dressedstone: (ROYAL_COST.dressedstone ?? 0) * k };
+}
+
+/**
+ * Whether the Royal Road joins two opposite edges of the land: only then
+ * do the king's merchants use it, and its trade bonus begins.
+ */
+export function royalLinked(s: GameState): boolean {
+  const W = s.width;
+  const H = s.height;
+  const seen = new Uint8Array(W * H);
+  for (const [from, to] of [
+    ['left', 'right'],
+    ['top', 'bottom'],
+  ] as const) {
+    seen.fill(0);
+    const queue: number[] = [];
+    for (let k = 0; k < (from === 'left' ? H : W); k++) {
+      const i = from === 'left' ? k * W : k;
+      if (s.road[i] === 4) {
+        seen[i] = 1;
+        queue.push(i);
+      }
+    }
+    while (queue.length) {
+      const i = queue.pop()!;
+      const x = i % W;
+      const y = (i / W) | 0;
+      if ((to === 'right' && x === W - 1) || (to === 'bottom' && y === H - 1)) return true;
+      for (const [dx, dy] of [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ]) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+        const n = ny * W + nx;
+        if (!seen[n] && s.road[n] === 4) {
+          seen[n] = 1;
+          queue.push(n);
+        }
+      }
+    }
+  }
+  return false;
+}
+
+/** The Royal Road, joined edge to edge: imports a further 0.15 cheaper and exports 0.15 dearer. */
+export const ROYAL_TRADE = 0.15;
 
 /** Lays planned road tiles as the days pass; returns how many were laid. */
 export function layRoads(s: GameState, days: number): number {
@@ -582,8 +652,8 @@ export function layRoads(s: GameState, days: number): number {
   let n = 0;
   while (s.roadPlan.length) {
     const c: number = s.roadPlan[0];
-    const i = c >> 2;
-    const kind = c & 3;
+    const i = c >> 3;
+    const kind = c & 7;
     const need = 1 / (kind >= 2 ? PAVE_LAY_PER_DAY : ROAD_LAY_PER_DAY);
     if (work < need) break;
     work -= need;
@@ -595,6 +665,7 @@ export function layRoads(s: GameState, days: number): number {
     }
     if (kind === 1 && s.road[i]) continue;
     setRoad(s, i % s.width, Math.floor(i / s.width), true, kind);
+    if (kind === 4) s.royalLinked = royalLinked(s);
     n++;
   }
   s.roadWork = s.roadPlan.length ? work : 0;
@@ -672,7 +743,7 @@ export function buyPrice(s: GameState, id: ResourceId, n: number): number {
 
 /** Better terms with the merchants: toll navigation and trade deals each take a tenth off imports and add a tenth to sales. */
 export function tradeTerms(s: GameState): number {
-  return (knows(s, 'x:tollnav') ? 0.1 : 0) + (knows(s, 'x:tradedeals') ? 0.1 : 0);
+  return (knows(s, 'x:tollnav') ? 0.1 : 0) + (knows(s, 'x:tradedeals') ? 0.1 : 0) + (s.royalLinked ? ROYAL_TRADE : 0);
 }
 
 /** Coins earned selling n units at the market. */
@@ -4200,6 +4271,7 @@ export function learningYield(s: GameState): number {
 
 /** Whether the lord rides out on horseback: a stable with its groom at work. */
 export function lordRides(s: GameState): boolean {
+  if (s.lordWalks) return false;
   return s.buildings.some((b) => b.type === 'stable' && b.build >= 1 && b.workers > 0);
 }
 
@@ -4226,7 +4298,8 @@ export function retinueError(s: GameState): string | null {
   if (s.tier < RETINUE_TIER) return `Requires ${TIERS[RETINUE_TIER].name}`;
   if (s.res.prestige < (RETINUE_COST.prestige ?? 0)) return `Needs ${RETINUE_COST.prestige} prestige`;
   if (s.res.gold < (RETINUE_COST.gold ?? 0)) return `Needs ${RETINUE_COST.gold} coins`;
-  if (!s.buildings.some((b) => b.type === 'armoury' && b.build >= 1)) return 'Needs an armoury';
+  if (!s.buildings.some((b) => b.type === 'barracks' && b.build >= 1)) return 'Raised at the barracks';
+  if (!s.buildings.some((b) => b.type === 'armoury' && b.build >= 1)) return 'Needs an armoury to fit them out';
   return null;
 }
 
@@ -4265,8 +4338,9 @@ function monthlyPrestige(s: GameState): void {
   s.universityOk = uni && s.res.books >= books;
   if (s.universityOk) s.res.books -= books;
   if (hasCharter(s, 'trade3b')) {
+    // The Royal Road pays three times as much a tile.
     let paved = 0;
-    for (let i = 0; i < s.road.length; i++) if (s.road[i] >= 2) paved++;
+    for (let i = 0; i < s.road.length; i++) if (s.road[i] >= 2) paved += s.road[i] === 4 ? 3 : 1;
     s.res.gold += Math.floor(paved / 2);
   }
 }

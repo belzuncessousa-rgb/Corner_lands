@@ -1037,6 +1037,8 @@ describe('retinue', () => {
     s.res.gold = 100;
     expect(retinueError(s)).toMatch(/Borough/);
     s.tier = 3;
+    expect(retinueError(s)).toMatch(/barracks/);
+    s.buildings.push({ ...s.buildings[0], id: 9998, type: 'barracks', build: 1 });
     expect(retinueError(s)).toMatch(/armoury/);
     s.buildings.push({ ...s.buildings[0], id: 9999, type: 'armoury', build: 1 });
     expect(raiseRetinue(s)).toBeNull();

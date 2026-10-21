@@ -643,6 +643,70 @@ export function pavedTile(season: Season, mask: number, layer: 'edge' | 'fill', 
 }
 
 /** Cobbled street (dressed stone): rounded setts over the whole roadway. */
+/**
+ * The Royal Road: broad slabs of pale dressed stone paving the whole tile,
+ * so its two lanes side by side read as one wide way, kerbed where it ends.
+ */
+export function royalTile(season: Season, mask: number, layer: 'edge' | 'fill'): Sprite {
+  return makeSprite(TW + 28, TH + 28, TW / 2 + 14, 14, (ctx) => {
+    const cy = TH / 2;
+    const diamond = (grow: number) => {
+      ctx.beginPath();
+      ctx.moveTo(0, cy - TH / 2 - grow / 2);
+      ctx.lineTo(TW / 2 + grow, cy);
+      ctx.lineTo(0, cy + TH / 2 + grow / 2);
+      ctx.lineTo(-TW / 2 - grow, cy);
+      ctx.closePath();
+    };
+    if (layer === 'edge') {
+      ctx.fillStyle = season === 3 ? 'rgba(170,165,155,0.5)' : 'rgba(120,105,80,0.45)';
+      diamond(5);
+      ctx.fill();
+      return;
+    }
+    ctx.fillStyle = season === 3 ? '#d8d6d0' : '#c9bfa8';
+    diamond(1);
+    ctx.fill();
+    // Slabs in courses across the tile.
+    ctx.strokeStyle = season === 3 ? '#b8b4ac' : '#9c917a';
+    ctx.lineWidth = 0.7;
+    const rand = mulberry32(mask * 29 + 5);
+    for (let k = 1; k < 4; k++) {
+      const t = k / 4;
+      ctx.beginPath();
+      ctx.moveTo(-TW / 2 + (TW / 2) * t, cy - (TH / 2) * t);
+      ctx.lineTo((TW / 2) * t, cy + TH / 2 - (TH / 2) * t);
+      ctx.stroke();
+    }
+    for (let k = 0; k < 8; k++) {
+      const u = rand() - 0.5;
+      const v = rand() - 0.5;
+      const x = (u - v) * (TW / 2);
+      const y = cy + (u + v) * (TH / 2);
+      ctx.beginPath();
+      ctx.moveTo(x - 3, y - 1.5);
+      ctx.lineTo(x + 3, y + 1.5);
+      ctx.stroke();
+    }
+    // A kerb where the road stops (sides with no road beside).
+    ctx.strokeStyle = season === 3 ? '#a8a49c' : '#7e735e';
+    ctx.lineWidth = 1.4;
+    const sides: [number, [number, number], [number, number]][] = [
+      [1, [TW / 2, cy], [0, cy + TH / 2]],
+      [2, [0, cy + TH / 2], [-TW / 2, cy]],
+      [4, [-TW / 2, cy], [0, cy - TH / 2]],
+      [8, [0, cy - TH / 2], [TW / 2, cy]],
+    ];
+    for (const [bit, a, b] of sides) {
+      if (mask & bit) continue;
+      ctx.beginPath();
+      ctx.moveTo(a[0], a[1]);
+      ctx.lineTo(b[0], b[1]);
+      ctx.stroke();
+    }
+  });
+}
+
 export function cobbleTile(season: Season, mask: number, layer: 'edge' | 'fill'): Sprite {
   return makeSprite(TW + 28, TH + 28, TW / 2 + 14, 14, (ctx) => {
     const cx = 0;

@@ -96,6 +96,8 @@ export function deserialize(json: string): GameState {
     for (const b of s.buildings) if (b.type === 'tavern') b.level = Math.max(b.level, 2);
     s.version = 3;
   }
+  // Planned roads now keep their kind in three bits (the Royal Road is the fourth).
+  if (beforeRework && s.roadPlan) s.roadPlan = s.roadPlan.map((c) => (c >> 2) * 8 + (c & 3));
   if (beforeRework) s.version = 4;
   // Goods once sold above their target become export orders at the first trading post or dock.
   if (s.sell) {

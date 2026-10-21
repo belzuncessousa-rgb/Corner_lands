@@ -3,7 +3,7 @@ import type { ResourceId } from '../game/types';
 const svg = (body: string) =>
   `<svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">${body}</svg>`;
 
-export const ICONS: Record<ResourceId | 'people' | 'happy' | 'materials' | 'goods' | 'storage' | 'granary' | 'road' | 'paved' | 'cobbles' | 'demolish' | 'grove' | 'cal', string> = {
+export const ICONS: Record<ResourceId | 'people' | 'happy' | 'materials' | 'goods' | 'storage' | 'granary' | 'road' | 'paved' | 'cobbles' | 'royalroad' | 'demolish' | 'grove' | 'cal', string> = {
   wood: svg(
     '<rect x="2" y="7" width="15" height="6" rx="3" fill="#7a5230"/><ellipse cx="16" cy="10" rx="2.4" ry="3" fill="#d8b47c"/><ellipse cx="16" cy="10" rx="1" ry="1.3" fill="#9a7346"/><path d="M4 9h8M5 11h7" stroke="#5a3a20" stroke-width=".8"/>',
   ),
@@ -119,6 +119,7 @@ export const ICONS: Record<ResourceId | 'people' | 'happy' | 'materials' | 'good
   paved: svg(
     '<path d="M5 18L8 2h4l3 16z" fill="#8a8274"/><g fill="#c2bbad"><ellipse cx="9" cy="5" rx="1.3" ry=".8"/><ellipse cx="11.2" cy="5.2" rx="1" ry=".8"/><ellipse cx="8.4" cy="9" rx="1.4" ry=".9"/><ellipse cx="11.4" cy="9" rx="1.4" ry=".9"/><ellipse cx="7.6" cy="14" rx="1.6" ry="1"/><ellipse cx="10.2" cy="14.2" rx="1.4" ry="1"/><ellipse cx="12.8" cy="14" rx="1.5" ry="1"/></g>',
   ),
+  royalroad: svg('<path d="M3 18L7 2h6l4 16z" fill="#c9bfa8" stroke="#7e735e" stroke-width=".8"/><path d="M10 3v15" stroke="#9c917a" stroke-width=".7" stroke-dasharray="1.6 1.2"/><path d="M8 7h4M7 11h6M6 15h8" stroke="#9c917a" stroke-width=".5"/><path d="M10 1.5l1 1.6h-2z" fill="#d8a838"/>'),
   cobbles: svg('<path d="M5 18L8 2h4l3 16z" fill="#3e3228"/><g fill="#d8c096"><rect x="8.35" y="2.30" width="1.40" height="2.10" rx=".5"/><rect x="10.25" y="2.30" width="1.40" height="2.10" rx=".5"/><rect x="7.77" y="5.20" width="0.74" height="2.50" rx=".5"/><rect x="9.01" y="5.20" width="1.98" height="2.50" rx=".5"/><rect x="11.49" y="5.20" width="0.74" height="2.50" rx=".5"/><rect x="7.11" y="8.50" width="1.59" height="2.90" rx=".5"/><rect x="9.20" y="8.50" width="1.59" height="2.90" rx=".5"/><rect x="11.30" y="8.50" width="1.59" height="2.90" rx=".5"/><rect x="6.51" y="12.20" width="0.75" height="1.90" rx=".5"/><rect x="7.76" y="12.20" width="1.99" height="1.90" rx=".5"/><rect x="10.25" y="12.20" width="1.99" height="1.90" rx=".5"/><rect x="12.74" y="12.20" width="0.75" height="1.90" rx=".5"/><rect x="5.95" y="14.90" width="2.37" height="2.50" rx=".5"/><rect x="8.82" y="14.90" width="2.37" height="2.50" rx=".5"/><rect x="11.68" y="14.90" width="2.37" height="2.50" rx=".5"/></g><path d="M5 18L8 2M15 18L12 2" stroke="#2e1e14" stroke-width="1.2"/>'),
   road: svg('<path d="M6 18L9 2h2l3 16z" fill="#a88a5c"/><path d="M10 4v2M10 9v2M10 14v2" stroke="#e8d8b0" stroke-width="1"/>'),
   demolish: svg(

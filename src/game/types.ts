@@ -488,6 +488,8 @@ export interface GameState {
   mushroomsMax?: Record<number, number>;
   /** Road tiles drawn by the player and not laid yet: tile index * 4 + kind (1 dirt, 2 stone, 3 cobbled), in order. */
   roadPlan?: number[];
+  /** The Royal Road joins two opposite edges of the land. */
+  royalLinked?: boolean;
   /** Progress towards laying the next planned road tile (in tiles). */
   roadWork?: number;
   /** Months in a row of hunger or deep gloom (villagers leave from the second). */
@@ -506,6 +508,8 @@ export interface GameState {
   name?: string;
   /** Works of art commissioned with prestige (see COMMISSIONS). */
   commissions?: string[];
+  /** The lord leaves the horse in the stable and goes on foot. */
+  lordWalks?: boolean;
   /** The atelier's hopes: this month's chance of a masterpiece, and months of rest left after one. */
   atelier?: { chance: number; rest: number };
   /** The lord's rank: 0 Lord, 1 Baron, 2 Earl, 3 Duke (see TITLES). */
