@@ -299,6 +299,8 @@ export function finishUpgrade(s: GameState, b: Building): void {
     return;
   }
   b.level = b.upgrading ?? b.level;
+  // A Patrician House is built right across its plot: the backyard goes.
+  if (b.type === 'house' && b.level >= 5) b.yard = undefined;
   b.upgrading = undefined;
   b.upProgress = undefined;
   b.upNote = undefined;

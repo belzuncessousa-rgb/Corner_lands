@@ -3283,6 +3283,7 @@ export function setFlowers(s: GameState, b: Building, on: boolean): string | nul
 export function setYard(s: GameState, b: Building, kind: string | undefined): string | null {
   if (b.type !== 'house' || b.build < 1) return 'Only homes have backyards';
   if (kind === b.yard) return null;
+  if (kind && b.level >= 5) return 'A Patrician House fills its plot: a paved court, no backyard';
   if (kind) {
     const y = YARDS[kind];
     if (!y) return 'Unknown';

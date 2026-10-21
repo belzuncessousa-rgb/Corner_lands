@@ -4155,6 +4155,12 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
         p.box(x0, y1 - 0.1, x1, y1, 0, 3, hedge);
         yew(mx, my, 16);
       };
+      // An avenue of ornamental trees down the two far walks: at the back, so drawn first.
+      const crown = winter ? '#9aa894' : season === 0 ? '#f0c4d4' : season === 2 ? '#d0803a' : '#4f8a3a';
+      for (let k = 1; k < 10; k += 2) {
+        if (k !== 5) tree(0.3, k, crown);
+      }
+      for (let k = 3; k < 10; k += 2) if (k !== 5) tree(k, 0.3, crown);
       // Back left: a lily pond with a pavilion beside it.
       {
         const [px, py] = iso(2.6, 2.6, 0);
@@ -4203,6 +4209,9 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
           p.circle(x - 0.05, 0.85, 16, 1.6, '#e84a6a');
         }
       }
+      // What stands behind the great fountain is drawn before it.
+      for (const [x, y] of [[5.0, 2.3], [2.3, 5.0]] as const) statue(x, y);
+      yew(4.4, 4.4, 18);
       // The great fountain where the walks cross: two basins and a jet.
       {
         const [fx, fy] = iso(5.0, 5.0, 0);
@@ -4251,14 +4260,8 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
         }
       }
       // Statues at the ends of the walks and yews flanking them.
-      for (const [x, y] of [[5.0, 2.3], [2.3, 5.0], [7.7, 5.0], [5.0, 7.7]] as const) statue(x, y);
-      for (const [x, y] of [[4.4, 4.4], [5.6, 4.4], [4.4, 5.6], [5.6, 5.6]] as const) yew(x, y, 18);
-      // An avenue of ornamental trees down the two far walks, and the corners.
-      const crown = winter ? '#9aa894' : season === 0 ? '#f0c4d4' : season === 2 ? '#d0803a' : '#4f8a3a';
-      for (let k = 1; k < 10; k += 2) {
-        if (k !== 5) tree(0.3, k, crown);
-      }
-      for (let k = 3; k < 10; k += 2) if (k !== 5) tree(k, 0.3, crown);
+      for (const [x, y] of [[7.7, 5.0], [5.0, 7.7]] as const) statue(x, y);
+      for (const [x, y] of [[5.6, 4.4], [4.4, 5.6], [5.6, 5.6]] as const) yew(x, y, 18);
       // The hedge round it all, open where the great walk meets the street.
       p.box(N - 0.3, 0.1, N - 0.1, 4.5, 0, 7, hedge);
       p.box(N - 0.3, 5.5, N - 0.1, N - 0.1, 0, 7, hedge);

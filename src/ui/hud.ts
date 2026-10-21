@@ -1057,7 +1057,14 @@ export class Hud {
         rows.push(`<div class="upgrade-box"><b>${label}</b><div class="desc">${what}</div>
           <div class="reqs">${plan.reqs.map((r) => `<span class="${r.met ? 'met' : 'unmet'}">${r.met ? '✓' : '✗'} ${esc(r.label)}</span>`).join('')}</div>
           <div class="costline">${costHtml(plan.cost, s.res)}</div>
-          <button class="primary" data-action="upgrade" ${blocker ? 'disabled' : ''}>⬆ ${b.type === 'townhall' ? 'Raise the manor' : 'Upgrade'}</button></div>`);
+          ${
+            // Rebuilding as a Patrician House clears the backyard: ask first.
+            b.type === 'house' && plan.to === 5 && b.yard && this.confirmUpgrade !== b.id
+              ? `<button class="primary" data-action="upgrade-ask" ${blocker ? 'disabled' : ''}>⬆ Upgrade</button>`
+              : b.type === 'house' && plan.to === 5 && b.yard
+                ? `<p class="warn">A Patrician House is built right across its plot: the ${esc(YARDS[b.yard]?.name.toLowerCase() ?? 'backyard')} will go.</p><button class="primary" data-action="upgrade">Yes, rebuild it</button> <button data-action="upgrade-cancel">Keep the house as it is</button>`
+                : `<button class="primary" data-action="upgrade" ${blocker ? 'disabled' : ''}>⬆ ${b.type === 'townhall' ? 'Raise the manor' : 'Upgrade'}</button>`
+          }</div>`);
       }
       const imps = b.build >= 1 ? improvementsFor(b.type) : [];
       if (imps.length) {
@@ -1384,7 +1391,7 @@ export class Hud {
           .join('')}</span></div>`);
       }
     }
-    if (b.type === 'house' && b.build >= 1) {
+    if (b.type === 'house' && b.build >= 1 && b.level < 5) {
       const opts = [{ id: '', name: 'None', cost: {} as Cost, desc: 'Nothing but a woodpile.', tier: 0 }, ...Object.entries(YARDS).map(([id, y]) => ({ id, ...y }))];
       rows.push(`<div class="kv product"><span>Backyard</span><span class="seg">${opts
         .map((o) => {
@@ -1885,9 +1892,20 @@ export class Hud {
         this.update();
         break;
       }
+      case 'upgrade-ask':
+        this.confirmUpgrade = this.selectedBuilding()?.id ?? null;
+        this.lastInspectorKey = '';
+        this.update();
+        break;
+      case 'upgrade-cancel':
+        this.confirmUpgrade = null;
+        this.lastInspectorKey = '';
+        this.update();
+        break;
       case 'upgrade': {
         const b = this.selectedBuilding();
         if (b && startUpgrade(s, b)) this.sound('place');
+        this.confirmUpgrade = null;
         this.update();
         break;
       }
@@ -2145,6 +2163,8 @@ export class Hud {
   private charterSel: string | null = null;
   /** The learning board: its open tab, the patch looked at, and a choice awaiting a second click. */
   private learnTab: LearnTab = 'land';
+  /** A home whose rebuilding (it loses its backyard) waits for a second click. */
+  private confirmUpgrade: number | null = null;
   private learnSel: string | null = null;
   private learnConfirm: string | null = null;
 
