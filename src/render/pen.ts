@@ -391,6 +391,12 @@ export class Pen {
     this.poly([d, a, apex], shade(col, 0.95), shade(col, 0.5));
     this.poly([d, c, apex], this.snow ? '#eef2f4' : shade(col, 1.05), shade(col, 0.5));
     this.poly([b, c, apex], this.snow ? '#cdd6dc' : shade(col, 0.75), shade(col, 0.45));
+    // The two faces we see get their slates, tiles or shingles like any other roof.
+    if (!this.snow && kind !== 'thatch') {
+      this.roofTexture([d, c, apex, apex], kind, 1.05);
+      this.roofTexture([b, c, apex, apex], kind, 0.75);
+      this.line(c, apex, shade(col, 0.45), 0.8);
+    }
   }
 
   /**
