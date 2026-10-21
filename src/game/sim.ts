@@ -1274,8 +1274,8 @@ export function coveredBy(s: GameState, b: Building, type: BuildingType): boolea
   }
   const c = bCenter(b);
   for (const o of s.buildings) {
-    // A cathedral serves as a church, with a far wider reach.
-    const serves = o.type === type || (type === 'church' && o.type === 'cathedral');
+    // A cathedral serves as a church, with a far wider reach; a fountain is water for the homes close by.
+    const serves = o.type === type || (type === 'church' && o.type === 'cathedral') || (type === 'well' && o.type === 'fountain');
     if (!serves || o.build < 1) continue;
     if (BUILDINGS[o.type].workers > 0 && (o.workers === 0 || o.blocked === BLOCK_PROBLEM)) continue;
     const oc = bCenter(o);
@@ -1987,7 +1987,7 @@ export function charterBonus(s: GameState, b: Building, id: ResourceId): number 
   const d = workDef(b);
   let f = 1;
   const t = b.trade ?? b.type;
-  if ((t === 'forager' || t === 'hunter') && hasCharter(s, 'nature1')) f *= 1.4;
+  if ((t === 'forager' || t === 'hunter') && hasCharter(s, 'nature1')) f *= 1.5;
   if (t === 'hunter' && hasCharter(s, 'nature3b')) f *= 1.5;
   if (t === 'woodcutter' && hasCharter(s, 'nature2')) f *= 1.2;
   if ((t === 'quarry' || t === 'mine') && onPath(s, 'nature')) f *= 0.8;

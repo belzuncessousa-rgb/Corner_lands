@@ -166,7 +166,8 @@ export function houseNeeds(s: GameState, b: Building, level: number): Need[] {
     out.push({ label: 'A luxury: jewellery, fine clothes, glass, wine or fine pottery', met: luxuryCount(s, b) >= 1 || LUXURIES.some((id) => s.res[id] >= 1) });
   }
   if (level >= 5) {
-    out.push({ label: 'A school in town', met: s.buildings.some((o) => o.type === 'school' && o.build >= 1) });
+    // A public school, or a church with its Sunday school.
+    out.push({ label: 'A school in town (public or Sunday)', met: s.buildings.some((o) => o.build >= 1 && (o.type === 'school' || (o.type === 'church' && !!o.improved?.includes('sundayschool')))) });
     out.push({ label: 'A Great Work in town', met: s.buildings.some((o) => GREAT_WORKS.includes(o.type) && o.build >= 1) });
     out.push({ label: 'Fine clothes', met: hasSupply(s, b, 'fineclothes') });
     out.push({ label: 'Two more luxuries', met: luxuryCount(s, b, 'fineclothes') >= 2 || LUXURIES.filter((id) => id !== 'fineclothes' && s.res[id] >= 1).length >= 2 });

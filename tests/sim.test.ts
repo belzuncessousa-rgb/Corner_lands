@@ -1007,6 +1007,7 @@ describe('mead', () => {
     bh.need = undefined;
     bh.recipe = 'mead';
     s.res.honey = 30;
+    s.res.firewood = 60;
     s.learned = s.learned!.filter((id) => id !== 'r:brewhouse:mead');
     expect(chooseRecipe(s, bh)).toBeNull();
     s.learned.push('r:brewhouse:mead');

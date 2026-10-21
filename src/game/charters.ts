@@ -53,7 +53,7 @@ export const CHARTERS: Charter[] = [
   { id: 'learning3a', path: 'learning', rank: 3, name: 'University Charter', desc: 'The University reads only one book a month and teaches half as much again, and its learning makes every workplace 10% faster instead of 5%.', excludes: ['learning3b'] },
   { id: 'learning3b', path: 'learning', rank: 3, name: 'Cathedral School', desc: 'A choir and a library: +6 happiness, +2 prestige a month, and the cathedral and churches teach twice as much.', excludes: ['learning3a'] },
 
-  { id: 'nature1', path: 'nature', rank: 1, name: 'Woodland Lore', desc: 'Foragers and hunters bring home 40% more.' },
+  { id: 'nature1', path: 'nature', rank: 1, name: 'Woodland Lore', desc: 'Foragers and hunters bring home half as much again.' },
   { id: 'nature2', path: 'nature', rank: 2, name: 'Greenwood', desc: 'Forests regrow twice as fast, woodcutters fell a fifth more, and the people love their woods (+3 happiness).' },
   { id: 'nature3a', path: 'nature', rank: 3, name: "Druids' Grove", desc: 'Old rites under the oaks: +6 happiness, herbs for the gathering, +1 prestige a month; and content with their woods, homes go up a level, or keep theirs, with one need unmet.', excludes: ['nature3b', 'metal2'] },
   { id: 'nature3b', path: 'nature', rank: 3, name: 'Royal Hunt', desc: 'The king hunts in your woods: hunters bring half again, two more herds of deer roam the land, and the deer park yields twice as much and brings 2 more prestige.', excludes: ['nature3a', 'metal2'] },

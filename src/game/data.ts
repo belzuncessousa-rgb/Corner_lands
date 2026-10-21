@@ -487,8 +487,8 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     tier: 1,
     recipes: [
       { id: 'ale', name: 'Ale', inputs: { barley: 3 }, outputs: { ale: 4 }, fuel: 1 },
-      { id: 'cider', name: 'Cider', inputs: { apples: 4 }, outputs: { cider: 4 } },
-      { id: 'mead', name: 'Mead', inputs: { honey: 3 }, outputs: { mead: 3 } },
+      { id: 'cider', name: 'Cider', inputs: { apples: 4 }, outputs: { cider: 4 }, fuel: 1 },
+      { id: 'mead', name: 'Mead', inputs: { honey: 3 }, outputs: { mead: 3 }, fuel: 1 },
     ],
   }),
   dairy: def({
@@ -1282,7 +1282,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   fountain: def({
     type: 'fountain',
     name: 'Stone Fountain',
-    desc: 'A small stone basin with a spout. Mostly for looks: a touch lovelier nearby.',
+    desc: 'A small stone basin with a spout: a touch lovelier nearby, and water for the homes close by, like a well of short reach.',
     category: 'decor',
     w: 1,
     h: 1,
