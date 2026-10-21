@@ -33,7 +33,7 @@ import {
 } from './data';
 import { advise } from './advisor';
 import { CHARTERS, hasCharter, onPath } from './charters';
-import { rollEvent } from './events';
+import { artBoons, DUKE_PRESTIGE, monthlyAtelier, rollEvent, TITLES } from './events';
 import {
   HOUSE_LEVELS,
   STONE_MANOR,
@@ -196,10 +196,15 @@ export function footprintClear(s: GameState, x: number, y: number, w: number, h:
  */
 export function isUnlocked(s: GameState, type: BuildingType): boolean {
   const d = BUILDINGS[type];
-  if (MANOR_WORKS.includes(type)) return hasStoneManor(s);
-  if (PALACE_WORKS.includes(type)) return manorLevel(s) >= PALACE;
-  if (type === 'stewpond') return manorLevel(s) >= 2;
+  // The lord's buildings wait for the manor (and, some of them, for learning too).
+  if (MANOR_WORKS.includes(type) && !hasStoneManor(s)) return false;
+  if (PALACE_WORKS.includes(type) && manorLevel(s) < PALACE) return false;
+  if (type === 'stewpond' && manorLevel(s) < 2) return false;
   if (type === 'stable') return s.buildings.some((b) => b.type === 'townhall' && b.build >= 1 && b.level >= 2);
+  if (MANOR_WORKS.includes(type) || PALACE_WORKS.includes(type) || type === 'stewpond') {
+    const u = unlockForBuilding(type);
+    return !u || knows(s, u.id);
+  }
   // Charters gate any building; the settlement's rank only decorations and the monuments.
   if (d.charter && !hasCharter(s, d.charter)) return false;
   // Everything outside the starting set must be learned (or wait for a rank).
@@ -216,7 +221,7 @@ export const ONE_PER_TOWN: BuildingType[] = ['atelier', 'barracks', 'tiltyard', 
 export const MONUMENTS: BuildingType[] = ['statue', 'belltower'];
 
 /** What a Stone Manor lets the lord build. */
-export const MANOR_WORKS: BuildingType[] = ['manorgarden', 'watchtower', 'wall', 'armoury'];
+export const MANOR_WORKS: BuildingType[] = ['manorgarden', 'watchtower', 'wall', 'armoury', 'deerpark'];
 /** What a Palace lets the lord build. */
 export const PALACE_WORKS: BuildingType[] = ['atelier', 'barracks', 'tiltyard'];
 
@@ -233,9 +238,9 @@ export function hasStoneManor(s: GameState): boolean {
 export function lockReason(s: GameState, type: BuildingType): string | null {
   const d = BUILDINGS[type];
   if (isUnlocked(s, type)) return null;
-  if (MANOR_WORKS.includes(type)) return 'Requires the Stone Manor';
-  if (PALACE_WORKS.includes(type)) return 'Requires the Palace';
-  if (type === 'stewpond') return 'Requires the Manor House';
+  if (MANOR_WORKS.includes(type) && !hasStoneManor(s)) return 'Requires the Stone Manor';
+  if (PALACE_WORKS.includes(type) && manorLevel(s) < PALACE) return 'Requires the Palace';
+  if (type === 'stewpond' && manorLevel(s) < 2) return 'Requires the Manor House';
   if (type === 'stable') return 'Requires the Manor House';
   if (d.tier > s.tier) return `Requires ${TIERS[d.tier].name}`;
   if (d.charter && !hasCharter(s, d.charter)) return `Requires the ${CHARTERS.find((c) => c.id === d.charter)?.name ?? d.charter} charter`;
@@ -262,8 +267,76 @@ export function placementError(s: GameState, type: BuildingType, x: number, y: n
   if (type === 'manorgarden' && s.buildings.some((b) => b.type === 'manorgarden')) return 'Your manor has its garden';
   if (type === 'stable' && s.buildings.some((b) => b.type === 'stable')) return 'Your manor has its stable';
   if (type === 'university' && s.buildings.some((b) => b.type === 'university')) return 'Your town has its university';
+  if (type === 'watchtower' && s.buildings.filter((b) => b.type === 'watchtower').length >= watchTowerLimit(s)) return `${watchTowerLimit(s)} watch towers for a town this size`;
+  if (type === 'silvermine' && !silverUnder(s, x, y, d.w, d.h)) return 'Must stand on a silver vein';
+  if (ESTATE.includes(type) && !touchesEstate(s, x, y, d.w, d.h)) return "Must touch the manor's grounds (the manor, its buildings, or hedges, flower beds and gardens beside them)";
   if ((d.cost.gold ?? 0) > s.res.gold) return 'Not enough coins';
   return null;
+}
+
+/** The deer park: its fence, its least size, and what it gives each month. */
+export const DEER_PARK_FENCE = 12;
+export const DEER_PARK_MIN = 12;
+/** Venison a staffed deer park gives each month for every four tiles. */
+export const DEER_PARK_MEAT = 1;
+
+/** Watch towers a town may keep: two for each rank above Village. */
+export function watchTowerLimit(s: GameState): number {
+  return Math.max(0, 2 * (s.tier - 1));
+}
+
+/** The lord's buildings: each must touch the manor or what already touches it. */
+export const ESTATE: BuildingType[] = ['stable', 'armoury', 'manorgarden', 'atelier', 'stewpond', 'tiltyard', 'barracks', 'deerpark'];
+/** Decorations that join the manor's grounds when they touch them. */
+const ESTATE_DECOR: BuildingType[] = ['hedge', 'flowerbed', 'publicgarden', 'manorgarden'];
+
+/** The tiles of the manor's grounds: the manor and everything of the estate joined to it. */
+export function estateTiles(s: GameState): Set<number> {
+  const hall = s.buildings.find((b) => b.type === 'townhall');
+  const tiles = new Set<number>();
+  if (!hall) return tiles;
+  const joined = new Set<number>([hall.id]);
+  const queue = [hall];
+  while (queue.length) {
+    const b = queue.pop()!;
+    for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) tiles.add(idx(s, x, y));
+    for (let y = b.y - 1; y <= b.y + b.h; y++)
+      for (let x = b.x - 1; x <= b.x + b.w; x++) {
+        if (!inBounds(s, x, y)) continue;
+        const id = s.occ[idx(s, x, y)];
+        if (id < 0 || joined.has(id)) continue;
+        const o = getBuilding(s, id);
+        if (!o || !(ESTATE.includes(o.type) || ESTATE_DECOR.includes(o.type))) continue;
+        // Corners do not join: the sides must meet.
+        const corner = (x < b.x || x >= b.x + b.w) && (y < b.y || y >= b.y + b.h);
+        if (corner) continue;
+        joined.add(id);
+        queue.push(o);
+      }
+  }
+  return tiles;
+}
+
+function touchesEstate(s: GameState, x: number, y: number, w: number, h: number): boolean {
+  const tiles = estateTiles(s);
+  for (let yy = y; yy < y + h; yy++)
+    for (let xx = x; xx < x + w; xx++)
+      for (const [dx, dy] of [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ])
+        if (inBounds(s, xx + dx, yy + dy) && tiles.has(idx(s, xx + dx, yy + dy))) return true;
+  return false;
+}
+
+function silverUnder(s: GameState, x: number, y: number, w: number, h: number): boolean {
+  return (s.silver ?? []).some((i) => {
+    const vx = i % s.width;
+    const vy = Math.floor(i / s.width);
+    return vx >= x && vx < x + w && vy >= y && vy < y + h;
+  });
 }
 
 /** Materials of a cost that builders must carry (gold is paid up front). */
@@ -298,6 +371,7 @@ export function isZone(type: BuildingType): boolean {
 export function zoneCost(type: BuildingType, w: number, h: number): Cost {
   if (type === 'pasture') return { wood: w + h };
   if (type === 'orchard') return { gold: 2 * w * h };
+  if (type === 'deerpark') return { wood: DEER_PARK_FENCE };
   return {};
 }
 
@@ -318,6 +392,11 @@ export function zoneError(s: GameState, type: BuildingType, x0: number, y0: numb
   if (r.w > z.max || r.h > z.max) return `At most ${z.max}×${z.max} tiles`;
   const clear = footprintClear(s, r.x, r.y, r.w, r.h);
   if (clear) return clear;
+  if (type === 'deerpark') {
+    if (s.buildings.some((b) => b.type === 'deerpark')) return 'Your manor has its deer park';
+    if (r.w * r.h < DEER_PARK_MIN) return `At least ${DEER_PARK_MIN} tiles`;
+    if (!touchesEstate(s, r.x, r.y, r.w, r.h)) return "Must touch the manor's grounds";
+  }
   const cost = zoneCost(type, r.w, r.h);
   if (!canAfford(s, cost)) return cost.gold ? 'Not enough coins' : 'Not enough timber for fences';
   return null;
@@ -635,7 +714,7 @@ export function wornYield(b: Building): number {
  */
 export function dailyUpkeep(s: GameState): void {
   for (const b of s.buildings) {
-    const extra = b.improved?.length ? improvedUpkeep(b) : undefined;
+    const extra = b.improved?.length ? improvedUpkeep(b, hasCharter(s, 'farm2') ? ['ironplough'] : []) : undefined;
     let wear = UPKEEP[b.type];
     if (extra) {
       wear = { ...wear };
@@ -646,7 +725,7 @@ export function dailyUpkeep(s: GameState): void {
     for (const k in wear) {
       const id = k as 'tools' | 'woodparts';
       const acc = (b.upkeep ??= {});
-      acc[id] = (acc[id] ?? 0) + ((wear[id] ?? 0) * crew) / DAYS_PER_MONTH;
+      acc[id] = (acc[id] ?? 0) + ((wear[id] ?? 0) * crew * (id === 'tools' && hasCharter(s, 'metal3b') ? 0.8 : 1)) / DAYS_PER_MONTH;
       if ((acc[id] ?? 0) < 1) continue;
       if (s.res[id] >= 1) {
         s.res[id] -= 1;
@@ -841,11 +920,11 @@ export function trade(s: GameState, id: ResourceId, amount: number): string | nu
 /** Market price of a good, with what charters add to it. */
 export function priceOf(s: GameState, id: ResourceId): number {
   const base = TRADE_PRICES[id] ?? 0;
-  const special: Partial<Record<ResourceId, string>> = { ale: 'farm3b', cheese: 'herd3b' };
-  if (special[id] && hasCharter(s, special[id]!)) return base * 2;
+  if ((id === 'ale' || id === 'cider' || id === 'mead') && hasCharter(s, 'farm3b')) return base * 1.5;
+  if (id === 'cheese' && hasCharter(s, 'herd3b')) return base * 1.5;
   if ((id === 'wine' || id === 'cider') && hasCharter(s, 'orchard3a')) return base * 1.5;
   if (id === 'tools' && hasCharter(s, 'metal3b')) return base * 1.5;
-  if (id === 'books' && hasCharter(s, 'learning3b')) return base * 1.5;
+  if (id === 'fineclothes' && hasCharter(s, 'craft3a')) return base * 1.25;
   return base;
 }
 
@@ -916,7 +995,9 @@ export function hasLuxury(s: GameState, b: Building): boolean {
 
 /** Luxuries a home has in use now (optionally not counting one). */
 export function luxuryCount(s: GameState, b: Building, except?: ResourceId): number {
-  return LUXURIES.filter((id) => id !== except && (b.supply?.[id] ?? -1) > s.day).length;
+  const have = LUXURIES.filter((id) => id !== except && (b.supply?.[id] ?? -1) > s.day);
+  // Potters' Guild: fine pottery counts twice.
+  return have.length + (hasCharter(s, 'craft3b') && have.includes('pottery') ? 1 : 0);
 }
 
 /** Luxuries a home of this level wants at once: one for a Merchant's House, three for a Patrician House. */
@@ -1838,7 +1919,13 @@ export function charterBonus(s: GameState, b: Building, id: ResourceId): number 
   if (t === 'hunter' && hasCharter(s, 'nature3b')) f *= 1.5;
   if (t === 'woodcutter' && hasCharter(s, 'nature2')) f *= 1.2;
   if ((t === 'quarry' || t === 'mine') && onPath(s, 'nature')) f *= 0.8;
-  if ((t === 'bloomery' || t === 'smithy' || t === 'armoury') && hasCharter(s, 'metal1')) f *= 1.25;
+  if ((t === 'bloomery' || t === 'smithy') && hasCharter(s, 'metal1')) f *= 1.25;
+  if (t === 'smithy' && hasCharter(s, 'metal3b')) f *= 4 / 3;
+  if (t === 'dyer' && hasCharter(s, 'craft1')) f *= 1.5;
+  if ((t === 'glassworks' || t === 'glazier') && hasCharter(s, 'craft2')) f *= 4 / 3;
+  if (t === 'embroiderer' && hasCharter(s, 'craft3a')) f *= 2;
+  if (t === 'potter' && hasCharter(s, 'craft3b')) f *= 2;
+  if (id === 'mead' && hasCharter(s, 'orchard3b')) f *= 1.5;
   if (t === 'jeweller' && hasCharter(s, 'metal3a')) f *= 2;
   if (t === 'scriptorium' && id === 'books' && hasCharter(s, 'learning1')) f *= 1.5;
   if ((t === 'windmill' || t === 'watermill' || t === 'bakery') && hasCharter(s, 'farm3a')) f *= 1.3;
@@ -1846,7 +1933,7 @@ export function charterBonus(s: GameState, b: Building, id: ResourceId): number 
   const converter = Object.keys(d.inputs).length > 0 || !!d.recipes?.some((r) => Object.keys(r.inputs).length > 0);
   if (converter && hasCharter(s, 'learning2')) f *= 1.1;
   if ((id === 'cider' || id === 'wine') && hasCharter(s, 'orchard3a')) f *= 1.5;
-  if (id === 'ale' && hasCharter(s, 'farm3b')) f *= 1.5;
+  if ((id === 'ale' || id === 'cider' || id === 'mead') && t === 'brewhouse' && hasCharter(s, 'farm3b')) f *= 1.5;
   if (id === 'cheese' && hasCharter(s, 'herd3b')) f *= 1.5;
   return f;
 }
@@ -2116,14 +2203,12 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
       b.resDist = walkFrom(s, b).cost[t];
       // Deep shafts never exhaust a vein.
       // A deep shaft makes the ore last twice as long.
-      if (!(b.type === 'mine' && hasCharter(s, 'metal2')) && !(has(b, 'deepshaft') && rng.next() < 0.5)) arr[t]--;
+      if (!(has(b, 'deepshaft') && rng.next() < 0.5)) arr[t]--;
       // A crane lifts one stone in five out ready-dressed.
       if (has(b, 'crane') && rng.next() < 0.2) {
         addOutput(s, b, { dressedstone: 1 });
         return null;
       }
-      // Precious veins: now and then a load of silver.
-      if (b.type === 'mine' && hasCharter(s, 'metal2') && rng.next() < 0.3) b.output += produced(s, 'silver', 1);
       addOutput(s, b, d.outputs);
       return null;
     }
@@ -2211,6 +2296,8 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
         if (e) return `Enough ${GOODS[e].name.toLowerCase()} in store`;
       }
       ({ inputs, outputs } = improvedRecipe(b, inputs, outputs) as { inputs: Cost; outputs: Cost });
+      // Dyers' Guild: berries dye as well as woad.
+      if (b.type === 'dyer' && inputs.berries && hasCharter(s, 'craft1')) inputs = { berries: 3 };
       if (b.type === 'beekeeper') {
         if ((b.swarmed ?? -1) > s.day) return 'The bees swarmed away: waiting for a new swarm';
         // Skeps give more honey, log hives a little more and never swarm.
@@ -2595,7 +2682,7 @@ function stepFarm(s: GameState, b: Building): void {
     return;
   }
   if (month <= 5) {
-    const grow = b.workers > 0 ? (b.workers * (hasCharter(s, 'farm2') ? 1.5 : 1) * (has(b, 'ironplough') ? 1.5 : 1) * wornYield(b) * (b.efficiency ?? 1)) / (area * TEND_PER_TILE) : 0;
+    const grow = b.workers > 0 ? (b.workers * (hasCharter(s, 'farm2') ? 1.25 : 1) * (has(b, 'ironplough') ? 1.5 : 1) * wornYield(b) * (b.efficiency ?? 1)) / (area * TEND_PER_TILE) : 0;
     for (const f of fields) {
       f.growth = Math.min(1, f.growth + grow);
       f.status = b.workers ? (month < 3 ? `Sowing ${cropOf(f)}` : `${cap(cropOf(f))} growing`) : 'Untended';
@@ -3629,6 +3716,28 @@ export function checkFeats(s: GameState): void {
   add('animalwork', () => s.buildings.some((o) => beastWorks(o)));
 }
 
+/**
+ * The lord's grounds each month: the deer park's venison, and the food the
+ * watchmen in their towers and the men in the barracks eat.
+ */
+function monthlyGrounds(s: GameState): void {
+  for (const b of s.buildings) {
+    if (b.build < 1) continue;
+    if (b.type === 'deerpark' && b.workers > 0) {
+      const meat = Math.floor(((b.w * b.h) / 4) * DEER_PARK_MEAT * (hasCharter(s, 'nature3b') ? 2 : 1));
+      b.output += produced(s, 'meat', Math.min(meat, Math.floor(roomFor(s, 'meat'))));
+      b.status = `${b.w * b.h} tiles of park: ${meat} venison a month`;
+    }
+    if ((b.type === 'watchtower' || b.type === 'barracks') && b.workers > 0) {
+      const food = (['bread', 'meat', 'fish', 'vegetables', 'cheese', 'pork'] as ResourceId[]).find((k) => s.res[k] >= GARRISON_FOOD);
+      if (food) s.res[food] -= GARRISON_FOOD;
+    }
+  }
+}
+
+/** Food each watch tower and the barracks eat a month. */
+export const GARRISON_FOOD = 2;
+
 /** Chance each month that a beekeeper's skeps swarm away. */
 export const SKEP_SWARM = 0.08;
 
@@ -3855,6 +3964,8 @@ export function monthly(s: GameState, rng: StateRng): void {
   serveAle(s);
   supplyHomes(s);
   monthlyCivic(s);
+  monthlyAtelier(s, rng);
+  monthlyGrounds(s);
   checkFeats(s);
   // Bees in skeps swarm away now and then: a month without honey.
   if (knows(s, 'c:skeps'))
@@ -3928,20 +4039,19 @@ export function prestigeIncome(s: GameState): number {
     if (b.build < 1) continue;
     if (b.type === 'townhall') n += (b.level - 1) * 1.5;
     else if (b.type === 'church') n += b.level >= 2 ? 1 : 0.5;
-    else if (b.type === 'cathedral') n += 6;
+    else if (b.type === 'cathedral') n += 3;
     else if (b.type === 'wall') walls++;
     else if (b.type === 'statue') n += 1;
     else if (b.type === 'belltower') n += 2;
     else if (b.type === 'manorgarden') n += 4;
     else if (b.type === 'watchtower') n += 0.5;
     else if (b.type === 'stable') n += 0.5;
-    else if (b.type === 'university') n += s.universityOk ? (hasCharter(s, 'learning3a') ? 6 : 4) : 0;
+    else if (b.type === 'university') n += s.universityOk ? 4 : 0;
     else if (b.type === 'publicgarden') n += 0.5;
     else if (b.type === 'guildhall') n += 4;
     else if (b.type === 'maypole') n += 0.5;
     else if (b.type === 'monastery') n += b.reading ? 0.5 : 0;
     else if (b.type === 'house' && b.level >= 3) n += b.level >= 4 ? 0.5 : 0.2;
-    else if (b.type === 'hunter' && hasCharter(s, 'nature3b')) n += 1;
   }
   if (hasCharter(s, 'learning1')) n += 1;
   if (hasCharter(s, 'learning3b')) n += 2;
@@ -3950,6 +4060,16 @@ export function prestigeIncome(s: GameState): number {
   // Town walls: renown grows with every twenty sections, up to six a month.
   n += Math.min(6, walls / 20);
   n += optionPrestige(s);
+  n += artBoons(s).prestige;
+  // The lord's grounds.
+  for (const b of s.buildings) {
+    if (b.build < 1) continue;
+    if (b.type === 'armoury' || b.type === 'tiltyard' || b.type === 'barracks') n += 1;
+    else if (b.type === 'stewpond' && b.workers > 0) n += 0.5;
+    else if (b.type === 'deerpark' && b.workers > 0) n += 1 + (hasCharter(s, 'nature3b') ? 2 : 0);
+  }
+  // A Duke's house: a fifth more.
+  if ((s.title ?? 0) >= 4) n *= DUKE_PRESTIGE;
   return n;
 }
 
@@ -3970,16 +4090,16 @@ export function knowledgeOf(s: GameState, b: Building): number {
     case 'church': {
       // A Sunday school teaches the children of every home the church serves.
       const pupils = has(b, 'sundayschool') ? s.buildings.filter((h) => h.type === 'house' && h.residents > 0 && coveredBy(s, h, 'church')).length : 0;
-      return (CHURCH_KNOWLEDGE[b.level] ?? CHURCH_KNOWLEDGE[1]) + SCHOOL_KNOWLEDGE * pupils;
+      return ((CHURCH_KNOWLEDGE[b.level] ?? CHURCH_KNOWLEDGE[1]) + SCHOOL_KNOWLEDGE * pupils) * (hasCharter(s, 'learning3b') ? 2 : 1);
     }
     case 'cathedral':
-      return 3;
+      return 3 * (hasCharter(s, 'learning3b') ? 2 : 1);
     case 'monastery':
       return b.reading ? MONASTERY_KNOWLEDGE * crew : 0;
     case 'scriptorium':
       return crew;
     case 'university':
-      return s.universityOk ? UNIVERSITY_KNOWLEDGE * crew : 0;
+      return s.universityOk ? UNIVERSITY_KNOWLEDGE * crew * (hasCharter(s, 'learning3a') ? 1.5 : 1) : 0;
     case 'school':
       return b.workers > 0 ? SCHOOL_KNOWLEDGE * s.buildings.filter((h) => h.type === 'house' && h.residents > 0).length : 0;
     case 'house':
@@ -3998,6 +4118,8 @@ export const SCHOOL_KNOWLEDGE = 0.02;
 export const SCHOOL_DRAG = 0.03;
 /** Sunday school: the children are at church, not at work. */
 export const SUNDAY_DRAG = 0.02;
+/** The bell tower: all work 2% faster. */
+export const BELL_TOWER_PACE = 1.02;
 
 const KNOWLEDGE_LABELS: Partial<Record<BuildingType, string>> = {
   church: 'The church school',
@@ -4014,6 +4136,8 @@ export function knowledgeSources(s: GameState): { label: string; value: number }
   const out = new Map<string, number>();
   // The settlers' elders teach what they know, from the first day.
   out.set("The elders' lore", ELDERS_LORE);
+  const art = artBoons(s).knowledge;
+  if (art) out.set('Works of art', art);
   for (const b of s.buildings) {
     const v = knowledgeOf(s, b);
     if (v) out.set(KNOWLEDGE_LABELS[b.type]!, (out.get(KNOWLEDGE_LABELS[b.type]!) ?? 0) + v);
@@ -4069,7 +4193,9 @@ export const UNIVERSITY_BOOKS = 2;
 /** The university's learning: every workplace a little more productive while it is fed books. */
 export function learningYield(s: GameState): number {
   const school = (s.buildings.some((b) => b.type === 'school' && b.build >= 1 && b.workers > 0) ? 1 - SCHOOL_DRAG : 1) * (townHas(s, 'sundayschool') ? 1 - SUNDAY_DRAG : 1);
-  return (s.universityOk ? (hasCharter(s, 'learning3a') ? 1.1 : 1.05) : 1) * school;
+  // The bell tower rings the hours: all work a little brisker.
+  const bells = s.buildings.some((b) => b.type === 'belltower' && b.build >= 1) ? BELL_TOWER_PACE : 1;
+  return (s.universityOk ? (hasCharter(s, 'learning3a') ? 1.1 : 1.05) : 1) * school * bells;
 }
 
 /** Whether the lord rides out on horseback: a stable with its groom at work. */
@@ -4234,7 +4360,8 @@ export function updateHappiness(s: GameState): void {
       b.unmet = houseNeeds(s, b, b.level)
         .filter((n) => !n.met)
         .map((n) => n.label);
-      if (b.level >= 2 && b.unmet.some((u) => u !== 'Enough food' && u !== 'Firewood in winter')) unmet += b.residents;
+      const lacking = b.unmet.filter((u) => u !== 'Enough food' && u !== 'Firewood in winter');
+      if (b.level >= 2 && lacking.length > (hasCharter(s, 'nature3a') ? 1 : 0)) unmet += b.residents;
     }
     if (coveredBy(s, b, 'well')) well += b.residents;
     if (coveredBy(s, b, 'market')) market += b.residents;
@@ -4264,9 +4391,8 @@ export function updateHappiness(s: GameState): void {
   }
   for (const m of s.moods ?? []) if (m.until > s.day) factors.push({ label: m.label, value: m.value });
   if (s.buildings.some((b) => b.type === 'cathedral' && b.build >= 1)) factors.push({ label: 'The cathedral', value: 6 });
-  if (s.commissions?.includes('tapestry')) factors.push({ label: 'The great tapestry', value: 2 });
-  if (s.commissions?.includes('glass')) factors.push({ label: 'The cathedral glass', value: 3 });
-  if ((s.title ?? 0) >= 2) factors.push({ label: `Proud to serve ${(s.title ?? 0) >= 3 ? 'a Duke' : 'an Earl'}`, value: 3 });
+  factors.push(...artBoons(s).happiness);
+  if ((s.title ?? 0) >= 2) factors.push({ label: `Proud to serve ${/^[AEIOU]/.test(TITLES[s.title ?? 0].name) ? 'an' : 'a'} ${TITLES[s.title ?? 0].name}`, value: 3 });
   if (s.buildings.some((b) => b.type === 'guildhall' && b.build >= 1)) factors.push({ label: 'Pride in the guildhall', value: 3 });
   if (monksReading(s)) factors.push({ label: 'The prayers of the monks', value: 3 });
   if (wallSections(s) >= WALL_SAFE) factors.push({ label: 'Safe behind the town walls', value: 4 });
@@ -4281,6 +4407,7 @@ export function updateHappiness(s: GameState): void {
     if (onPath(s, 'metal') && s.buildings.some((b) => (b.type === 'mine' || b.type === 'bloomery' || b.type === 'smithy') && b.build >= 1)) {
       factors.push({ label: 'Smoke from the forges', value: -4 });
     }
+    if (onPath(s, 'craft') && s.buildings.some((b) => b.type === 'dyer' && b.build >= 1)) factors.push({ label: 'The stink of the dye works', value: -3 });
     if (onPath(s, 'trade') && s.taxLevel > 0) factors.push({ label: 'Grumbling at the merchants’ taxes', value: -3 });
   }
   if (homeless > 0 && s.population > 0) {

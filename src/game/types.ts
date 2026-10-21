@@ -154,6 +154,7 @@ export type BuildingType =
   | 'cobbler'
   | 'watersawmill'
   | 'silvermine'
+  | 'deerpark'
   | 'bathhouse'
   | 'school'
   | 'taxoffice'
@@ -477,6 +478,8 @@ export interface GameState {
   stumps?: Record<number, number>;
   /** Herds of game that keep to their part of the woods. */
   herds?: Herd[];
+  /** Silver veins the Deep Veins charter revealed (tile indices). */
+  silver?: number[];
   /** Where fish shoal in the rivers and lakes. */
   shoals?: Shoal[];
   /** Mushrooms on the forest floor: tile -> how many can be picked now. */
@@ -503,6 +506,8 @@ export interface GameState {
   name?: string;
   /** Works of art commissioned with prestige (see COMMISSIONS). */
   commissions?: string[];
+  /** The atelier's hopes: this month's chance of a masterpiece, and months of rest left after one. */
+  atelier?: { chance: number; rest: number };
   /** The lord's rank: 0 Lord, 1 Baron, 2 Earl, 3 Duke (see TITLES). */
   title?: number;
   /** Woods the woodcutters leave standing (tile rectangles). */

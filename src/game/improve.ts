@@ -90,9 +90,10 @@ export function improvedPlaces(b: Building): number {
 }
 
 /** Upkeep its improvements add to a workplace (a month). */
-export function improvedUpkeep(b: Building): Partial<Record<'tools' | 'woodparts', number>> {
+export function improvedUpkeep(b: Building, free: string[] = []): Partial<Record<'tools' | 'woodparts', number>> {
   const out: Partial<Record<'tools' | 'woodparts', number>> = {};
   for (const id of b.improved ?? []) {
+    if (free.includes(id)) continue;
     const u = IMPROVEMENT_BY_ID.get(id)?.upkeep;
     for (const k in u) out[k as 'tools'] = (out[k as 'tools'] ?? 0) + (u[k as 'tools'] ?? 0) / 12;
   }

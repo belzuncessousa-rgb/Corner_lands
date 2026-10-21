@@ -27,7 +27,7 @@ import {
   EXPORT_PER_MARKET,
   UPKEEP,
 } from '../game/data';
-import { commission, commissionError, COMMISSIONS, nextTitle, takeTitle, titleError, TITLES, fairCost, fairError, fairPrestige, FAIR_TIER, feastCost, feastError, FESTIVALS, festivalError, getEvent, holdFair, holdFeast, holdFestival, resolveEvent } from '../game/events';
+import { WORKS_OF_ART, nextTitle, takeTitle, titleError, TITLES, fairCost, fairError, fairPrestige, FAIR_TIER, feastCost, feastError, FESTIVALS, festivalError, getEvent, holdFair, holdFeast, holdFestival, resolveEvent } from '../game/events';
 import { CHARTERS, CHARTER_TIER, PATHS, charterCost, charterError, grantCharter, hasCharter } from '../game/charters';
 import { CHURCH_LEVELS, TAVERN_LEVELS, HOUSE_LEVELS, MANOR_LEVELS, buildingName, houseNeeds, marketStalls, startUpgrade, upgradeBlocker, upgradePlan, workersOf } from '../game/levels';
 import { activeQuests } from '../game/quests';
@@ -602,19 +602,24 @@ export class Hud {
       <p class="note">Select a workplace to set its workers and priority. Idle villagers help on building sites.</p>`;
   }
 
-  /** Works of art prestige can buy once the great buildings stand. */
+  /** Works of art: masterpieces from the patrons' atelier, now and then. */
   private commissionRows(): string {
     const s = this.game.state;
-    if (s.tier < 3) return '';
-    return COMMISSIONS.map((c) => {
-      const done = s.commissions?.includes(c.id);
-      const err = commissionError(s, c.id);
-      const goods = Object.entries(c.goods ?? {}).map(([id, n]) => `${n} ${GOODS[id as ResourceId].name.toLowerCase()}`);
-      const tip = `<b>${c.name}</b><br>${esc(c.desc)}. +${c.happiness} happiness for good.<br>Costs ${c.prestige} prestige${goods.map((g) => ` and ${g}`).join('')}`;
-      return `<div class="kv feast" data-tip="${esc(tip)}"><span>${c.name}</span><span>${
-        done ? '<span class="pos">Made ✓</span>' : `<button data-action="commission" data-id="${c.id}" ${err ? `disabled title="${esc(err)}"` : ''}>Commission <small>${c.prestige} ${ICONS.prestige}</small></button>`
-      }</span></div>`;
-    }).join('');
+    const atelier = s.buildings.some((b) => b.type === 'atelier' && b.build >= 1);
+    if (!atelier && !s.commissions?.length) return '';
+    const head = atelier
+      ? `<div class="kv" data-tip="Each month the atelier has its goods, the chance of a masterpiece grows by 1%; a month without them and it starts over. After a masterpiece the artists rest a year."><span>The atelier</span><span>${
+          (s.atelier?.rest ?? 0) > 0 ? `resting ${s.atelier!.rest} months` : `${Math.round((s.atelier?.chance ?? 0) * 100)}% a month`
+        }</span></div>`
+      : '';
+    return (
+      head +
+      WORKS_OF_ART.map((w) => {
+        const done = s.commissions?.includes(w.id);
+        const boon = [w.happiness && `+${w.happiness} happiness`, w.prestige && `+${w.prestige} prestige a month`, w.knowledge && `+${w.knowledge} knowledge a month`].filter(Boolean).join(', ');
+        return `<div class="kv feast" data-tip="${esc(`<b>${w.name}</b><br>${w.desc}. ${boon}, for good.<br>Made by the patrons' atelier, by chance.`)}"><span>${w.name}</span><span>${done ? '<span class="pos">Made ✓</span>' : '<small class="muted">awaiting a masterpiece</small>'}</span></div>`;
+      }).join('')
+    );
   }
 
   /** The lord's title, and the next one prestige can buy. */
@@ -969,7 +974,7 @@ export class Hud {
           rows.push(`<div class="kv feast" data-tip="${esc(`<b>${f.name}</b><br>${f.desc}<br>+${f.mood} happiness for a season, +${f.prestige} prestige.`)}"><span>${f.name}</span><span>${
             err
               ? `<small class="muted">${esc(err)}</small>`
-              : `<button data-action="festival" data-id="${f.id}">Celebrate <small>${c.food} food${c.wood ? ` · ${c.wood} timber` : ''}</small></button>`
+              : `<button data-action="festival" data-id="${f.id}">Celebrate <small>${c.food} food${c.firewood ? ` · ${c.firewood} firewood` : ''}</small></button>`
           }</span></div>`);
         }
         if (s.tier >= RETINUE_TIER - 1) {
@@ -1926,13 +1931,6 @@ export class Hud {
           this.sound('jig');
         }
         this.lastInspectorKey = '';
-        break;
-      }
-      case 'commission': {
-        const err = commission(s, t.dataset.id ?? '');
-        if (err) this.flash(err);
-        else this.sound('fanfare');
-        this.renderChipPanel();
         break;
       }
       case 'title': {

@@ -139,6 +139,12 @@ export const UNLOCKS: Unlock[] = [
   { id: b('builderyard'), name: "Builder's Yard", kind: 'building', tab: 'civic', group: 'Services', desc: 'With an ox, building sites nearby rise faster.', knowledge: 4, condition: { built: ['draughtstable'], label: 'a draught stable' }, building: 'builderyard', icon: 'builderyard' },
   { id: b('dock'), name: 'Dock', kind: 'building', tab: 'civic', group: 'Trade', desc: 'Boats trade more, and cheaper.', knowledge: 4, building: 'dock', icon: 'dock' },
 
+  // ------------------------------------------------ the lord's buildings (also wait for the manor)
+  { id: b('stewpond'), name: 'Stew Pond', kind: 'building', tab: 'civic', group: 'The manor', desc: "Fish for the lord's table, a little prestige.", knowledge: 4, building: 'stewpond', icon: 'stewpond' },
+  { id: b('deerpark'), name: 'Deer Park', kind: 'building', tab: 'civic', group: 'The manor', desc: 'Venison and prestige from a fenced park.', knowledge: 6, building: 'deerpark', icon: 'deerpark' },
+  { id: b('barracks'), name: 'Barracks', kind: 'building', tab: 'civic', group: 'The manor', desc: 'Raises the retinue; its men help the courthouse.', knowledge: 6, building: 'barracks', icon: 'barracks' },
+  { id: b('tiltyard'), name: 'Tiltyard', kind: 'building', tab: 'civic', group: 'The manor', desc: 'Jousting: fairs bring twice the prestige.', knowledge: 8, building: 'tiltyard', icon: 'tiltyard' },
+  { id: b('atelier'), name: "Patrons' Atelier", kind: 'building', tab: 'civic', group: 'The manor', desc: 'Artists who, kept supplied, now and then make a masterpiece.', knowledge: 8, building: 'atelier', icon: 'atelier' },
   // ------------------------------------------------ step 4: upgrades, extensions, variants, choices, options
   { id: 'c:coppice', name: 'Coppicing', kind: 'choice', tab: 'land', group: 'Timber', choice: 'woods', desc: 'Woods regrow twice as fast; woodcutters fell poles: firewood half again, timber a third less.', knowledge: 6, condition: { made: { wood: 200 }, label: '200 timber felled' }, icon: 'firewood' },
   { id: 'c:highforest', name: 'High forest', kind: 'choice', tab: 'land', group: 'Timber', choice: 'woods', desc: 'Tall timber: woodcutters fell a fifth more timber.', knowledge: 6, condition: { made: { wood: 200 }, label: '200 timber felled' }, icon: 'wood' },
@@ -218,6 +224,8 @@ export function knows(s: GameState, id: string): boolean {
   const u = UNLOCK_BY_ID.get(id);
   if (!u) return true;
   if (s.learned?.includes(id)) return true;
+  // The Heavy Plough charter brings the iron plough with it.
+  if (id === 'i:ironplough' && s.charters?.includes('farm2')) return true;
   return u.rank !== undefined && u.knowledge === undefined && s.tier >= u.rank;
 }
 

@@ -1341,7 +1341,7 @@ describe('review fixes', () => {
 });
 
 describe('seasonal festivals', () => {
-  it('May Day needs a maypole in spring; Midsummer burns timber in summer', async () => {
+  it('May Day needs a maypole in spring; Midsummer burns firewood in summer', async () => {
     const { festivalError, holdFestival } = await import('../src/game/events');
     const s = generateWorld(101);
     s.population = 16;
@@ -1359,9 +1359,9 @@ describe('seasonal festivals', () => {
     expect(festivalError(s, 'mayday')).toMatch(/this year/);
     expect(festivalError(s, 'midsummer')).toMatch(/midsummer/);
     s.day = 4 * DAYS_PER_MONTH;
-    const wood = s.res.wood;
+    s.res.firewood = 40;
     expect(holdFestival(s, 'midsummer')).toBeNull();
-    expect(s.res.wood).toBe(wood - 20);
+    expect(s.res.firewood).toBe(30);
     expect(s.festivalDay?.id).toBe('midsummer');
   });
 });
@@ -1465,20 +1465,25 @@ describe('protected woods', () => {
 });
 
 describe('titles', () => {
-  it('prestige buys Baron, Earl and Duke in turn, each needing a larger town', async () => {
+  it('prestige buys Baron, Earl, Marquess and Duke in turn, each needing a larger town', async () => {
     const { takeTitle, titleError } = await import('../src/game/events');
     const s = generateWorld(4);
-    s.res.prestige = 10000;
+    s.res.prestige = 20000;
     expect(titleError(s)).toMatch(/Baron needs a Town/);
     s.tier = 2;
     expect(takeTitle(s)).toBeNull();
     expect(s.title).toBe(1);
-    expect(s.res.prestige).toBe(9500);
+    expect(s.res.prestige).toBe(19500);
     expect(titleError(s)).toMatch(/Earl needs a Borough/);
     s.tier = 4;
     expect(takeTitle(s)).toBeNull();
     expect(takeTitle(s)).toBeNull();
     expect(s.title).toBe(3);
+    expect(titleError(s)).toMatch(/Palace/);
+    const manor = manorFor(s);
+    manor.level = 4;
+    expect(takeTitle(s)).toBeNull();
+    expect(s.title).toBe(4);
     expect(titleError(s)).toMatch(/no higher title/);
     expect(s.milestones!.map((m) => m.id)).toEqual(expect.arrayContaining(['title1', 'title2', 'title3']));
   });
@@ -1534,23 +1539,34 @@ describe('year goals', () => {
   });
 });
 
-describe('commissions', () => {
-  it('prestige buys each work of art once, for lasting cheer', async () => {
-    const { commission, commissionError } = await import('../src/game/events');
-    const { updateHappiness } = await import('../src/game/sim');
+describe('works of art', () => {
+  it('a supplied atelier grows its chance month by month and, at last, makes a masterpiece', async () => {
+    const { monthlyAtelier, artBoons } = await import('../src/game/events');
+    const { StateRng } = await import('../src/game/rng');
     const s = generateWorld(15);
-    s.tier = 3;
-    s.res.wood = 100;
-    s.res.planks = 40;
-    s.res.stone = 40;
-    manorFor(s);
-    s.res.prestige = 1000;
-    expect(commissionError(s, 'glass')).toMatch(/cathedral/);
-    expect(commission(s, 'tapestry')).toBeNull();
-    expect(s.res.prestige).toBe(700);
-    expect(commissionError(s, 'tapestry')).toMatch(/Already/);
-    updateHappiness(s);
-    expect(s.happinessFactors.some((f) => f.label === 'The great tapestry' && f.value === 2)).toBe(true);
+    const { makeBuilding, placeBuilding } = await import('../src/game/world');
+    const at = makeBuilding(s.nextId++, 'atelier', 2, 2);
+    placeBuilding(s, at);
+    at.build = 1;
+    at.workers = 2;
+    const stock = () => Object.assign(s.res, { gold: 1000, dyes: 50, dressedstone: 50, paper: 50, jewellery: 50 });
+    stock();
+    const rng = new StateRng(s);
+    monthlyAtelier(s, rng);
+    expect(s.atelier!.chance).toBeCloseTo(0.01);
+    // A month without paper: the chance starts over.
+    s.res.paper = 0;
+    monthlyAtelier(s, rng);
+    expect(s.atelier!.chance).toBe(0);
+    let months = 0;
+    while (!s.commissions?.length && months++ < 400) {
+      stock();
+      monthlyAtelier(s, rng);
+    }
+    expect(s.commissions?.length).toBe(1);
+    expect(s.atelier!.rest).toBe(12);
+    const b = artBoons(s);
+    expect(b.happiness.length + b.prestige + b.knowledge).toBeGreaterThan(0);
   });
 });
 

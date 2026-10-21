@@ -1,5 +1,6 @@
 import { IMPROVEMENT_BY_ID, has, improvedPlaces } from './improve';
 import { BUILDINGS, TIERS } from './data';
+import { hasCharter } from './charters';
 import {
   coveredBy,
   luxuryCount,
@@ -189,7 +190,11 @@ export function upgradePlan(s: GameState, b: Building): UpgradePlan | null {
     if (!next?.cost) return null;
     const reqs: Need[] = [{ label: `Settlement is a ${TIERS[next.tier ?? 0].name}`, met: s.tier >= (next.tier ?? 0) }];
     // A house can only grow once the needs of the next level are met.
-    reqs.push(...houseNeeds(s, b, b.level + 1).slice(2));
+    const needs = houseNeeds(s, b, b.level + 1).slice(2);
+    // Druids' Grove: content with their woods, a home may grow with one need unmet.
+    const unmet = needs.filter((n) => !n.met);
+    if (unmet.length === 1 && hasCharter(s, 'nature3a')) unmet[0].met = true;
+    reqs.push(...needs);
     return { to: b.level + 1, name: next.name, cost: next.cost, days: 6 + b.level * 3, reqs };
   }
   if (b.type === 'tavern') {
