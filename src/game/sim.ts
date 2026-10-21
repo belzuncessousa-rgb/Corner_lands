@@ -37,6 +37,7 @@ import { rollEvent } from './events';
 import {
   HOUSE_LEVELS,
   STONE_MANOR,
+  PALACE,
   finishUpgrade,
   houseNeeds,
   isProject,
@@ -193,6 +194,8 @@ export function footprintClear(s: GameState, x: number, y: number, w: number, h:
 export function isUnlocked(s: GameState, type: BuildingType): boolean {
   const d = BUILDINGS[type];
   if (MANOR_WORKS.includes(type)) return hasStoneManor(s);
+  if (PALACE_WORKS.includes(type)) return manorLevel(s) >= PALACE;
+  if (type === 'stewpond') return manorLevel(s) >= 2;
   if (type === 'stable') return s.buildings.some((b) => b.type === 'townhall' && b.build >= 1 && b.level >= 2);
   // Charters gate any building; the settlement's rank only decorations and the monuments.
   if (d.charter && !hasCharter(s, d.charter)) return false;
@@ -210,7 +213,14 @@ export const ONE_PER_TOWN: BuildingType[] = ['atelier', 'barracks', 'tiltyard', 
 export const MONUMENTS: BuildingType[] = ['statue', 'belltower'];
 
 /** What a Stone Manor lets the lord build. */
-export const MANOR_WORKS: BuildingType[] = ['manorgarden', 'watchtower', 'wall'];
+export const MANOR_WORKS: BuildingType[] = ['manorgarden', 'watchtower', 'wall', 'armoury'];
+/** What a Palace lets the lord build. */
+export const PALACE_WORKS: BuildingType[] = ['atelier', 'barracks', 'tiltyard'];
+
+/** The manor's level (0 before there is one). */
+export function manorLevel(s: GameState): number {
+  return s.buildings.find((b) => b.type === 'townhall' && b.build >= 1)?.level ?? 0;
+}
 
 export function hasStoneManor(s: GameState): boolean {
   return s.buildings.some((b) => b.type === 'townhall' && b.build >= 1 && b.level >= STONE_MANOR);
@@ -221,6 +231,8 @@ export function lockReason(s: GameState, type: BuildingType): string | null {
   const d = BUILDINGS[type];
   if (isUnlocked(s, type)) return null;
   if (MANOR_WORKS.includes(type)) return 'Requires the Stone Manor';
+  if (PALACE_WORKS.includes(type)) return 'Requires the Palace';
+  if (type === 'stewpond') return 'Requires the Manor House';
   if (type === 'stable') return 'Requires the Manor House';
   if (d.tier > s.tier) return `Requires ${TIERS[d.tier].name}`;
   if (d.charter && !hasCharter(s, d.charter)) return `Requires the ${CHARTERS.find((c) => c.id === d.charter)?.name ?? d.charter} charter`;
@@ -3016,6 +3028,26 @@ function passiveStatus(s: GameState, b: Building): string {
       }
       return homes ? `Cheering ${homes} home${homes > 1 ? 's' : ''} nearby` : 'No homes nearby yet';
     }
+    case 'bathhouse': {
+      if (b.blocked === BLOCK_PROBLEM) return 'The fires are out: needs firewood or charcoal';
+      const n = [...crewAssign(s, 'bathhouse').values()].filter((id) => id === b.id).length;
+      return n ? `Hot baths for ${n} home${n > 1 ? 's' : ''}` : 'No homes nearby yet';
+    }
+    case 'courthouse': {
+      const n = [...crewAssign(s, 'courthouse').values()].filter((id) => id === b.id).length;
+      const short = b.supplied === false ? ' (short of paper or the watch\'s clothes: half the watch)' : '';
+      return `Keeping order in ${n} home${n === 1 ? '' : 's'}${short}`;
+    }
+    case 'taxoffice':
+      return b.supplied === false ? `No paper or parchment: taxing only ${TAX_OFFICE_REACH / 2} villagers` : `Taxing ${TAX_OFFICE_REACH} more villagers`;
+    case 'school': {
+      const homes = s.buildings.filter((h) => h.type === 'house' && h.residents > 0).length;
+      return `Teaching the children of ${homes} home${homes === 1 ? '' : 's'}`;
+    }
+    case 'tiltyard':
+      return 'Fairs bring twice the prestige';
+    case 'barracks':
+      return s.retinue ? 'The retinue is quartered here' : 'Ready to raise a retinue (at the manor)';
     case 'monastery':
       if (b.workers === 0) return 'No monks: the cloister stands empty';
       if (b.reading) return 'The monks are at their books';

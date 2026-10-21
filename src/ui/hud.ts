@@ -47,6 +47,8 @@ import {
   moodYield,
   lockReason,
   prestigeIncome,
+  MANOR_TAX_REACH,
+  TAX_OFFICE_REACH,
   recipeKnown,
   knowledgeIncome,
   knowledgeOf,
@@ -630,6 +632,7 @@ export class Hud {
     return `<h3>${ICONS.gold} Treasury</h3>
       <div class="kv"><span>Coins</span><b>${Math.floor(s.res.gold)}</b></div>
       <div class="kv"><span>Taxes last month</span><span class="pos">+${r.taxes}</span></div>
+      ${!s.buildings.some((b) => b.type === 'townhall' && b.build >= 1) ? '<div class="kv" data-tip="Taxes are collected only once there is a manor."><span>Taxes</span><span class="neg">No manor yet: no taxes</span></div>' : r.untaxed ? `<div class="kv" data-tip="The manor taxes up to ${MANOR_TAX_REACH} villagers; each tax office ${TAX_OFFICE_REACH} more, with paper or parchment."><span>Untaxed villagers</span><span class="neg">${r.untaxed}: build a tax office</span></div>` : ''}
       ${r.trade ? `<div class="kv"><span>Merchants last month</span><span class="pos">+${r.trade}</span></div>` : ''}
       <div class="sub">Taxes</div>
       <div class="tax">${TAX_LEVELS.map(

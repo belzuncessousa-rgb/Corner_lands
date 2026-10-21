@@ -65,6 +65,7 @@ export const UNLOCKS: Unlock[] = [
   { id: b('forester'), name: "Forester's Hut", kind: 'building', tab: 'land', group: 'Timber', desc: 'Plants trees where the woods have thinned.', knowledge: 1, building: 'forester', icon: 'forester' },
   { id: b('carpenter'), name: "Carpenter's Workshop", kind: 'building', tab: 'land', group: 'Timber', desc: 'Planks into wood parts, which mills and workshops wear.', knowledge: 1, building: 'carpenter', icon: 'carpenter' },
   { id: b('cooper'), name: "Cooper's Workshop", kind: 'building', tab: 'land', group: 'Timber', desc: 'Planks and iron hoops into crates, which carry more trade.', knowledge: 3, condition: { built: ['tradingpost', 'dock', 'winery'], label: 'a trading post, dock or winery' }, building: 'cooper', icon: 'cooper' },
+  { id: b('watersawmill'), name: 'Water Sawmill', kind: 'building', tab: 'land', group: 'Timber', desc: 'Beside water: one timber makes one plank.', knowledge: 8, needs: [b('carpenter')], building: 'watersawmill', icon: 'watersawmill' },
   { id: b('claypit'), name: 'Clay Pit', kind: 'building', tab: 'land', group: 'Earth', desc: 'Digs clay from a shore.', rank: 1, building: 'claypit', icon: 'claypit' },
   { id: b('kiln'), name: 'Tile Kiln', kind: 'building', tab: 'land', group: 'Earth', desc: 'Fires clay into roof tiles.', knowledge: 1, building: 'kiln', icon: 'kiln' },
   { id: b('potter'), name: "Potter's Workshop", kind: 'building', tab: 'land', group: 'Earth', desc: 'Fine glazed pottery, coloured with dye: a luxury.', knowledge: 6, building: 'potter', icon: 'potter' },
@@ -92,6 +93,7 @@ export const UNLOCKS: Unlock[] = [
   { id: b('dairy'), name: 'Dairy', kind: 'building', tab: 'herd', group: 'Herds', desc: 'Milk into cheese.', knowledge: 2, building: 'dairy', icon: 'dairy' },
   { id: b('draughtstable'), name: 'Draught Stable', kind: 'building', tab: 'herd', group: 'Herds', desc: 'Stalls for pack horses and oxen.', knowledge: 2, building: 'draughtstable', icon: 'draughtstable' },
   { id: b('orchardist'), name: "Orchard Keeper's Lodge", kind: 'building', tab: 'herd', group: 'Orchards', desc: 'Apple orchards.', knowledge: 1, building: 'orchardist', icon: 'orchardist' },
+  { id: b('beekeeper'), name: 'Beekeeper', kind: 'building', tab: 'herd', group: 'Orchards', desc: 'Honey from rows of skeps, spring to autumn.', knowledge: 2, building: 'beekeeper', icon: 'beekeeper' },
   { id: r('orchard', 'pears'), name: 'Pears', kind: 'variant', tab: 'herd', group: 'Orchards', desc: 'A year longer to bear, but a third more fruit.', knowledge: 6, needs: [b('orchardist')], recipe: { building: 'orchard', id: 'pears' }, icon: 'pears' },
   { id: r('orchard', 'plums'), name: 'Plums', kind: 'crop', tab: 'herd', group: 'Orchards', desc: 'Plum trees for the orchards.', knowledge: 1, needs: [b('orchardist')], recipe: { building: 'orchard', id: 'plums' }, icon: 'plums' },
 
@@ -102,6 +104,8 @@ export const UNLOCKS: Unlock[] = [
   { id: b('tanner'), name: 'Tannery', kind: 'building', tab: 'cloth', group: 'Leather', desc: 'Hides into leather.', knowledge: 2, building: 'tanner', icon: 'tanner' },
   { id: r('tailor', 'boots'), name: 'Tailor: boots', kind: 'recipe', tab: 'cloth', group: 'Leather', desc: 'Leather into boots.', knowledge: 3, needs: [b('tailor')], recipe: { building: 'tailor', id: 'boots' }, icon: 'boots' },
   { id: r('tanner', 'parchment'), name: 'Tanner: parchment', kind: 'recipe', tab: 'cloth', group: 'Leather', desc: 'Hides scraped into parchment, for offices and books.', knowledge: 3, needs: [b('tanner')], recipe: { building: 'tanner', id: 'parchment' }, icon: 'parchment' },
+  { id: b('cobbler'), name: 'Cobbler', kind: 'building', tab: 'cloth', group: 'Leather', desc: 'Boots alone, quicker than the tailor.', knowledge: 6, needs: [r('tailor', 'boots')], building: 'cobbler', icon: 'cobbler' },
+  { id: b('embroiderer'), name: 'Embroiderer', kind: 'building', tab: 'cloth', group: 'Dyes', desc: 'Dyed cloth into fine clothes, a luxury.', knowledge: 10, building: 'embroiderer', icon: 'embroiderer' },
   { id: r('field', 'woad'), name: 'Woad', kind: 'crop', tab: 'cloth', group: 'Dyes', desc: 'The blue dye plant.', knowledge: 3, recipe: { building: 'field', id: 'woad' }, icon: 'woad' },
   { id: b('dyer'), name: "Dyer's Workshop", kind: 'building', tab: 'cloth', group: 'Dyes', desc: 'Woad or berries into dyes.', knowledge: 5, building: 'dyer', icon: 'dyer' },
 
@@ -110,11 +114,17 @@ export const UNLOCKS: Unlock[] = [
   { id: b('collier'), name: 'Charcoal Burner', kind: 'building', tab: 'metal', group: 'Iron', desc: 'Timber into charcoal, the hot fuel.', knowledge: 3, building: 'collier', icon: 'collier' },
   { id: b('bloomery'), name: 'Bloomery', kind: 'building', tab: 'metal', group: 'Iron', desc: 'Smelts ore into iron.', rank: 1, building: 'bloomery', icon: 'bloomery' },
   { id: b('smithy'), name: 'Blacksmith', kind: 'building', tab: 'metal', group: 'Iron', desc: 'Iron and timber into tools.', knowledge: 2, building: 'smithy', icon: 'smithy' },
+  { id: b('glazier'), name: "Glazier's Workshop", kind: 'building', tab: 'metal', group: 'Glass', desc: 'Glass and dyes into stained glass.', knowledge: 10, building: 'glazier', icon: 'glazier' },
   { id: b('glassworks'), name: 'Glassworks', kind: 'building', tab: 'metal', group: 'Glass', desc: 'Sand and charcoal into glass.', knowledge: 10, building: 'glassworks', icon: 'glassworks' },
 
   // ------------------------------------------------ town, learning & trade
   { id: b('church'), name: 'Wooden Church', kind: 'building', tab: 'civic', group: 'Faith & learning', desc: 'Worship, cheer and the first schooling.', rank: 1, building: 'church', icon: 'church' },
   { id: b('monastery'), name: 'Monastery', kind: 'building', tab: 'civic', group: 'Faith & learning', desc: 'Monks read books for knowledge, prestige and cheer.', knowledge: 10, building: 'monastery', icon: 'monastery' },
+  { id: b('school'), name: 'Public School', kind: 'building', tab: 'civic', group: 'Faith & learning', desc: 'A little knowledge from every home; all work a little slower.', knowledge: 2, building: 'school', icon: 'school' },
+  { id: b('papermill'), name: 'Paper Mill', kind: 'building', tab: 'civic', group: 'Faith & learning', desc: 'Flax beaten into rag paper by a water wheel.', knowledge: 8, building: 'papermill', icon: 'papermill' },
+  { id: b('taxoffice'), name: 'Tax Office', kind: 'building', tab: 'civic', group: 'Services', desc: 'Taxes forty more villagers, on paper or parchment.', rank: 2, building: 'taxoffice', icon: 'taxoffice' },
+  { id: b('bathhouse'), name: 'Bathhouse', kind: 'building', tab: 'civic', group: 'Services', desc: "Hot baths: a Merchant's House need.", rank: 3, building: 'bathhouse', icon: 'bathhouse' },
+  { id: b('courthouse'), name: 'Courthouse', kind: 'building', tab: 'civic', group: 'Services', desc: 'Keeps order in a crowded town.', rank: 3, building: 'courthouse', icon: 'courthouse' },
   { id: b('tavern'), name: 'Alehouse', kind: 'building', tab: 'civic', group: 'Services', desc: 'Pours drink for the homes around it.', rank: 2, building: 'tavern', icon: 'tavern' },
   { id: b('builderyard'), name: "Builder's Yard", kind: 'building', tab: 'civic', group: 'Services', desc: 'With an ox, building sites nearby rise faster.', knowledge: 4, condition: { built: ['draughtstable'], label: 'a draught stable' }, building: 'builderyard', icon: 'builderyard' },
   { id: b('dock'), name: 'Dock', kind: 'building', tab: 'civic', group: 'Trade', desc: 'Boats trade more, and cheaper.', knowledge: 4, building: 'dock', icon: 'dock' },
