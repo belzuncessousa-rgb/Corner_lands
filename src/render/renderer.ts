@@ -4783,6 +4783,10 @@ function drawFieldPicture(p: Pen, b: Building, crop: string, stage: string, seas
       k = woadRow(p, a, z, y, stage, k, rand);
       continue;
     }
+    if (crop === 'vegetables') {
+      k = vegetableRow(p, a, z, y, stage, k, rand, r);
+      continue;
+    }
     for (let x = a; x < z; x += 0.055) {
       k++;
       const jx = x + (rand(k) - 0.5) * 0.03;
@@ -4846,7 +4850,28 @@ function drawFieldPicture(p: Pen, b: Building, crop: string, stage: string, seas
       }
     }
   }
-  if (stage === 'stooks' && !winter && crop === 'woad') {
+  if (stage === 'stooks' && !winter && crop === 'vegetables') {
+    // The crop lifted into baskets along the rows.
+    for (let yy = 0.6; yy < b.h - 0.3; yy += 1.2) {
+      for (let xx = 0.6; xx < b.w - 0.3; xx += 1.1) {
+        const [sx, sy] = iso(xx + ((b.id + Math.floor(yy)) % 2) * 0.3, yy);
+        c.fillStyle = 'rgba(30,20,10,0.2)';
+        c.beginPath();
+        c.ellipse(sx + 1, sy, 5, 2, 0, 0, Math.PI * 2);
+        c.fill();
+        c.fillStyle = '#a07a40';
+        c.beginPath();
+        c.ellipse(sx, sy - 3, 4.5, 3.5, 0, 0, Math.PI);
+        c.fill();
+        for (const [dx, col] of [[-2, '#7ab04a'], [0.5, '#e8e0c8'], [2.5, '#6aa040']] as [number, string][]) {
+          c.fillStyle = col;
+          c.beginPath();
+          c.arc(sx + dx, sy - 3.6, 1.8, 0, Math.PI * 2);
+          c.fill();
+        }
+      }
+    }
+  } else if (stage === 'stooks' && !winter && crop === 'woad') {
     // The cut leaves piled in heaps along the rows, to be carted to the dyer.
     for (let yy = 0.6; yy < b.h - 0.3; yy += 1.2) {
       for (let xx = 0.6; xx < b.w - 0.3; xx += 1.1) {
@@ -4895,6 +4920,70 @@ function drawFieldPicture(p: Pen, b: Building, crop: string, stage: string, seas
       }
     }
   }
+}
+
+/**
+ * One row of vegetables: cabbages in one row, the feathery tops of turnips
+ * and leeks in the next, swelling from shoots to round heads by harvest.
+ */
+function vegetableRow(p: Pen, a: number, z: number, y: number, stage: string, k: number, rand: (k: number) => number, row: number): number {
+  const c = p.ctx;
+  const size: Record<string, number> = { sprout: 1.2, young: 2, tall: 2.8, full: 3.4, flower: 3.4, ripe: 3.6, stubble: 0.8 };
+  const r = size[stage] ?? 0;
+  const cabbage = row % 2 === 0;
+  for (let x = a + 0.05; x < z; x += 0.14) {
+    k++;
+    const [sx, sy] = iso(x + (rand(k) - 0.5) * 0.03, y);
+    const rr = r * (0.85 + rand(k + 7) * 0.3);
+    if (stage === 'stubble') {
+      c.fillStyle = '#6a7a48';
+      c.fillRect(sx - 0.7, sy - 1, 1.4, 1);
+      continue;
+    }
+    c.fillStyle = 'rgba(30,20,10,0.28)';
+    c.beginPath();
+    c.ellipse(sx + 0.5, sy, rr, rr * 0.45, 0, 0, Math.PI * 2);
+    c.fill();
+    if (cabbage) {
+      // Outer leaves, then the pale heart.
+      c.fillStyle = stage === 'sprout' ? '#8ac060' : '#5e9a3e';
+      c.beginPath();
+      c.ellipse(sx, sy - rr * 0.45, rr, rr * 0.62, 0, 0, Math.PI * 2);
+      c.fill();
+      if (stage !== 'sprout') {
+        c.fillStyle = '#a8d070';
+        c.beginPath();
+        c.arc(sx - rr * 0.1, sy - rr * 0.6, rr * 0.48, 0, Math.PI * 2);
+        c.fill();
+        c.strokeStyle = 'rgba(60,100,40,0.6)';
+        c.lineWidth = 0.4;
+        c.beginPath();
+        c.arc(sx - rr * 0.1, sy - rr * 0.6, rr * 0.3, 0.5, 2.6);
+        c.stroke();
+      }
+    } else {
+      // Turnip tops: a spray of leaves over a white-and-purple shoulder.
+      if (stage === 'full' || stage === 'ripe' || stage === 'flower') {
+        c.fillStyle = '#e8e0d0';
+        c.beginPath();
+        c.arc(sx, sy - 0.6, 1.2, 0, Math.PI * 2);
+        c.fill();
+        c.fillStyle = '#9a5aa0';
+        c.beginPath();
+        c.arc(sx, sy - 1.1, 1.1, Math.PI, 0);
+        c.fill();
+      }
+      c.strokeStyle = '#4f8a3c';
+      c.lineWidth = 0.8;
+      for (let j = -2; j <= 2; j++) {
+        c.beginPath();
+        c.moveTo(sx, sy - 1);
+        c.quadraticCurveTo(sx + j * rr * 0.3, sy - rr * 1.2, sx + j * rr * 0.5, sy - rr * 1.6);
+        c.stroke();
+      }
+    }
+  }
+  return k;
 }
 
 /**

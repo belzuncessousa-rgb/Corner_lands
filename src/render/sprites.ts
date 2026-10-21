@@ -2765,6 +2765,279 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       }
       break;
     }
+    case 'beekeeper': {
+      // A little hut, a bench of straw skeps in the meadow and a veil on a peg.
+      p.shadow(0.3, 0.3, 1.1, 1.0);
+      p.box(0.3, 0.3, 1.05, 0.95, 0, 11, PLASTER);
+      p.timber(0.3, 0.3, 1.05, 0.95, 0, 11, BEAM);
+      p.doorL(0.95, 0.6, 0.18, 9);
+      p.roofX(0.3, 0.3, 1.05, 0.95, 11, 10, 'thatch', PLASTER, 0.1);
+      if (season !== 3) for (const [x, y] of [[1.35, 0.5], [1.65, 0.9], [0.5, 1.45]] as const) p.bush(x, y, 3, '#c8a8d8');
+      p.box(0.85, 1.25, 1.8, 1.4, 4, 1.2, '#8a6440');
+      for (const x of [0.88, 1.77]) p.line([x, 1.38, 0], [x, 1.38, 4], BEAM, 1);
+      for (const x of [1.0, 1.25, 1.5, 1.72]) skep(p, x, 1.32, 5.2);
+      p.box(1.3, 0.35, 1.75, 0.6, 0, 3, '#7b5a36');
+      skep(p, 1.42, 0.47, 3);
+      skep(p, 1.62, 0.47, 3);
+      break;
+    }
+    case 'papermill': {
+      // A stone mill on the water: the wheel drives the stampers; sheets dry on lines.
+      p.shadow(0.3, 0.3, 1.35, 1.6);
+      p.box(0.3, 0.3, 1.35, 1.6, 0, 10, STONE, undefined, 'stone');
+      p.box(0.28, 0.28, 1.37, 1.62, 10, 10, PLASTER);
+      p.timber(0.28, 0.28, 1.37, 1.62, 10, 10, BEAM);
+      p.doorL(1.6, 0.55, 0.2, 10);
+      // Louvred drying loft.
+      for (let k = 0; k < 4; k++) p.wallL(1.623, 0.85 + k * 0.12, 0.93 + k * 0.12, 12, 18, '#5a4030');
+      p.roofX(0.28, 0.28, 1.37, 1.62, 20, 15, 'tile', PLASTER, 0.1);
+      waterWheel(p, 1.62, 0.95, 11, 0.45, 11, season);
+      // Sheets of paper drying on a line by the door.
+      p.line([0.35, 1.8, 0], [0.35, 1.8, 12], BEAM, 1);
+      p.line([1.15, 1.8, 0], [1.15, 1.8, 12], BEAM, 1);
+      p.line([0.35, 1.8, 12], [1.15, 1.8, 12], '#6a5a4a', 0.5);
+      for (let k = 0; k < 5; k++) p.wallL(1.801, 0.42 + k * 0.15, 0.53 + k * 0.15, 6.5, 11.8, k % 2 ? '#f4ecd8' : '#ece4d0');
+      break;
+    }
+    case 'embroiderer': {
+      // A tall shop with a wide window, a gown on a stand and bolts of dyed cloth.
+      p.shadow(0.3, 0.3, 1.4, 1.3);
+      p.box(0.3, 0.3, 1.35, 1.25, 0, 12, STONE, undefined, 'stone');
+      p.box(0.28, 0.28, 1.37, 1.27, 12, 11, '#e6d2b0');
+      p.timber(0.28, 0.28, 1.37, 1.27, 12, 11, BEAM);
+      p.wallL(1.252, 0.4, 0.95, 3, 10, '#4a3020');
+      p.wallL(1.253, 0.43, 0.92, 4, 9, season === 3 ? '#e8b850' : '#3a3540');
+      p.doorL(1.25, 1.05, 0.18, 10);
+      p.windowL(1.27, 0.6, 15, 0.14, 5);
+      p.roofX(0.28, 0.28, 1.37, 1.27, 23, 14, 'tile', '#e6d2b0', 0.1);
+      // An awning over the window, striped in the lord's colours.
+      for (let k = 0; k < 6; k++) p.poly([[0.38 + k * 0.1, 1.27, 11], [0.48 + k * 0.1, 1.27, 11], [0.48 + k * 0.1, 1.45, 8.5], [0.38 + k * 0.1, 1.45, 8.5]], k % 2 ? '#7a3ab0' : '#e8d8b0');
+      gown(p, 1.62, 1.55, '#7a3ab0');
+      for (const [x, y, c] of [[1.62, 0.55, '#2f4fa8'], [1.72, 0.78, '#a83a2a'], [1.62, 1.0, '#4f8a3c']] as [number, number, string][]) p.line([x, y - 0.1, 3], [x, y + 0.1, 3], c, 5);
+      break;
+    }
+    case 'glazier': {
+      // A stone workshop with a kiln, a bench of coloured panes and finished windows.
+      p.shadow(0.3, 0.3, 1.4, 1.3);
+      p.box(0.3, 0.3, 1.3, 1.2, 0, 15, STONE, undefined, 'stone');
+      p.doorL(1.2, 0.85, 0.18, 10);
+      lancetL(p, 1.202, 0.45, 0.16, 5, 11, season === 3);
+      p.roofX(0.3, 0.3, 1.3, 1.2, 15, 12, 'slate', STONE, 0.1);
+      smoke.push(p.chimney(0.45, 0.45, 24, 10, '#7a7268'));
+      // Panes leaning on a rack.
+      p.box(1.45, 0.35, 1.85, 1.05, 0, 1, '#8a6440');
+      const cols = ['#3a62c4', '#c42b3a', '#d8a838', '#4f8a3c', '#7a3ab0'];
+      for (let k = 0; k < 5; k++) {
+        const y = 0.42 + k * 0.12;
+        p.poly([[1.5, y, 1], [1.5, y + 0.1, 1], [1.56, y + 0.1, 11], [1.56, y, 11]], cols[k]);
+        p.poly([[1.5, y, 1], [1.5, y + 0.1, 1], [1.56, y + 0.1, 11], [1.56, y, 11]], null, '#2a2a30', 0.5);
+      }
+      // A finished window crated for the church.
+      p.crate(0.5, 1.45, 0.24);
+      p.wallL(1.692, 0.54, 0.7, 4, 9.5, '#3a62c4');
+      p.wallL(1.693, 0.54, 0.7, 6.5, 7.5, '#d8a838');
+      break;
+    }
+    case 'cobbler': {
+      // A small shop with a boot sign and a last on the bench outside.
+      p.shadow(0.35, 0.3, 1.4, 1.3);
+      p.box(0.35, 0.35, 1.35, 1.25, 0, 12, '#dfbd88');
+      p.timber(0.35, 0.35, 1.35, 1.25, 0, 12, BEAM);
+      p.doorL(1.25, 0.75, 0.2, 10);
+      p.windowL(1.25, 0.45, 4, 0.14, 5, season === 3);
+      p.roofX(0.35, 0.35, 1.35, 1.25, 12, 11, 'shingle', '#dfbd88', 0.12);
+      p.line([1.36, 1.2, 14], [1.55, 1.35, 14], '#3b2a1a', 1.2);
+      bootSign(p, 1.5, 1.33, 8);
+      p.box(1.45, 0.45, 1.85, 0.75, 5, 1.2, '#8a6440');
+      for (const x of [1.48, 1.82]) p.line([x, 0.72, 0], [x, 0.72, 5], BEAM, 1);
+      bootSign(p, 1.6, 0.6, 6.2);
+      bootSign(p, 1.74, 0.6, 6.2);
+      p.sack(0.55, 1.6, '#7a4a2a');
+      break;
+    }
+    case 'watersawmill': {
+      // An open-sided timber mill on the water: the wheel drives a frame saw.
+      p.shadow(0.3, 0.3, 1.4, 1.6);
+      p.logPile(0.3, 0.2, 2);
+      p.box(0.3, 0.3, 1.35, 1.6, 0, 3, STONE, undefined, 'stone');
+      for (const [x, y] of [[0.35, 0.35], [1.3, 0.35], [0.35, 1.55], [1.3, 1.55]]) p.line([x, y, 3], [x, y, 16], BEAM, 2);
+      // The saw frame and a log on the carriage.
+      p.line([0.8, 0.95, 3], [0.8, 0.95, 14], '#5a3e26', 1.4);
+      p.line([0.8, 1.15, 3], [0.8, 1.15, 14], '#5a3e26', 1.4);
+      p.line([0.8, 1.05, 4], [0.8, 1.05, 13], '#c8ccd4', 1);
+      p.line([0.45, 1.05, 5], [1.2, 1.05, 5], '#8a6236', 5);
+      p.roofX(0.28, 0.28, 1.37, 1.0, 16, 10, 'shingle', WOOD, 0.06);
+      waterWheel(p, 1.62, 0.95, 9, 0.42, 9, season);
+      for (let i = 0; i < 3; i++) p.box(0.4, 1.7, 1.2, 1.85, i * 2.2, 2, i % 2 ? '#d7b47c' : '#c8a46c');
+      break;
+    }
+    case 'silvermine': {
+      // An adit into the rock with a timber frame, a windlass, and a heap of bright ore.
+      for (const [x, y, r] of [[0.5, 0.4, 14], [1.1, 0.3, 16], [1.6, 0.55, 12]] as const) rockLump(p, x, y, r, '#8a8478', 3);
+      rockLump(p, 1.0, 0.8, 13, '#8a8478', 5);
+      p.wallL(0.952, 0.82, 1.18, 0, 10, '#141210');
+      p.line([0.78, 0.96, 0], [0.78, 0.96, 12], BEAM, 2);
+      p.line([1.22, 0.96, 0], [1.22, 0.96, 12], BEAM, 2);
+      p.line([0.74, 0.96, 12], [1.26, 0.96, 12], BEAM, 2.2);
+      // Windlass.
+      p.line([1.5, 1.2, 0], [1.5, 1.2, 9], BEAM, 1.4);
+      p.line([1.5, 1.5, 0], [1.5, 1.5, 9], BEAM, 1.4);
+      p.line([1.5, 1.2, 9], [1.5, 1.5, 9], '#6b4a2e', 3);
+      for (const [dx, dy] of [[0, 0], [0.12, 0.06], [-0.08, 0.1], [0.05, 0.16]]) {
+        rockLump(p, 0.7 + dx, 1.5 + dy, 3.5, '#9a9aa4', 7);
+        const [sx, sy] = iso(0.7 + dx, 1.5 + dy, 2);
+        p.ctx.fillStyle = '#eef2f8';
+        p.ctx.fillRect(sx - 1, sy - 2, 1.6, 1.2);
+      }
+      p.barrel(1.2, 1.65);
+      break;
+    }
+    case 'bathhouse': {
+      // A low stone house with a tiled roof, steam from the vents and a woodpile.
+      p.shadow(0.2, 0.25, 2.8, 1.7);
+      p.box(0.25, 0.3, 2.75, 1.6, 0, 14, STONE, undefined, 'stone');
+      p.doorL(1.6, 1.3, 0.24, 11);
+      for (const x of [0.5, 0.85, 2.0, 2.35]) p.windowL(1.6, x, 6, 0.14, 5, true);
+      p.windowR(2.75, 0.8, 6, 0.14, 5, true);
+      p.roofX(0.25, 0.3, 2.75, 1.6, 14, 13, 'tile', STONE, 0.1);
+      for (const x of [0.9, 1.9]) {
+        p.box(x, 0.85, x + 0.18, 1.05, 21, 4, '#8a7d70', undefined, 'stone');
+        smoke.push([x + 0.09, 0.95, 26]);
+      }
+      p.logPile(0.3, 1.9, 2);
+      tub(p, 2.5, 1.85, 6, 5, '#7ab0c8');
+      break;
+    }
+    case 'school': {
+      // A schoolroom with tall windows, a bell on the gable and a yard with a slate board.
+      p.shadow(0.25, 0.3, 2.75, 1.5);
+      p.box(0.25, 0.3, 2.7, 1.45, 0, 14, PLASTER);
+      p.timber(0.25, 0.3, 2.7, 1.45, 0, 14, BEAM);
+      p.doorL(1.45, 1.35, 0.2, 10);
+      for (const x of [0.45, 0.8, 1.75, 2.1, 2.4]) p.windowL(1.452, x, 4, 0.16, 7, season === 3);
+      p.roofX(0.25, 0.3, 2.7, 1.45, 14, 12, 'tile', PLASTER, 0.1);
+      // Bell-cote on the near gable.
+      p.box(2.55, 0.8, 2.75, 0.95, 26, 6, '#8a7d70');
+      p.wallR(2.752, 0.83, 0.92, 27, 31, '#2a2522');
+      p.circle(2.75, 0.875, 28.5, 1.4, '#c89a38');
+      // A slate board on legs in the yard.
+      p.line([1.0, 1.75, 0], [1.0, 1.75, 9], BEAM, 1);
+      p.line([1.5, 1.75, 0], [1.5, 1.75, 9], BEAM, 1);
+      p.wallL(1.75, 0.95, 1.55, 4, 10, '#7a5230');
+      p.wallL(1.751, 0.99, 1.51, 4.6, 9.4, '#33403a');
+      p.line([1.08, 1.752, 8], [1.3, 1.752, 6], '#f2ece0', 0.5);
+      break;
+    }
+    case 'taxoffice': {
+      // A sober stone office: barred window, a chest by the door, the lord's arms over it.
+      p.shadow(0.3, 0.3, 1.4, 1.3);
+      p.box(0.3, 0.3, 1.35, 1.25, 0, 16, '#b6ae9f', undefined, 'stone');
+      p.doorL(1.25, 0.95, 0.2, 11);
+      p.windowL(1.25, 0.45, 5, 0.18, 7);
+      for (const t of [0.5, 0.56]) p.line([t, 1.253, 5], [t, 1.253, 12], '#2a2a2a', 0.7);
+      p.roofPyramid(0.3, 0.3, 1.35, 1.25, 16, 12, 'slate');
+      p.flag(1.05, 1.252, 13, 5, '#c42b3a');
+      p.box(0.55, 1.4, 0.85, 1.6, 0, 5, '#6a4426');
+      p.box(0.55, 1.4, 0.85, 1.6, 5, 0.8, '#c89a38');
+      p.sack(1.5, 0.8, '#d8c79c');
+      break;
+    }
+    case 'courthouse': {
+      // A great hall of dressed stone with a porch on columns and a watch at the door.
+      p.shadow(0.2, 0.2, 2.8, 2.8);
+      p.box(0.3, 0.3, 2.7, 2.2, 0, 22, '#cfc8b8', undefined, 'stone');
+      for (const x of [0.6, 1.0, 1.9, 2.3]) lancetL(p, 2.202, x, 0.16, 8, 15, season === 3);
+      p.roofX(0.3, 0.3, 2.7, 2.2, 22, 16, 'slate', '#cfc8b8', 0.1);
+      // The porch.
+      p.box(1.25, 2.2, 1.75, 2.75, 0, 1.5, '#b8b0a0');
+      for (const x of [1.3, 1.7]) p.line([x, 2.7, 1.5], [x, 2.7, 13], '#e0dacc', 2.2);
+      p.wallL(2.202, 1.38, 1.62, 0, 11, '#4a2f1b');
+      p.roofY(1.22, 2.2, 1.78, 2.78, 13, 7, 'slate', '#cfc8b8', 0.04);
+      // Scales of justice carved over the door.
+      const [sx, sy] = iso(1.5, 2.781, 17);
+      p.ctx.strokeStyle = '#c89a38';
+      p.ctx.lineWidth = 0.8;
+      p.ctx.beginPath();
+      p.ctx.moveTo(sx, sy - 3);
+      p.ctx.lineTo(sx, sy + 1.5);
+      p.ctx.moveTo(sx - 3, sy - 2);
+      p.ctx.lineTo(sx + 3, sy - 2);
+      p.ctx.stroke();
+      p.flag(2.65, 2.2, 22, 8, '#2f4fa8');
+      break;
+    }
+    case 'atelier': {
+      // A palace studio: tall north windows, an easel in the yard, a loom inside.
+      p.shadow(0.3, 0.3, 1.45, 1.4);
+      p.box(0.3, 0.3, 1.4, 1.3, 0, 18, '#e6dcc6', undefined, 'stone');
+      for (const x of [0.45, 0.8]) p.windowL(1.302, x, 6, 0.2, 10, true);
+      p.doorL(1.3, 1.1, 0.18, 10);
+      p.roofX(0.3, 0.3, 1.4, 1.3, 18, 9, 'slate', '#e6dcc6', 0.1);
+      // Easel with a painting in progress.
+      p.line([1.6, 1.4, 0], [1.66, 1.5, 13], '#7a5230', 1.2);
+      p.line([1.78, 1.4, 0], [1.72, 1.5, 13], '#7a5230', 1.2);
+      p.line([1.69, 1.62, 0], [1.69, 1.5, 12], '#7a5230', 1);
+      p.wallL(1.52, 1.55, 1.85, 5, 12, '#f4ecd8');
+      p.wallL(1.521, 1.58, 1.82, 6, 11, '#6a9ad0');
+      p.wallL(1.522, 1.58, 1.82, 6, 8, '#5a8a4a');
+      p.circle(1.75, 1.522, 10, 1.2, '#f2d34a');
+      p.bush(0.55, 1.65, 4, '#4f8a3c');
+      break;
+    }
+    case 'barracks': {
+      // A long stone barracks with a weapon rack and a guard's banner.
+      p.shadow(0.25, 0.3, 1.6, 1.5);
+      p.box(0.3, 0.3, 1.6, 1.4, 0, 14, '#a49c8e', undefined, 'stone');
+      p.doorL(1.4, 1.1, 0.22, 11);
+      for (const x of [0.45, 0.75]) p.windowL(1.402, x, 6, 0.12, 4);
+      p.roofX(0.3, 0.3, 1.6, 1.4, 14, 10, 'slate', '#a49c8e', 0.1);
+      p.line([0.4, 1.75, 0], [0.4, 1.75, 14], BEAM, 1.2);
+      p.flag(0.4, 1.75, 14, 7, '#c42b3a');
+      // Spears in a rack.
+      p.box(1.0, 1.65, 1.5, 1.72, 0, 6, '#7b5a36');
+      for (let k = 0; k < 5; k++) {
+        const x = 1.04 + k * 0.1;
+        p.line([x, 1.68, 0], [x, 1.68, 15], '#8a6440', 0.8);
+        p.line([x, 1.68, 15], [x, 1.68, 17], '#c8ccd4', 1.2);
+      }
+      break;
+    }
+    case 'stewpond': {
+      // A stone-edged pond with lilies, a little sluice and a net drying.
+      p.poly([[0.25, 0.3, 0], [1.75, 0.3, 0], [1.75, 1.7, 0], [0.25, 1.7, 0]], '#9d978c');
+      p.poly([[0.35, 0.4, 0], [1.65, 0.4, 0], [1.65, 1.6, 0], [0.35, 1.6, 0]], season === 3 ? '#cfe0e8' : '#4a7ab0');
+      if (season !== 3) {
+        for (const [x, y] of [[0.6, 0.7], [1.2, 1.1], [0.9, 1.4], [1.4, 0.6]]) {
+          p.ellipse(x, y, 0, 3, 1.4, '#4f8a3c');
+          p.circle(x + 0.03, y, 0.5, 0.8, '#f2d0e0');
+        }
+        const [fx, fy] = iso(1.05, 0.8, 0);
+        p.ctx.strokeStyle = 'rgba(220,235,245,0.7)';
+        p.ctx.lineWidth = 0.6;
+        p.ctx.beginPath();
+        p.ctx.ellipse(fx, fy, 4, 1.6, 0, 0, Math.PI * 2);
+        p.ctx.stroke();
+      }
+      p.line([1.85, 0.5, 0], [1.85, 0.5, 8], BEAM, 1);
+      p.line([1.85, 1.1, 0], [1.85, 1.1, 8], BEAM, 1);
+      p.wallR(1.85, 0.52, 1.08, 3, 8, 'rgba(120,100,70,0.45)');
+      break;
+    }
+    case 'tiltyard': {
+      // A lists: a long barrier, stands at one side, pennants on poles.
+      p.poly([[0.2, 0.2, 0], [3.8, 0.2, 0], [3.8, 1.8, 0], [0.2, 1.8, 0]], season === 3 ? '#e4e8e8' : '#c8b480');
+      p.box(0.4, 0.95, 3.6, 1.05, 0, 4, '#a83a2a');
+      for (let k = 0; k <= 8; k++) p.line([0.4 + k * 0.4, 1.0, 0], [0.4 + k * 0.4, 1.0, 5], '#e8d8b0', 1);
+      // Stands.
+      p.box(1.2, 0.2, 2.8, 0.5, 0, 6, '#8a6440');
+      p.box(1.2, 0.2, 2.8, 0.35, 6, 4, '#7b5a36');
+      p.roofX(1.15, 0.15, 2.85, 0.55, 12, 4, 'plank', WOOD, 0.04);
+      for (const [x, c] of [[0.3, '#c42b3a'], [1.3, '#2f4fa8'], [2.7, '#d8a838'], [3.7, '#4f8a3c']] as [number, string][]) {
+        p.line([x, 1.7, 0], [x, 1.7, 18], BEAM, 1);
+        p.flag(x, 1.7, 18, 5, c);
+      }
+      break;
+    }
     case 'wall': {
       // A short stretch with a merlon, for the build card and the building site.
       p.shadow(0.1, 0.3, 0.9, 0.7);
@@ -3692,25 +3965,7 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       if (season !== 3) p.poly([[1.42, 0.22, 25], [1.83, 0.22, 25], [1.83, 0.34, 25], [1.42, 0.34, 25]], '#6aa0c0');
       p.line([1.84, 0.28, 0], [1.84, 0.28, 22], BEAM, 1.6);
       // The wheel, upright beside the wall.
-      const wx = 1.62;
-      const wy = 0.95;
-      const wz = 12;
-      const R = 0.5;
-      const RZ = 12;
-      const ring = (k: number, r: number): V3 => [wx, wy + Math.cos(k) * r, wz + Math.sin(k) * (RZ * r) / R];
-      const pts: V3[] = [];
-      for (let k = 0; k < 24; k++) pts.push(ring((k / 24) * Math.PI * 2, R));
-      p.poly(pts, null, '#5a3e26', 2.2);
-      const inner: V3[] = [];
-      for (let k = 0; k < 24; k++) inner.push(ring((k / 24) * Math.PI * 2, R * 0.82));
-      p.poly(inner, null, '#6b4a2c', 1);
-      for (let k = 0; k < 8; k++) {
-        const a = (k / 8) * Math.PI * 2;
-        p.line([wx, wy, wz], ring(a, R), '#6b4a2c', 1);
-        const o = ring(a, R);
-        p.line(o, [o[0] + 0.08, o[1], o[2]], '#8a6440', 2);
-      }
-      p.circle(wx, wy, wz, 2, '#4a3020');
+      waterWheel(p, 1.62, 0.95, 12, 0.5, 12, season);
       if (season !== 3) {
         // Water spilling off the paddles into the stream.
         p.line([1.7, 0.42, 22], [1.7, 0.5, 12], 'rgba(170,210,230,0.8)', 1.4);
@@ -5255,6 +5510,90 @@ export function oreHeap(p: Pen, x: number, y: number, n = 5): void {
 }
 
 /** Squared, freshly cut blocks of pale stone, stacked. */
+/** A water wheel standing upright on the +x side of a mill, in its race. */
+function waterWheel(p: Pen, wx: number, wy: number, wz: number, R: number, RZ: number, season: Season): void {
+  const ring = (k: number, r: number): V3 => [wx, wy + Math.cos(k) * r, wz + Math.sin(k) * (RZ * r) / R];
+  const pts: V3[] = [];
+  for (let k = 0; k < 24; k++) pts.push(ring((k / 24) * Math.PI * 2, R));
+  p.poly(pts, null, '#5a3e26', 2.2);
+  const inner: V3[] = [];
+  for (let k = 0; k < 24; k++) inner.push(ring((k / 24) * Math.PI * 2, R * 0.82));
+  p.poly(inner, null, '#6b4a2c', 1);
+  for (let k = 0; k < 8; k++) {
+    const a = (k / 8) * Math.PI * 2;
+    p.line([wx, wy, wz], ring(a, R), '#6b4a2c', 1);
+    const o = ring(a, R);
+    p.line(o, [o[0] + 0.08, o[1], o[2]], '#8a6440', 2);
+  }
+  p.circle(wx, wy, wz, 2, '#4a3020');
+  if (season !== 3) p.line([wx + 0.08, wy - R, 1], [wx + 0.08, wy + R * 1.6, 0], 'rgba(200,230,240,0.6)', 1);
+}
+
+/** A straw bee skep on a bench (z), coiled in rings, with its little door. */
+function skep(p: Pen, x: number, y: number, z: number): void {
+  const [sx, sy] = iso(x, y, z);
+  const c = p.ctx;
+  c.fillStyle = '#c8a050';
+  c.beginPath();
+  c.moveTo(sx - 3, sy);
+  c.quadraticCurveTo(sx - 3.2, sy - 6, sx, sy - 6.5);
+  c.quadraticCurveTo(sx + 3.2, sy - 6, sx + 3, sy);
+  c.closePath();
+  c.fill();
+  c.strokeStyle = '#9a7a38';
+  c.lineWidth = 0.5;
+  for (const h of [1.8, 3.6, 5]) {
+    c.beginPath();
+    c.moveTo(sx - 3 + h * 0.15, sy - h);
+    c.lineTo(sx + 3 - h * 0.15, sy - h);
+    c.stroke();
+  }
+  c.fillStyle = '#3a2a1a';
+  c.fillRect(sx - 0.6, sy - 1.2, 1.2, 1.2);
+}
+
+/** A gown on a dress form. */
+function gown(p: Pen, x: number, y: number, color: string): void {
+  const [gx, gy] = iso(x, y, 0);
+  const c = p.ctx;
+  c.fillStyle = 'rgba(30,24,12,0.22)';
+  c.beginPath();
+  c.ellipse(gx + 1, gy, 4.5, 1.8, 0, 0, Math.PI * 2);
+  c.fill();
+  c.fillStyle = color;
+  c.beginPath();
+  c.moveTo(gx - 1.6, gy - 15);
+  c.lineTo(gx + 1.6, gy - 15);
+  c.lineTo(gx + 1.2, gy - 11);
+  c.lineTo(gx + 4, gy - 3);
+  c.lineTo(gx - 4, gy - 3);
+  c.lineTo(gx - 1.2, gy - 11);
+  c.closePath();
+  c.fill();
+  c.strokeStyle = '#e0b840';
+  c.lineWidth = 0.8;
+  c.beginPath();
+  c.moveTo(gx - 1.3, gy - 11);
+  c.lineTo(gx + 1.3, gy - 11);
+  c.moveTo(gx - 4, gy - 3.2);
+  c.lineTo(gx + 4, gy - 3.2);
+  c.stroke();
+  c.strokeStyle = '#5e4129';
+  c.lineWidth = 1;
+  c.beginPath();
+  c.moveTo(gx, gy);
+  c.lineTo(gx, gy - 3);
+  c.stroke();
+}
+
+/** A boot, as a shop sign or on the bench (z). */
+function bootSign(p: Pen, x: number, y: number, z: number): void {
+  const [bx, by] = iso(x, y, z);
+  p.ctx.fillStyle = '#6a3e22';
+  p.ctx.fillRect(bx - 2, by - 5, 3, 5);
+  p.ctx.fillRect(bx - 2, by - 1, 6, 2);
+}
+
 /** A pointed window of coloured glass in a wall facing +y, its panes leaded in bands. */
 function lancetL(p: Pen, y: number, x: number, w: number, z0: number, z1: number, lit: boolean): void {
   p.wallL(y, x - 0.025, x + w + 0.025, z0 - 1, z1, '#3a3a44');

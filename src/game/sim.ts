@@ -4212,10 +4212,13 @@ export function rankNeeds(s: GameState, tier: number): Need[] {
     out.push({ label: 'A well', met: has('well') });
   }
   if (tier === 2) {
-    out.push({ label: 'A tavern', met: has('tavern') });
+    out.push({ label: 'A church', met: has('church') });
     out.push({ label: 'A trading post or dock', met: has('tradingpost') || has('dock') });
   }
-  if (tier === 3) out.push({ label: 'A church', met: has('church') });
+  if (tier === 3) {
+    out.push({ label: 'An alehouse or tavern', met: has('tavern') });
+    out.push({ label: 'A stone church', met: s.buildings.some((b) => (b.type === 'church' && b.level >= 2 && b.build >= 1) || (b.type === 'cathedral' && b.build >= 1)) });
+  }
   if (tier === 4) out.push({ label: 'Three town charters', met: (s.charters?.length ?? 0) >= 3 });
   return out;
 }

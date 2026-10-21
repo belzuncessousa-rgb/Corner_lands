@@ -58,6 +58,8 @@ import { LANDS, generateWorld, idx, inBounds } from './game/world';
 import { demolishWithUndo } from './game/undo';
 import type { Agent } from './render/agents';
 import { AgentSystem } from './render/agents';
+import { learnEverything } from './game/unlocks';
+import { grantCharter } from './game/charters';
 import { buildingDoor } from './render/sprites';
 import { reachOf } from './game/levels';
 import { Wildlife } from './render/wildlife';
@@ -1186,7 +1188,7 @@ function rangeHighlighter(s: GameState, type: BuildingType): ((i: number) => boo
 const game = new Game();
 // Handy hooks for debugging and automated screenshots.
 (window as unknown as Record<string, unknown>).game = game;
-(window as unknown as Record<string, unknown>).cl = { door: (b: Building) => buildingDoor(game.state, b), defs: BUILDINGS, placeOrder, buildRoad, planRoad, buyAnimal, stepDay, recompute, placementError, playBot, placeZone, setYard, keepOf, log };
+(window as unknown as Record<string, unknown>).cl = { door: (b: Building) => buildingDoor(game.state, b), defs: BUILDINGS, placeOrder, buildRoad, planRoad, buyAnimal, stepDay, recompute, placementError, playBot, placeZone, setYard, keepOf, log, learnEverything, grantCharter };
 
 /** Hands the player a file to save. */
 function download(blob: Blob, name: string): void {
