@@ -1274,6 +1274,69 @@ function drawGothicChurch(p: Pen, season: Season, glazed: number): void {
   }
 }
 
+/**
+ * A sanded or gravelled patch on the ground: soft at its edges where it wears
+ * into the grass, speckled with grit and pebbles, and raked faintly.
+ */
+export function sandPatch(p: Pen, pts: [number, number][], color: string, seed: number, grit = 1): void {
+  const c = p.ctx;
+  const path = (inset: number) => {
+    const cx = pts.reduce((a, q) => a + q[0], 0) / pts.length;
+    const cy = pts.reduce((a, q) => a + q[1], 0) / pts.length;
+    c.beginPath();
+    pts.forEach(([x, y], k) => {
+      const [sx, sy] = iso(x + (cx - x) * inset, y + (cy - y) * inset, 0);
+      if (k) c.lineTo(sx, sy);
+      else c.moveTo(sx, sy);
+    });
+    c.closePath();
+  };
+  // The worn edge: the sand blurred out over the grass.
+  c.save();
+  c.filter = 'blur(3px)';
+  c.fillStyle = color;
+  c.globalAlpha = 0.8;
+  path(0);
+  c.fill();
+  c.restore();
+  c.save();
+  path(0.03);
+  c.fillStyle = color;
+  c.fill();
+  c.clip();
+  // Grit and pebbles, lighter and darker.
+  const rand = mulberry32(seed * 977 + 13);
+  let x0 = 1e9;
+  let x1 = -1e9;
+  let y0 = 1e9;
+  let y1 = -1e9;
+  for (const [x, y] of pts) {
+    const [sx, sy] = iso(x, y, 0);
+    x0 = Math.min(x0, sx);
+    x1 = Math.max(x1, sx);
+    y0 = Math.min(y0, sy);
+    y1 = Math.max(y1, sy);
+  }
+  const n = Math.round(((x1 - x0) * (y1 - y0)) / 22 * grit);
+  for (let k = 0; k < n; k++) {
+    const sx = x0 + rand() * (x1 - x0);
+    const sy = y0 + rand() * (y1 - y0);
+    const r = rand();
+    c.fillStyle = r < 0.45 ? mix(color, '#000000', 0.16) : r < 0.85 ? mix(color, '#ffffff', 0.22) : '#9a9284';
+    c.fillRect(sx, sy, r < 0.85 ? 1 : 1.6, r < 0.85 ? 0.7 : 1.1);
+  }
+  // Faint raking across it.
+  c.strokeStyle = mix(color, '#000000', 0.07);
+  c.lineWidth = 0.6;
+  for (let sy = y0 + 4; sy < y1; sy += 6) {
+    c.beginPath();
+    c.moveTo(x0, sy + Math.sin(sy) * 1.5);
+    c.lineTo(x1, sy + Math.cos(sy) * 1.5);
+    c.stroke();
+  }
+  c.restore();
+}
+
 /** Panes of stained glass: ruby, sapphire, gold, emerald. */
 const GLASS = ['#b83a3a', '#3a5ab8', '#d8a83a', '#3a8a5a'];
 /** Limewashed walls. */
@@ -3089,21 +3152,62 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       break;
     }
     case 'atelier': {
-      // A palace studio: tall north windows, an easel in the yard, a loom inside.
-      p.shadow(0.3, 0.3, 1.45, 1.4);
-      p.box(0.3, 0.3, 1.4, 1.3, 0, 18, '#e6dcc6', undefined, 'stone');
-      for (const x of [0.45, 0.8]) p.windowL(1.302, x, 6, 0.2, 10, true);
-      p.doorL(1.3, 1.1, 0.18, 10);
-      p.roofX(0.3, 0.3, 1.4, 1.3, 18, 9, 'slate', '#e6dcc6', 0.1);
-      // Easel with a painting in progress.
-      p.line([1.6, 1.4, 0], [1.66, 1.5, 13], '#7a5230', 1.2);
-      p.line([1.78, 1.4, 0], [1.72, 1.5, 13], '#7a5230', 1.2);
-      p.line([1.69, 1.62, 0], [1.69, 1.5, 12], '#7a5230', 1);
-      p.wallL(1.52, 1.55, 1.85, 5, 12, '#f4ecd8');
-      p.wallL(1.521, 1.58, 1.82, 6, 11, '#6a9ad0');
-      p.wallL(1.522, 1.58, 1.82, 6, 8, '#5a8a4a');
-      p.circle(1.75, 1.522, 10, 1.2, '#f2d34a');
-      p.bush(0.55, 1.65, 4, '#4f8a3c');
+      // The patrons' studio: two storeys of pale stone with tall north windows and
+      // a flat roof terrace behind a balustrade, where finished statues stand in
+      // the light; in the yard a block half carved, an easel, a bust on its plinth.
+      const ST = '#e6dcc6';
+      const winter = season === 3;
+      const marble = winter ? '#f4f6f8' : '#f2efe8';
+      p.shadow(0.25, 0.25, 1.5, 1.35);
+      p.box(0.3, 0.3, 1.4, 1.2, 0, 24, ST, undefined, 'stone');
+      for (const x of [0.42, 0.75]) p.windowL(1.202, x, 4, 0.22, 14, true);
+      p.doorL(1.2, 1.1, 0.18, 11);
+      p.windowR(1.4, 0.5, 12, 0.24, 10, true);
+      // The terrace: a cornice, flagstones and a balustrade with little balusters.
+      p.box(0.27, 0.27, 1.43, 1.23, 24, 2, '#d2c6ac', winter ? '#eef2f4' : '#cbbfa6');
+      for (let k = 0; k <= 10; k++) {
+        const x = 0.3 + k * 0.11;
+        p.line([x, 1.22, 26], [x, 1.22, 30], '#e8dfcc', 1.2);
+      }
+      for (let k = 0; k <= 8; k++) {
+        const y = 0.3 + k * 0.115;
+        p.line([1.42, y, 26], [1.42, y, 30], '#e8dfcc', 1.2);
+      }
+      p.line([0.28, 1.22, 30.5], [1.42, 1.22, 30.5], '#d6cdb8', 1.6);
+      p.line([1.42, 0.28, 30.5], [1.42, 1.22, 30.5], '#d6cdb8', 1.6);
+      // A striped awning over the back of the terrace, and a potted bay tree.
+      p.poly([[0.32, 0.32, 38], [1.0, 0.32, 38], [1.0, 0.6, 33], [0.32, 0.6, 33]], '#b8483a', '#7a2a20', 0.6);
+      for (const x of [0.48, 0.72]) p.poly([[x, 0.32, 38], [x + 0.12, 0.32, 38], [x + 0.12, 0.6, 33], [x, 0.6, 33]], '#f2ead8');
+      p.line([1.0, 0.6, 26], [1.0, 0.6, 33], '#5e4129', 1);
+      p.box(1.15, 0.4, 1.3, 0.55, 26, 4, '#a4523a');
+      p.circle(1.22, 0.47, 34, 4, '#4f8a3c');
+      // Statues on the terrace.
+      const statue = (x: number, y: number, z: number, pose: number) => {
+        p.box(x - 0.06, y - 0.06, x + 0.06, y + 0.06, z, 3, '#cfc5ae');
+        p.poly([[x - 0.035, y, z + 3], [x + 0.035, y, z + 3], [x + 0.025, y, z + 11], [x - 0.025, y, z + 11]], marble, '#b8b0a0', 0.4);
+        p.circle(x, y, z + 12.6, 1.5, marble);
+        // An arm raised, or a staff.
+        if (pose) p.line([x + 0.02, y, z + 10], [x + 0.08, y, z + 14], marble, 1.1);
+        else p.line([x - 0.04, y, z + 3], [x - 0.04, y, z + 14], '#c8c0b0', 0.8);
+      };
+      statue(0.55, 1.0, 26, 1);
+      statue(0.9, 0.95, 26, 0);
+      // The yard: a block being carved, an easel, a bust on a column.
+      p.box(1.55, 0.7, 1.75, 0.9, 0, 5, '#e8e4dc', marble);
+      p.poly([[1.6, 0.8, 5], [1.7, 0.8, 5], [1.68, 0.8, 11], [1.62, 0.8, 11]], marble, '#b8b0a0', 0.4);
+      p.circle(1.65, 0.8, 12.2, 1.3, marble);
+      p.line([1.82, 0.95, 0], [1.76, 0.85, 6], '#6a6a72', 0.9);
+      p.line([1.6, 1.5, 0], [1.66, 1.6, 13], '#7a5230', 1.2);
+      p.line([1.78, 1.5, 0], [1.72, 1.6, 13], '#7a5230', 1.2);
+      p.line([1.69, 1.72, 0], [1.69, 1.6, 12], '#7a5230', 1);
+      p.wallL(1.62, 1.55, 1.85, 5, 12, '#f4ecd8');
+      p.wallL(1.621, 1.58, 1.82, 6, 11, '#6a9ad0');
+      p.wallL(1.622, 1.58, 1.82, 6, 8, '#5a8a4a');
+      p.circle(1.75, 1.622, 10, 1.2, '#f2d34a');
+      p.box(0.4, 1.55, 0.52, 1.67, 0, 9, '#d8d0be');
+      p.circle(0.46, 1.61, 11, 2, marble);
+      p.box(0.43, 1.58, 0.49, 1.64, 9, 1.5, marble);
+      p.bush(0.85, 1.7, 3.5, '#4f8a3c');
       break;
     }
     case 'barracks': {
@@ -3146,17 +3250,91 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       break;
     }
     case 'tiltyard': {
-      // A lists: a long barrier, stands at one side, pennants on poles.
-      p.poly([[0.2, 0.2, 0], [3.8, 0.2, 0], [3.8, 1.8, 0], [0.2, 1.8, 0]], season === 3 ? '#e4e8e8' : '#c8b480');
-      p.box(0.4, 0.95, 3.6, 1.05, 0, 4, '#a83a2a');
-      for (let k = 0; k <= 8; k++) p.line([0.4 + k * 0.4, 1.0, 0], [0.4 + k * 0.4, 1.0, 5], '#e8d8b0', 1);
-      // Stands.
-      p.box(1.2, 0.2, 2.8, 0.5, 0, 6, '#8a6440');
-      p.box(1.2, 0.2, 2.8, 0.35, 6, 4, '#7b5a36');
-      p.roofX(1.15, 0.15, 2.85, 0.55, 12, 4, 'plank', WOOD, 0.04);
-      for (const [x, c] of [[0.3, '#c42b3a'], [1.3, '#2f4fa8'], [2.7, '#d8a838'], [3.7, '#4f8a3c']] as [number, string][]) {
-        p.line([x, 1.7, 0], [x, 1.7, 18], BEAM, 1);
-        p.flag(x, 1.7, 18, 5, c);
+      // The lists: a sanded arena with the tilt barrier down its length, a
+      // grandstand of spectators under a striped canopy with the lord's box in
+      // the middle, two knights waiting at either end, pennants along the front.
+      const winter = season === 3;
+      sandPatch(p, [[0.15, 0.25], [5.85, 0.25], [5.85, 2.85], [0.15, 2.85]], winter ? '#e4e8e8' : '#d2bc88', 7);
+      // The grandstand: three tiers stepping up at the back.
+      const sx0 = 1.3;
+      const sx1 = 4.7;
+      for (let k = 0; k < 3; k++) {
+        const y0 = 0.3 + k * 0.18;
+        p.box(sx0, 0.3, sx1, y0 + 0.18, 0, 6 + (2 - k) * 6, '#8a6440', '#a07a50');
+      }
+      // Spectators on every tier.
+      const coats = ['#b8483a', '#3a5a8a', '#d8a838', '#4f8a3c', '#6a4a8a', '#e8dcc0', '#8a3b2e'];
+      let n = 0;
+      for (let k = 0; k < 3; k++) {
+        const y = 0.4 + k * 0.18;
+        const z = 6 + (2 - k) * 6;
+        for (let x = sx0 + 0.12; x < sx1 - 0.05; x += 0.16) {
+          n++;
+          if ((n * 7) % 11 === 0 || (x > 2.75 && x < 3.25)) continue;
+          p.poly([[x - 0.04, y, z], [x + 0.04, y, z], [x + 0.03, y, z + 5], [x - 0.03, y, z + 5]], coats[n % coats.length]);
+          p.circle(x, y, z + 6.5, 1.3, '#e8c8a8');
+        }
+      }
+      // The lord's box in the middle, a little higher, hung with the arms.
+      p.box(2.75, 0.3, 3.25, 0.72, 0, 22, '#7b5a36', '#9a7a50');
+      p.wallL(0.722, 2.78, 3.22, 12, 21, HERALDRY.current.field);
+      p.circle(3.0, 0.724, 16.5, 2.2, HERALDRY.current.second);
+      // The striped canopy on posts.
+      for (const x of [sx0, 2.15, 3.0, 3.85, sx1]) p.line([x, 0.86, 0], [x, 0.86, 30], BEAM, 1.2);
+      const stripes = 12;
+      for (let k = 0; k < stripes; k++) {
+        const xa = sx0 + ((sx1 - sx0) * k) / stripes;
+        const xb = sx0 + ((sx1 - sx0) * (k + 1)) / stripes;
+        p.poly([[xa, 0.22, 34], [xb, 0.22, 34], [xb, 0.9, 29], [xa, 0.9, 29]], k % 2 ? '#f2ead8' : '#b8483a', '#7a2a20', 0.4);
+      }
+      // The tilt barrier, red and white, down the middle of the arena.
+      p.box(0.7, 1.8, 5.3, 1.86, 0, 7, '#a83a2a');
+      for (let k = 0; k <= 23; k++) p.line([0.7 + k * 0.2, 1.861, 1], [0.7 + k * 0.2, 1.861, 6.5], '#efe4cc', 1.6);
+      // Two knights, one at each end, lances up.
+      const knight = (x: number, y: number, f: number, cloth: string) => {
+        const [hx, hy] = iso(x, y, 0);
+        const c = p.ctx;
+        c.fillStyle = 'rgba(30,20,10,0.25)';
+        c.beginPath();
+        c.ellipse(hx, hy, 9, 3, 0, 0, Math.PI * 2);
+        c.fill();
+        c.strokeStyle = '#3a2a1a';
+        c.lineWidth = 1.4;
+        c.beginPath();
+        for (const dx of [-5, -2, 3, 6]) {
+          c.moveTo(hx + dx, hy - 7);
+          c.lineTo(hx + dx, hy);
+        }
+        c.stroke();
+        // Caparisoned horse.
+        c.fillStyle = cloth;
+        c.beginPath();
+        c.ellipse(hx, hy - 9, 8, 4.2, 0, 0, Math.PI * 2);
+        c.fill();
+        c.beginPath();
+        c.ellipse(hx + 8 * f, hy - 13, 2.6, 3.4, 0.4 * f, 0, Math.PI * 2);
+        c.fill();
+        // The rider in mail, with a shield and a lance.
+        c.fillStyle = '#9aa0a8';
+        c.fillRect(hx - 2, hy - 20, 4, 8);
+        c.beginPath();
+        c.arc(hx, hy - 22, 2.4, 0, Math.PI * 2);
+        c.fill();
+        c.fillStyle = cloth;
+        c.fillRect(hx - 4 - 1.5 * f, hy - 18, 3, 5);
+        c.strokeStyle = '#e8dcc0';
+        c.lineWidth = 1.3;
+        c.beginPath();
+        c.moveTo(hx + f, hy - 14);
+        c.lineTo(hx + 10 * f, hy - 40);
+        c.stroke();
+      };
+      knight(0.6, 2.2, 1, '#2f4fa8');
+      knight(5.4, 1.45, -1, '#c42b3a');
+      // Pennants along the front edge.
+      for (const [x, c] of [[0.4, '#c42b3a'], [1.8, '#2f4fa8'], [3.2, '#d8a838'], [4.6, '#4f8a3c'], [5.7, '#c42b3a']] as [number, string][]) {
+        p.line([x, 2.75, 0], [x, 2.75, 22], BEAM, 1);
+        p.flag(x, 2.75, 22, 6, c);
       }
       break;
     }
@@ -3894,13 +4072,35 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       const rand = mulberry32(31);
       const rect = (x0: number, y0: number, x1: number, y1: number, col: string) => p.poly([[x0, y0, 0], [x1, y0, 0], [x1, y1, 0], [x0, y1, 0]], col);
       rect(0.05, 0.05, N - 0.05, N - 0.05, lawn);
-      // Walks: round the inside of the hedge, and the two great walks crossing.
-      rect(0.5, 0.5, N - 0.5, 0.95, gravel);
-      rect(0.5, 0.5, 0.95, N - 0.5, gravel);
-      rect(N - 0.95, 0.5, N - 0.5, N - 0.5, gravel);
-      rect(0.5, N - 0.95, N - 0.5, N - 0.5, gravel);
-      rect(4.6, 0.5, 5.4, N - 0.2, gravel);
-      rect(0.5, 4.6, N - 0.5, 5.4, gravel);
+      // The hedge along the back two sides (the front ones are drawn last, over everything).
+      p.box(0.05, 0.05, N - 0.1, 0.22, 0, 7, hedge);
+      p.box(0.05, 0.05, 0.22, N - 0.1, 0, 7, hedge);
+      // Walks of raked gravel: round the inside of the hedge, and the two great walks crossing.
+      const walk = (x0: number, y0: number, x1: number, y1: number, seed: number) =>
+        sandPatch(p, [[x0, y0], [x1, y0], [x1, y1], [x0, y1]], gravel, seed, 1.8);
+      walk(0.5, 0.5, N - 0.5, 0.95, 1);
+      walk(0.5, 0.5, 0.95, N - 0.5, 2);
+      walk(N - 0.95, 0.5, N - 0.5, N - 0.5, 3);
+      walk(0.5, N - 0.95, N - 0.5, N - 0.5, 4);
+      walk(4.6, 0.5, 5.4, N - 0.2, 5);
+      walk(0.5, 4.6, N - 0.5, 5.4, 6);
+      // Flower borders along both sides of the great walks, thick with blooms.
+      const border = (x0: number, y0: number, x1: number, y1: number) => {
+        if (!flowers.length) return;
+        const n = Math.round(Math.max(x1 - x0, y1 - y0) * 26);
+        for (let k = 0; k < n; k++) {
+          const x = x0 + rand() * (x1 - x0);
+          const y = y0 + rand() * (y1 - y0);
+          p.bush(x, y, 1.6, '#4a7a34');
+          p.circle(x, y, 2.4, 1.15, flowers[(k * 3 + 1) % flowers.length]);
+        }
+      };
+      for (const [a, b] of [[1.0, 3.9], [6.1, 9.0]] as const) {
+        border(a, 4.3, b, 4.55);
+        border(a, 5.45, b, 5.7);
+        border(4.3, a, 4.55, b);
+        border(5.45, a, 5.7, b);
+      }
       const yew = (x: number, y: number, h = 20) => {
         const [tx, ty] = iso(x, y, 0);
         const c = p.ctx;
@@ -3940,7 +4140,7 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
         const mx = (x0 + x1) / 2;
         const my = (y0 + y1) / 2;
         if (flowers.length) {
-          for (let k = 0; k < 120; k++) {
+          for (let k = 0; k < 260; k++) {
             const x = x0 + 0.15 + rand() * (x1 - x0 - 0.3);
             const y = y0 + 0.15 + rand() * (y1 - y0 - 0.3);
             p.bush(x, y, 1.9, '#4a7a34');
@@ -6114,7 +6314,7 @@ function drawManor(p: Pen, level: number, season: Season, smoke: V3[]): void {
   const ST = '#b6ae9f';
   p.shadow(0.35, 0.3, 3.65, 3.2);
   // Gravel path to the door, and clipped box hedges either side.
-  p.poly([[1.6, 2.95, 0], [2.06, 2.95, 0], [2.11, 3.95, 0], [1.55, 3.95, 0]], winter ? '#d4d8d6' : '#c8b896');
+  sandPatch(p, [[1.6, 2.95], [2.06, 2.95], [2.11, 3.95], [1.55, 3.95]], winter ? '#d4d8d6' : '#c8b896', 3, 1.6);
   for (const y of [3.25, 3.7]) {
     p.bush(1.3, y, 4.5, '#557a38');
     p.bush(2.36, y, 4.5, '#557a38');
@@ -6173,7 +6373,7 @@ function drawPalace(p: Pen, season: Season, smoke: V3[]): void {
   const ROOFC = 'slate';
   p.shadow(0.2, 0.2, 3.85, 3.3);
   // The forecourt: gravel, with a round basin in the middle.
-  p.poly([[1.1, 2.95, 0], [2.9, 2.95, 0], [3.0, 3.95, 0], [1.0, 3.95, 0]], winter ? '#d8dcda' : '#d2c4a0');
+  sandPatch(p, [[1.1, 2.95], [2.9, 2.95], [3.0, 3.95], [1.0, 3.95]], winter ? '#d8dcda' : '#d2c4a0', 4, 1.6);
   p.ellipse(2.0, 3.45, 1, 13, 6.5, '#a8a093');
   p.ellipse(2.0, 3.45, 2, 11, 5.4, winter ? '#dde8ee' : '#5a8ab0');
   p.line([2.0, 3.45, 2], [2.0, 3.45, 9], '#bab3a6', 1.6);

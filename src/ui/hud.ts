@@ -146,6 +146,7 @@ import { folkDoing, folkName, folkThought, WISHES, workplaceOf } from './folk';
 const ZONE_COST_NOTE: Partial<Record<BuildingType, string>> = {
   field: '<small>Free · draw it</small>',
   pasture: '<small>Fences: timber</small>',
+  deerpark: '<small>Paling: timber</small>',
   orchard: '<small>2 coins a tile</small>',
 };
 const YARD_ICON: Record<string, string> = { veg: 'vegetables', hens: 'eggs', bees: 'honey' };

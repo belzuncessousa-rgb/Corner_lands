@@ -826,23 +826,48 @@ export class Renderer {
     p.fence([x0 + 0.05, y0 + 0.05], [x1 - 0.05, y0 + 0.05], post);
     p.fence([x0 + 0.05, y0 + 0.05], [x0 + 0.05, y1 - 0.05], post);
     const rand = mulberry32(b.id * 13 + 1);
-    // A few old trees inside the paling, drawn from back to front.
-    const trees: [number, number][] = [];
-    for (let k = 0; k < Math.max(2, Math.floor((b.w * b.h) / 6)); k++) trees.push([x0 + 0.6 + rand() * (b.w - 1.2), y0 + 0.6 + rand() * (b.h - 1.2)]);
-    // The deer: a few grazing, wandering slowly about the park.
-    const deer = Math.min(8, Math.max(2, Math.floor((b.w * b.h) / 4)));
-    const items: { x: number; y: number; tree?: boolean; j?: number }[] = trees.map(([x, y]) => ({ x, y, tree: true }));
+    // Woods in groves, with open glades between where the deer can be seen.
+    const area = b.w * b.h;
+    const groves: [number, number][] = [];
+    for (let k = 0; k < Math.max(3, Math.round(area / 22)); k++) groves.push([x0 + 1 + rand() * (b.w - 2), y0 + 1 + rand() * (b.h - 2)]);
+    const trees: { x: number; y: number; kind: TreeKind }[] = [];
+    for (const [gx, gy] of groves) {
+      for (let k = 0; k < Math.round(area / (groves.length * 3.2)); k++) {
+        const a = rand() * Math.PI * 2;
+        const r = Math.sqrt(rand()) * 1.7;
+        const x = Math.max(x0 + 0.4, Math.min(x1 - 0.4, gx + Math.cos(a) * r));
+        const y = Math.max(y0 + 0.4, Math.min(y1 - 0.4, gy + Math.sin(a) * r));
+        const v = rand();
+        trees.push({ x, y, kind: v < 0.55 ? 'oak' : v < 0.8 ? 'pine' : 'birch' });
+      }
+    }
+    // A few lone trees out in the glades.
+    for (let k = 0; k < Math.round(area / 12); k++) trees.push({ x: x0 + 0.5 + rand() * (b.w - 1), y: y0 + 0.5 + rand() * (b.h - 1), kind: 'oak' });
+    // The deer graze in the glades, wandering slowly about the park.
+    const deer = Math.min(16, Math.max(4, Math.floor(area / 5)));
+    const items: { x: number; y: number; tree?: TreeKind; j?: number }[] = trees.map((tr) => ({ x: tr.x, y: tr.y, tree: tr.kind }));
     for (let j = 0; j < deer; j++) {
       const r1 = rand();
       const r2 = rand();
       const t = this.time * 0.04 + r1 * 10;
-      items.push({ x: x0 + 0.4 + (b.w - 0.8) * (0.5 + 0.45 * Math.sin(r1 * 6.283 + t * 0.5)), y: y0 + 0.4 + (b.h - 0.8) * (0.5 + 0.45 * Math.sin(r2 * 6.283 + t * 0.4)), j });
+      let x = x0 + 0.4 + (b.w - 0.8) * (0.5 + 0.45 * Math.sin(r1 * 6.283 + t * 0.5));
+      let y = y0 + 0.4 + (b.h - 0.8) * (0.5 + 0.45 * Math.sin(r2 * 6.283 + t * 0.4));
+      // Out of the thick of a grove, into the open.
+      for (const [gx, gy] of groves) {
+        const d = Math.hypot(x - gx, y - gy);
+        if (d < 1.2) {
+          x = Math.max(x0 + 0.4, Math.min(x1 - 0.4, gx + ((x - gx) / (d || 1)) * 1.3));
+          y = Math.max(y0 + 0.4, Math.min(y1 - 0.4, gy + ((y - gy) / (d || 1)) * 1.3));
+        }
+      }
+      items.push({ x, y, j });
     }
     items.sort((a, c) => a.x + a.y - (c.x + c.y));
     for (const it of items) {
       if (it.tree) {
         const tv = Math.floor(it.x * 7 + it.y * 3) % TREE_VARIANTS;
-        const sp = this.sprite(`t:oak:${season}:${tv}`, () => treeSprite('oak', season, tv));
+        const kind = it.tree;
+        const sp = this.sprite(`t:${kind}:${season}:${tv}`, () => treeSprite(kind, season, tv));
         const [wx, wy] = iso(it.x, it.y);
         this.blit(sp, wx, wy, 1, TREE_SCALE * 0.9);
       } else {
