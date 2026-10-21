@@ -101,6 +101,10 @@ export class Renderer {
   /** Whether the lord rides out on horseback (a staffed stable). */
   private lordRides = false;
   private buckets: number[][] = [];
+  /** Each bucket entry's place along its row, by where its base stands (x + y). */
+  private bucketKeys: number[][] = [];
+  /** Things on the ground pass's zones that stand up (beasts, park trees, front fences), sorted in with the rest. */
+  private late: { x: number; y: number; fn: () => void }[] = [];
   time = 0;
   /** Show the little problem markers over buildings. */
   showMarkers = true;
@@ -305,6 +309,7 @@ export class Renderer {
     }
     this.mark('ground');
     this.drawWaterShimmer(s, visible);
+    this.late.length = 0;
     this.drawFields(s, season, ov.selected);
     this.drawBedGround(s, season, visible);
     this.drawFootpaths(s, agents, season, dt, visible);
@@ -371,9 +376,29 @@ export class Renderer {
 
     // ---- objects, back to front
     this.computeBoost(s);
-    const nb = W + H + 4;
-    if (this.buckets.length !== nb) this.buckets = Array.from({ length: nb }, () => []);
+    // Everything goes in a bucket by the row its base stands on, and within
+    // the row by its exact place, so whatever stands nearer is drawn later.
+    // A tile's things stand at its centre (row + 1), a building at its front
+    // tile's centre; tiles just in front of a building come after it.
+    const nb = W + H + 6;
+    if (this.buckets.length !== nb) {
+      this.buckets = Array.from({ length: nb }, () => []);
+      this.bucketKeys = Array.from({ length: nb }, () => []);
+    }
     for (const b of this.buckets) b.length = 0;
+    for (const b of this.bucketKeys) b.length = 0;
+    const put = (code: number, key: number) => {
+      const k = Math.max(0, Math.min(nb - 1, Math.floor(key)));
+      this.buckets[k].push(code);
+      this.bucketKeys[k].push(key);
+    };
+    const tileKey = (d: number, i: number) => (this.boost[i] > d ? this.boost[i] + 1.001 : d + 1);
+    const standKey = (x: number, y: number) => {
+      const tx = Math.floor(x);
+      const ty = Math.floor(y);
+      const bo = inBounds(s, tx, ty) ? this.boost[ty * W + tx] : 0;
+      return bo > tx + ty ? bo + 1.002 + (x + y - tx - ty) * 0.001 : x + y;
+    };
     this.orchardTiles.clear();
     this.stallTiles.clear();
     s.buildings.forEach((b, bi) => {
@@ -388,7 +413,7 @@ export class Renderer {
           const y = (i / W) | 0;
           this.stallTiles.set(i, { b, k, open: k < b.workers });
           const [wx, wy] = iso(x, y);
-          if (visible(wx, wy)) this.buckets[Math.max(x + y, this.boost[i])].push(i * 4);
+          if (visible(wx, wy)) put(i * 8, tileKey(x + y, i));
         }
         return;
       }
@@ -399,7 +424,7 @@ export class Renderer {
               const [wx, wy] = iso(x, y);
               if (!visible(wx, wy)) continue;
               this.orchardTiles.set(y * W + x, b);
-              this.buckets[Math.max(x + y, this.boost[y * W + x])].push((y * W + x) * 4);
+              put((y * W + x) * 8, tileKey(x + y, y * W + x));
             }
           }
         }
@@ -407,7 +432,7 @@ export class Renderer {
       }
       const [wx, wy] = iso(b.x + b.w / 2, b.y + b.h / 2);
       if (!visible(wx, wy + 60) && !visible(wx, wy - 100)) return;
-      this.buckets[this.buildingDepth(s, b)].push(bi * 4 + 1);
+      put(bi * 8 + 1, this.buildingDepth(s, b) + 1);
     });
     for (let d = 0; d < W + H - 1; d++) {
       for (let x = Math.max(0, d - H + 1); x <= Math.min(W - 1, d); x++) {
@@ -416,13 +441,13 @@ export class Renderer {
         if (!s.trees[i] && !s.rock[i] && !s.ore[i] && !s.berriesMax[i] && !s.stumps?.[i]) continue;
         const [wx, wy] = iso(x, y);
         if (!visible(wx, wy)) continue;
-        this.buckets[Math.max(d, this.boost[i])].push(i * 4);
+        put(i * 8, tileKey(d, i));
       }
     }
     this.festTile = this.light ? -1 : this.festivalTile(s);
     if (this.festTile >= 0) {
       const [wx, wy] = iso((this.festTile % W) + 0.5, ((this.festTile / W) | 0) + 0.5);
-      if (visible(wx, wy)) this.buckets[Math.max(((this.festTile % W) + ((this.festTile / W) | 0)), this.boost[this.festTile])].push(this.festTile * 4);
+      if (visible(wx, wy)) put(this.festTile * 8, tileKey((this.festTile % W) + ((this.festTile / W) | 0), this.festTile));
     }
     agents.forEach((a, ai) => {
       if (!a.visible) return;
@@ -431,9 +456,9 @@ export class Renderer {
       if (!inBounds(s, tx, ty)) return;
       const [wx, wy] = iso(a.x, a.y);
       if (!visible(wx, wy)) return;
-      const d = Math.max(tx + ty, this.boost[ty * W + tx]);
-      this.buckets[Math.min(nb - 1, d)].push(ai * 4 + 2);
+      put(ai * 8 + 2, standKey(a.x, a.y));
     });
+    this.late.forEach((l, li) => put(li * 8 + 4, standKey(l.x, l.y)));
     this.mark('bucketing');
     animals.forEach((a, ai) => {
       const tx = Math.floor(a.x);
@@ -441,8 +466,7 @@ export class Renderer {
       if (!inBounds(s, tx, ty)) return;
       const [wx, wy] = iso(a.x, a.y);
       if (!visible(wx, wy)) return;
-      const d = Math.max(tx + ty, this.boost[ty * W + tx]);
-      this.buckets[Math.min(nb - 1, d)].push(ai * 4 + 3);
+      put(ai * 8 + 3, standKey(a.x, a.y));
     });
     this.drawRoadPlan(s, visible);
     if (!this.light) this.drawPuddles(s, season, dt, visible);
@@ -452,14 +476,30 @@ export class Renderer {
       this.drawBoats(s, visible);
       this.drawMist(s, season, visible);
     }
-    for (const bucket of this.buckets) {
+    for (let bi = 0; bi < nb; bi++) {
+      const bucket = this.buckets[bi];
+      const keys = this.bucketKeys[bi];
+      // Insertion sort by key (buckets are short and nearly in order); ties keep their order.
+      for (let i = 1; i < bucket.length; i++) {
+        const c = bucket[i];
+        const k = keys[i];
+        let j = i - 1;
+        while (j >= 0 && keys[j] > k) {
+          bucket[j + 1] = bucket[j];
+          keys[j + 1] = keys[j];
+          j--;
+        }
+        bucket[j + 1] = c;
+        keys[j + 1] = k;
+      }
       for (const code of bucket) {
-        const kind = code & 3;
-        const n = code >> 2;
+        const kind = code & 7;
+        const n = code >> 3;
         if (kind === 0) this.drawTileObjects(s, n, season);
         else if (kind === 1) this.drawBuilding(s, s.buildings[n], season, ov.selected === s.buildings[n].id);
         else if (kind === 2) this.drawAgent(agents[n]);
-        else this.drawAnimal(animals[n], season);
+        else if (kind === 3) this.drawAnimal(animals[n], season);
+        else this.late[n].fn();
       }
     }
 
@@ -826,32 +866,79 @@ export class Renderer {
     p.fence([x0 + 0.05, y0 + 0.05], [x1 - 0.05, y0 + 0.05], post);
     p.fence([x0 + 0.05, y0 + 0.05], [x0 + 0.05, y1 - 0.05], post);
     const rand = mulberry32(b.id * 13 + 1);
-    // A few old trees inside the paling, drawn from back to front.
-    const trees: [number, number][] = [];
-    for (let k = 0; k < Math.max(2, Math.floor((b.w * b.h) / 6)); k++) trees.push([x0 + 0.6 + rand() * (b.w - 1.2), y0 + 0.6 + rand() * (b.h - 1.2)]);
-    // The deer: a few grazing, wandering slowly about the park.
-    const deer = Math.min(8, Math.max(2, Math.floor((b.w * b.h) / 4)));
-    const items: { x: number; y: number; tree?: boolean; j?: number }[] = trees.map(([x, y]) => ({ x, y, tree: true }));
+    // Woods in groves, with open glades between where the deer can be seen.
+    const area = b.w * b.h;
+    const groves: [number, number][] = [];
+    for (let k = 0; k < Math.max(3, Math.round(area / 22)); k++) groves.push([x0 + 1 + rand() * (b.w - 2), y0 + 1 + rand() * (b.h - 2)]);
+    const trees: { x: number; y: number; kind: TreeKind }[] = [];
+    for (const [gx, gy] of groves) {
+      for (let k = 0; k < Math.round(area / (groves.length * 3.2)); k++) {
+        const a = rand() * Math.PI * 2;
+        const r = Math.sqrt(rand()) * 1.7;
+        const x = Math.max(x0 + 0.4, Math.min(x1 - 0.4, gx + Math.cos(a) * r));
+        const y = Math.max(y0 + 0.4, Math.min(y1 - 0.4, gy + Math.sin(a) * r));
+        const v = rand();
+        trees.push({ x, y, kind: v < 0.55 ? 'oak' : v < 0.8 ? 'pine' : 'birch' });
+      }
+    }
+    // A few lone trees out in the glades.
+    for (let k = 0; k < Math.round(area / 12); k++) trees.push({ x: x0 + 0.5 + rand() * (b.w - 1), y: y0 + 0.5 + rand() * (b.h - 1), kind: 'oak' });
+    // The deer graze in the glades, wandering slowly about the park.
+    const deer = Math.min(16, Math.max(4, Math.floor(area / 5)));
+    const items: { x: number; y: number; tree?: TreeKind; j?: number }[] = trees.map((tr) => ({ x: tr.x, y: tr.y, tree: tr.kind }));
     for (let j = 0; j < deer; j++) {
       const r1 = rand();
       const r2 = rand();
       const t = this.time * 0.04 + r1 * 10;
-      items.push({ x: x0 + 0.4 + (b.w - 0.8) * (0.5 + 0.45 * Math.sin(r1 * 6.283 + t * 0.5)), y: y0 + 0.4 + (b.h - 0.8) * (0.5 + 0.45 * Math.sin(r2 * 6.283 + t * 0.4)), j });
+      let x = x0 + 0.4 + (b.w - 0.8) * (0.5 + 0.45 * Math.sin(r1 * 6.283 + t * 0.5));
+      let y = y0 + 0.4 + (b.h - 0.8) * (0.5 + 0.45 * Math.sin(r2 * 6.283 + t * 0.4));
+      // Out of the thick of a grove, into the open.
+      for (const [gx, gy] of groves) {
+        const d = Math.hypot(x - gx, y - gy);
+        if (d < 1.2) {
+          x = Math.max(x0 + 0.4, Math.min(x1 - 0.4, gx + ((x - gx) / (d || 1)) * 1.3));
+          y = Math.max(y0 + 0.4, Math.min(y1 - 0.4, gy + ((y - gy) / (d || 1)) * 1.3));
+        }
+      }
+      items.push({ x, y, j });
     }
-    items.sort((a, c) => a.x + a.y - (c.x + c.y));
+    // Trees and deer stand up, so they are sorted in with everything else.
     for (const it of items) {
       if (it.tree) {
         const tv = Math.floor(it.x * 7 + it.y * 3) % TREE_VARIANTS;
-        const sp = this.sprite(`t:oak:${season}:${tv}`, () => treeSprite('oak', season, tv));
-        const [wx, wy] = iso(it.x, it.y);
-        this.blit(sp, wx, wy, 1, TREE_SCALE * 0.9);
+        const kind = it.tree;
+        this.late.push({
+          x: it.x,
+          y: it.y,
+          fn: () => {
+            const sp = this.sprite(`t:${kind}:${season}:${tv}`, () => treeSprite(kind, season, tv));
+            const [wx, wy] = iso(it.x, it.y);
+            this.blit(sp, wx, wy, 1, TREE_SCALE * 0.9);
+          },
+        });
       } else {
-        const [sx, sy] = iso(it.x, it.y);
-        drawDeer(p.ctx, sx, sy, Math.sin(this.time * 0.02 + it.j!) > 0 ? 1 : -1, it.j! % 3 === 0);
+        this.late.push({
+          x: it.x,
+          y: it.y,
+          fn: () => {
+            const [sx, sy] = iso(it.x, it.y);
+            drawDeer(p.ctx, sx, sy, Math.sin(this.time * 0.02 + it.j!) > 0 ? 1 : -1, it.j! % 3 === 0);
+          },
+        });
       }
     }
-    p.fence([x1 - 0.05, y0 + 0.05], [x1 - 0.05, y1 - 0.05], post);
-    p.fence([x0 + 0.05, y1 - 0.05], [x1 - 0.05, y1 - 0.05], post);
+    this.lateFence(p, [x1 - 0.05, y0 + 0.05], [x1 - 0.05, y1 - 0.05], post);
+    this.lateFence(p, [x0 + 0.05, y1 - 0.05], [x1 - 0.05, y1 - 0.05], post);
+  }
+
+  /** A fence along the front of a zone, tile by tile, sorted in with what stands near it. */
+  private lateFence(p: Pen, a: [number, number], b: [number, number], color: string): void {
+    const n = Math.max(1, Math.round(Math.hypot(b[0] - a[0], b[1] - a[1])));
+    for (let k = 0; k < n; k++) {
+      const u: [number, number] = [a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n];
+      const v: [number, number] = [a[0] + ((b[0] - a[0]) * (k + 1)) / n, a[1] + ((b[1] - a[1]) * (k + 1)) / n];
+      this.late.push({ x: (u[0] + v[0]) / 2, y: (u[1] + v[1]) / 2, fn: () => p.fence(u, v, color) });
+    }
   }
 
   private drawPasture(p: Pen, s: GameState, b: Building, season: Season, herds: Map<number, number>): void {
@@ -902,17 +989,22 @@ export class Renderer {
         const dy = (b.h - 0.9) * Math.cos(r2 * 6.283 + t * 0.45 + 1) * 0.45;
         return { kind, ax, ay, f: dx - dy >= 0 ? 1 : -1, j };
       });
-      beasts.sort((p1, p2) => p1.ax + p1.ay - (p2.ax + p2.ay));
       for (const { kind, ax, ay, f, j } of beasts) {
-        const [sx, sy] = iso(ax, ay);
-        if (kind === 'sheep') drawSheep(p.ctx, sx, sy, f, season === 3 ? '#e2ddd2' : '#f2ece0');
-        else if (kind === 'goats') drawGoat(p.ctx, sx, sy, f, j);
-        else drawBeast(p.ctx, sx, sy, f, kind === 'cattle' ? breed : kind, j);
+        this.late.push({
+          x: ax,
+          y: ay,
+          fn: () => {
+            const [sx, sy] = iso(ax, ay);
+            if (kind === 'sheep') drawSheep(p.ctx, sx, sy, f, season === 3 ? '#e2ddd2' : '#f2ece0');
+            else if (kind === 'goats') drawGoat(p.ctx, sx, sy, f, j);
+            else drawBeast(p.ctx, sx, sy, f, kind === 'cattle' ? breed : kind, j);
+          },
+        });
       }
     }
-    p.fence([x1 - 0.05, y0 + 0.05], [x1 - 0.05, y1 - 0.05], post);
-    p.fence([x0 + 0.05, y1 - 0.05], [x0 + b.w / 2 - 0.3, y1 - 0.05], post);
-    p.fence([x0 + b.w / 2 + 0.3, y1 - 0.05], [x1 - 0.05, y1 - 0.05], post);
+    this.lateFence(p, [x1 - 0.05, y0 + 0.05], [x1 - 0.05, y1 - 0.05], post);
+    this.lateFence(p, [x0 + 0.05, y1 - 0.05], [x0 + b.w / 2 - 0.3, y1 - 0.05], post);
+    this.lateFence(p, [x0 + b.w / 2 + 0.3, y1 - 0.05], [x1 - 0.05, y1 - 0.05], post);
   }
 
   private drawGroundOverlays(s: GameState, ov: Overlay): void {

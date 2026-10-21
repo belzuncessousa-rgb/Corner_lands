@@ -274,10 +274,9 @@ export function placementError(s: GameState, type: BuildingType, x: number, y: n
   return null;
 }
 
-/** The deer park: its fence, its least size, and what it gives each month. */
-export const DEER_PARK_FENCE = 12;
-export const DEER_PARK_MIN = 12;
-/** Venison a staffed deer park gives each month for every four tiles. */
+/** The deer park: a reserve of at least seven by seven tiles. */
+export const DEER_PARK_MIN = 49;
+/** Venison a staffed deer park gives each month for every ten tiles. */
 export const DEER_PARK_MEAT = 1;
 
 /** Watch towers a town may keep: two for each rank above Village. */
@@ -371,7 +370,8 @@ export function isZone(type: BuildingType): boolean {
 export function zoneCost(type: BuildingType, w: number, h: number): Cost {
   if (type === 'pasture') return { wood: w + h };
   if (type === 'orchard') return { gold: 2 * w * h };
-  if (type === 'deerpark') return { wood: DEER_PARK_FENCE };
+  // A timber for every tile of paling round the reserve.
+  if (type === 'deerpark') return { wood: 2 * (w + h) };
   return {};
 }
 
@@ -3283,6 +3283,7 @@ export function setFlowers(s: GameState, b: Building, on: boolean): string | nul
 export function setYard(s: GameState, b: Building, kind: string | undefined): string | null {
   if (b.type !== 'house' || b.build < 1) return 'Only homes have backyards';
   if (kind === b.yard) return null;
+  if (kind && b.level >= 5) return 'A Patrician House fills its plot: a paved court, no backyard';
   if (kind) {
     const y = YARDS[kind];
     if (!y) return 'Unknown';
@@ -3797,7 +3798,7 @@ function monthlyGrounds(s: GameState): void {
   for (const b of s.buildings) {
     if (b.build < 1) continue;
     if (b.type === 'deerpark' && b.workers > 0) {
-      const meat = Math.floor(((b.w * b.h) / 4) * DEER_PARK_MEAT * (hasCharter(s, 'nature3b') ? 2 : 1));
+      const meat = Math.floor(((b.w * b.h) / 10) * DEER_PARK_MEAT * (hasCharter(s, 'nature3b') ? 2 : 1));
       b.output += produced(s, 'meat', Math.min(meat, Math.floor(roomFor(s, 'meat'))));
       b.status = `${b.w * b.h} tiles of park: ${meat} venison a month`;
     }

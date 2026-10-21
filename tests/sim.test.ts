@@ -2446,3 +2446,27 @@ describe('improvements, choices and town options', () => {
     expect(roadError(s, h.x - 3, h.y + 6, 2)).toBeNull();
   });
 });
+
+describe('the deer park', () => {
+  it('is a great reserve of land: never over water, and at least seven by seven', async () => {
+    const { zoneError } = await import('../src/game/sim');
+    const s = generateWorld(4242);
+    s.res.wood = 999;
+    manorFor(s).level = 3;
+    // Any 8x8 square with a water tile in it is refused.
+    let wet: [number, number] | null = null;
+    for (let i = 0; i < s.terrain.length && !wet; i++) if (s.terrain[i] === 1 && i % s.width > 10 && i % s.width < s.width - 10 && i / s.width > 10 && i / s.width < s.height - 10) wet = [i % s.width, Math.floor(i / s.width)];
+    expect(wet).not.toBeNull();
+    const [x, y] = wet!;
+    // Nothing else in the way but the water itself.
+    for (let yy = y - 3; yy <= y + 4; yy++)
+      for (let xx = x - 3; xx <= x + 4; xx++) {
+        const i = yy * s.width + xx;
+        s.rock[i] = 0;
+        s.ore[i] = 0;
+        s.road[i] = 0;
+      }
+    expect(zoneError(s, 'deerpark', x - 3, y - 3, x + 4, y + 4)).toMatch(/water/);
+    expect(zoneError(s, 'deerpark', 10, 10, 14, 14)).toMatch(/At least 7/);
+  });
+});
