@@ -87,7 +87,6 @@ import {
   orchardMaturity,
   TEND_PER_TILE,
   labourSummary,
-  bCenter,
   coveredBy,
   PAVING_COST,
   COBBLE_COST,
@@ -120,7 +119,6 @@ import {
   retinueError,
   yearGoal,
   yearGoalMet,
-  seatOf,
   yardTotal,
   MONUMENTS,
   ZONE_OWNERS,
@@ -135,7 +133,7 @@ import {
 import type { Building, BuildingType, Category, Cost, GoodsGroup, Land, ResourceId } from '../game/types';
 import type { StorageKind } from '../game/data';
 import { RESOURCE_IDS } from '../game/types';
-import { LANDS, generateWorld, idx, inBounds } from '../game/world';
+import { LANDS, idx, inBounds } from '../game/world';
 import type { Game } from '../main';
 import { BUILDING_ICONS, CATEGORY_ICONS, ICONS, LOGO, SEASON_ICONS } from './icons';
 import { Minimap } from './minimap';
@@ -218,6 +216,20 @@ const TIPS: Record<string, string> = {
   villager: 'Every villager has a name and a thought. Their wishes tell you what the town lacks.',
   speed: 'Space pauses; 1, 2 and 3 set the speed. Press V to see which homes a well, market or church reaches.',
 };
+
+/** The kinds of land, each a little painted picture; what each is like shows on hover. */
+const LAND_ICONS: Record<Land, string> = {
+  meadow: `<svg viewBox="0 0 40 30" width="44" height="33" aria-hidden="true"><path d="M0 22c8-7 14-8 22-3s12 3 18-1v12H0z" fill="#8cbf5a"/><path d="M0 26c10-4 18-3 26 0s10 2 14 0v4H0z" fill="#6aa444"/><path d="M4 27c6-1 10 0 12 3H6z" fill="#4f88c0"/><rect x="27" y="11" width="2" height="7" fill="#6b4a2e"/><circle cx="28" cy="10" r="5" fill="#3f7a34"/><circle cx="12" cy="15" r=".9" fill="#f4e27a"/><circle cx="17" cy="18" r=".9" fill="#f2f0e6"/><circle cx="8" cy="20" r=".9" fill="#e88"/></svg>`,
+  valley: `<svg viewBox="0 0 40 30" width="44" height="33" aria-hidden="true"><path d="M0 8l10-6 10 7 8-5 12 6v20H0z" fill="#7aa850"/><path d="M0 12l9-4 9 5v17H0z" fill="#8cbf5a"/><path d="M26 30c-4-6 4-9-2-14s4-8 2-12h5c2 4-6 8 0 12s-3 8 1 14z" fill="#4f88c0"/><path d="M27 23c-1-2 1-3 0-5" stroke="#bfe0f4" stroke-width="1" fill="none"/><ellipse cx="29" cy="16" rx="2" ry="1.2" fill="#8cbf5a"/></svg>`,
+  hills: `<svg viewBox="0 0 40 30" width="44" height="33" aria-hidden="true"><path d="M0 30l12-20 7 9 7-14 14 25z" fill="#9a958a"/><path d="M26 5l4 7-3-1-2 3-2-3z" fill="#f0eee8"/><path d="M12 10l3 5-2-1-2 2-1-2z" fill="#f0eee8"/><path d="M0 30c6-5 12-6 20-4s14 1 20-1v5z" fill="#7aa850"/><circle cx="33" cy="26" r="1.6" fill="#7c7870"/><circle cx="8" cy="27" r="1.2" fill="#7c7870"/></svg>`,
+};
+
+/** How hard the going is: the setting, its name and what it means. */
+const MODES: [string, string, string][] = [
+  ['normal', 'Normal', 'Hungry or unhappy villagers will leave.'],
+  ['relaxed', 'Easy', 'Objectives to guide you, double starting supplies; nobody ever leaves in anger.'],
+  ['hardy', 'Hardy', 'A scarcer start, bitter winters, choosier settlers.'],
+];
 
 export class Hud {
   private el: Record<string, HTMLElement> = {};
@@ -1631,12 +1643,17 @@ export class Hud {
     // A category tab whose name is showing says all its tip would: only icon-only tabs (narrow screens) need it.
     const named = target?.classList.contains('name-tip') && (target.querySelector('span') as HTMLElement | null)?.offsetParent;
     if (!target || named) {
-      tip.style.display = 'none';
+      if (this.uiTip) tip.style.display = 'none';
+      this.uiTip = false;
       return;
     }
     tip.innerHTML = target.dataset.tip!;
     this.placeTip(e.clientX, e.clientY);
+    this.uiTip = true;
   }
+
+  /** Whether the tooltip showing belongs to a panel rather than the map. */
+  private uiTip = false;
 
   private placeTip(x: number, y: number): void {
     const tip = this.el.tooltip;
@@ -1657,6 +1674,8 @@ export class Hud {
   hoverWorld(x: number, y: number): void {
     const tip = this.el.tooltip;
     const g = this.game;
+    if (x < 0 && this.uiTip) return;
+    this.uiTip = false;
     if (x < 0 || g.tool.kind !== 'select') {
       tip.style.display = 'none';
       return;
@@ -2370,6 +2389,7 @@ export class Hud {
   showNewGame(fromMain: boolean, presetSeed?: number, presetLand?: Land, preset?: { name: string; named: boolean; mode: string }, tutorial = false): void {
     const seed = presetSeed ?? Math.floor(Math.random() * 999999);
     const mode0 = preset?.mode ?? 'normal';
+    const land0: Land = presetLand ?? 'meadow';
     this.modalHelp = 'newgame';
     const m = this.openModal(
       `<h2>${tutorial ? 'Tutorial' : 'New Settlement'}</h2>
@@ -2378,15 +2398,10 @@ export class Hud {
       <div class="row lord-pick"><label>Your lord</label><span class="lord-mini"></span><span class="lord-mini flag"></span><button data-m="lord">Choose looks &amp; arms…</button></div>
       <div class="land-pick" ${tutorial ? 'hidden' : ''}><p>Every map is generated from a seed. Share a seed to play the same land, or take this week's seed, the same for everyone.</p>
       <div class="row"><label>Seed</label><input id="seed" value="${seed}" inputmode="numeric"><button data-m="dice" data-tip="Another land">🎲</button><button data-m="weekly" data-tip="The same land for everyone until Monday">Seed of the week</button></div>
-      <div class="lands">${(Object.keys(LANDS) as Land[])
-        .map((l) => `<label class="mode"><input type="radio" name="land" value="${l}" ${(presetLand ?? 'meadow') === l ? 'checked' : ''}><span><b>${LANDS[l].name}</b><br><small>${esc(LANDS[l].desc)}</small></span></label>`)
-        .join('')}</div></div>
-      <div class="map-preview"><canvas width="300" height="160" aria-label="The land from above"></canvas><div class="map-facts"></div></div>
-      <div class="modes">
-        <label class="mode"><input type="radio" name="mode" value="normal" ${mode0 === 'normal' ? 'checked' : ''}><span><b>Normal</b><br><small>Hungry or unhappy villagers will leave.</small></span></label>
-        <label class="mode"><input type="radio" name="mode" value="relaxed" ${mode0 === 'relaxed' ? 'checked' : ''}><span><b>Easy</b><br><small>Objectives to guide you, double starting supplies; nobody ever leaves in anger.</small></span></label>
-        <label class="mode"><input type="radio" name="mode" value="hardy" ${mode0 === 'hardy' ? 'checked' : ''}><span><b>Hardy</b><br><small>A scarcer start, bitter winters, choosier settlers.</small></span></label>
-      </div>
+      <div class="row land-row"><label>Land</label><div class="lands">${(Object.keys(LANDS) as Land[])
+        .map((l) => `<button class="land-btn ${land0 === l ? 'active' : ''}" data-land="${l}" data-tip="${esc(`${LANDS[l].name}: ${LANDS[l].desc}`)}" aria-label="${esc(LANDS[l].name)}">${LAND_ICONS[l]}</button>`)
+        .join('')}</div></div></div>
+      <div class="modes">${MODES.map(([v, name, desc]) => `<button class="mode-btn ${mode0 === v ? 'active' : ''}" data-mode="${v}"><b>${name}</b><small>${desc}</small></button>`).join('')}</div>
       <div class="ornament">❦</div>
       <div class="row" style="justify-content:flex-end">
         <button data-m="back">Back</button>
@@ -2403,22 +2418,28 @@ export class Hud {
       }
       return Math.floor(Math.abs(n)) % 2147483647;
     };
-    const landOf = () => ((m.querySelector('input[name="land"]:checked') as HTMLInputElement | null)?.value ?? 'meadow') as Land;
-    const preview = () => this.drawMapPreview(m.querySelector('.map-preview')!, seedOf(input.value.trim()), landOf());
-    m.querySelectorAll('input[name="land"]').forEach((r) => r.addEventListener('change', preview));
-    let typing = 0;
-    input.addEventListener('input', () => {
-      clearTimeout(typing);
-      typing = window.setTimeout(preview, 250);
-    });
-    preview();
+    let land = land0;
+    let mode = mode0;
+    const landOf = () => land;
+    m.querySelectorAll<HTMLButtonElement>('[data-land]').forEach((btn) =>
+      btn.addEventListener('click', () => {
+        land = btn.dataset.land as Land;
+        m.querySelectorAll('[data-land]').forEach((o) => o.classList.toggle('active', o === btn));
+      }),
+    );
+    m.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach((btn) =>
+      btn.addEventListener('click', () => {
+        mode = btn.dataset.mode!;
+        m.querySelectorAll('[data-mode]').forEach((o) => o.classList.toggle('active', o === btn));
+      }),
+    );
     const town = m.querySelector('#town') as HTMLInputElement;
     // The name follows the seed until the player types their own.
     let named = preset?.named ?? false;
     town.addEventListener('input', () => (named = true));
     m.querySelector('.lord-mini')!.replaceChildren(lordPortrait(this.draftLord, 40, this.draftArms));
     m.querySelector('.lord-mini.flag')!.replaceChildren(this.flagCanvas(this.draftArms, 40, 40));
-    const modeOf = () => (m.querySelector('input[name="mode"]:checked') as HTMLInputElement | null)?.value ?? 'normal';
+    const modeOf = () => mode;
     m.querySelector('[data-m="lord"]')!.addEventListener('click', () => {
       const back = { seed: seedOf(input.value.trim()), land: landOf(), preset: { name: town.value, named, mode: modeOf() } };
       this.showLord(() => this.showNewGame(fromMain, back.seed, back.land, back.preset, tutorial));
@@ -2426,7 +2447,6 @@ export class Hud {
     const reseed = (n: number) => {
       input.value = String(n);
       if (!named) town.value = placeName(n);
-      preview();
     };
     m.querySelector('[data-m="dice"]')!.addEventListener('click', () => reseed(Math.floor(Math.random() * 999999)));
     m.querySelector('[data-m="weekly"]')!.addEventListener('click', () => reseed(weeklySeed()));
@@ -2436,8 +2456,7 @@ export class Hud {
     });
     m.querySelector('[data-m="back"]')!.addEventListener('click', () => (fromMain ? this.showMainMenu() : this.showGameMenu()));
     m.querySelector('[data-m="go"]')!.addEventListener('click', () => {
-      const mode = ((m.querySelector('input[name="mode"]:checked') as HTMLInputElement | null)?.value ?? 'normal') as 'normal' | 'relaxed' | 'hardy';
-      this.game.newGame(tutorial ? TUTORIAL_SEED : seedOf(input.value.trim()), mode, town.value, tutorial ? 'meadow' : landOf());
+      this.game.newGame(tutorial ? TUTORIAL_SEED : seedOf(input.value.trim()), mode as 'normal' | 'relaxed' | 'hardy', town.value, tutorial ? 'meadow' : landOf());
       if (tutorial) this.game.state.tutorial = { step: 0, chapter: 'start' };
       this.game.state.lord = { ...this.draftLord };
       this.game.state.heraldry = { ...this.draftArms };
@@ -2470,61 +2489,6 @@ export class Hud {
       <p class="thought">“${esc(folkThought(s, a))}”</p>`;
   }
 
-  /** The land a seed makes, from above, with what lies near the starting manor. */
-  private drawMapPreview(box: HTMLElement, seed: number, land: Land = 'meadow'): void {
-    const s = generateWorld(seed, { land });
-    const cv = box.querySelector('canvas')!;
-    const c = cv.getContext('2d')!;
-    const W = s.width;
-    const H = s.height;
-    const tiles = document.createElement('canvas');
-    tiles.width = W;
-    tiles.height = H;
-    const t = tiles.getContext('2d')!;
-    const img = t.createImageData(W, H);
-    for (let i = 0; i < W * H; i++) {
-      const col =
-        s.terrain[i] === 1 ? [64, 122, 156] : s.occ[i] >= 0 ? [200, 70, 50] : s.road[i] ? [170, 140, 96] : s.rock[i] ? [150, 148, 140] : s.ore[i] ? [120, 90, 70] : s.trees[i] ? [46, 92 + s.trees[i] * 4, 46] : [118 + s.fertility[i] * 20, 150 + s.fertility[i] * 30, 70];
-      img.data.set([col[0], col[1], col[2], 255], i * 4);
-    }
-    t.putImageData(img, 0, 0);
-    // Isometric: rotate the tile grid by 45 degrees and squash it vertically.
-    const k = Math.min(cv.width / (W + H), (cv.height * 2) / (W + H)) * Math.SQRT2;
-    c.clearRect(0, 0, cv.width, cv.height);
-    c.save();
-    c.translate(cv.width / 2, (cv.height - ((W + H) * k) / Math.SQRT2 / 2) / 2);
-    c.scale(1, 0.5);
-    c.rotate(Math.PI / 4);
-    c.imageSmoothingEnabled = false;
-    c.drawImage(tiles, 0, 0, W * k, H * k);
-    c.restore();
-    // What a settler would ask about the land.
-    const hall = seatOf(s)!;
-    const c0 = bCenter(hall);
-    let near = 0;
-    let rock = 0;
-    let ore = 0;
-    let fertile = 0;
-    let water = 0;
-    let forest = 0;
-    for (let i = 0; i < W * H; i++) {
-      if (s.terrain[i] === 1) water++;
-      else if (s.trees[i]) forest++;
-      const x = i % W;
-      const y = Math.floor(i / W);
-      if (Math.hypot(x + 0.5 - c0.x, y + 0.5 - c0.y) > 14) continue;
-      near++;
-      if (s.rock[i]) rock++;
-      if (s.ore[i]) ore++;
-      fertile += s.fertility[i];
-    }
-    const pct = (n: number, of: number) => Math.round((100 * n) / Math.max(1, of));
-    const soil = fertile / Math.max(1, near);
-    box.querySelector('.map-facts')!.innerHTML = `
-      <div>Forest ${pct(forest, W * H)}% · water ${pct(water, W * H)}%</div>
-      <div>Near the manor: ${rock ? 'rock' : '<span class="neg">no rock</span>'}, ${ore ? 'bog iron' : 'no bog iron'}</div>
-      <div>Soil around it: ${soil < 0.4 ? 'poor' : soil < 0.7 ? 'fair' : 'rich'}</div>`;
-  }
 
   /** The portrait on the button at the top left, redrawn when the look or arms change. */
   private renderLordButton(): void {

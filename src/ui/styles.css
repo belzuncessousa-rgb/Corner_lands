@@ -608,7 +608,7 @@ button.active {
   padding: 7px 10px;
   font-size: 14px;
   pointer-events: none;
-  z-index: 40;
+  z-index: 70;
   display: none;
 }
 #tooltip b {
@@ -1045,38 +1045,36 @@ button.active {
   stroke-width: 1;
 }
 
-.modes,
 .lands {
   display: flex;
   gap: 8px;
-  margin-top: 10px;
 }
-.lands {
-  margin: 8px 0;
+.land-btn {
+  padding: 2px 6px;
+  line-height: 0;
 }
-.mode {
+.modes {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+/* Each setting is a wooden board to press, the chosen one painted honey. */
+.mode-btn {
   flex: 1;
   display: flex;
-  gap: 6px;
+  flex-direction: column;
+  gap: 3px;
   align-items: flex-start;
-  padding: 6px 8px;
-  border: 1.5px solid rgba(91, 58, 34, 0.35);
-  border-radius: 5px;
-  background: rgba(255, 250, 235, 0.55);
-  cursor: pointer;
-  line-height: 1.15;
+  text-align: left;
+  padding: 8px 10px;
+  line-height: 1.2;
 }
-.mode:has(input:checked) {
-  border-color: #c89a38;
-  background: #fff8e0;
+.mode-btn b {
+  font-size: 1.08em;
 }
-.mode small {
-  color: var(--ink-soft);
-}
-.mode input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
+.mode-btn small {
+  font-weight: 500;
+  opacity: 0.92;
 }
 
 .msg.link {
@@ -1092,7 +1090,7 @@ button.active {
 }
 
 /* Title screen: hide the HUD over the demo village. */
-#ui.demo > *:not(.modal-back) {
+#ui.demo > *:not(.modal-back):not(#tooltip) {
   display: none !important;
 }
 
@@ -2025,15 +2023,6 @@ table.prod td.num {
 .chain .link.weak { border-color: var(--bad); background: rgba(184, 72, 58, 0.12); font-weight: bold; }
 .chain .link svg { width: 16px; height: 16px; }
 
-/* The new-game map preview. */
-.map-preview { display: flex; gap: 12px; align-items: center; margin: 8px 0; }
-.map-preview canvas { width: 300px; height: 160px; flex: none; filter: drop-shadow(0 2px 3px rgba(60, 40, 20, 0.35)); }
-.map-facts { font-size: 14px; line-height: 1.5; }
-@media (max-width: 700px) {
-  .map-preview { flex-direction: column; align-items: stretch; }
-  .map-preview canvas { width: 100%; height: auto; }
-}
-
 /* A villager's passing thought. */
 #inspector .thought { font-style: italic; margin: 8px 2px 2px; color: var(--ink-soft); line-height: 1.35; }
 @media (max-width: 700px) {
@@ -2893,4 +2882,8 @@ button.finga-help svg {
 }
 #objectives {
   position: relative;
+}
+
+@media (max-width: 560px) {
+  .modes { flex-direction: column; }
 }
