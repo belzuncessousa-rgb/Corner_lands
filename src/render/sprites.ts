@@ -1248,14 +1248,12 @@ function drawGothicChurch(p: Pen, season: Season, glazed: number): void {
     [1.05, 0.3, 1.95, 0.7, 0.3],
     [0.45, 0.75, 2.55, 3.3, 0.35],
     [0.8, 0.7, 2.2, 3.35, 0.45],
-    [0.3, 2.45, 0.8, 3.07, 0.5],
+    [0.3, 3.0, 0.8, 3.62, 0.55],
     [2.2, 3.0, 2.7, 3.62, 0.55],
   ]);
   // A small apse at the east end.
   p.box(1.05, 0.3, 1.95, 0.7, 0, 30, ST2, undefined, 'stone');
   p.roofPyramid(1.05, 0.3, 1.95, 0.7, 30, 12, 'slate', 0.04);
-  // The left tower stands back, behind the front of the church, which hides its foot.
-  tower(0.3, 2.45);
   // The aisles: low, with lean-to roofs against the nave.
   p.box(0.45, 0.75, 2.55, 3.3, 0, 20, ST2, undefined, 'stone');
   p.poly([[2.55, 0.75, 20], [2.55, 3.3, 20], [2.2, 3.3, 27], [2.2, 0.75, 27]], '#5d6670', '#3a4048', 0.6);
@@ -1284,29 +1282,40 @@ function drawGothicChurch(p: Pen, season: Season, glazed: number): void {
   p.roofPyramid(1.38, 1.38, 1.62, 1.62, 80, 30, 'slate', 0.02);
   p.line([1.5, 1.5, 110], [1.5, 1.5, 118], '#d8b84a', 1.3);
   // The west front: the gable between twin towers, a rose window, a deep portal.
-  p.poly([[0.8, 3.352, 46], [2.2, 3.352, 46], [1.5, 3.352, 74]], ST, '#9a927f', 0.6);
-  const [rx, ry] = iso(1.5, 3.352, 46);
-  const c = p.ctx;
-  c.fillStyle = '#3a3a52';
-  c.beginPath();
-  c.arc(rx, ry, 8, 0, Math.PI * 2);
-  c.fill();
-  for (let k = 0; k < 8; k++) {
-    c.fillStyle = winter ? '#e8b850' : glazed ? GLASS[k % GLASS.length] : k % 2 ? '#6a5a9a' : '#7a6aaa';
+  const westFront = () => {
+    p.poly([[0.8, 3.352, 46], [2.2, 3.352, 46], [1.5, 3.352, 74]], ST, '#9a927f', 0.6);
+    const [rx, ry] = iso(1.5, 3.352, 46);
+    const c = p.ctx;
+    c.fillStyle = '#3a3a52';
     c.beginPath();
-    c.moveTo(rx, ry);
-    c.arc(rx, ry, 6.5, (k * Math.PI) / 4, ((k + 1) * Math.PI) / 4);
+    c.arc(rx, ry, 8, 0, Math.PI * 2);
     c.fill();
-  }
-  c.fillStyle = '#e8c860';
-  c.beginPath();
-  c.arc(rx, ry, 1.5, 0, Math.PI * 2);
-  c.fill();
-  // The portal, its arch stepped in, under a little gable.
-  p.wallL(3.354, 1.3, 1.7, 0, 22, '#8a8070');
-  p.wallL(3.356, 1.36, 1.64, 0, 18, '#4a2f1b');
-  p.line([1.5, 3.358, 0], [1.5, 3.358, 18], '#2e1d10', 0.8);
-  p.poly([[1.26, 3.36, 22], [1.74, 3.36, 22], [1.5, 3.36, 31]], ST2, '#9a927f', 0.6);
+    for (let k = 0; k < 8; k++) {
+      c.fillStyle = winter ? '#e8b850' : glazed ? GLASS[k % GLASS.length] : k % 2 ? '#6a5a9a' : '#7a6aaa';
+      c.beginPath();
+      c.moveTo(rx, ry);
+      c.arc(rx, ry, 6.5, (k * Math.PI) / 4, ((k + 1) * Math.PI) / 4);
+      c.fill();
+    }
+    c.fillStyle = '#e8c860';
+    c.beginPath();
+    c.arc(rx, ry, 1.5, 0, Math.PI * 2);
+    c.fill();
+    // The portal, its arch stepped in, under a little gable.
+    p.wallL(3.354, 1.3, 1.7, 0, 22, '#8a8070');
+    p.wallL(3.356, 1.36, 1.64, 0, 18, '#4a2f1b');
+    p.line([1.5, 3.358, 0], [1.5, 3.358, 18], '#2e1d10', 0.8);
+    p.poly([[1.26, 3.36, 22], [1.74, 3.36, 22], [1.5, 3.36, 31]], ST2, '#9a927f', 0.6);
+  };
+  westFront();
+  tower(0.3, 3.0);
+  // The back of the left tower's side stands behind the west front: lay the
+  // front (its wall, gable, rose window and portal) over it again, so the
+  // tower stands on the grass beside the church instead of over it.
+  inFront(p, [[0.8, 3.352, 0], [2.2, 3.352, 0], [2.2, 3.352, 46], [1.5, 3.352, 74], [0.8, 3.352, 46]], () => {
+    p.box(0.8, 0.7, 2.2, 3.35, 0, 46, ST, undefined, 'stone');
+    westFront();
+  });
   tower(2.2, 3.0);
 }
 
@@ -6730,6 +6739,26 @@ function drawManor(p: Pen, level: number, season: Season, smoke: V3[]): void {
  * copper dome over the hall, the lord's banner flying from its lantern.
  */
 /**
+ * Draws again, clipped to a wall's outline (points on the wall, in world
+ * coordinates), the parts of a building that stand in front of something
+ * drawn after them: a wall that hides the back of a tower's side.
+ */
+function inFront(p: Pen, wall: V3[], draw: () => void): void {
+  const c = p.ctx;
+  c.save();
+  c.beginPath();
+  wall.forEach(([x, y, z], k) => {
+    const [sx, sy] = iso(x, y, z);
+    if (k) c.lineTo(sx, sy);
+    else c.moveTo(sx, sy);
+  });
+  c.closePath();
+  c.clip();
+  draw();
+  c.restore();
+}
+
+/**
  * Shadows cast to the right of each block (x0, y0, x1, y1, how far it reaches),
  * as one shape so overlaps do not darken. A block's front wall stands right on
  * the shadow's edge, so it meets the ground instead of floating over a dark band.
@@ -6757,7 +6786,7 @@ function drawPalace(p: Pen, season: Season, smoke: V3[]): void {
     [0.3, 0.45, 1.3, 2.95, 0.3],
     [1.3, 0.6, 2.7, 2.6, 0.4],
     [2.7, 0.45, 3.7, 2.95, 0.35],
-    [0.22, 1.75, 0.92, 2.45, 0.45],
+    [0.22, 2.45, 0.92, 3.15, 0.45],
     [3.08, 2.45, 3.78, 3.15, 0.45],
     [1.5, 2.6, 2.5, 2.95, 0.15],
   ]);
@@ -6775,8 +6804,6 @@ function drawPalace(p: Pen, season: Season, smoke: V3[]): void {
     p.roofPyramid(x0, y0, x0 + 0.7, y1, h, 26, ROOFC, 0.05);
     p.line([x0 + 0.35, y0 + 0.35, h + 26], [x0 + 0.35, y0 + 0.35, h + 34], '#d8b84a', 1.2);
   };
-  // The left pavilion stands back, behind the front of the palace, which hides its foot.
-  pavilion(0.22, 1.75, 70);
   // Left wing, ridge front to back.
   p.box(0.3, 0.45, 1.3, 2.95, 0, 36, ST, undefined, 'stone');
   for (const z of [5, 19]) p.windowL(2.95, 0.55, z, 0.16, 9, winter && z === 5);
@@ -6802,6 +6829,14 @@ function drawPalace(p: Pen, season: Season, smoke: V3[]): void {
   for (const z of [5, 19]) p.windowL(2.95, 3.25, z, 0.16, 9);
   p.roofY(2.7, 0.45, 3.7, 2.95, 36, 22, ROOFC, ST, 0.08);
   smoke.push(p.chimney(3.2, 0.8, 52, 12, '#a8a093'));
+  pavilion(0.22, 2.45, 50);
+  // The back of the left pavilion's side stands behind the left wing's front:
+  // lay that strip of the wing (and its gable) over it again.
+  inFront(p, [[0.92, 2.952, 0], [1.3, 2.952, 0], [1.3, 2.952, 36], [0.92, 2.952, 52.7]], () => {
+    p.box(0.3, 0.45, 1.3, 2.95, 0, 36, ST, undefined, 'stone');
+    for (const z of [5, 19]) p.windowL(2.95, 0.55, z, 0.16, 9, winter && z === 5);
+    p.roofY(0.3, 0.45, 1.3, 2.95, 36, 22, ROOFC, ST, 0.08);
+  });
   pavilion(3.08, 2.45, 50);
   // The door and the hangings in the lord's colours, on the wall behind the portico.
   p.wallL(2.602, 1.86, 2.14, 2.5, 18, '#4a2f1b');
