@@ -146,7 +146,22 @@ export type BuildingType =
   | 'collier'
   | 'glassworks'
   | 'dyer'
-  | 'monastery';
+  | 'monastery'
+  | 'beekeeper'
+  | 'papermill'
+  | 'embroiderer'
+  | 'glazier'
+  | 'cobbler'
+  | 'watersawmill'
+  | 'silvermine'
+  | 'bathhouse'
+  | 'school'
+  | 'taxoffice'
+  | 'courthouse'
+  | 'atelier'
+  | 'barracks'
+  | 'stewpond'
+  | 'tiltyard';
 
 export type Category = 'housing' | 'resources' | 'farming' | 'food' | 'industry' | 'civic' | 'manor' | 'works' | 'decor';
 
@@ -268,6 +283,8 @@ export interface Building {
   flowers?: boolean;
   /** Monasteries: whether the monks had their book this month. */
   reading?: boolean;
+  /** Tax offices and courthouses: whether they had their paper this month. */
+  supplied?: boolean;
   /** Hedges and flower beds laid in one go share a group: beds in a group grow into one. */
   group?: number;
   /** Units produced in the last month, for display. */
@@ -296,6 +313,8 @@ export interface MonthReport {
   /** Share of the hearths left unheated last winter month. */
   coldShare?: number;
   taxes: number;
+  /** Villagers beyond what the manor and tax offices can tax. */
+  untaxed?: number;
   arrived: number;
   left: number;
   /** Gold earned from merchants last month. */

@@ -286,7 +286,7 @@ describe('yards and haulers', () => {
     s.dirty = true;
     recompute(s);
     s.res.wood = 0;
-    run(s, 6);
+    run(s, 12);
     // No storehouse yet: timber goes straight into the manor's store.
     expect(wc.hauled).toBe(false);
     expect(s.res.wood).toBeGreaterThan(0);
@@ -355,7 +355,7 @@ describe('planned roads', () => {
 describe('relaxed mode', () => {
   it('starts with more supplies and nobody leaves when starving', () => {
     const s = generateWorld(5, { relaxed: true });
-    expect(s.res.wood).toBe(140);
+    expect(s.res.wood).toBe(60);
     for (const f of ['berries', 'meat'] as const) s.res[f] = 0;
     run(s, DAYS_PER_MONTH * 3);
     expect(s.population).toBe(8);
@@ -462,6 +462,7 @@ describe('levels', () => {
     const m = manorFor(s);
     expect(placementError(s, 'townhall', 1, 1)).toMatch(/has its manor/);
     s.res.wood = 100;
+    s.res.planks = 50;
     s.res.stone = 40;
     s.res.gold = 200;
     expect(startUpgrade(s, m)).toBe(true);
@@ -474,18 +475,18 @@ describe('levels', () => {
     if (blocker) expect(blocker).toMatch(/ground|coins/);
   });
 
-  it('a cottage needs a well and a market before becoming a Timber House', async () => {
+  it('a cottage needs a church, a well and a market before becoming a Timber House', async () => {
     const { upgradeBlocker, houseNeeds } = await import('../src/game/levels');
     const s = generateWorld(15);
     s.tier = 1;
     hall(s).level = 2;
     const house = placeNearRoad(s, 'house');
     house.build = 1;
-    expect(upgradeBlocker(s, house)).toMatch(/well/);
+    expect(upgradeBlocker(s, house)).toMatch(/church/);
     expect(houseNeeds(s, house, 2).filter((n) => !n.met).length).toBeGreaterThan(0);
   });
 
-  it('the manor stops at the Stone Manor, which opens the garden, watch towers and walls', async () => {
+  it('the Stone Manor opens the garden, watch towers and walls, and the manor stops at the Palace', async () => {
     const { upgradePlan } = await import('../src/game/levels');
     const { isUnlocked, lockReason } = await import('../src/game/sim');
     const s = generateWorld(17);
@@ -497,6 +498,8 @@ describe('levels', () => {
     expect(lockReason(s, 'watchtower')).toMatch(/Stone Manor/);
     expect(upgradePlan(s, m)?.name).toBe('Stone Manor');
     m.level = 3;
+    expect(upgradePlan(s, m)?.name).toBe('Palace');
+    m.level = 4;
     expect(upgradePlan(s, m)).toBeNull();
     for (const t of ['manorgarden', 'watchtower', 'wall'] as const) expect(isUnlocked(s, t)).toBe(true);
   });
@@ -732,11 +735,11 @@ describe('workshops and household goods', () => {
     expect(s.res.cider).toBeLessThan(5);
   });
 
-  it('timber houses use up clothes every few months', () => {
+  it('townhouses use up clothes (or boots) every few months', () => {
     const s = generateWorld(42);
     const h = placeNearRoad(s, 'house');
     h.build = 1;
-    h.level = 2;
+    h.level = 3;
     marketBy(s, h);
     // The manor hall fills first.
     s.population = 15;
@@ -843,11 +846,11 @@ describe('charter goods', () => {
     expect(chooseRecipe(s, o, true)?.id).toBe('grapes');
   });
 
-  it('townhouses enjoy luxuries and pay more for them', () => {
+  it("merchant's houses enjoy luxuries and pay more for them", () => {
     const s = generateWorld(62);
     const h = placeNearRoad(s, 'house');
     h.build = 1;
-    h.level = 3;
+    h.level = 4;
     marketBy(s, h);
     s.population = 17;
     s.res.wine = 2;
@@ -910,13 +913,13 @@ describe('batch work', () => {
     k.need = undefined;
     s.population = 10;
     s.res.clay = 8;
-    s.res.firewood = 20;
+    s.res.firewood = 60;
     s.dirty = true;
     run(s, 2);
     expect(k.workers).toBe(0);
     expect(k.status).toMatch(/full batch/);
     s.res.clay = 12;
-    run(s, 30);
+    run(s, 60);
     expect(s.res.tiles).toBeGreaterThan(0);
     expect(k.batchOn).toBe(false);
     run(s, 1);
@@ -964,7 +967,7 @@ describe('steward', () => {
     s.advice = { housing: s.day, 'food-low': s.day, firewood: s.day };
     advise(s, 3);
     const msg = s.messages.find((m) => m.kind === 'advice');
-    expect(msg?.text).toMatch(/storehouses are full, mostly \w+ \(\d+\) and planks/);
+    expect(msg?.text).toMatch(/storehouses are full, mostly planks \(\d+\)/);
   });
 });
 
@@ -992,7 +995,7 @@ describe('harvest feast', () => {
 });
 
 describe('mead', () => {
-  it('the brewhouse brews mead only for Meadmakers, and taverns pour it', async () => {
+  it('the brewhouse brews mead once it is learned, and taverns pour it', async () => {
     const { chooseRecipe, serveAle } = await import('../src/game/sim');
     const s = generateWorld(86);
     s.tier = 1;
@@ -1004,8 +1007,9 @@ describe('mead', () => {
     bh.need = undefined;
     bh.recipe = 'mead';
     s.res.honey = 30;
+    s.learned = s.learned!.filter((id) => id !== 'r:brewhouse:mead');
     expect(chooseRecipe(s, bh)).toBeNull();
-    s.charters = ['orchard1', 'orchard2', 'orchard3b'];
+    s.learned.push('r:brewhouse:mead');
     expect(chooseRecipe(s, bh)?.id).toBe('mead');
     s.population = 8;
     s.dirty = true;
@@ -2127,12 +2131,12 @@ describe('upkeep and crates', () => {
     q.need = undefined;
     q.workers = BUILDINGS.quarry.workers;
     s.res.tools = 3;
-    // 0.2 tools a month with a full crew: five months wear out one.
-    for (let d = 0; d < DAYS_PER_MONTH * 5; d++) dailyUpkeep(s);
+    // A tool and a half a year with a full crew: about eight months wear out one.
+    for (let d = 0; d < DAYS_PER_MONTH * 9; d++) dailyUpkeep(s);
     expect(s.res.tools).toBe(2);
     expect(q.worn).toBeFalsy();
     s.res.tools = 0;
-    for (let d = 0; d < DAYS_PER_MONTH * 5; d++) dailyUpkeep(s);
+    for (let d = 0; d < DAYS_PER_MONTH * 8; d++) dailyUpkeep(s);
     expect(q.worn).toBe(true);
     expect(wornYield(q)).toBe(WORN_YIELD);
     s.res.tools = 5;
@@ -2171,14 +2175,14 @@ describe('alehouse and tavern, and fields far from their farm', () => {
     t.build = 1;
     t.need = undefined;
     expect(buildingName(t)).toBe('Alehouse');
-    expect(workersOf(t)).toBe(1);
+    expect(workersOf(t)).toBe(2);
     const r = reachOf(t);
     const plan = upgradePlan(s, t);
     expect(plan?.name).toBe('Tavern');
     t.level = plan!.to;
     finishUpgrade(s, t);
     expect(buildingName(t)).toBe('Tavern');
-    expect(workersOf(t)).toBe(2);
+    expect(workersOf(t)).toBe(3);
     expect(reachOf(t)).toBe(r * 2);
     // Saves from before the alehouse: their taverns are full taverns.
     const old = JSON.parse(serialize(s));
@@ -2262,7 +2266,7 @@ describe('knowledge and the monastery', () => {
     expect(base).toBe(ELDERS_LORE);
     const c = placeNearRoad(s, 'church');
     c.build = 1;
-    expect(knowledgeIncome(s)).toBe(base + 0.5);
+    expect(knowledgeIncome(s)).toBe(base + 0.25);
     c.level = 2;
     expect(knowledgeIncome(s)).toBe(base + 1);
     const h = placeNearRoad(s, 'house');

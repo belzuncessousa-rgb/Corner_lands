@@ -203,6 +203,9 @@ export function isUnlocked(s: GameState, type: BuildingType): boolean {
   return d.tier <= s.tier;
 }
 
+/** Buildings a town has only one of. */
+export const ONE_PER_TOWN: BuildingType[] = ['atelier', 'barracks', 'tiltyard', 'stewpond', 'armoury', 'stable'];
+
 /** Great works that, like decorations, wait for the settlement's rank. */
 export const MONUMENTS: BuildingType[] = ['statue', 'belltower'];
 
@@ -232,11 +235,13 @@ export function placementError(s: GameState, type: BuildingType, x: number, y: n
   if (!isUnlocked(s, type)) return lockReason(s, type);
   const clear = footprintClear(s, x, y, d.w, d.h, type === 'dock');
   if (clear) return clear;
-  if ((type === 'fisher' || type === 'claypit' || type === 'sandpit' || type === 'watermill' || type === 'dock') && countInRadius(s, centerOf(x, y, d.w, d.h), 2.5, (i) => s.terrain[i] === 1) < 2) {
+  if ((type === 'fisher' || type === 'claypit' || type === 'sandpit' || type === 'watermill' || type === 'dock' || type === 'papermill' || type === 'watersawmill') && countInRadius(s, centerOf(x, y, d.w, d.h), 2.5, (i) => s.terrain[i] === 1) < 2) {
     return 'Must be next to water';
   }
   if (type === 'cathedral' && s.buildings.some((b) => b.type === 'cathedral')) return 'Your town has its cathedral';
   if (type === 'townhall' && s.buildings.some((b) => b.type === 'townhall')) return 'Your town has its manor';
+  if (type === 'church' && s.buildings.some((b) => b.type === 'church')) return 'One church to a town: rebuild it to grow';
+  if (ONE_PER_TOWN.includes(type) && s.buildings.some((b) => b.type === type)) return `Your town has its ${BUILDINGS[type].name.toLowerCase()}`;
   if (type === 'guildhall' && s.buildings.some((b) => b.type === 'guildhall')) return 'Your town has its guildhall';
   if (type === 'belltower' && s.buildings.some((b) => b.type === 'belltower')) return 'Your town has its bell tower';
   if (type === 'manorgarden' && s.buildings.some((b) => b.type === 'manorgarden')) return 'Your manor has its garden';
@@ -636,7 +641,8 @@ export function dailyUpkeep(s: GameState): void {
 export function tradeCapacity(s: GameState, b: Building): number {
   if (b.build < 1 || b.workers <= 0) return 0;
   const per = b.type === 'dock' ? EXPORT_PER_DOCK : b.type === 'tradingpost' ? EXPORT_PER_MARKET : 0;
-  return Math.floor(per * (hasCharter(s, 'trade2') ? 2 : 1) * ((s.title ?? 0) >= 3 ? 1.5 : 1) * (beastWorks(b) ? HORSE_TRADE : 1));
+  const crew = Math.min(1, b.workers / Math.max(1, workersOf(b)));
+  return Math.floor(per * crew * (hasCharter(s, 'trade2') ? 2 : 1) * ((s.title ?? 0) >= 3 ? 1.5 : 1) * (beastWorks(b) ? HORSE_TRADE : 1));
 }
 
 /** Crates in store above their stock target: each lets a cart carry ten more exports. */
@@ -821,22 +827,14 @@ export const TAVERN_DRINKS: ResourceId[] = ['ale', 'cider', 'mead', 'wine'];
 
 /** Taverns pour ale, cider, mead or wine: a cask a month for every eight villagers they serve. */
 export function serveAle(s: GameState): void {
-  // Each home drinks at its nearest open tavern only, so overlapping taverns do not pour twice.
+  // Each home drinks at one tavern only, so overlapping taverns do not pour twice;
+  // each tapster serves so many homes, the nearest first.
   const taverns = s.buildings.filter((t) => t.type === 'tavern' && t.build >= 1 && t.workers > 0);
   const regulars = new Map<number, number>();
+  const assigned = crewAssign(s, 'tavern');
   for (const h of s.buildings) {
-    if (h.residents === 0) continue;
-    const hc = bCenter(h);
-    let best: Building | null = null;
-    let bd = Infinity;
-    for (const t of taverns) {
-      const d = Math.hypot(bCenter(t).x - hc.x, bCenter(t).y - hc.y);
-      if (d <= reachOf(t) && d < bd) {
-        bd = d;
-        best = t;
-      }
-    }
-    if (best) regulars.set(best.id, (regulars.get(best.id) ?? 0) + h.residents);
+    const t = assigned.get(h.id);
+    if (t !== undefined) regulars.set(t, (regulars.get(t) ?? 0) + h.residents);
   }
   for (const t of taverns) {
     const served = regulars.get(t.id) ?? 0;
@@ -862,8 +860,18 @@ export function serveAle(s: GameState): void {
   }
 }
 
-/** Goods each home level uses up, one every two months. */
-export const HOUSE_GOODS: Record<number, ResourceId[]> = { 2: ['clothes'], 3: ['clothes', 'boots', 'medicine'], 4: ['clothes', 'boots', 'medicine', 'pottery'] };
+/**
+ * Goods each home level uses up, one every two months. A list inside the list
+ * is a choice: the first in store will do (a Townhouse wears clothes or boots;
+ * herbs stand in for medicine, but last a third as long).
+ */
+export const HOUSE_GOODS: Record<number, (ResourceId | ResourceId[])[]> = {
+  3: [['clothes', 'boots'], ['medicine', 'herbs']],
+  4: ['clothes', 'boots', ['medicine', 'herbs']],
+  5: ['clothes', 'boots', ['medicine', 'herbs'], 'fineclothes'],
+};
+/** How long a good lasts in a home, as a share of the usual two months. */
+const SUPPLY_LASTS: Partial<Record<ResourceId, number>> = { herbs: 1 / 3 };
 const SUPPLY_DAYS = DAYS_PER_MONTH * 2;
 
 /** Whether a home has (or could get from store) a good it needs. */
@@ -872,33 +880,43 @@ export function hasSupply(s: GameState, b: Building, id: ResourceId): boolean {
   return (b.supply?.[id] ?? -1) > s.day || (s.res[id] >= 1 && coveredBy(s, b, 'market'));
 }
 
-/** Luxuries Townhouses enjoy (one at a time): they lift spirits and taxes. */
-export const LUXURIES: ResourceId[] = ['jewellery', 'fineclothes', 'books', 'wine', 'mead'];
+/** Luxuries the finest homes enjoy: they lift spirits and taxes. */
+export const LUXURIES: ResourceId[] = ['jewellery', 'fineclothes', 'glass', 'wine', 'pottery'];
 
 export function hasLuxury(s: GameState, b: Building): boolean {
-  return LUXURIES.some((id) => (b.supply?.[id] ?? -1) > s.day);
+  return luxuryCount(s, b) > 0;
+}
+
+/** Luxuries a home has in use now (optionally not counting one). */
+export function luxuryCount(s: GameState, b: Building, except?: ResourceId): number {
+  return LUXURIES.filter((id) => id !== except && (b.supply?.[id] ?? -1) > s.day).length;
+}
+
+/** Luxuries a home of this level wants at once: one for a Merchant's House, three for a Patrician House. */
+function luxuriesWanted(level: number): number {
+  return level >= 5 ? 3 : level >= 4 ? 1 : 0;
 }
 
 /** Homes take clothes, boots and medicine from the stores as theirs wear out. */
 function supplyHomes(s: GameState): void {
+  const give = (b: Building, id: ResourceId) => {
+    s.res[id] -= 1;
+    (b.supply ??= {})[id] = s.day + Math.round(SUPPLY_DAYS * (SUPPLY_LASTS[id] ?? 1));
+  };
   for (const b of s.buildings) {
     if (b.type !== 'house' || b.residents === 0) continue;
     // Clothes, boots and luxuries are bought at the market, like food.
     if (!coveredBy(s, b, 'market')) continue;
-    if (b.level >= 3 && !hasLuxury(s, b)) {
-      const lux = LUXURIES.find((id) => s.res[id] >= 1);
-      if (lux) {
-        s.res[lux] -= 1;
-        (b.supply ??= {})[lux] = s.day + SUPPLY_DAYS;
-      }
+    for (let want = luxuriesWanted(b.level) - luxuryCount(s, b); want > 0; want--) {
+      const lux = LUXURIES.find((id) => s.res[id] >= 1 && (b.supply?.[id] ?? -1) <= s.day);
+      if (!lux) break;
+      give(b, lux);
     }
-    for (const id of HOUSE_GOODS[Math.min(4, b.level)] ?? []) {
-      b.supply ??= {};
-      if ((b.supply[id] ?? -1) > s.day) continue;
-      if (s.res[id] >= 1) {
-        s.res[id] -= 1;
-        b.supply[id] = s.day + SUPPLY_DAYS;
-      }
+    for (const need of HOUSE_GOODS[Math.min(5, b.level)] ?? []) {
+      const ids = Array.isArray(need) ? need : [need];
+      if (ids.some((id) => (b.supply?.[id] ?? -1) > s.day)) continue;
+      const id = ids.find((k) => s.res[k] >= 1);
+      if (id) give(b, id);
     }
   }
 }
@@ -1064,6 +1082,15 @@ export function coveredBy(s: GameState, b: Building, type: BuildingType): boolea
     // The camp's and the manor's folk are fed from any open stall, without taking a household's place.
     if (b.type !== 'house') return s.buildings.some((m) => isMarket(m) && m.build >= 1 && m.workers > 0);
     return marketServed(s).has(b.id);
+  }
+  // Services worked by a crew serve as many homes as their hands allow, the nearest first (G20).
+  if (HOMES_PER_WORKER[type]) {
+    if (b.type === 'house') {
+      const id = crewAssign(s, type).get(b.id);
+      const o = id === undefined ? undefined : getBuilding(s, id);
+      return !!o && o.blocked !== BLOCK_PROBLEM;
+    }
+    return s.buildings.some((o) => o.type === type && o.build >= 1 && o.workers > 0 && Math.hypot(bCenter(o).x - bCenter(b).x, bCenter(o).y - bCenter(b).y) <= reachOf(o));
   }
   const c = bCenter(b);
   for (const o of s.buildings) {
@@ -1534,6 +1561,7 @@ function recipeInMonth(r: Recipe, month: number): boolean {
 function recipeReady(s: GameState, b: Building, r: Recipe): boolean {
   if (!recipeInMonth(r, monthOf(s.day))) return false;
   if (!canAfford(s, r.inputs)) return false;
+  if (!fuelPlan(s, b.type, fuelOf(workDef(b), r))) return false;
   if (b.type === 'forager' && r.id === 'berries') {
     return countInRadius(s, bCenter(b), GATHER_REACH, (i) => s.berries[i] > 0) > 0;
   }
@@ -2110,6 +2138,11 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
         b.lack = 'wood';
         return 'Waiting for wood (keeping firewood reserve)';
       }
+      const fuel = fuelPlan(s, b.type, fuelOf(d, d.recipes ? chooseRecipe(s, b) : null));
+      if (canAfford(s, inputs) && !fuel) {
+        b.lack = 'firewood';
+        return 'Waiting for fuel (firewood or charcoal)';
+      }
       if (!canAfford(s, inputs)) {
         // A batch ends when the inputs run out; workers go back to other jobs.
         if (d.batch) {
@@ -2123,11 +2156,14 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
       // Inputs leave the store as the outputs arrive: milling a full granary's
       // grain into flour must not stall for want of room.
       pay(s, inputs);
+      pay(s, fuel!);
       if (!addOutput(s, b, outputs)) {
         for (const k in inputs) s.res[k as ResourceId] += inputs[k as ResourceId] ?? 0;
+        for (const k in fuel) s.res[k as ResourceId] += fuel![k as ResourceId] ?? 0;
         return 'Storage full';
       }
       for (const k in inputs) tally(s, 'using', k as ResourceId, inputs[k as ResourceId] ?? 0);
+      for (const k in fuel) tally(s, 'using', k as ResourceId, fuel![k as ResourceId] ?? 0);
       return null;
     }
   }
@@ -2145,6 +2181,49 @@ export const FIELD_YIELD = 18;
 export const TEND_PER_TILE = 4;
 /** Converters leave this much timber in stock for firewood. */
 export const WOOD_RESERVE = 20;
+/** Workshops leave this much firewood for the homes' hearths. */
+export const FIREWOOD_RESERVE = 20;
+
+/**
+ * Goods other than food are made more slowly than they used to be, to match
+ * the cheaper buildings (G19; tuned in the balance pass).
+ */
+export const MATERIAL_PACE = 0.5;
+
+/** How fast a workplace works for what it makes now: food at full pace, other goods at MATERIAL_PACE. */
+export function paceOf(s: GameState, b: Building): number {
+  const d = workDef(b);
+  const outs = d.recipes ? (chooseRecipe(s, b, true)?.outputs ?? d.outputs) : d.outputs;
+  const ids = Object.keys(outs) as ResourceId[];
+  if (!ids.length) return 1;
+  return ids.some((k) => GOODS[k].food) ? 1 : MATERIAL_PACE;
+}
+
+/** Fuel a batch burns: the recipe's, else the building's (G18). */
+export function fuelOf(d: BuildingDef, r: Recipe | null | undefined): number {
+  return r?.fuel ?? d.fuel ?? 0;
+}
+
+/**
+ * What a batch's fuel is paid with: a firewood is one unit, a charcoal two.
+ * Smelters and smiths burn charcoal first, other fires firewood first, and
+ * the homes' firewood reserve is never touched. Null when there is not enough.
+ */
+export function fuelPlan(s: GameState, type: BuildingType, units: number): Cost | null {
+  if (units <= 0) return {};
+  const wood = Math.max(0, Math.floor(s.res.firewood - FIREWOOD_RESERVE));
+  const coal = Math.floor(s.res.charcoal);
+  if (type === 'bloomery' || type === 'smithy') {
+    const c = Math.min(coal, Math.ceil(units / 2));
+    const rest = Math.max(0, units - c * 2);
+    if (rest > wood) return null;
+    return { ...(c ? { charcoal: c } : {}), ...(rest ? { firewood: rest } : {}) };
+  }
+  if (wood >= units) return { firewood: units };
+  const c = Math.ceil((units - wood) / 2);
+  if (c > coal) return null;
+  return { ...(wood ? { firewood: wood } : {}), charcoal: c };
+}
 
 const CROP_GOOD: Record<string, ResourceId> = { vegetables: 'vegetables', wheat: 'grain', barley: 'barley', flax: 'flax', woad: 'woad' };
 /** Vegetables need no mill but yield poorly; flax and woad are lighter crops. */
@@ -2754,6 +2833,12 @@ export const DRAUGHT_PRICE: Record<Draught, number> = { horse: 60, ox: 45 };
 export const HORSE_TRADE = 1.5;
 /** A builder's yard with its ox: sites within reach are supplied and raised half as fast again. */
 export const YARD_BOOST = 1.5;
+
+/** A builder's yard speeds sites by its crew at work (G20). */
+export function yardBoost(yard: Building | null | undefined): number {
+  if (!yard) return 1;
+  return 1 + (YARD_BOOST - 1) * Math.min(1, yard.workers / Math.max(1, workersOf(yard)));
+}
 /** Days of carting before the ox cart has worn through a wood part. */
 export const YARD_WEAR_DAYS = 30;
 
@@ -3037,7 +3122,7 @@ export function dailyProduction(s: GameState, rng: StateRng): void {
     b.hauled = servedByHaulers(s, b);
     b.efficiency = workEfficiency(b);
     // Time spent on the household's errands is time not spent at work.
-    b.work += ((b.workers / d.workers) * b.efficiency * moodYield(s) * learningYield(s) * (1 - (s.report.errands ?? 0)) * wornYield(b)) / d.cycle;
+    b.work += ((b.workers / d.workers) * b.efficiency * moodYield(s) * learningYield(s) * (1 - (s.report.errands ?? 0)) * wornYield(b) * paceOf(s, b)) / d.cycle;
     let status: string | null = null;
     let tried = false;
     while (b.work >= 1) {
@@ -3082,10 +3167,11 @@ const SHORT_DAYS = 3;
 /** Whether a workshop's inputs (for its current product) are in store, above the firewood reserve. */
 export function inputsReady(s: GameState, b: Building): boolean {
   const d = workDef(b);
-  const inputs = d.recipes ? chooseRecipe(s, b)?.inputs : d.inputs;
+  const r = d.recipes ? chooseRecipe(s, b) : null;
+  const inputs = d.recipes ? r?.inputs : d.inputs;
   if (!inputs) return false;
   if ((inputs.wood ?? 0) > 0 && s.res.wood - (inputs.wood ?? 0) < WOOD_RESERVE) return false;
-  return canAfford(s, inputs);
+  return canAfford(s, inputs) && !!fuelPlan(s, b.type, fuelOf(d, r));
 }
 
 // ---------------------------------------------------------------- construction
@@ -3136,7 +3222,7 @@ export function dailyConstruction(s: GameState): void {
       // own tally so they do not disturb production.
       const yard = yardFor(s, b);
       if (yard) wearCart(s, yard);
-      const carry = ((n * BUILD_LOAD) / ((b.trip ?? 0) + BUILD_TRIP_DAYS)) * (yard ? YARD_BOOST : 1);
+      const carry = ((n * BUILD_LOAD) / ((b.trip ?? 0) + BUILD_TRIP_DAYS)) * yardBoost(yard);
       let pool = (renovating ? (b.carry ?? 0) : b.work) + carry;
       let missing = '';
       // With no timber in store, a woodcutter's lodge is raised from trees
@@ -3177,7 +3263,7 @@ export function dailyConstruction(s: GameState): void {
     }
     const yard = yardFor(s, b);
     if (yard) wearCart(s, yard);
-    const boost = yard ? YARD_BOOST : 1;
+    const boost = yardBoost(yard);
     if (renovating) {
       b.upNote = `Building (${n} builder${n > 1 ? 's' : ''})`;
       b.upProgress = Math.min(1, (b.upProgress ?? 0) + (n * LABOUR_PER_BUILDER * boost) / upgradeDays(b));
@@ -3271,6 +3357,110 @@ let servedCache: { key: string; set: Set<number> } = { key: '', set: new Set() }
  * but each staffed stall can serve only so many households, and the homes
  * nearest a market come first.
  */
+/** Fuel a bathhouse burns each month (a firewood is one, a charcoal two). */
+export const BATHHOUSE_FUEL = 2;
+/** Population past which a town grows unruly without a courthouse's watch. */
+export const CROWDING_FROM = 90;
+
+/**
+ * Civic buildings that run on goods: the bathhouse burns fuel; the courthouse
+ * uses paper or parchment and its watch wears clothes and boots (a set every
+ * two months). Short of them, they shut (bathhouse) or police half as many.
+ */
+function monthlyCivic(s: GameState): void {
+  const month = monthOf(s.day);
+  for (const b of s.buildings) {
+    if (b.build < 1 || b.workers <= 0) continue;
+    if (b.type === 'bathhouse') {
+      const fuel = fuelPlan(s, b.type, BATHHOUSE_FUEL);
+      if (fuel) {
+        pay(s, fuel);
+        if (b.blocked === BLOCK_PROBLEM) b.blocked = 0;
+        b.lack = undefined;
+      } else {
+        b.blocked = BLOCK_PROBLEM;
+        b.lack = 'firewood';
+      }
+    } else if (b.type === 'courthouse') {
+      const id: ResourceId | undefined = s.res.paper >= 1 ? 'paper' : s.res.parchment >= 1 ? 'parchment' : undefined;
+      if (id) s.res[id] -= 1;
+      let dressed = true;
+      if (month % 2 === 0) {
+        if (s.res.clothes >= 1 && s.res.boots >= 1) {
+          s.res.clothes -= 1;
+          s.res.boots -= 1;
+        } else dressed = false;
+      }
+      b.supplied = !!id && dressed;
+    }
+  }
+}
+
+/** Villagers the manor's clerk can tax, and each tax office (with its paper; half without). */
+export const MANOR_TAX_REACH = 45;
+export const TAX_OFFICE_REACH = 40;
+/** Paper or parchment a tax office uses each month. */
+export const TAX_OFFICE_PAPER = 2;
+
+/**
+ * How many villagers can be taxed: none before there is a manor. With
+ * `month` set, tax offices take their paper (or parchment) for the month.
+ */
+export function taxReach(s: GameState, month = false): number {
+  if (!s.buildings.some((b) => b.type === 'townhall' && b.build >= 1)) return 0;
+  let n = MANOR_TAX_REACH;
+  for (const b of s.buildings) {
+    if (b.type !== 'taxoffice' || b.build < 1 || b.workers <= 0) continue;
+    if (month) {
+      const id: ResourceId | undefined = s.res.paper >= TAX_OFFICE_PAPER ? 'paper' : s.res.parchment >= TAX_OFFICE_PAPER ? 'parchment' : undefined;
+      if (id) s.res[id] -= TAX_OFFICE_PAPER;
+      b.supplied = !!id;
+    }
+    n += TAX_OFFICE_REACH * (b.supplied === false ? 0.5 : 1) * (b.workers / Math.max(1, workersOf(b)));
+  }
+  return Math.floor(n);
+}
+
+/** Homes one worker of a service can see to (G20). */
+export const HOMES_PER_WORKER: Partial<Record<BuildingType, number>> = { tavern: 8, bathhouse: 10, courthouse: 12 };
+
+const crewCache = new Map<string, { key: string; map: Map<number, number> }>();
+
+/**
+ * Which service building each home goes to: the nearest one in reach that
+ * still has hands to spare, nearer homes first. Home id -> building id.
+ */
+export function crewAssign(s: GameState, type: BuildingType): Map<number, number> {
+  const per = HOMES_PER_WORKER[type] ?? 0;
+  const places = s.buildings.filter((o) => o.type === type && o.build >= 1 && o.workers > 0);
+  const key = `${s.day}:${s.buildings.length}:${s.nextId}:${s.population}:${places.map((o) => o.workers).join(',')}`;
+  const hit = crewCache.get(type);
+  if (hit?.key === key) return hit.map;
+  const map = new Map<number, number>();
+  const barracks = type === 'courthouse' && s.buildings.some((x) => x.type === 'barracks' && x.build >= 1);
+  const room = new Map(places.map((o) => [o.id, o.workers * per * (barracks ? 1.5 : 1) * (o.supplied === false ? 0.5 : 1)]));
+  const homes = s.buildings
+    .filter((h) => h.residents > 0)
+    .map((h) => {
+      const c = bCenter(h);
+      const near = places
+        .map((o) => ({ o, d: Math.hypot(bCenter(o).x - c.x, bCenter(o).y - c.y) }))
+        .filter((x) => x.d <= reachOf(x.o))
+        .sort((a, b) => a.d - b.d);
+      return { h, near };
+    })
+    .filter((x) => x.near.length)
+    .sort((a, b) => a.near[0].d - b.near[0].d);
+  for (const { h, near } of homes) {
+    const pick = near.find((x) => (room.get(x.o.id) ?? 0) >= 1);
+    if (!pick) continue;
+    room.set(pick.o.id, (room.get(pick.o.id) ?? 0) - 1);
+    map.set(h.id, pick.o.id);
+  }
+  crewCache.set(type, { key, map });
+  return map;
+}
+
 export function marketServed(s: GameState): Set<number> {
   const markets = s.buildings.filter((m) => isMarket(m) && m.build >= 1 && m.workers > 0);
   let stalls = 0;
@@ -3404,15 +3594,22 @@ export function monthly(s: GameState, rng: StateRng): void {
   // Taxes.
   const tax = TAX_LEVELS[s.taxLevel];
   let taxes = 0;
+  let residents = 0;
   for (const b of s.buildings) {
     if (b.residents === 0) continue;
+    residents += b.residents;
     taxes += b.residents * tax.perHead * (b.type === 'house' ? (HOUSE_LEVELS[b.level]?.tax ?? 1) * (hasLuxury(s, b) ? 1.3 : 1) : 1);
   }
+  // Only so many can be taxed: the manor's clerk sees to the first 45, each tax office to 40 more.
+  const taxable = taxReach(s, true);
+  report.untaxed = Math.max(0, residents - taxable);
+  if (residents > 0) taxes *= Math.min(1, taxable / residents);
   // A Baron and above collects a tenth more.
   report.taxes = Math.floor(taxes * ((s.title ?? 0) >= 1 ? 1.1 : 1));
   s.res.gold += report.taxes;
   serveAle(s);
   supplyHomes(s);
+  monthlyCivic(s);
   monthlyHerds(s, month);
   monthlyYards(s, month);
   monthlyDraught(s);
@@ -3513,23 +3710,34 @@ export const ELDERS_LORE = 0.5;
  */
 export function knowledgeOf(s: GameState, b: Building): number {
   if (b.build < 1) return 0;
+  const crew = Math.min(1, b.workers / Math.max(1, workersOf(b)));
   switch (b.type) {
     case 'church':
-      return b.level >= 2 ? 1 : 0.5;
+      return CHURCH_KNOWLEDGE[b.level] ?? CHURCH_KNOWLEDGE[1];
     case 'cathedral':
       return 3;
     case 'monastery':
-      return b.reading ? MONASTERY_KNOWLEDGE : 0;
+      return b.reading ? MONASTERY_KNOWLEDGE * crew : 0;
     case 'scriptorium':
-      return b.workers > 0 ? 1 : 0;
+      return crew;
     case 'university':
-      return s.universityOk ? 5 : 0;
+      return s.universityOk ? UNIVERSITY_KNOWLEDGE * crew : 0;
+    case 'school':
+      return b.workers > 0 ? SCHOOL_KNOWLEDGE * s.buildings.filter((h) => h.type === 'house' && h.residents > 0).length : 0;
     case 'house':
-      return b.level >= 3 && b.residents > 0 ? (b.level >= 4 ? 0.25 : 0.1) : 0;
+      return b.residents > 0 ? (HOME_KNOWLEDGE[b.level] ?? 0) : 0;
     default:
       return 0;
   }
 }
+
+/** Knowledge a month from each church level, home level, the university, and the school per home. */
+const CHURCH_KNOWLEDGE = [0, 0.25, 1, 2];
+const HOME_KNOWLEDGE = [0, 0, 0.05, 0.1, 0.25, 0.75];
+export const UNIVERSITY_KNOWLEDGE = 8;
+export const SCHOOL_KNOWLEDGE = 0.02;
+/** All work is this much slower while a public school keeps the children at their letters. */
+export const SCHOOL_DRAG = 0.03;
 
 const KNOWLEDGE_LABELS: Partial<Record<BuildingType, string>> = {
   church: 'The church school',
@@ -3537,6 +3745,7 @@ const KNOWLEDGE_LABELS: Partial<Record<BuildingType, string>> = {
   monastery: 'Monasteries at their books',
   scriptorium: 'Scribes at work',
   university: 'The university',
+  school: 'The public school',
   house: 'Well-to-do homes',
 };
 
@@ -3599,7 +3808,8 @@ export const UNIVERSITY_BOOKS = 2;
 
 /** The university's learning: every workplace a little more productive while it is fed books. */
 export function learningYield(s: GameState): number {
-  return s.universityOk ? (hasCharter(s, 'learning3a') ? 1.1 : 1.05) : 1;
+  const school = s.buildings.some((b) => b.type === 'school' && b.build >= 1 && b.workers > 0) ? 1 - SCHOOL_DRAG : 1;
+  return (s.universityOk ? (hasCharter(s, 'learning3a') ? 1.1 : 1.05) : 1) * school;
 }
 
 /** Whether the lord rides out on horseback: a stable with its groom at work. */
@@ -3743,9 +3953,13 @@ export function updateHappiness(s: GameState): void {
   let tavern = 0;
   let unmet = 0;
   let luxury = 0;
+  let baths = 0;
+  let policed = 0;
   for (const b of s.buildings) {
     if (b.residents === 0) continue;
     residents += b.residents;
+    if (coveredBy(s, b, 'bathhouse')) baths += b.residents;
+    if (b.type !== 'house' || coveredBy(s, b, 'courthouse')) policed += b.residents;
     beauty += beautyAt(s, b) * b.residents;
     if (coveredBy(s, b, 'tavern')) tavern += b.residents;
     if (b.type === 'house') {
@@ -3773,6 +3987,12 @@ export function updateHappiness(s: GameState): void {
     if (unmet) factors.push({ label: 'Homes lacking what they need', value: -Math.round((14 * unmet) / residents) });
     if (beauty) factors.push({ label: 'Beautiful surroundings', value: Math.round(beauty / residents) });
     if (luxury) factors.push({ label: 'Fine living (luxuries)', value: Math.round((10 * luxury) / residents) });
+    if (baths) factors.push({ label: 'Hot baths nearby', value: Math.round((3 * baths) / residents) });
+    // Past a Borough's size a crowded town grows unruly, ever faster, wherever the watch does not reach.
+    if (s.population > CROWDING_FROM && policed < residents) {
+      const unrest = Math.min(25, 2 + 4 * Math.pow((s.population - CROWDING_FROM) / 40, 1.5));
+      factors.push({ label: 'Unrest in the crowded streets', value: -Math.round((unrest * (residents - policed)) / residents) });
+    }
   }
   for (const m of s.moods ?? []) if (m.until > s.day) factors.push({ label: m.label, value: m.value });
   if (s.buildings.some((b) => b.type === 'cathedral' && b.build >= 1)) factors.push({ label: 'The cathedral', value: 6 });

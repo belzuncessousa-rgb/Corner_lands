@@ -1,7 +1,7 @@
 import { BUILDINGS, TIERS } from './data';
 import {
   coveredBy,
-  hasLuxury,
+  luxuryCount,
   hasSupply,
   LUXURIES,
   HOME_TRADE_COST,
@@ -11,7 +11,7 @@ import {
   needsMaterials,
   recompute,
 } from './sim';
-import type { Building, Cost, GameState } from './types';
+import type { Building, BuildingType, Cost, GameState } from './types';
 import { idx, inBounds } from './world';
 
 /**
@@ -32,30 +32,33 @@ export interface HouseLevel {
 export const HOUSE_LEVELS: HouseLevel[] = [
   { name: '', housing: 0, tax: 0 },
   { name: 'Cottage', housing: 5, tax: 1 },
-  { name: 'Timber House', housing: 7, tax: 1.5, cost: { planks: 12, wood: 6 }, tier: 1 },
-  { name: 'Townhouse', housing: 9, tax: 2, cost: { planks: 20, tiles: 15, stone: 10, tools: 3 }, tier: 2 },
-  { name: "Merchant's House", housing: 11, tax: 3, cost: { dressedstone: 15, tiles: 20, planks: 20, tools: 4, gold: 60 }, tier: 3 },
+  { name: 'Timber House', housing: 7, tax: 1.5, cost: { wood: 2, planks: 4 }, tier: 1 },
+  { name: 'Townhouse', housing: 9, tax: 2, cost: { planks: 6, stone: 4, tiles: 10 }, tier: 2 },
+  { name: "Merchant's House", housing: 9, tax: 3, cost: { dressedstone: 6, tiles: 10, mortar: 4, glass: 4, gold: 20 }, tier: 3 },
+  { name: 'Patrician House', housing: 9, tax: 4, cost: { dressedstone: 6, mortar: 4, glass: 10, stainedglass: 6, gold: 100 }, tier: 4 },
 ];
 
 export const MANOR_LEVELS: { name: string; cost?: Cost; days?: number }[] = [
   { name: '' },
   { name: 'Manor Hall' },
-  { name: 'Manor House', cost: { wood: 40, stone: 20, gold: 50 }, days: 20 },
-  { name: 'Stone Manor', cost: { planks: 40, dressedstone: 40, stone: 20, gold: 150 }, days: 30 },
+  { name: 'Manor House', cost: { wood: 4, planks: 10, stone: 10, gold: 12 }, days: 20 },
+  { name: 'Stone Manor', cost: { stone: 5, dressedstone: 10, tiles: 10, gold: 40 }, days: 30 },
+  { name: 'Palace', cost: { dressedstone: 10, mortar: 6, tools: 4, gold: 60 }, days: 40 },
 ];
 
-/** A church is raised in timber and may be rebuilt in stone once the town is a Town. */
+/** A church is raised in timber, rebuilt in stone once a Town, and in dressed stone once a Borough. */
 export const CHURCH_LEVELS: { name: string; cost?: Cost; days?: number; tier?: number }[] = [
   { name: '' },
   { name: 'Wooden Church' },
-  { name: 'Stone Church', cost: { planks: 20, dressedstone: 30, stone: 20, tools: 5, gold: 80 }, days: 25, tier: 2 },
+  { name: 'Stone Church', cost: { stone: 8, tiles: 4, tools: 1, gold: 10 }, days: 25, tier: 2 },
+  { name: 'Dressed Stone Church', cost: { dressedstone: 8, mortar: 4, glass: 3, tools: 1, gold: 20 }, days: 30, tier: 3 },
 ];
 
 /** The alehouse, and the tavern it can be enlarged into: a second tapster, and twice the reach. */
 export const TAVERN_LEVELS: { name: string; cost?: Cost; days?: number; tier?: number }[] = [
   { name: '' },
   { name: 'Alehouse' },
-  { name: 'Tavern', cost: { wood: 20, planks: 15, stone: 10 }, days: 14, tier: 1 },
+  { name: 'Tavern', cost: { wood: 5, planks: 4, stone: 3 }, days: 14, tier: 2 },
 ];
 
 /** How far a service reaches, in tiles: an enlarged tavern twice as far as an alehouse. */
@@ -64,13 +67,15 @@ export function reachOf(b: Building): number {
   return b.type === 'tavern' && b.level >= 2 ? r * 2 : r;
 }
 
-/** The manor's last step: once it stands, the lord may build what befits it. */
+/** The manor level from which the lord may build walls, towers, the garden and the armoury. */
 export const STONE_MANOR = 3;
+/** The palace: the atelier, the barracks and the tiltyard. */
+export const PALACE = 4;
 
 /** The manor's grounds at each level: it needs more room as it grows. */
-export const MANOR_SIZE = [0, 3, 3, 4];
+export const MANOR_SIZE = [0, 3, 3, 4, 4];
 /** The town size each manor level waits for. */
-export const MANOR_TIER = [0, 1, 1, 2];
+export const MANOR_TIER = [0, 0, 1, 2, 3];
 
 /** Whether the ground the manor would grow onto is clear. */
 export function roomToGrow(s: GameState, b: Building, size: number): boolean {
@@ -97,7 +102,7 @@ export function workersOf(b: Building): number {
   // A family craft is worked by as many of the household as the workshop needs.
   if (b.trade) return Math.min(BUILDINGS[b.trade].workers, b.residents);
   // A tavern keeps a second tapster.
-  if (b.type === 'tavern' && b.level >= 2) return 2;
+  if (b.type === 'tavern' && b.level >= 2) return 3;
   return BUILDINGS[b.type].workers;
 }
 
@@ -107,6 +112,22 @@ export function buildingName(b: Building): string {
   if (b.type === 'church') return CHURCH_LEVELS[b.level]?.name || 'Wooden Church';
   if (b.type === 'tavern') return TAVERN_LEVELS[b.level]?.name || 'Alehouse';
   return BUILDINGS[b.type].name;
+}
+
+/** Great Works that count for the Patrician House (all but the statue). */
+export const GREAT_WORKS: BuildingType[] = ['markethall', 'belltower', 'cathedral', 'university', 'guildhall'];
+
+/** The best church (or the cathedral, as the finest) whose reach covers a home. */
+export function churchLevelNear(s: GameState, home: Building): number {
+  let best = 0;
+  const c = { x: home.x + home.w / 2, y: home.y + home.h / 2 };
+  for (const o of s.buildings) {
+    if ((o.type !== 'church' && o.type !== 'cathedral') || o.build < 1) continue;
+    const r = BUILDINGS[o.type].radius;
+    if (Math.hypot(o.x + o.w / 2 - c.x, o.y + o.h / 2 - c.y) > r) continue;
+    best = Math.max(best, o.type === 'cathedral' ? 3 : o.level || 1);
+  }
+  return best;
 }
 
 export interface Need {
@@ -121,21 +142,31 @@ export function houseNeeds(s: GameState, b: Building, level: number): Need[] {
     { label: 'Firewood in winter', met: !s.report.cold },
   ];
   if (level >= 2) {
+    out.push({ label: 'A church nearby', met: churchLevelNear(s, b) >= 1 });
     out.push({ label: 'A well nearby', met: coveredBy(s, b, 'well') });
     out.push({ label: 'A market nearby', met: coveredBy(s, b, 'market') });
-    out.push({ label: 'An alehouse or tavern with drink', met: coveredBy(s, b, 'tavern') });
     out.push({ label: 'Two food groups', met: s.report.variety >= 2 });
-    out.push({ label: 'Clothes', met: hasSupply(s, b, 'clothes') });
   }
   if (level >= 3) {
-    out.push({ label: 'A church nearby', met: coveredBy(s, b, 'church') });
+    out.push({ label: 'A stone church nearby', met: churchLevelNear(s, b) >= 2 });
+    out.push({ label: 'An alehouse or tavern with drink', met: coveredBy(s, b, 'tavern') });
     out.push({ label: 'Three food groups', met: s.report.variety >= 3 });
-    out.push({ label: 'Boots', met: hasSupply(s, b, 'boots') });
-    out.push({ label: 'Medicine', met: hasSupply(s, b, 'medicine') });
+    if (level === 3) out.push({ label: 'Clothes or boots', met: hasSupply(s, b, 'clothes') || hasSupply(s, b, 'boots') });
+    out.push({ label: 'Medicine (or herbs)', met: hasSupply(s, b, 'medicine') || hasSupply(s, b, 'herbs') });
   }
   if (level >= 4) {
-    out.push({ label: 'Fine pottery', met: hasSupply(s, b, 'pottery') });
-    out.push({ label: 'A luxury: wine, mead, books or jewellery', met: hasLuxury(s, b) || LUXURIES.some((id) => s.res[id] >= 1) });
+    out.push({ label: 'A dressed stone church nearby', met: churchLevelNear(s, b) >= 3 });
+    out.push({ label: 'A bathhouse nearby', met: coveredBy(s, b, 'bathhouse') });
+    out.push({ label: 'Four food groups', met: s.report.variety >= 4 });
+    out.push({ label: 'Clothes', met: hasSupply(s, b, 'clothes') });
+    out.push({ label: 'Boots', met: hasSupply(s, b, 'boots') });
+    out.push({ label: 'A luxury: jewellery, fine clothes, glass, wine or fine pottery', met: luxuryCount(s, b) >= 1 || LUXURIES.some((id) => s.res[id] >= 1) });
+  }
+  if (level >= 5) {
+    out.push({ label: 'A school in town', met: s.buildings.some((o) => o.type === 'school' && o.build >= 1) });
+    out.push({ label: 'A Great Work in town', met: s.buildings.some((o) => GREAT_WORKS.includes(o.type) && o.build >= 1) });
+    out.push({ label: 'Fine clothes', met: hasSupply(s, b, 'fineclothes') });
+    out.push({ label: 'Two more luxuries', met: luxuryCount(s, b, 'fineclothes') >= 2 || LUXURIES.filter((id) => id !== 'fineclothes' && s.res[id] >= 1).length >= 2 });
   }
   return out;
 }
