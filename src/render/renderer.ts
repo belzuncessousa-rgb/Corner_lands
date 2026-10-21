@@ -29,7 +29,6 @@ import {
   fruitTreeSprite,
   drawSheep,
   variantOf,
-  buildingDoor,
   homeWindow,
   pavedTile,
   cobbleTile,
@@ -241,7 +240,6 @@ export class Renderer {
 
   render(s: GameState, agents: Agent[], ov: Overlay, dt: number, animals: Animal[] = []): void {
     this.lordRides = lordRides(s);
-    this.swingDoors(agents, dt);
     const started = performance.now();
     try {
       this.renderFrame(s, agents, ov, dt, animals);
@@ -1259,7 +1257,6 @@ export class Renderer {
       return;
     }
     this.blit(sp, wx, wy);
-    this.drawDoor(s, b);
     if (b.type === 'house' && b.flowers) this.drawDoorFlowers(b, season);
     if (b.improved?.length) drawImprovements(c, b, season, this.time);
     if (turning) {
@@ -1550,57 +1547,6 @@ export class Renderer {
   }
 
   /** Flower boxes along the front of a home's plot, between the door and the street. */
-  /** Outlines every building's door (a debugging aid: `renderer.debugDoors = true`). */
-  debugDoors = false;
-  /** How far each building's door stands open, 0..1, by building id. */
-  private doorOpen = new Map<number, number>();
-
-  /** Doors swing open as someone comes up to them and close behind them. */
-  private swingDoors(agents: Agent[], dt: number): void {
-    const want = new Set<number>();
-    for (const a of agents) {
-      if (!a.door || !a.visible) continue;
-      if (Math.hypot(a.x - a.door.x, a.y - a.door.y) < 1.1) want.add(a.door.id);
-    }
-    for (const id of want) if (!this.doorOpen.has(id)) this.doorOpen.set(id, 0);
-    for (const [id, v] of this.doorOpen) {
-      const n = want.has(id) ? Math.min(1, v + dt * 4.5) : Math.max(0, v - dt * 2.2);
-      if (n <= 0 && !want.has(id)) this.doorOpen.delete(id);
-      else this.doorOpen.set(id, n);
-    }
-  }
-
-  /**
-   * A building's door, standing open while someone goes in or out: the dark
-   * (at dusk, lamplit) doorway, and the door leaf swung out on its hinges.
-   */
-  private drawDoor(s: GameState, b: Building): void {
-    const open = this.doorOpen.get(b.id) ?? 0;
-    if (!this.debugDoors && open <= 0.01) return;
-    const d = buildingDoor(s, b);
-    if (!d) return;
-    const p = new Pen(this.ctx);
-    const z0 = d.z0 ?? 0;
-    const L = d.face === 'L';
-    const at = (u: number, out: number, z: number): V3 => (L ? [b.x + u, b.y + d.plane + out, z] : [b.x + d.plane + out, b.y + u, z]);
-    if (this.debugDoors) {
-      p.poly([at(d.a, 0, z0), at(d.b, 0, z0), at(d.b, 0, d.h), at(d.a, 0, d.h)], 'rgba(255,0,0,0.35)', '#ff2020', 1.2);
-      if (open <= 0.01) return;
-    }
-    if (d.open) return;
-    // The doorway: dark inside, warm with firelight once the lamps are lit.
-    const inside = this.dusk > 0.3 && b.type !== 'storehouse' && b.type !== 'granary' ? mix('#2a1a10', '#e8a850', Math.min(1, (this.dusk - 0.3) * 2)) : '#1e140c';
-    p.poly([at(d.a, 0.004, z0), at(d.b, 0.004, z0), at(d.b, 0.004, d.h), at(d.a, 0.004, d.h)], inside);
-    // The leaf, hinged on the side nearer the corner, swinging out toward us.
-    const w = d.b - d.a;
-    const th = open * 1.35;
-    const hinge = d.a;
-    const tip = (z: number): V3 => at(hinge + Math.cos(th) * w, Math.sin(th) * w + 0.004, z);
-    const leaf = L ? '#6a4428' : '#563820';
-    p.poly([at(hinge, 0.004, z0), tip(z0), tip(d.h), at(hinge, 0.004, d.h)], leaf, '#2e1d10', 0.6);
-    p.line(at(hinge + Math.cos(th) * w * 0.5, Math.sin(th) * w * 0.5 + 0.005, z0), at(hinge + Math.cos(th) * w * 0.5, Math.sin(th) * w * 0.5 + 0.005, d.h), '#3d2614', 0.5);
-  }
-
   private drawDoorFlowers(b: Building, season: Season): void {
     const p = new Pen(this.ctx);
     const wood = '#8a5a30';
@@ -2814,7 +2760,7 @@ export class Renderer {
       legA = Math.sin(this.time * 9 + lh) * 1.8;
     } else if (leisure === 'pray' || leisure === 'sit' || kneel) bob = 3;
     else if (crouch) bob = 1.8;
-    c.globalAlpha = a.fadeIn * doorFade(a);
+    c.globalAlpha = a.fadeIn;
     if (a.key === this.selectedAgent) {
       // A gold ring at the feet of the villager being looked at.
       c.strokeStyle = '#e8c048';
@@ -3247,7 +3193,7 @@ export class Renderer {
           const q = (p - 0.72) / 0.28;
           c.globalAlpha *= 1 - q;
           line(bx + (2 + q * 40) * f, by - q * 3, bx + (6 + q * 40) * f, by - q * 3, '#8a6a44', 0.6);
-          c.globalAlpha = a.fadeIn * doorFade(a);
+          c.globalAlpha = a.fadeIn;
         }
         break;
       }
@@ -3493,7 +3439,7 @@ export class Renderer {
     const f = a.dir;
     const walking = a.phase === 'walk';
     const resting = a.act === 'graze' && !a.carry;
-    c.globalAlpha = a.fadeIn * doorFade(a);
+    c.globalAlpha = a.fadeIn;
     if (a.key === this.selectedAgent) {
       c.strokeStyle = '#e8c048';
       c.lineWidth = 1.6;
@@ -4618,12 +4564,6 @@ function drawGoat(c: CanvasRenderingContext2D, x: number, y: number, f: number, 
   c.moveTo(hx, hy - 0.4);
   c.quadraticCurveTo(hx - 0.6 * f, hy - 2.4, hx - 2 * f, hy - 2);
   c.stroke();
-}
-
-/** How visible a villager is while stepping through a door: fading out as they cross the sill, in as they leave it. */
-function doorFade(a: Agent): number {
-  if (!a.door) return 1;
-  return Math.min(1, Math.hypot(a.x - a.door.x, a.y - a.door.y) / 0.38);
 }
 
 /** A small pile of one kind of goods. */

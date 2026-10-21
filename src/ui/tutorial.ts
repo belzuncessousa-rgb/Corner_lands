@@ -1,6 +1,7 @@
 import type { Game } from '../main';
 import { bCenter } from '../game/sim';
 import type { GameState } from '../game/types';
+import { readyCount } from './learning';
 
 /**
  * The tutorial: Fingamoboblius, an old steward with a beard, walks about the
@@ -92,8 +93,12 @@ const START: Step[] = [
     show: '#topbar [data-chip="goods"]',
   },
   {
-    say: 'And the treasury: coins from taxes and trade, and later the prestige of your house. Click it to set the taxes.',
+    say: 'And the treasury: coins from trade, and taxes once you raise a manor hall, and later the prestige of your house. Click it to set the taxes.',
     show: '#topbar [data-chip="treasury"]',
+  },
+  {
+    say: "This book holds what your people know. Knowledge gathers slowly, month by month, and buys new buildings, recipes and better ways of working. I shall show you more when there is enough to spend.",
+    show: '#topbar .learn-chip',
   },
   {
     say: 'Over here is the calendar. A year has twelve months and four seasons. These buttons pause time or make it run faster. I have stopped it while we talk.',
@@ -150,19 +155,10 @@ const START: Step[] = [
     },
   },
   {
-    say: 'Mushrooms grow on the forest floor, best in autumn. Foragers gather those too.',
+    say: 'Herbs grow in the shade of the woods. Once your foragers learn them, the apothecary makes them into medicine.',
     show: (g) => {
-      // A patch that can be seen: trees on the tiles in front of it would hide it.
       const s = g.state;
-      const hidden = (i: number) => {
-        let n = 0;
-        const x = i % s.width;
-        const y = Math.floor(i / s.width);
-        for (let dy = 0; dy <= 2; dy++)
-          for (let dx = 0; dx <= 2; dx++) if (x + dx < s.width && y + dy < s.height && s.trees[(y + dy) * s.width + x + dx]) n++;
-        return n * 4;
-      };
-      const t = nearest(s, (i) => (s.mushroomsMax?.[i] ?? 0) > 0, hidden);
+      const t = nearest(s, (i) => s.trees[i] >= 3);
       if (!t) return null;
       lookAt(g, t.x, t.y);
       return landSpot(g, t.x, t.y);
@@ -237,11 +233,15 @@ const START: Step[] = [
     show: '#buildbar [data-cat="civic"]',
   },
   {
-    say: 'Before winter, make sure there is timber or firewood for the hearths, and food for the cold months, when nothing grows. A Marketplace and a Well will make your hamlet a village.',
+    say: 'Before winter, make sure there is firewood for the hearths (a woodcutter can cut it instead of timber), and food for the cold months, when nothing grows. A Marketplace and a Well will make your hamlet a village.',
     show: '#objectives',
   },
   {
-    say: 'I shall leave you to it now, my liege. When you raise your manor, I shall come back to show you what a lord can do. Good fortune!',
+    say: 'And raise a Manor Hall (in the Manor menu) as soon as you can spare the timber: no lord, no taxes, and coins buy tools and goods when your own run short.',
+    show: '#buildbar [data-cat="manor"]',
+  },
+  {
+    say: 'I shall leave you to it now, my liege. When there is knowledge to spend, or your manor stands, I shall come back. Good fortune!',
     enter: (g) => g.setSpeed(1),
   },
 ];
@@ -263,16 +263,52 @@ const MANOR: Step[] = [
     say: 'From here you hold feasts and festivals that cheer the people and bring prestige: click the manor to see them. You yourself will now walk out among your subjects.',
   },
   {
-    say: 'Prestige gathers each month from the manor, the church and other fine things. Spend it on town charters here, once you are a Town: each shapes what kind of town yours becomes.',
+    say: 'Taxes are paid now: the manor clerk can see to five and forty villagers, and tax offices to more. Prestige gathers each month from the manor, the church and other fine things. Spend it on town charters here, once you are a Town: each shapes what kind of town yours becomes, and each costs more than the last.',
     show: '#top [data-action="charters"]',
   },
   {
-    say: 'The manor can be renovated into a Manor House, and then a Stone Manor, which lets you lay out a grand garden, raise watch towers and build the town walls.',
+    say: "The manor can be renovated into a Manor House, a Stone Manor and at last a Palace. Each opens buildings for the lord's grounds: a stable, a garden, an armoury, a deer park, the atelier where masterpieces are made. They must stand beside the manor, or beside the hedges and gardens that join it.",
   },
   {
     say: 'And here you may dress yourself and design the arms that fly over the manor. That is all, my liege. Rule well!',
     show: '#lord-btn',
     enter: (g) => g.setSpeed(0),
+  },
+];
+
+/** How many things the town has learned. */
+const learned = (g: Game) => g.state.learned?.length ?? 0;
+let learnedBefore = 0;
+
+const LEARN: Step[] = [
+  {
+    say: 'My liege, your people have gathered enough knowledge to learn something new! Click the book up here to open the learning board.',
+    enter: (g) => g.setSpeed(0),
+    show: '#topbar .learn-chip',
+    until: () => !!document.querySelector('.lb'),
+  },
+  {
+    say: 'Every patch on the board is something your people can learn, pinned beside the others of its craft. The tabs along the top hold the other crafts.',
+    show: '.lb-board',
+  },
+  {
+    say: 'Gold-stitched patches are learned. Glowing ones can be learned now. The rest are locked, and show what they wait for: a size of town, something made, or another patch first (the threads show which). Patches joined by "or" are a choice, for good.',
+    show: () => {
+      const e = document.querySelector('.lb-patch.ready') as HTMLElement | null;
+      if (!e) return null;
+      const r = e.getBoundingClientRect();
+      return { x: r.left - 10, y: r.top - 10, w: r.width + 20, h: r.height + 20, round: true };
+    },
+  },
+  {
+    say: 'Click a glowing patch to look at it, then Learn it. A Forester, perhaps, so the woods never run out.',
+    enter: (g) => {
+      learnedBefore = learned(g);
+    },
+    until: (g) => learned(g) > learnedBefore,
+  },
+  {
+    say: 'Splendid! It waits for you in the build menu now. Knowledge comes faster as the town grows, and the church, a school, the monks and the finest homes all add to it. Come back to the board whenever the book shows a number.',
   },
 ];
 
@@ -428,7 +464,7 @@ export class Tutor {
     window.addEventListener(
       'keydown',
       (e) => {
-        if (e.key !== 'Enter' || !this.active || this.root.style.display === 'none' || this.game.modalOpen) return;
+        if (e.key !== 'Enter' || !this.active || this.root.style.display === 'none' || (this.game.modalOpen && !this.help)) return;
         if ((e.target as HTMLElement).tagName === 'INPUT') return;
         e.preventDefault();
         e.stopImmediatePropagation();
@@ -443,18 +479,42 @@ export class Tutor {
     this.guide.style.height = '64px';
   }
 
-  /** The view stays where the guide puts it while he leads. */
+  /** The view stays where the guide puts it while he leads (not while he only explains a panel). */
   get locksCamera(): boolean {
-    return this.active;
+    return this.active && !this.help;
+  }
+
+  /** A panel he has been asked to explain, and its key. */
+  private help: Step | null = null;
+  private helpKey = '';
+
+  /**
+   * Asked (by the little portrait on a panel) to explain it: he pops up beside
+   * the panel, says his piece, and goes when clicked.
+   */
+  explain(key: string, text: string, show?: string): void {
+    this.help = { say: text, show };
+    this.helpKey = `${key}:${Date.now()}`;
+    this.stepKey = '';
+  }
+
+  private endHelp(): void {
+    this.help = null;
+    this.hide();
   }
 
   private get steps(): Step[] {
     const c = this.game.state.tutorial?.chapter;
-    return c === 'manor' ? MANOR : c === 'trade' ? TRADE : START;
+    return c === 'manor' ? MANOR : c === 'trade' ? TRADE : c === 'learn' ? LEARN : START;
   }
 
   /** A click or Enter: finish the line, then go on (or, on a step that waits, step aside). */
   private next(): void {
+    if (this.help) {
+      if (this.typed < this.text.length) this.typed = this.text.length;
+      else this.endHelp();
+      return;
+    }
     const t = this.game.state.tutorial;
     if (!t || this.waiting) return;
     if (this.typed < this.text.length) {
@@ -468,10 +528,15 @@ export class Tutor {
   }
 
   private skip(): void {
+    if (this.help) {
+      this.endHelp();
+      return;
+    }
     const t = this.game.state.tutorial;
     if (!t) return;
     if (t.chapter === 'manor') t.manorSeen = true;
     if (t.chapter === 'trade') t.tradeSeen = true;
+    if (t.chapter === 'learn') t.learnSeen = true;
     t.chapter = 'done';
     this.hide();
     this.game.setSpeed(1);
@@ -483,6 +548,7 @@ export class Tutor {
     if (t.step >= this.steps.length) {
       if (t.chapter === 'manor') t.manorSeen = true;
       if (t.chapter === 'trade') t.tradeSeen = true;
+      if (t.chapter === 'learn') t.learnSeen = true;
       t.chapter = 'done';
       if (this.game.speed === 0) this.game.setSpeed(1);
       t.step = 0;
@@ -521,8 +587,14 @@ export class Tutor {
   /** Called every frame. */
   update(dt: number): void {
     const g = this.game;
+    // Called to explain a panel: he does that before anything else.
+    if (this.help) {
+      this.play(this.help, `help:${this.helpKey}`, dt);
+      return;
+    }
     // In any game, the first trading post or dock brings him to explain trade (unless tips are off).
-    if (!g.state.tutorial && !g.demo && tradeHouse(g) && tipsOn()) g.state.tutorial = { step: 0, chapter: 'done', manorSeen: true };
+    // And the first knowledge worth spending brings him to show the learning board.
+    if (!g.state.tutorial && !g.demo && (tradeHouse(g) || readyCount(g.state) > 0) && tipsOn()) g.state.tutorial = { step: 0, chapter: 'done', manorSeen: true };
     const t = g.state.tutorial;
     if (!t || g.demo) {
       if (this.active) this.hide();
@@ -535,8 +607,14 @@ export class Tutor {
     } else if (t.chapter === 'done' && !t.tradeSeen && tradeHouse(g)) {
       t.chapter = 'trade';
       t.step = 0;
+    } else if (t.chapter === 'done' && !t.learnSeen && readyCount(g.state) > 0 && !g.modalOpen) {
+      // Enough knowledge for something: he shows the learning board.
+      t.chapter = 'learn';
+      t.step = 0;
     }
-    if (t.chapter === 'done' || g.modalOpen) {
+    // He keeps talking over the learning board; other windows send him away.
+    const overBoard = t.chapter === 'learn' && !!document.querySelector('.lb');
+    if (t.chapter === 'done' || (g.modalOpen && !overBoard)) {
       if (this.active || this.root.style.display !== 'none') this.root.style.display = 'none';
       this.visible = false;
       this.active = t.chapter !== 'done';
@@ -544,9 +622,14 @@ export class Tutor {
     }
     const step = this.steps[t.step];
     if (!step) return;
+    this.play(step, `${t.chapter}:${t.step}`, dt);
+  }
+
+  /** Shows a step: he walks to what it lights up and has his say. */
+  private play(step: Step, key: string, dt: number): void {
+    const g = this.game;
     this.active = true;
     this.root.style.display = 'block';
-    const key = `${t.chapter}:${t.step}`;
     if (key !== this.stepKey) {
       this.stepKey = key;
       step.enter?.(g);
@@ -555,7 +638,7 @@ export class Tutor {
       this.shown = 0;
       this.waiting = false;
     }
-    if (step.until?.(g)) {
+    if (step.until?.(g) && !this.help) {
       this.advance();
       return;
     }
@@ -691,11 +774,15 @@ export class Tutor {
     const right = this.side ? this.side === 'right' : this.gx < W / 2;
     const shownText = this.text.slice(0, Math.floor(this.typed));
     const done = this.typed >= this.text.length;
-    const t = this.game.state.tutorial!;
+    const t = this.game.state.tutorial;
+    // Explaining a panel, he only asks to be thanked.
+    const skip = this.help ? 'Thank you' : t?.chapter === 'start' ? 'Skip tutorial' : 'Skip';
+    const next = this.help ? 'Click when you have heard enough ▸' : step.until ? 'Over to you, my liege ▸' : 'Click or press Enter to go on ▸';
     const html = `<div class="t-name">Fingamoboblius</div><p>${esc(shownText)}<span class="t-caret">${done ? '' : '▌'}</span></p>
-      <div class="t-foot"><span class="t-next">${done ? (step.until ? 'Over to you, my liege ▸' : 'Click or press Enter to go on ▸') : 'Click to hurry him'}</span><button data-t="skip">${t.chapter === 'start' ? 'Skip tutorial' : 'Skip'}</button></div>`;
-    if (this.balloon.dataset.html !== `${t.chapter}${t.step}:${Math.floor(this.typed)}`) {
-      this.balloon.dataset.html = `${t.chapter}${t.step}:${Math.floor(this.typed)}`;
+      <div class="t-foot"><span class="t-next">${done ? next : 'Click to hurry him'}</span><button data-t="skip">${skip}</button></div>`;
+    const stamp = `${this.stepKey}:${Math.floor(this.typed)}`;
+    if (this.balloon.dataset.html !== stamp) {
+      this.balloon.dataset.html = stamp;
       this.balloon.innerHTML = html;
     }
     // Beside the trade window there is only so much room.

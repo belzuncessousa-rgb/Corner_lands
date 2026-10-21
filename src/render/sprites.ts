@@ -4,7 +4,7 @@ import { mulberry32 } from '../game/rng';
 import { HERALDRY } from './heraldry';
 import { HOME_TRADES } from '../game/sim';
 import type { BuildingType, Season } from '../game/types';
-import { type Material, Pen, type PenDoor, ROOF_COLORS, TH, TW, iso, mix, shade, type V3 } from './pen';
+import { type Material, Pen, ROOF_COLORS, TH, TW, iso, mix, shade, type V3 } from './pen';
 import type { Building, GameState } from '../game/types';
 
 /** Supersampling factor so sprites stay crisp when zoomed in. */
@@ -20,7 +20,6 @@ export interface Sprite {
   /** Chimney tops in local 3D coordinates, for smoke. */
   smoke: V3[];
   /** The door villagers go in and out by, in local tile coordinates, if it has one. */
-  door?: PenDoor;
 }
 
 export function makeSprite(w: number, h: number, ax: number, ay: number, draw: (ctx: CanvasRenderingContext2D) => V3[] | void): Sprite {
@@ -1157,68 +1156,12 @@ export function buildingSprite(type: BuildingType, w: number, h: number, level: 
   const top = 200;
   const sw = (w + h) * (TW / 2) + 30;
   const sh = (w + h) * (TH / 2) + top + 14;
-  let door: PenDoor | undefined;
-  const sp = makeSprite(sw, sh, h * (TW / 2) + 15, top, (ctx) => {
+  return makeSprite(sw, sh, h * (TW / 2) + 15, top, (ctx) => {
     const p = new Pen(ctx);
     p.snow = season === 3;
     p.matFor = wallMaterial;
-    const smoke = drawBuilding(p, type, level, season, variant);
-    door = pickDoor(p, w, h, type);
-    return smoke;
+    return drawBuilding(p, type, level, season, variant);
   });
-  sp.door = door;
-  return sp;
-}
-
-/**
- * The door to use from those drawn: the first proper door on a front wall,
- * else the front-most dark doorway standing on the ground. Doors on inner
- * walls (a porch, a lean-to) count only if they face out from the building.
- */
-function pickDoor(p: Pen, w: number, h: number, type: BuildingType): PenDoor | undefined {
-  if (DOOR_SPOTS[type]) return DOOR_SPOTS[type];
-  const front = (d: PenDoor) => (d.face === 'L' ? d.plane > h * 0.4 : d.plane > w * 0.4);
-  const real = p.doors.filter(front);
-  if (real.length) return real[0];
-  const rough = p.doorish.filter(front).sort((a, b) => b.plane - a.plane || (b.b - b.a) - (a.b - a.a));
-  return rough[0];
-}
-
-/**
- * Doors the pictures draw in their own way (stall doors, tent flaps, a raised
- * granary door, the cathedral's portal), and the spot under the roof where
- * open sheds are entered.
- */
-const DOOR_SPOTS: Partial<Record<BuildingType, PenDoor>> = {
-  camp: { face: 'R', plane: 1.1, a: 1.65, b: 1.95, h: 11, open: true },
-  cathedral: { face: 'L', plane: 5.752, a: 2.26, b: 2.74, h: 20 },
-  granary: { face: 'L', plane: 1.722, a: 0.62, b: 0.92, h: 23, z0: 9 },
-  stable: { face: 'L', plane: 1.052, a: 1.35, b: 1.77, h: 11, open: true },
-  draughtstable: { face: 'L', plane: 1.222, a: 1.02, b: 1.42, h: 10, open: true },
-  byre: { face: 'L', plane: 1.202, a: 0.85, b: 1.2, h: 11, open: true },
-  stonemason: { face: 'L', plane: 1.0, a: 0.7, b: 1.0, h: 9, open: true },
-  bloomery: { face: 'L', plane: 1.15, a: 0.7, b: 1.0, h: 9, open: true },
-  tanner: { face: 'L', plane: 0.95, a: 0.7, b: 1.0, h: 9, open: true },
-  kiln: { face: 'R', plane: 1.15, a: 0.8, b: 1.05, h: 7, open: true },
-  builderyard: { face: 'L', plane: 0.722, a: 0.5, b: 1.0, h: 9, open: true },
-  markethall: { face: 'L', plane: 2.85, a: 1.6, b: 2.2, h: 14, open: true },
-  sandpit: { face: 'L', plane: 0.75, a: 0.6, b: 0.9, h: 9, open: true },
-  limekiln: { face: 'L', plane: 1.5, a: 1.3, b: 1.7, h: 10, open: true },
-  collier: { face: 'L', plane: 0.75, a: 0.3, b: 0.5, h: 9, open: true },
-};
-
-const DOORS = new Map<string, PenDoor | null>();
-
-/** Where a building's door is drawn (local tile coordinates), for villagers to walk in by; cached. */
-export function buildingDoor(s: GameState, b: Building): PenDoor | null {
-  const v = variantOf(s, b);
-  const key = `${b.type}:${b.w}:${b.h}:${b.level}:${v}`;
-  let d = DOORS.get(key);
-  if (d === undefined) {
-    d = buildingSprite(b.type, b.w, b.h, b.level, 0, v).door ?? null;
-    DOORS.set(key, d);
-  }
-  return d;
 }
 
 /** Which look a building's picture takes: the house forms and colours, the dock's side, the cathedral's glass. */
@@ -1240,7 +1183,7 @@ export function variantOf(s: GameState, b: Building): number {
   if (b.type !== 'house') return 0;
   const trade = b.trade ? HOME_TRADES.indexOf(b.trade) + 1 : 0;
   // Colours, yard, craft and the shape of the house, which the id picks.
-  const forms = HOUSE_FORMS[Math.max(1, Math.min(4, b.level))] || 5;
+  const forms = HOUSE_FORMS[Math.max(1, Math.min(5, b.level))] || 5;
   const form = (((b.id * 2654435761) >>> 0) >>> 7) % forms;
   return ((b.id * 7 + b.x) % 4) + 4 * Math.max(0, YARD_CODES.indexOf(b.yard ?? null)) + 16 * trade + 128 * form + (b.limewashed ? 1024 : 0);
 }
@@ -2687,38 +2630,62 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
         p.roofY(1.24, 3.5, 1.76, 3.88, 13, 8, 'shingle', WOOD, 0.04);
         break;
       }
+      // Stone church; rebuilt in dressed stone (level 3) it is paler and finer:
+      // a taller tower with pinnacles, a south porch, and grander windows.
+      const dressed = level >= 3;
+      const TW_ = dressed ? '#d2cab8' : '#b0a898';
+      const NAVE = dressed ? '#d8d0be' : '#b6ae9f';
+      const th = dressed ? 82 : 70;
       p.shadow(0.4, 0.2, 2.6, 3.7);
       // Bell tower at the back.
-      p.box(0.95, 0.25, 2.05, 1.3, 0, 70, '#b0a898', undefined, 'stone');
+      p.box(0.95, 0.25, 2.05, 1.3, 0, th, TW_, undefined, 'stone');
       // Belfry openings.
-      p.wallL(1.302, 1.3, 1.7, 52, 64, '#2a2522');
-      p.wallR(2.052, 0.6, 0.95, 52, 64, '#221e1b');
-      p.roofPyramid(0.95, 0.25, 2.05, 1.3, 70, 46, 'slate');
+      p.wallL(1.302, 1.3, 1.7, th - 18, th - 6, '#2a2522');
+      p.wallR(2.052, 0.6, 0.95, th - 18, th - 6, '#221e1b');
+      p.roofPyramid(0.95, 0.25, 2.05, 1.3, th, dressed ? 58 : 46, 'slate');
+      if (dressed) {
+        // Pinnacles at the tower's corners.
+        for (const [px, py] of [
+          [0.98, 1.27],
+          [2.02, 1.27],
+          [2.02, 0.28],
+        ])
+          p.poly([[px - 0.05, py, th], [px + 0.05, py, th], [px, py, th + 12]], TW_, '#9a927f');
+      }
       // Cross.
-      p.line([1.5, 0.775, 116], [1.5, 0.775, 130], '#d8b84a', 1.6);
-      p.line([1.5 - 0.06, 0.775 + 0.06, 125], [1.5 + 0.06, 0.775 - 0.06, 125], '#d8b84a', 1.6);
+      const ct = th + (dressed ? 58 : 46);
+      p.line([1.5, 0.775, ct], [1.5, 0.775, ct + 14], '#d8b84a', 1.6);
+      p.line([1.5 - 0.06, 0.775 + 0.06, ct + 9], [1.5 + 0.06, 0.775 - 0.06, ct + 9], '#d8b84a', 1.6);
       // Nave.
-      p.box(0.6, 1.2, 2.4, 3.65, 0, 32, '#b6ae9f');
+      p.box(0.6, 1.2, 2.4, 3.65, 0, 32, NAVE);
       // Buttresses and tall windows.
       [1.6, 2.2, 2.8, 3.4].forEach((y, k) => {
-        p.box(2.4, y - 0.05, 2.5, y + 0.05, 0, 20, '#a49c8e');
-        p.wallR(2.402, y + 0.12, y + 0.26, 10, 26, '#3a3a52');
-        p.wallR(2.403, y + 0.14, y + 0.24, 11, 25, season === 3 ? '#e8b850' : variant ? GLASS[k % GLASS.length] : '#5a6a9a');
+        p.box(2.4, y - 0.05, 2.5, y + 0.05, 0, dressed ? 26 : 20, dressed ? '#c4bcaa' : '#a49c8e');
+        if (dressed) p.poly([[2.4, y, 26], [2.5, y, 26], [2.45, y, 33]], '#b8b09e');
+        p.wallR(2.402, y + 0.12, y + 0.26, 10, dressed ? 28 : 26, '#3a3a52');
+        p.wallR(2.403, y + 0.14, y + 0.24, 11, dressed ? 27 : 25, season === 3 ? '#e8b850' : variant ? GLASS[k % GLASS.length] : '#5a6a9a');
         // Stained glass: leading across the panes.
         if (variant && season !== 3) p.line([2.404, y + 0.14, 18], [2.404, y + 0.24, 18], '#2a2a3a', 0.6);
       });
       // Front gable with door and rose window.
-      p.roofY(0.6, 1.2, 2.4, 3.65, 32, 26, 'slate', '#b6ae9f', 0.1);
+      p.roofY(0.6, 1.2, 2.4, 3.65, 32, 26, 'slate', NAVE, 0.1);
+      if (dressed) {
+        // A gabled south porch on the long side.
+        p.box(2.4, 2.35, 2.75, 2.75, 0, 14, NAVE, undefined, 'stone');
+        p.wallR(2.752, 2.45, 2.65, 0, 10, '#4a2f1b');
+        p.roofX(2.4, 2.35, 2.75, 2.75, 14, 8, 'slate', NAVE, 0.03);
+      }
       p.wallL(3.652, 1.3, 1.7, 0, 18, '#4a2f1b');
       p.line([1.5, 3.654, 0], [1.5, 3.654, 18], '#2e1d10', 0.8);
       const [rx, ry] = iso(1.5, 3.652, 38);
+      const rr = dressed ? 6.5 : 5;
       p.ctx.fillStyle = '#3a3a52';
       p.ctx.beginPath();
-      p.ctx.arc(rx, ry, 5, 0, Math.PI * 2);
+      p.ctx.arc(rx, ry, rr, 0, Math.PI * 2);
       p.ctx.fill();
       p.ctx.fillStyle = season === 3 ? '#e8b850' : '#7a5a9a';
       p.ctx.beginPath();
-      p.ctx.arc(rx, ry, 3.5, 0, Math.PI * 2);
+      p.ctx.arc(rx, ry, rr - 1.5, 0, Math.PI * 2);
       p.ctx.fill();
       if (variant && season !== 3) {
         // A rose of coloured petals.
@@ -2726,7 +2693,7 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
           p.ctx.fillStyle = GLASS[k % GLASS.length];
           p.ctx.beginPath();
           p.ctx.moveTo(rx, ry);
-          p.ctx.arc(rx, ry, 3.5, (k * Math.PI) / 3, ((k + 1) * Math.PI) / 3);
+          p.ctx.arc(rx, ry, rr - 1.5, (k * Math.PI) / 3, ((k + 1) * Math.PI) / 3);
           p.ctx.fill();
         }
         p.ctx.fillStyle = '#e8c860';
@@ -4652,7 +4619,7 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
 export const YARD_CODES: (string | null)[] = [null, 'veg', 'hens', 'bees'];
 
 /** How many house shapes there are for each level (the rest of a variant is colours, yard and craft). */
-export const HOUSE_FORMS = [0, 5, 5, 3, 3];
+export const HOUSE_FORMS = [0, 5, 5, 3, 3, 3];
 
 /** Splits a house variant: colours, yard extension, home craft and shape. */
 function homeParts(variant: number) {
@@ -4688,7 +4655,8 @@ function drawHome(p: Pen, level: number, variant: number, season: Season, smoke:
   const doorX = level >= 4 ? 0.8 : level >= 3 ? 0.95 : 0.85;
   p.poly([[doorX - 0.1, 1.0, 0], [doorX + 0.12, 1.0, 0], [doorX + 0.16, 1.95, 0], [doorX - 0.14, 1.95, 0]], winter ? '#dfe3e2' : '#b8a27a');
   p.roofTint = hv.tint;
-  if (level >= 4) drawMerchantHouse(p, form, hv, season, smoke);
+  if (level >= 5) drawPatricianHouse(p, form, season, smoke);
+  else if (level >= 4) drawMerchantHouse(p, form, hv, season, smoke);
   else if (level >= 3) drawTownhouse(p, form, hv, season, smoke);
   else if (level === 2) drawTimberHouse(p, form, hv, season, smoke);
   else drawCottage(p, form, hv, season, smoke);
@@ -5088,6 +5056,86 @@ function drawMerchantHouse(p: Pen, form: number, hv: HouseLook, season: Season, 
   // Pennant from the shop's sign-iron.
   p.line([1.5, 1.45, 14], [1.68, 1.55, 14], '#2a2018', 1.2);
   p.wallR(1.64, 1.48, 1.64, 7, 13.5, HERALDRY.current.field);
+}
+
+/**
+ * A Patrician House: a small palace of dressed stone, an arcade along the
+ * street, tall windows with stained glass in their heads on the main floor,
+ * a carved cornice under a hipped roof, the family's arms over the door, and
+ * (in most forms) a slender tower with a pennant.
+ */
+function drawPatricianHouse(p: Pen, form: number, season: Season, smoke: V3[]): void {
+  const winter = season === 3;
+  const stones = ['#d8cfbc', '#cfc2a4', '#c9c6be'];
+  const ST = stones[form % stones.length];
+  const gold = '#d8b04a';
+  const arms = HERALDRY.current;
+  const x0 = 0.18;
+  const x1 = 1.55;
+  const y0 = 0.15;
+  const y1 = 1.4;
+  const fh = 12;
+  const top = fh * 3;
+  p.shadow(x0, y0, x1 + 0.1, y1);
+  p.box(x0, y0, x1, y1, 0, top, ST, undefined, 'stone');
+  // The arcade: round-headed openings along the ground floor.
+  const bays = 4;
+  const w = (x1 - x0) / bays;
+  for (let k = 0; k < bays; k++) {
+    const a = x0 + w * k + 0.04;
+    const b = a + w - 0.08;
+    p.wallL(y1 + 0.002, a, b, 0, 8, '#3a2e24');
+    const [sa, ya] = iso(a, y1 + 0.003, 8);
+    const [sb, yb] = iso(b, y1 + 0.003, 8);
+    p.ctx.fillStyle = '#3a2e24';
+    p.ctx.beginPath();
+    p.ctx.moveTo(sa, ya);
+    p.ctx.quadraticCurveTo((sa + sb) / 2, (ya + yb) / 2 - 7, sb, yb);
+    p.ctx.closePath();
+    p.ctx.fill();
+  }
+  // The door in the middle bay is lit at night; the arms above it.
+  p.wallL(y1 + 0.004, x0 + w * 2 - 0.08, x0 + w * 2 + 0.08, 0, 8, winter ? '#e0b04e' : '#5b3a22');
+  p.circle(x0 + w * 2, y1 + 0.005, 14.5, 2.4, arms.field);
+  p.circle(x0 + w * 2, y1 + 0.006, 14.5, 1.2, arms.second);
+  // String courses and the main floor's tall windows, glass in their heads.
+  for (const z of [fh, fh * 2]) p.wallL(y1 + 0.002, x0, x1, z - 0.6, z + 0.6, mix(ST, '#000000', 0.18));
+  const glass = ['#b83a3a', '#3a5ab8', '#d8a83a', '#3a8a5a'];
+  for (let k = 0; k < bays; k++) {
+    const wx = x0 + w * (k + 0.5) - 0.075;
+    p.windowL(y1, wx, fh + 2.5, 0.15, 8, winter && k === 1);
+    if (!winter) p.wallL(y1 + 0.004, wx + 0.01, wx + 0.14, fh + 8.5, fh + 10.5, glass[(k + form) % glass.length]);
+    p.windowL(y1, wx + 0.01, fh * 2 + 3, 0.13, 6);
+  }
+  for (const y of [0.45, 0.95]) {
+    p.windowR(x1, y, fh + 2.5, 0.15, 8);
+    p.windowR(x1, y, fh * 2 + 3, 0.13, 6);
+  }
+  // A cornice and a hipped roof.
+  p.box(x0 - 0.03, y0 - 0.03, x1 + 0.03, y1 + 0.03, top, 2, mix(ST, '#000000', 0.1));
+  p.roofPyramid(x0, y0, x1, y1, top + 2, 20, form % 2 ? 'tile' : 'slate', 0.06);
+  smoke.push(p.chimney(x0 + 0.3, y0 + 0.35, top + 12, 10, '#a8a093'));
+  smoke.push(p.chimney(x1 - 0.3, y0 + 0.35, top + 12, 10, '#a8a093'));
+  // The tower, at one corner or the other.
+  if (form % 3 !== 2) {
+    const tx = form % 3 === 0 ? x1 - 0.42 : x0;
+    p.box(tx, y0 - 0.05, tx + 0.42, y0 + 0.37, 0, top + 18, ST, undefined, 'stone');
+    p.windowL(y0 + 0.37, tx + 0.14, top + 6, 0.13, 7);
+    p.windowR(tx + 0.42, y0 + 0.1, top + 6, 0.13, 7);
+    p.roofPyramid(tx, y0 - 0.05, tx + 0.42, y0 + 0.37, top + 18, 18, 'slate', 0.05);
+    p.line([tx + 0.21, y0 + 0.16, top + 36], [tx + 0.21, y0 + 0.16, top + 46], '#3b2a1a', 1.2);
+    p.poly(
+      [
+        [tx + 0.21, y0 + 0.16, top + 46],
+        [tx + 0.21 + 0.25, y0 + 0.16, top + 43],
+        [tx + 0.21, y0 + 0.16, top + 40],
+      ],
+      arms.field,
+    );
+  } else {
+    // A loggia on the roof instead: a gilded weather vane.
+    p.line([(x0 + x1) / 2, (y0 + y1) / 2, top + 22], [(x0 + x1) / 2, (y0 + y1) / 2, top + 30], gold, 1.2);
+  }
 }
 
 /** The yard extension a household keeps: vegetable beds, hens or bees. */
