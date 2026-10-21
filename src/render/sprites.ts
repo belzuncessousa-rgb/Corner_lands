@@ -1214,96 +1214,95 @@ export function variantOf(s: GameState, b: Building): number {
 
 /**
  * The church rebuilt in dressed stone: a Gothic church on the same ground. A
- * tall nave with a clerestory above lower aisles, flying buttresses along the
- * side, a south porch, and a great west tower on the front, flush with the
- * aisles, rising in three stages to battlements, pinnacles and a spire.
+ * tall nave with a clerestory above lower aisles, flying buttresses along
+ * the side, twin towers with spires flanking the west front, a great rose
+ * window over a deep pointed portal, and a slender flèche over the crossing.
  */
 function drawGothicChurch(p: Pen, season: Season, glazed: number): void {
   const winter = season === 3;
   const ST = '#ddd4c0';
   const ST2 = '#cfc5ae';
-  const LINE = '#9a927f';
   const pane = (k: number) => (winter ? '#e8b850' : glazed ? GLASS[k % GLASS.length] : '#5a6a9a');
-  // A pointed lancet window on the front (L) or right (R) face.
-  const lancet = (face: 'L' | 'R', at: number, a: number, b: number, z0: number, z1: number, k: number) => {
-    const m = (a + b) / 2;
-    const pts = (inset: number, dz: number): V3[] =>
-      face === 'L'
-        ? [[a + inset, at, z0 + dz], [b - inset, at, z0 + dz], [b - inset, at, z1 - 4], [m, at, z1 - dz], [a + inset, at, z1 - 4]]
-        : [[at, a + inset, z0 + dz], [at, b - inset, z0 + dz], [at, b - inset, z1 - 4], [at, m, z1 - dz], [at, a + inset, z1 - 4]];
-    p.poly(pts(0, 0), '#3a3a4a');
-    p.poly(pts(0.02, 1), pane(k));
-  };
-  p.shadow(0.45, 0.3, 2.55, 3.55, 0.05);
+  // Shadows fall away from the light, to the right of each part, never out in front of a wall.
+  castShadows(p, [
+    [1.05, 0.3, 1.95, 0.7, 0.3],
+    [0.45, 0.75, 2.55, 3.3, 0.35],
+    [0.8, 0.7, 2.2, 3.35, 0.45],
+    [0.3, 3.0, 0.8, 3.62, 0.55],
+    [2.2, 3.0, 2.7, 3.62, 0.55],
+  ]);
   // A small apse at the east end.
   p.box(1.05, 0.3, 1.95, 0.7, 0, 30, ST2, undefined, 'stone');
   p.roofPyramid(1.05, 0.3, 1.95, 0.7, 30, 12, 'slate', 0.04);
-  // The aisles, low under lean-to roofs, reaching the front either side of the tower.
-  p.box(0.45, 0.75, 2.55, 3.55, 0, 20, ST2, undefined, 'stone');
-  p.poly([[2.55, 0.75, 20], [2.55, 3.55, 20], [2.2, 3.55, 27], [2.2, 0.75, 27]], '#5d6670', '#3a4048', 0.6);
-  for (let k = 0; k < 4; k++) lancet('R', 2.552, 0.95 + k * 0.55, 1.12 + k * 0.55, 4, 17, k);
-  for (const [xa, xb] of [[0.55, 0.9], [2.1, 2.45]] as const) lancet('L', 3.552, xa + 0.1, xb - 0.1, 4, 17, 2);
-  // The nave above them, with its clerestory.
-  p.box(0.8, 0.7, 2.2, 3.0, 0, 46, ST, undefined, 'stone');
-  for (let k = 0; k < 4; k++) lancet('R', 2.202, 0.95 + k * 0.5, 1.1 + k * 0.5, 29, 43, k + 1);
-  p.roofY(0.8, 0.7, 2.2, 3.0, 46, 34, 'slate', ST, 0.06);
+  // The aisles: low, with lean-to roofs against the nave.
+  p.box(0.45, 0.75, 2.55, 3.3, 0, 20, ST2, undefined, 'stone');
+  p.poly([[2.55, 0.75, 20], [2.55, 3.3, 20], [2.2, 3.3, 27], [2.2, 0.75, 27]], '#5d6670', '#3a4048', 0.6);
+  for (let k = 0; k < 4; k++) {
+    const y = 0.95 + k * 0.6;
+    p.wallR(2.552, y, y + 0.16, 5, 16, '#2e2e40');
+    p.wallR(2.553, y + 0.02, y + 0.14, 6, 15, pane(k));
+  }
+  // The nave rises above them, with tall clerestory windows.
+  p.box(0.8, 0.7, 2.2, 3.35, 0, 46, ST, undefined, 'stone');
+  for (let k = 0; k < 4; k++) {
+    const y = 0.95 + k * 0.6;
+    p.wallR(2.202, y, y + 0.14, 30, 43, '#2e2e40');
+    p.wallR(2.203, y + 0.02, y + 0.12, 31, 42, pane(k + 1));
+  }
+  p.roofY(0.8, 0.7, 2.2, 3.35, 46, 34, 'slate', ST, 0.06);
   // Flying buttresses from the aisle wall up to the nave.
   for (let k = 0; k < 5; k++) {
-    const y = 0.8 + k * 0.5;
+    const y = 0.8 + k * 0.6;
     p.box(2.55, y - 0.04, 2.68, y + 0.04, 0, 30, ST2);
-    p.poly([[2.6, y, 30], [2.62, y, 38], [2.61, y, 44]], ST2, LINE, 0.6);
+    p.poly([[2.6, y, 30], [2.62, y, 38], [2.61, y, 44]], ST2, '#9a927f', 0.6);
     p.line([2.6, y, 28], [2.22, y, 42], '#b8ae98', 2.2);
   }
-  // A porch on the south side, over the side door.
-  p.box(2.68, 2.55, 2.98, 2.95, 0, 13, ST2, undefined, 'stone');
-  p.wallR(2.982, 2.67, 2.83, 0, 10, '#4a2f1b');
-  p.roofX(2.68, 2.55, 2.98, 2.95, 13, 7, 'slate', ST2, 0.03);
-  // The great west tower, flush with the front: three stages, battlements and a spire.
-  const X0 = 1.0;
-  const X1 = 2.0;
-  const Y0 = 2.75;
-  const Y1 = 3.55;
-  const H = 82;
-  p.box(X0, Y0, X1, Y1, 0, H, ST, undefined, 'stone');
-  // Paler pilasters up its corners, and string courses between the stages.
-  for (const [x, y] of [[X0, Y1], [X1, Y1], [X1, Y0]] as const) p.line([x, y, 0], [x, y, H], '#ece6d8', 3);
-  for (const z of [26, 54]) {
-    p.wallL(Y1 + 0.002, X0, X1, z, z + 2, ST2);
-    p.wallR(X1 + 0.002, Y0, Y1, z, z + 2, ST2);
+  // A slender flèche over the crossing.
+  p.box(1.38, 1.38, 1.62, 1.62, 70, 10, ST);
+  p.roofPyramid(1.38, 1.38, 1.62, 1.62, 80, 30, 'slate', 0.02);
+  p.line([1.5, 1.5, 110], [1.5, 1.5, 118], '#d8b84a', 1.3);
+  // The west front: the gable between twin towers, a rose window, a deep portal.
+  p.poly([[0.8, 3.352, 46], [2.2, 3.352, 46], [1.5, 3.352, 74]], ST, '#9a927f', 0.6);
+  const [rx, ry] = iso(1.5, 3.352, 46);
+  const c = p.ctx;
+  c.fillStyle = '#3a3a52';
+  c.beginPath();
+  c.arc(rx, ry, 8, 0, Math.PI * 2);
+  c.fill();
+  for (let k = 0; k < 8; k++) {
+    c.fillStyle = winter ? '#e8b850' : glazed ? GLASS[k % GLASS.length] : k % 2 ? '#6a5a9a' : '#7a6aaa';
+    c.beginPath();
+    c.moveTo(rx, ry);
+    c.arc(rx, ry, 6.5, (k * Math.PI) / 4, ((k + 1) * Math.PI) / 4);
+    c.fill();
   }
-  // The west door: a deep pointed arch under a little gable.
-  p.poly([[1.3, Y1 + 0.003, 0], [1.7, Y1 + 0.003, 0], [1.7, Y1 + 0.003, 14], [1.5, Y1 + 0.003, 22], [1.3, Y1 + 0.003, 14]], '#8a8070');
-  p.poly([[1.36, Y1 + 0.005, 0], [1.64, Y1 + 0.005, 0], [1.64, Y1 + 0.005, 13], [1.5, Y1 + 0.005, 19], [1.36, Y1 + 0.005, 13]], '#4a2f1b');
-  p.line([1.5, Y1 + 0.006, 0], [1.5, Y1 + 0.006, 18], '#2e1d10', 0.8);
-  p.poly([[1.26, Y1 + 0.007, 21], [1.74, Y1 + 0.007, 21], [1.5, Y1 + 0.007, 29]], ST2, LINE, 0.6);
-  // The great west window, and its fellow on the side.
-  lancet('L', Y1 + 0.003, 1.38, 1.62, 31, 51, 0);
-  lancet('R', X1 + 0.003, 3.03, 3.27, 31, 51, 3);
-  // The belfry: paired louvred openings on each face.
-  for (const [a, b] of [[1.22, 1.42], [1.58, 1.78]] as const) {
-    p.poly([[a, Y1 + 0.003, 58], [b, Y1 + 0.003, 58], [b, Y1 + 0.003, 70], [(a + b) / 2, Y1 + 0.003, 76], [a, Y1 + 0.003, 70]], '#2a2522');
-    for (let z = 61; z < 72; z += 3) p.line([a + 0.02, Y1 + 0.004, z], [b - 0.02, Y1 + 0.004, z], '#6a5a48', 0.8);
+  c.fillStyle = '#e8c860';
+  c.beginPath();
+  c.arc(rx, ry, 1.5, 0, Math.PI * 2);
+  c.fill();
+  // The portal, its arch stepped in, under a little gable.
+  p.wallL(3.354, 1.3, 1.7, 0, 22, '#8a8070');
+  p.wallL(3.356, 1.36, 1.64, 0, 18, '#4a2f1b');
+  p.line([1.5, 3.358, 0], [1.5, 3.358, 18], '#2e1d10', 0.8);
+  p.poly([[1.26, 3.36, 22], [1.74, 3.36, 22], [1.5, 3.36, 31]], ST2, '#9a927f', 0.6);
+  // The twin towers with their spires and pinnacles.
+  for (const x0 of [0.3, 2.2]) {
+    const x1 = x0 + 0.5;
+    p.box(x0, 3.0, x1, 3.62, 0, 70, ST, undefined, 'stone');
+    p.wallL(3.622, x0 + 0.15, x0 + 0.35, 50, 64, '#2a2522');
+    p.wallR(x1 + 0.002, 3.2, 3.42, 50, 64, '#221e1b');
+    p.wallL(3.622, x0 + 0.18, x0 + 0.32, 20, 34, '#2e2e40');
+    p.wallL(3.623, x0 + 0.2, x0 + 0.3, 21, 33, pane(x0 > 1 ? 2 : 3));
+    p.roofPyramid(x0, 3.0, x1, 3.62, 70, 44, 'slate', 0.03);
+    for (const [px, py] of [
+      [x0 + 0.03, 3.59],
+      [x1 - 0.03, 3.59],
+      [x1 - 0.03, 3.03],
+    ])
+      p.poly([[px - 0.04, py, 70], [px + 0.04, py, 70], [px, py, 82]], ST, '#9a927f', 0.5);
+    p.line([(x0 + x1) / 2, 3.31, 114], [(x0 + x1) / 2, 3.31, 124], '#d8b84a', 1.4);
+    p.line([(x0 + x1) / 2 - 0.05, 3.36, 120], [(x0 + x1) / 2 + 0.05, 3.26, 120], '#d8b84a', 1.4);
   }
-  for (const [a, b] of [[2.93, 3.11], [3.19, 3.37]] as const) {
-    p.poly([[X1 + 0.003, a, 58], [X1 + 0.003, b, 58], [X1 + 0.003, b, 70], [X1 + 0.003, (a + b) / 2, 76], [X1 + 0.003, a, 70]], '#221e1b');
-    for (let z = 61; z < 72; z += 3) p.line([X1 + 0.004, a + 0.02, z], [X1 + 0.004, b - 0.02, z], '#5a4a3a', 0.8);
-  }
-  // Battlements along the top, pinnacles at the corners.
-  p.box(X0 - 0.03, Y0 - 0.03, X1 + 0.03, Y1 + 0.03, H, 3, ST2);
-  for (let k = 0; k < 5; k++) {
-    const x = X0 + 0.02 + k * 0.24;
-    p.box(x, Y1 - 0.05, x + 0.12, Y1 + 0.03, H + 3, 4, ST2);
-    const y = Y0 + 0.02 + k * 0.2;
-    p.box(X1 - 0.05, y, X1 + 0.03, y + 0.1, H + 3, 4, ST2);
-  }
-  // The spire, set within the battlements.
-  p.roofPyramid(X0 + 0.14, Y0 + 0.14, X1 - 0.14, Y1 - 0.14, H + 3, 52, 'slate', 0);
-  for (const [x, y] of [[X0 + 0.04, Y1 - 0.04], [X1 - 0.04, Y1 - 0.04], [X1 - 0.04, Y0 + 0.04], [X0 + 0.04, Y0 + 0.04]] as const)
-    p.poly([[x - 0.05, y, H + 3], [x + 0.05, y, H + 3], [x, y, H + 20]], ST, LINE, 0.5);
-  const cx = (X0 + X1) / 2;
-  const cy = (Y0 + Y1) / 2;
-  p.line([cx, cy, H + 55], [cx, cy, H + 67], '#d8b84a', 1.5);
-  p.line([cx - 0.05, cy + 0.05, H + 63], [cx + 0.05, cy - 0.05, H + 63], '#d8b84a', 1.5);
 }
 
 /**
@@ -6726,155 +6725,88 @@ function drawManor(p: Pen, level: number, season: Season, smoke: V3[]): void {
  * copper dome over the hall, the lord's banner flying from its lantern.
  */
 /**
- * A copper dome seen from the side: a swelling, curved profile on a round
- * drum, lit from the left, ribbed, with a small lantern and a finial on top.
- * r is its half-width and h its height, in pixels on the picture.
+ * Shadows cast to the right of each block (x0, y0, x1, y1, how far it reaches),
+ * as one shape so overlaps do not darken. A block's front wall stands right on
+ * the shadow's edge, so it meets the ground instead of floating over a dark band.
  */
-function dome(p: Pen, x: number, y: number, z: number, r: number, h: number, [lit, dark]: [string, string], banner = false): void {
+function castShadows(p: Pen, blocks: [number, number, number, number, number][]): void {
   const c = p.ctx;
-  const [cx, by] = iso(x, y, z);
-  const ry = r / 2;
-  const top = by - h;
-  const profile = () => {
-    c.beginPath();
-    c.moveTo(cx - r, by);
-    c.bezierCurveTo(cx - r * 1.04, by - h * 0.62, cx - r * 0.42, top + h * 0.06, cx, top);
-    c.bezierCurveTo(cx + r * 0.42, top + h * 0.06, cx + r * 1.04, by - h * 0.62, cx + r, by);
-    c.ellipse(cx, by, r, ry, 0, 0, Math.PI);
+  c.fillStyle = 'rgba(30,30,10,0.22)';
+  c.beginPath();
+  for (const [x0, y0, x1, y1, len] of blocks) {
+    const pts = [iso(x0, y0), iso(x1 + len, y0), iso(x1 + len, y1), iso(x0, y1)];
+    c.moveTo(pts[0][0], pts[0][1]);
+    for (const [x, y] of pts.slice(1)) c.lineTo(x, y);
     c.closePath();
-  };
-  // The drum's rim under it.
-  c.fillStyle = '#c4bcac';
-  c.beginPath();
-  c.ellipse(cx, by + 1.5, r + 1.5, ry + 1, 0, 0, Math.PI * 2);
-  c.fill();
-  const g = c.createLinearGradient(cx - r, 0, cx + r, 0);
-  g.addColorStop(0, lit);
-  g.addColorStop(0.45, mix(lit, dark, 0.35));
-  g.addColorStop(1, dark);
-  c.fillStyle = g;
-  profile();
-  c.fill();
-  // Ribs running up to the lantern, and a highlight on the lit side.
-  c.save();
-  profile();
-  c.clip();
-  c.strokeStyle = 'rgba(30,60,50,0.35)';
-  c.lineWidth = 0.8;
-  for (const k of [-0.62, -0.25, 0.25, 0.62]) {
-    c.beginPath();
-    c.moveTo(cx + k * r, by + ry * Math.sqrt(1 - k * k));
-    c.quadraticCurveTo(cx + k * r * 0.95, by - h * 0.55, cx, top + 2);
-    c.stroke();
   }
-  c.strokeStyle = 'rgba(255,255,255,0.35)';
-  c.lineWidth = 2;
-  c.beginPath();
-  c.moveTo(cx - r * 0.72, by - 2);
-  c.quadraticCurveTo(cx - r * 0.72, by - h * 0.55, cx - r * 0.25, top + h * 0.18);
-  c.stroke();
-  c.restore();
-  // The lantern: a little drum with openings, a cap and a gilt finial.
-  const lw = Math.max(3, r * 0.2);
-  c.fillStyle = '#ddd5c6';
-  c.fillRect(cx - lw, top - 7, lw * 2, 7);
-  c.fillStyle = '#3a3530';
-  c.fillRect(cx - lw * 0.5, top - 6, lw * 0.35, 4.5);
-  c.fillRect(cx + lw * 0.15, top - 6, lw * 0.35, 4.5);
-  c.fillStyle = dark;
-  c.beginPath();
-  c.moveTo(cx - lw - 1, top - 7);
-  c.quadraticCurveTo(cx, top - 14, cx + lw + 1, top - 7);
-  c.fill();
-  if (!banner) {
-    c.strokeStyle = '#d8b84a';
-    c.lineWidth = 1.2;
-    c.beginPath();
-    c.moveTo(cx, top - 12);
-    c.lineTo(cx, top - 19);
-    c.stroke();
-    c.fillStyle = '#e8c860';
-    c.beginPath();
-    c.arc(cx, top - 13, 1.4, 0, Math.PI * 2);
-    c.fill();
-  }
+  c.fill('nonzero');
 }
 
 function drawPalace(p: Pen, season: Season, smoke: V3[]): void {
   const winter = season === 3;
   const arms = HERALDRY.current;
   const ST = '#d4ccbc';
-  const QUOIN = '#ebe5d8';
-  const CORNICE = '#c4bcac';
-  const COPPER: [string, string] = winter ? ['#f4f8fa', '#c8d2d6'] : ['#86c2ac', '#3f7a66'];
-  p.shadow(0.3, 0.35, 3.7, 3.25, 0.05);
-  // The court between the wings: gravel, with a round basin in the middle.
-  sandPatch(p, [[1.2, 2.55], [2.8, 2.55], [2.85, 3.95], [1.15, 3.95]], winter ? '#d8dcda' : '#d2c4a0', 4, 1.6);
+  const ROOFC = 'slate';
+  // Shadows fall away from the light, to the right of each part, never out in front of a wall.
+  castShadows(p, [
+    [0.3, 0.45, 1.3, 2.95, 0.3],
+    [1.3, 0.6, 2.7, 2.6, 0.4],
+    [2.7, 0.45, 3.7, 2.95, 0.35],
+    [0.22, 2.45, 0.92, 3.15, 0.45],
+    [3.08, 2.45, 3.78, 3.15, 0.45],
+    [1.5, 2.6, 2.5, 2.95, 0.15],
+  ]);
+  // The forecourt: gravel, with a round basin in the middle.
+  sandPatch(p, [[1.1, 2.95], [2.9, 2.95], [3.0, 3.95], [1.0, 3.95]], winter ? '#d8dcda' : '#d2c4a0', 4, 1.6);
   p.ellipse(2.0, 3.45, 1, 13, 6.5, '#a8a093');
   p.ellipse(2.0, 3.45, 2, 11, 5.4, winter ? '#dde8ee' : '#5a8ab0');
   p.line([2.0, 3.45, 2], [2.0, 3.45, 9], '#bab3a6', 1.6);
-  // Light dressed stones up the corners of a block.
-  const quoins = (x0: number, y0: number, x1: number, y1: number, h: number) => {
-    for (const [x, y] of [[x0, y1], [x1, y1], [x1, y0]] as const) {
-      for (let z = 0, k = 0; z < h - 3; z += 5, k++) p.line([x, y, z + 0.5], [x, y, z + 4], k % 2 ? '#ddd6c8' : QUOIN, 1.5);
-    }
-  };
-  // A corner tower: the front end of a wing raised two storeys, under a copper bell dome.
-  const T = 50;
-  const tower = (x0: number, right: boolean) => {
-    const x1 = x0 + 0.9;
-    p.box(x0, 2.45, x1, 3.25, 0, T, ST, undefined, 'stone');
-    quoins(x0, 2.45, x1, 3.25, T);
-    for (const z of [6, 21]) p.windowL(3.25, x0 + 0.36, z, 0.18, 10, winter && z === 6);
-    p.windowL(3.25, x0 + 0.38, 37, 0.14, 7);
-    for (const z of [6, 21]) p.windowR(x1, 2.76, z, 0.18, 10);
-    if (right) p.windowR(x1, 2.78, 37, 0.14, 7);
-    // String courses between the storeys, a cornice on top.
-    for (const z of [17, 33]) {
-      p.wallL(3.252, x0, x1, z, z + 1.5, CORNICE);
-      p.wallR(x1 + 0.002, 2.45, 3.25, z, z + 1.5, CORNICE);
-    }
-    p.box(x0 - 0.03, 2.42, x1 + 0.03, 3.28, T, 3, CORNICE);
-    const cx = (x0 + x1) / 2;
-    p.box(cx - 0.3, 2.55, cx + 0.3, 3.15, T + 3, 4, ST);
-    dome(p, cx, 2.85, T + 7, 18, 21, COPPER);
-  };
-  // The left wing.
-  p.box(0.3, 0.35, 1.2, 3.25, 0, 36, ST, undefined, 'stone');
-  p.roofPyramid(0.3, 0.35, 1.2, 2.5, 36, 16, 'slate', 0.06);
-  // The main block of state rooms, a balustrade along its top.
-  p.box(1.2, 0.6, 2.8, 2.55, 0, 44, ST, undefined, 'stone');
-  for (const z of [6, 22]) for (const x of [1.32, 1.58, 2.28, 2.54]) p.windowL(2.55, x, z, 0.14, z === 22 ? 12 : 9, winter && z === 6);
-  for (const x of [1.32, 1.58, 1.94, 2.28, 2.54]) p.windowL(2.55, x, 35, 0.14, 4);
-  p.wallL(2.552, 1.2, 2.8, 17, 18.5, CORNICE);
-  p.wallL(2.553, 1.2, 2.8, 41, 44, CORNICE);
-  p.roofPyramid(1.2, 0.6, 2.8, 2.55, 44, 13, 'slate', 0.03);
-  // The great dome over the hall, its lantern and the lord's banner.
-  smoke.push(p.chimney(1.3, 0.75, 50, 9, '#a8a093'));
-  smoke.push(p.chimney(2.6, 0.75, 50, 9, '#a8a093'));
-  p.box(1.72, 1.32, 2.28, 1.88, 50, 8, ST);
-  for (let k = 0; k < 4; k++) p.windowL(1.88, 1.78 + k * 0.12, 51.5, 0.06, 4);
-  dome(p, 2.0, 1.6, 58, 22, 25, COPPER, true);
-  p.lordFlag(2.0, 1.6, 78, 18);
-  tower(0.3, false);
-  // The door and the hangings in the lord's colours, behind a portico of four columns.
-  p.wallL(2.552, 1.86, 2.14, 1.5, 17, '#4a2f1b');
-  p.wallL(2.554, 1.64, 1.72, 13, 25, arms.field);
-  p.wallL(2.554, 2.28, 2.36, 13, 25, arms.field);
-  p.box(1.55, 2.55, 2.45, 2.92, 0, 2.5, '#c4bcac');
-  for (const x of [1.63, 1.87, 2.13, 2.37]) {
-    p.line([x, 2.87, 2.5], [x, 2.87, 30], '#efe9dc', 2.4);
-    p.line([x + 0.03, 2.87, 2.5], [x + 0.03, 2.87, 30], 'rgba(120,110,95,0.35)', 0.8);
+  // Left wing, ridge front to back.
+  p.box(0.3, 0.45, 1.3, 2.95, 0, 36, ST, undefined, 'stone');
+  for (const z of [5, 19]) p.windowL(2.95, 0.55, z, 0.16, 9, winter && z === 5);
+  p.roofY(0.3, 0.45, 1.3, 2.95, 36, 22, ROOFC, ST, 0.08);
+  // The central block of state rooms.
+  p.box(1.3, 0.6, 2.7, 2.6, 0, 46, ST, undefined, 'stone');
+  for (const z of [6, 22]) for (const x of [1.45, 1.75, 2.25, 2.55]) p.windowL(2.6, x, z, 0.14, z === 22 ? 12 : 9, winter && z === 6);
+  for (const x of [1.45, 1.75, 2.0, 2.25, 2.55]) p.windowL(2.6, x - 0.04, 37, 0.12, 5);
+  // A balustrade along the top, and a low hipped roof behind it.
+  p.wallL(2.603, 1.3, 2.7, 43, 46, '#c4bcac');
+  p.roofPyramid(1.3, 0.6, 2.7, 2.6, 46, 12, ROOFC, 0.02);
+  // The dome over the great hall, its lantern and the lord's banner.
+  p.box(1.72, 1.32, 2.28, 1.88, 52, 8, ST);
+  p.ellipse(2.0, 1.6, 60, 22, 11, winter ? '#e6ecee' : '#5f9a86');
+  p.ellipse(2.0, 1.6, 66, 16, 8, winter ? '#f2f6f8' : '#6faa94');
+  p.ellipse(2.0, 1.6, 71, 9, 5, winter ? '#f6f9fa' : '#7cb8a2');
+  p.box(1.94, 1.54, 2.06, 1.66, 74, 6, ST);
+  p.lordFlag(2.0, 1.6, 80, 20);
+  smoke.push(p.chimney(1.45, 0.85, 50, 10, '#a8a093'));
+  // Right wing, ridge front to back.
+  p.box(2.7, 0.45, 3.7, 2.95, 0, 36, ST, undefined, 'stone');
+  for (const y of [0.75, 1.35, 1.95, 2.55]) for (const z of [5, 19]) p.windowR(3.7, y, z, 0.15, 9, winter && z === 5 && y === 1.35);
+  for (const z of [5, 19]) p.windowL(2.95, 3.25, z, 0.16, 9);
+  p.roofY(2.7, 0.45, 3.7, 2.95, 36, 22, ROOFC, ST, 0.08);
+  smoke.push(p.chimney(3.2, 0.8, 52, 12, '#a8a093'));
+  // Corner pavilions at the front of each wing, a storey higher, under tall roofs.
+  for (const x0 of [0.22, 3.08]) {
+    p.box(x0, 2.45, x0 + 0.7, 3.15, 0, 50, ST, undefined, 'stone');
+    for (const z of [6, 22, 38]) p.windowL(3.15, x0 + 0.27, z, 0.15, 9);
+    p.windowR(x0 + 0.7, 2.72, 22, 0.14, 9);
+    p.roofPyramid(x0, 2.45, x0 + 0.7, 3.15, 50, 26, ROOFC, 0.05);
+    p.line([x0 + 0.35, 2.8, 76], [x0 + 0.35, 2.8, 84], '#d8b84a', 1.2);
   }
-  p.box(1.55, 2.55, 2.45, 2.92, 30, 3, '#e2dccd');
-  p.poly([[1.55, 2.92, 33], [2.45, 2.92, 33], [2.0, 2.92, 42]], '#e8e2d4', '#b8b0a0', 0.8);
-  p.circle(2.0, 2.922, 36.5, 2.6, arms.field);
-  // The right wing, its long side to the garden.
-  p.box(2.8, 0.35, 3.7, 3.25, 0, 36, ST, undefined, 'stone');
-  for (const y of [0.55, 0.95, 1.35, 1.75, 2.15]) for (const z of [6, 21]) p.windowR(3.7, y, z, 0.15, 10, winter && z === 6 && y === 1.35);
-  p.wallR(3.702, 0.35, 2.45, 18, 19.5, CORNICE);
-  p.roofPyramid(2.8, 0.35, 3.7, 2.5, 36, 16, 'slate', 0.06);
-  tower(2.8, true);
+  // The door and the hangings in the lord's colours, on the wall behind the portico.
+  p.wallL(2.602, 1.86, 2.14, 2.5, 18, '#4a2f1b');
+  p.wallL(2.604, 1.62, 1.7, 14, 26, arms.field);
+  p.wallL(2.604, 2.3, 2.38, 14, 26, arms.field);
+  // The portico: four columns under a pediment carved with the arms.
+  p.box(1.5, 2.6, 2.5, 2.95, 0, 2.5, '#c4bcac');
+  for (const x of [1.58, 1.84, 2.16, 2.42]) {
+    p.line([x, 2.9, 2.5], [x, 2.9, 30], '#efe9dc', 2.4);
+    p.line([x + 0.03, 2.9, 2.5], [x + 0.03, 2.9, 30], 'rgba(120,110,95,0.35)', 0.8);
+  }
+  p.box(1.5, 2.6, 2.5, 2.95, 30, 3, '#e2dccd');
+  p.poly([[1.5, 2.95, 33], [2.5, 2.95, 33], [2.0, 2.95, 43]], '#e8e2d4', '#b8b0a0', 0.8);
+  p.circle(2.0, 2.952, 37, 2.6, arms.field);
 }
 
 /** Ground tile for building yards drawn under some buildings. */
