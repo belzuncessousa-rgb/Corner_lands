@@ -54,6 +54,7 @@ import { StateRng } from './rng';
 import type { Building, BuildingType, Category, Cost, GameState, Herd, MessageKind, ResourceId, Season, Shoal, TradeOrder } from './types';
 import { RESOURCE_IDS } from './types';
 import { getBuilding, idx, inBounds, makeBuilding, placeBuilding, removeBuilding, setRoad } from './world';
+import { knows, unlockForBuilding, unlockForRecipe } from './unlocks';
 
 // ---------------------------------------------------------------- time helpers
 
@@ -195,6 +196,9 @@ export function isUnlocked(s: GameState, type: BuildingType): boolean {
   if (type === 'stable') return s.buildings.some((b) => b.type === 'townhall' && b.build >= 1 && b.level >= 2);
   // Charters gate any building; the settlement's rank only decorations and the monuments.
   if (d.charter && !hasCharter(s, d.charter)) return false;
+  // Everything outside the starting set must be learned (or wait for a rank).
+  const u = unlockForBuilding(type);
+  if (u && !knows(s, u.id)) return false;
   if (d.category !== 'decor' && !MONUMENTS.includes(type)) return true;
   return d.tier <= s.tier;
 }
@@ -217,6 +221,8 @@ export function lockReason(s: GameState, type: BuildingType): string | null {
   if (type === 'stable') return 'Requires the Manor House';
   if (d.tier > s.tier) return `Requires ${TIERS[d.tier].name}`;
   if (d.charter && !hasCharter(s, d.charter)) return `Requires the ${CHARTERS.find((c) => c.id === d.charter)?.name ?? d.charter} charter`;
+  const u = unlockForBuilding(type);
+  if (u && !knows(s, u.id)) return u.rank !== undefined && u.knowledge === undefined ? `Opens at ${TIERS[u.rank].name}` : u.knowledge !== undefined ? `Learn it first (${u.knowledge} knowledge)` : 'Learn one of its recipes first';
   return null;
 }
 
@@ -805,7 +811,7 @@ export function priceOf(s: GameState, id: ResourceId): number {
   const special: Partial<Record<ResourceId, string>> = { ale: 'farm3b', cheese: 'herd3b' };
   if (special[id] && hasCharter(s, special[id]!)) return base * 2;
   if ((id === 'wine' || id === 'cider') && hasCharter(s, 'orchard3a')) return base * 1.5;
-  if (id === 'weapons' && hasCharter(s, 'metal3b')) return base * 1.5;
+  if (id === 'tools' && hasCharter(s, 'metal3b')) return base * 1.5;
   if (id === 'books' && hasCharter(s, 'learning3b')) return base * 1.5;
   return base;
 }
@@ -1531,14 +1537,6 @@ function recipeReady(s: GameState, b: Building, r: Recipe): boolean {
   if (b.type === 'forager' && r.id === 'berries') {
     return countInRadius(s, bCenter(b), GATHER_REACH, (i) => s.berries[i] > 0) > 0;
   }
-  if (b.type === 'forager' && r.id === 'mushrooms') {
-    const c = bCenter(b);
-    for (const k in s.mushrooms ?? {}) {
-      const i = Number(k);
-      if ((s.mushrooms![k] ?? 0) > 0 && Math.hypot((i % s.width) + 0.5 - c.x, Math.floor(i / s.width) + 0.5 - c.y) <= GATHER_REACH) return true;
-    }
-    return false;
-  }
   return true;
 }
 
@@ -1547,10 +1545,17 @@ function recipeReady(s: GameState, b: Building, r: Recipe): boolean {
  * one that is in season, has its inputs and is below its stock target.
  * `any` returns the chosen or first recipe regardless of readiness.
  */
+/** Whether a recipe may be made: its charter granted and, if it must be learned, learned. */
+export function recipeKnown(s: GameState, type: BuildingType, r: Recipe): boolean {
+  if (r.charter && !hasCharter(s, r.charter)) return false;
+  const u = unlockForRecipe(type, r.id);
+  return !u || knows(s, u.id);
+}
+
 export function chooseRecipe(s: GameState, b: Building, any = false): Recipe | null {
   const all = workDef(b).recipes;
   if (!all) return null;
-  const list = all.filter((r) => !r.charter || hasCharter(s, r.charter));
+  const list = all.filter((r) => recipeKnown(s, b.type, r));
   const fixed = b.recipe ? list.find((r) => r.id === b.recipe) : undefined;
   if (fixed) return any || recipeInMonth(fixed, monthOf(s.day)) ? fixed : null;
   const auto = list.filter((r) => r.auto !== false);
@@ -1562,7 +1567,10 @@ export function chooseRecipe(s: GameState, b: Building, any = false): Recipe | n
   return null;
 }
 
-export function setRecipe(_s: GameState, b: Building, id: string | undefined): void {
+export function setRecipe(s: GameState, b: Building, id: string | undefined): void {
+  // Only what the town has learned.
+  const r = id ? workDef(b).recipes?.find((x) => x.id === id) : undefined;
+  if (r && !recipeKnown(s, b.type, r)) return;
   // Replanting an orchard starts the trees over.
   if (b.type === 'orchard' && (b.recipe ?? 'apples') !== (id ?? 'apples')) {
     b.age = 0;
@@ -1755,7 +1763,6 @@ export function charterBonus(s: GameState, b: Building, id: ResourceId): number 
   if ((id === 'cider' || id === 'wine') && hasCharter(s, 'orchard3a')) f *= 1.5;
   if (id === 'ale' && hasCharter(s, 'farm3b')) f *= 1.5;
   if (id === 'cheese' && hasCharter(s, 'herd3b')) f *= 1.5;
-  if (id === 'weapons' && hasCharter(s, 'metal3b')) f *= 1.5;
   return f;
 }
 
@@ -2039,13 +2046,6 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
         if (t < 0) return nearestTile(s, b, (i) => s.berriesMax[i] > 0) >= 0 ? 'Bushes picked clean for now' : 'No berry bushes within reach';
         b.resDist = f.cost[t];
         s.berries[t]--;
-      } else if (r.id === 'mushrooms') {
-        // Mushrooms come up in rings in the old woods, and are picked out.
-        const m = s.mushrooms ?? {};
-        const t = nearestTile(s, b, (i) => (m[i] ?? 0) > 0);
-        if (t < 0) return nearestTile(s, b, (i) => (s.mushroomsMax?.[i] ?? 0) > 0) >= 0 ? 'Mushrooms picked out for now' : 'No mushrooms within reach';
-        b.resDist = f.cost[t];
-        m[t]--;
       } else {
         // Herbs grow in the woods.
         const t = nearestTile(s, b, (i) => s.trees[i] > 0);
@@ -2146,11 +2146,12 @@ export const TEND_PER_TILE = 4;
 /** Converters leave this much timber in stock for firewood. */
 export const WOOD_RESERVE = 20;
 
-const CROP_GOOD: Record<string, ResourceId> = { wheat: 'grain', barley: 'barley', flax: 'flax' };
-const CROP_FACTOR: Record<string, number> = { wheat: 1, barley: 1, flax: 0.5 };
+const CROP_GOOD: Record<string, ResourceId> = { vegetables: 'vegetables', wheat: 'grain', barley: 'barley', flax: 'flax', woad: 'woad' };
+/** Vegetables need no mill but yield poorly; flax and woad are lighter crops. */
+const CROP_FACTOR: Record<string, number> = { vegetables: 0.6, wheat: 1, barley: 1, flax: 0.5, woad: 0.5 };
 
 export function cropOf(f: Building): string {
-  return f.recipe ?? 'wheat';
+  return f.recipe ?? 'vegetables';
 }
 
 /** What a field will bring in at harvest, with `crew` the share of farmers at work. */
@@ -2219,6 +2220,7 @@ function tally(s: GameState, key: 'making' | 'using', id: ResourceId, n: number)
   if (n <= 0) return;
   const t = (s[key] ??= {});
   t[id] = (t[id] ?? 0) + n;
+  if (key === 'making') (s.madeEver ??= {})[id] = (s.madeEver[id] ?? 0) + n;
 }
 
 /** Production chains, raw good first, as the Production Book shows them. */
@@ -2549,6 +2551,7 @@ function removeAnimals(b: Building, n: number): void {
 export function buyAnimalError(s: GameState, b: Building, kind: AnimalKind): string | null {
   if (b.type !== 'byre' || b.build < 1) return 'Only an animal farm keeps animals';
   if (!hasTrade(s)) return 'Animals are bought at a trading post or dock';
+  if (kind === 'cattle' && !knows(s, 'a:cattle')) return 'Learn to keep cattle first';
   const r = herdRoom(s, b);
   if (r.used + HERDS[kind].tiles > r.room) return 'No room on the pastures: fence more';
   if (s.res.gold < HERDS[kind].price) return `Needs ${HERDS[kind].price} coins`;
@@ -3500,6 +3503,8 @@ export function prestigeIncome(s: GameState): number {
 
 /** Knowledge the monks give each month for every monastery that had its book. */
 export const MONASTERY_KNOWLEDGE = 3;
+/** What the elders teach every month, from the first day (tuned in the balance pass). */
+export const ELDERS_LORE = 0.5;
 
 /**
  * Knowledge: what the town learns each month. The church teaches the
@@ -3538,6 +3543,8 @@ const KNOWLEDGE_LABELS: Partial<Record<BuildingType, string>> = {
 /** Where this month's knowledge comes from, by kind of building. */
 export function knowledgeSources(s: GameState): { label: string; value: number }[] {
   const out = new Map<string, number>();
+  // The settlers' elders teach what they know, from the first day.
+  out.set("The elders' lore", ELDERS_LORE);
   for (const b of s.buildings) {
     const v = knowledgeOf(s, b);
     if (v) out.set(KNOWLEDGE_LABELS[b.type]!, (out.get(KNOWLEDGE_LABELS[b.type]!) ?? 0) + v);
@@ -3613,8 +3620,8 @@ export function wallSections(s: GameState): number {
 
 /** Settlement rank (Borough) from which the lord may keep a retinue. */
 export const RETINUE_TIER = 3;
-/** Raising the guard: prestige to attract men-at-arms, and their arms. */
-export const RETINUE_COST: Cost = { prestige: 60, weapons: 10 };
+/** Raising the guard: prestige to attract men-at-arms, and coin to keep them; the armoury fits them out. */
+export const RETINUE_COST: Cost = { prestige: 60, gold: 25 };
 /** Coins the guard is paid each month. */
 export const RETINUE_PAY = 10;
 
@@ -3622,7 +3629,8 @@ export function retinueError(s: GameState): string | null {
   if (s.retinue) return 'The retinue is already raised';
   if (s.tier < RETINUE_TIER) return `Requires ${TIERS[RETINUE_TIER].name}`;
   if (s.res.prestige < (RETINUE_COST.prestige ?? 0)) return `Needs ${RETINUE_COST.prestige} prestige`;
-  if (s.res.weapons < (RETINUE_COST.weapons ?? 0)) return `Needs ${RETINUE_COST.weapons} arms`;
+  if (s.res.gold < (RETINUE_COST.gold ?? 0)) return `Needs ${RETINUE_COST.gold} coins`;
+  if (!s.buildings.some((b) => b.type === 'armoury' && b.build >= 1)) return 'Needs an armoury';
   return null;
 }
 

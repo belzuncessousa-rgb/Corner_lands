@@ -3,6 +3,7 @@ import type { Building, BuildingType, GameState, ResourceId } from './types';
 import { mulberry32 } from './rng';
 import { emptyResources, makeBuilding, placeBuilding, seedNature } from './world';
 import { addOrder, keepOf } from './sim';
+import { grantWhatExists } from './unlocks';
 
 const TYPED_KEYS = [
   'terrain',
@@ -51,12 +52,21 @@ export function deserialize(json: string): GameState {
     else (s as unknown as Record<string, Uint8Array>)[k] = new Uint8Array(buf);
   }
   s.res = { ...emptyResources(), ...s.res };
-  // Oats are no longer grown: oat fields go to wheat, and the oats in store to grain.
-  for (const b of s.buildings) if (b.type === 'field' && b.recipe === 'oats') b.recipe = 'wheat';
-  if (s.res.oats > 0) {
-    s.res.grain += s.res.oats;
-    s.res.oats = 0;
+  // Goods no longer kept: oats go to grain, mushrooms to berries, arms are sold off.
+  const old = s.res as Record<string, number>;
+  // Before the rework (version 4) a field without a crop grew wheat; now vegetables.
+  const beforeRework = (s.version ?? 1) < 4;
+  for (const b of s.buildings) {
+    if (b.type === 'field' && (b.recipe === 'oats' || (beforeRework && b.recipe === undefined))) b.recipe = 'wheat';
+    if (b.type === 'forager' && b.recipe === 'mushrooms') b.recipe = 'berries';
+    if (b.type === 'armoury') b.recipe = undefined;
   }
+  s.res.grain += old.oats ?? 0;
+  s.res.berries += old.mushrooms ?? 0;
+  s.res.gold += (old.weapons ?? 0) * 10;
+  for (const k of ['oats', 'mushrooms', 'weapons']) delete old[k];
+  // Towns from before learning know everything they have already built.
+  if (beforeRework || !s.learned) grantWhatExists(s);
   // Older lands had no herds, shoals or mushrooms: give them some, around the manor.
   if (!s.herds) {
     const hall = s.buildings.find((b) => b.type === 'townhall');
@@ -86,6 +96,7 @@ export function deserialize(json: string): GameState {
     for (const b of s.buildings) if (b.type === 'tavern') b.level = Math.max(b.level, 2);
     s.version = 3;
   }
+  if (beforeRework) s.version = 4;
   // Goods once sold above their target become export orders at the first trading post or dock.
   if (s.sell) {
     const post = s.buildings.find((b) => b.type === 'tradingpost' || b.type === 'dock');

@@ -81,7 +81,7 @@ export const GOODS: Record<ResourceId, GoodDef> = {
   fish: good('Fish', 'food', 3, 'Caught from rivers and lakes.', { food: 1, foodGroup: 'meat' }),
   eggs: good('Eggs', 'food', 2, 'From backyard hens.', { food: 0.75, foodGroup: 'meat' }),
   berries: good('Berries', 'food', 2, 'Foraged in spring and summer.', { food: 1, foodGroup: 'produce' }),
-  mushrooms: good('Mushrooms', 'food', 2, 'Foraged in the autumn woods.', { food: 1, foodGroup: 'produce' }),
+  strawberries: good('Strawberries', 'food', 3, 'From strawberry beds in the orchards: they bear in their first year.', { food: 1, foodGroup: 'produce' }),
   vegetables: good('Vegetables', 'food', 2, 'Cabbages, leeks and turnips from backyard plots.', { food: 1, foodGroup: 'produce' }),
   apples: good('Apples', 'food', 2, 'From orchards; also pressed into cider.', { food: 1, foodGroup: 'produce' }),
   pears: good('Pears', 'food', 2, 'From orchards.', { food: 1, foodGroup: 'produce' }),
@@ -94,7 +94,6 @@ export const GOODS: Record<ResourceId, GoodDef> = {
   grain: good('Wheat', 'goods', 2, 'Harvested in autumn, milled and baked into bread.', { storage: 'food', keep: 300 }),
   barley: good('Barley', 'goods', 2, 'Brewed into ale.', { storage: 'food' }),
   // No longer grown (kept so older saves load).
-  oats: good('Oats', 'goods', 0, 'No longer grown.', { storage: 'food' }),
   flour: good('Flour', 'goods', 3, 'Milled wheat, ready for the oven.', { storage: 'food' }),
   flax: good('Flax', 'goods', 2, 'Retted and spun into linen.'),
   wool: good('Wool', 'goods', 3, 'Shorn from sheep in spring.'),
@@ -113,11 +112,11 @@ export const GOODS: Record<ResourceId, GoodDef> = {
   woad: good('Woad', 'goods', 2, 'Leaves of the dye plant, crushed and fermented for the dyer.'),
   dyes: good('Dyes', 'goods', 10, "Blue steeped from woad in the dyer's vats."),
   fineclothes: good('Fine Clothes', 'goods', 30, 'Gowns and cloaks of dyed cloth from the tailor. A luxury for the finest homes, and a rich export.', { keep: 30 }),
-  paper: good('Paper', 'goods', 6, 'Pressed from flax at the scriptorium.', { keep: 40 }),
+  paper: good('Paper', 'goods', 6, 'Rag paper from the paper mill, for offices and books.', { keep: 40 }),
+  parchment: good('Parchment', 'goods', 8, 'Hides scraped and stretched at the tannery: offices and books use it like paper.', { keep: 40 }),
   books: good('Books', 'goods', 40, 'Copied and bound at the scriptorium, or bought from merchants. A luxury for Townhouses; universities and monasteries read them.', { keep: 20 }),
   jewellery: good('Jewellery', 'goods', 60, 'Rings and brooches of silver. The finest luxury.', { keep: 20 }),
   pottery: good('Fine Pottery', 'goods', 14, 'Glazed jugs and dishes from the potter: a luxury the finest homes want.', { keep: 40 }),
-  weapons: good('Arms', 'goods', 20, "Bows, pikes and armour. The lord's retinue needs them; merchants pay well.", { keep: 30 }),
 
   gold: good('Coins', 'currency', 0, 'Collected from taxes and trade.'),
   prestige: good('Prestige', 'currency', 0, 'The renown of your house. Earned from a fine manor and a thriving town; spent on charters, titles (Baron, Earl, Duke) and works of art.'),
@@ -315,7 +314,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   forager: def({
     type: 'forager',
     name: "Forager's Hut",
-    desc: 'Gathers berries from wild bushes in spring and summer, mushrooms in the autumn woods, and wild herbs. Rests in deep winter.',
+    desc: 'Gathers berries from wild bushes in spring and summer, and wild herbs once foragers know them. Rests in deep winter.',
     category: 'food',
     cost: { wood: 10 },
     workers: 2,
@@ -325,7 +324,6 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     months: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
     recipes: [
       { id: 'berries', name: 'Berries', inputs: {}, outputs: { berries: 5 }, months: [0, 1, 2, 3, 4, 5, 6, 7] },
-      { id: 'mushrooms', name: 'Mushrooms', inputs: {}, outputs: { mushrooms: 4 }, months: [6, 7, 8, 9] },
       { id: 'herbs', name: 'Herbs', inputs: {}, outputs: { herbs: 3 }, months: [0, 1, 2, 3, 4, 5, 6, 7, 8], auto: false },
     ],
     hotkey: 'g',
@@ -366,7 +364,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   field: def({
     type: 'field',
     name: 'Field',
-    desc: 'Draw a field near a Farmstead and choose its crop: wheat for bread, barley for ale, flax for linen or woad for dye. Changing crops each year keeps the soil rich.',
+    desc: 'Draw a field near a Farmstead and choose its crop: vegetables to eat as they are, wheat for bread, barley for ale, flax for linen or woad for dye. Changing crops each year keeps the soil rich.',
     category: 'farming',
     w: 1,
     h: 1,
@@ -374,6 +372,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     tier: 1,
     zone: { owner: 'farm', min: 2, max: 10 },
     recipes: [
+      { id: 'vegetables', name: 'Vegetables', inputs: {}, outputs: { vegetables: 1 } },
       { id: 'wheat', name: 'Wheat', inputs: {}, outputs: { grain: 1 } },
       { id: 'barley', name: 'Barley', inputs: {}, outputs: { barley: 1 } },
       { id: 'flax', name: 'Flax', inputs: {}, outputs: { flax: 1 } },
@@ -508,6 +507,10 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     outputs: { leather: 2 },
     batch: 3,
     tier: 1,
+    recipes: [
+      { id: 'leather', name: 'Leather', inputs: { hides: 2 }, outputs: { leather: 2 } },
+      { id: 'parchment', name: 'Parchment', inputs: { hides: 2 }, outputs: { parchment: 2 } },
+    ],
   }),
   weaver: def({
     type: 'weaver',
@@ -794,19 +797,12 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   armoury: def({
     type: 'armoury',
     name: 'Armoury',
-    desc: "Fletchers and armourers make bows from planks and armour from iron and leather. The lord's retinue needs arms.",
-    category: 'industry',
+    desc: "The lord's armourer fits out the guard: the retinue and the watchmen wear his armour. Needed to raise a retinue.",
+    category: 'manor',
     cost: { stone: 25, planks: 15 },
     buildDays: 14,
-    workers: 2,
-    cycle: 4,
-    inputs: { planks: 2 },
-    outputs: { weapons: 1 },
-    tier: 3,
-    recipes: [
-      { id: 'bows', name: 'Bows', inputs: { planks: 2 }, outputs: { weapons: 1 } },
-      { id: 'armour', name: 'Armour', inputs: { iron: 2, leather: 1 }, outputs: { weapons: 2 } },
-    ],
+    workers: 1,
+    tier: 2,
   }),
   well: def({
     type: 'well',

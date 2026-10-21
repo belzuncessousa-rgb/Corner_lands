@@ -48,6 +48,27 @@ import {
 } from './sim';
 import type { BuildingType, Cost, GameState, ResourceId } from './types';
 import { idx, inBounds } from './world';
+import { knows, learn, learnError, unlockForBuilding } from './unlocks';
+
+/** Learns an unlock if it can; true when the town knows it. */
+function ensureLearned(s: GameState, id: string): boolean {
+  if (knows(s, id)) return true;
+  return !learnError(s, id) && !learn(s, id);
+}
+
+/** Learns what a building needs before it can be placed; true when it may be built. */
+function ensureBuilding(s: GameState, type: BuildingType): boolean {
+  const u = unlockForBuilding(type);
+  if (!u || knows(s, u.id)) return true;
+  if (type === 'brewhouse') return ensureLearned(s, 'r:brewhouse:ale') || ensureLearned(s, 'r:brewhouse:cider');
+  return ensureLearned(s, u.id);
+}
+
+/** The crop to sow: the one wanted if known (or learnable now), else what the town can grow. */
+function cropFor(s: GameState, want: string): string {
+  if (want === 'vegetables' || ensureLearned(s, `r:field:${want}`)) return want;
+  return knows(s, 'r:field:wheat') ? 'wheat' : 'vegetables';
+}
 
 const count = (s: GameState, t: BuildingType) => s.buildings.filter((b) => b.type === t).length;
 
@@ -60,6 +81,7 @@ export function tryPlace(s: GameState, type: BuildingType, near?: { x: number; y
   // So are the other great works.
   // A woodcutter's lodge can always be begun: without timber, its builders fell their own.
   if (type === 'cathedral' || type === 'guildhall' || type === 'belltower' ? s.res.gold < (d.cost.gold ?? 0) + 500 : type !== 'woodcutter' && !affordsWithPromises(s, d.cost)) return false;
+  if (!ensureBuilding(s, type)) return false;
   const reached = reachableRoads(s);
   let best: { x: number; y: number; score: number } | null = null;
   const hall = seatOf(s)!;
@@ -173,14 +195,15 @@ function drawFields(s: GameState): void {
     const f = placeZone(s, 'field', spot.x, spot.y, spot.x + spot.w - 1, spot.y + spot.h - 1);
     if (f) {
       const farms = s.buildings.filter((b) => b.type === 'farm').indexOf(farm);
-      f.recipe = crops[(fields.length + farms) % crops.length];
+      f.recipe = cropFor(s, crops[(fields.length + farms) % crops.length]);
     }
   }
   // Sow wheat again where barley or flax piles up unused.
   for (const f of s.buildings) {
     if (f.type !== 'field' || f.growth > 0.01) continue;
-    if ((f.recipe === 'barley' && s.res.barley > 200) || (f.recipe === 'flax' && s.res.flax > 200)) f.recipe = 'wheat';
-    else if (f.recipe === 'wheat' && s.res.barley < 20 && count(s, 'brewhouse') > 0 && s.res.grain > 100) f.recipe = 'barley';
+    if ((f.recipe === 'barley' && s.res.barley > 200) || (f.recipe === 'flax' && s.res.flax > 200)) f.recipe = cropFor(s, 'wheat');
+    else if (f.recipe === 'wheat' && s.res.barley < 20 && count(s, 'brewhouse') > 0 && s.res.grain > 100) f.recipe = cropFor(s, 'barley');
+    else if ((f.recipe ?? 'vegetables') === 'vegetables' && knows(s, 'r:field:wheat')) f.recipe = 'wheat';
   }
   for (const byre of s.buildings) {
     if (byre.type !== 'byre' || byre.build < 1 || zonesOf(s, byre).length) continue;

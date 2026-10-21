@@ -994,7 +994,6 @@ export class AgentSystem {
         return pick((i) => s.ore[i] > 0, 'dig');
       case 'forager': {
         if (isWinter(s.day)) return null;
-        if (chooseRecipe(s, b)?.id === 'mushrooms') return pick((i) => (s.mushrooms?.[i] ?? 0) > 0, 'pick');
         return pick((i) => s.berries[i] > 0, 'pick');
       }
       case 'forester':
@@ -1163,7 +1162,7 @@ function goodCarried(s: GameState, b: Building): ResourceId | null {
   }
   if (b.type === 'farm') {
     const f = s.buildings.find((z) => z.owner === b.id);
-    return ({ wheat: 'grain', barley: 'barley', oats: 'oats', flax: 'flax' } as Record<string, ResourceId>)[f?.recipe ?? 'wheat'] ?? 'grain';
+    return ({ vegetables: 'vegetables', wheat: 'grain', barley: 'barley', flax: 'flax', woad: 'woad' } as Record<string, ResourceId>)[f?.recipe ?? 'vegetables'] ?? 'vegetables';
   }
   const r = chooseRecipe(s, b, true);
   if (r) return (Object.keys(r.outputs)[0] as ResourceId) ?? null;

@@ -723,7 +723,7 @@ export class Renderer {
   private fieldCache = new Map<number, { key: string; sp: Sprite }>();
 
   private drawField(_p: Pen, b: Building, season: Season, month: number): void {
-    const crop = b.recipe ?? 'wheat';
+    const crop = b.recipe ?? 'vegetables';
     // The crop's stage: bare, sprouting, young, tall, ripe, stooked or stubble.
     let stage = 'bare';
     if (month <= 5 && b.growth > 0) stage = b.growth < 0.2 ? 'sprout' : b.growth < 0.5 ? 'young' : b.growth < 0.8 ? 'tall' : 'full';
@@ -4472,7 +4472,6 @@ function drawGood(p: Pen, id: ResourceId, x: number, y: number): void {
     }
     case 'flour':
     case 'barley':
-    case 'oats':
     case 'herbs':
       p.sack(x - 0.08, y, id === 'flour' ? '#efe6d4' : '#d8c890');
       p.sack(x + 0.08, y + 0.05, id === 'flour' ? '#e8dcc4' : '#cdbb8e');
@@ -4532,10 +4531,10 @@ function drawGood(p: Pen, id: ResourceId, x: number, y: number): void {
     case 'apples':
     case 'pears':
     case 'plums':
-    case 'mushrooms':
+    case 'strawberries':
     case 'vegetables':
     case 'eggs': {
-      const fill = { apples: '#c4322a', pears: '#c8c040', plums: '#6a3a80', mushrooms: '#a8603a', vegetables: '#5d9a3a', eggs: '#f2e8d4' }[id];
+      const fill = { apples: '#c4322a', pears: '#c8c040', plums: '#6a3a80', strawberries: '#d8323a', vegetables: '#5d9a3a', eggs: '#f2e8d4' }[id];
       const [bx, by] = iso(x, y, 0);
       p.ctx.fillStyle = '#a07a40';
       p.ctx.beginPath();
@@ -4672,14 +4671,13 @@ const CARRY_SHAPES: Partial<Record<ResourceId, CarryShape>> = {
   planks: 'log',
   grain: 'sack',
   barley: 'sack',
-  oats: 'sack',
   flour: 'sack',
   wool: 'sack',
   herbs: 'sack',
   clay: 'sack',
   ore: 'sack',
   berries: 'basket',
-  mushrooms: 'basket',
+  strawberries: 'basket',
   apples: 'basket',
   pears: 'basket',
   plums: 'basket',
@@ -4700,6 +4698,7 @@ const CARRY_SHAPES: Partial<Record<ResourceId, CarryShape>> = {
   clothes: 'bundle',
   flax: 'bundle',
   paper: 'bundle',
+  parchment: 'bundle',
   sand: 'sack',
   mortar: 'sack',
   charcoal: 'sack',
@@ -4712,13 +4711,12 @@ const CARRY_SHAPES: Partial<Record<ResourceId, CarryShape>> = {
 const GOOD_COLORS: Partial<Record<ResourceId, string>> = {
   firewood: '#9a6a3a',
   barley: '#e0cc84',
-  oats: '#e0d090',
   flour: '#efe6d4',
   wool: '#f2ece0',
   herbs: '#6aa04a',
   clay: '#b0643a',
   ore: '#6a5a50',
-  mushrooms: '#a8603a',
+  strawberries: '#d8323a',
   apples: '#c4322a',
   pears: '#c8c040',
   plums: '#6a3a80',
@@ -4739,7 +4737,7 @@ const GOOD_COLORS: Partial<Record<ResourceId, string>> = {
   silver: '#c8ccd4',
   jewellery: '#d8a838',
   books: '#3a5a8a',
-  weapons: '#8a8e94',
+  parchment: '#e8dcc0',
   medicine: '#6aa0a0',
   boots: '#6a3e22',
   sand: '#e2c98a',

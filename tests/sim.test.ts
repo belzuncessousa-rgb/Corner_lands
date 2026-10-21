@@ -17,7 +17,15 @@ import {
   totalHousing,
 } from '../src/game/sim';
 import type { Building, BuildingType, GameState } from '../src/game/types';
-import { generateWorld, idx } from '../src/game/world';
+import { generateWorld as freshWorld, idx } from '../src/game/world';
+import { learnEverything } from '../src/game/unlocks';
+
+/** A new world where everything is already learned, for testing other systems. */
+function generateWorld(seed: number, opts?: Parameters<typeof freshWorld>[1]): GameState {
+  const s = freshWorld(seed, opts);
+  learnEverything(s);
+  return s;
+}
 
 function hall(s: GameState) {
   return s.buildings.find((b) => (b.type === 'townhall' || b.type === 'camp'))!;
@@ -574,28 +582,6 @@ describe('labour', () => {
     expect(f.workers).toBeGreaterThan(0);
   });
 
-  it('foragers on auto turn to mushrooms in autumn', async () => {
-    const { chooseRecipe } = await import('../src/game/sim');
-    const s = generateWorld(23);
-    const f = placeNearRoad(s, 'forager');
-    f.build = 1;
-    // A ring of mushrooms in a copse nearby (wild food is sparse near the start).
-    s.mushroomsMax = {};
-    s.mushrooms = {};
-    for (let k = 0; k < 4; k++) {
-      const i = idx(s, f.x + 4 + k, f.y + 4);
-      s.trees[i] = 2;
-      s.mushroomsMax[i] = 2;
-      s.mushrooms[i] = 2;
-    }
-    s.day = DAYS_PER_MONTH * 8; // late autumn: no berries
-    expect(chooseRecipe(s, f)?.id).toBe('mushrooms');
-    f.recipe = 'herbs';
-    expect(chooseRecipe(s, f)?.id).toBe('herbs');
-  });
-});
-
-describe('paved roads', () => {
   it('cost stone (from the start) and make walking cheaper', async () => {
     const { stepCost, roadError } = await import('../src/game/sim');
     const s = generateWorld(24);
@@ -627,6 +613,8 @@ describe('fields, herds, orchards and backyards', () => {
     for (let r = 1; r < 12; r++) {
       for (const [dx, dy] of [[r, 0], [0, r], [-r - w, 0], [0, -r - h], [r, r], [-r - w, -r - h]]) {
         const z = placeZone(s, type, near.x + dx, near.y + dy, near.x + dx + w - 1, near.y + dy + h - 1);
+        // These tests were written for wheat fields.
+        if (z && type === 'field') z.recipe ??= 'wheat';
         if (z) return z;
       }
     }
@@ -1042,12 +1030,14 @@ describe('retinue', () => {
     const { EVENTS } = await import('../src/game/events');
     const s = generateWorld(87);
     s.res.prestige = 100;
-    s.res.weapons = 10;
+    s.res.gold = 100;
     expect(retinueError(s)).toMatch(/Borough/);
     s.tier = 3;
+    expect(retinueError(s)).toMatch(/armoury/);
+    s.buildings.push({ ...s.buildings[0], id: 9999, type: 'armoury', build: 1 });
     expect(raiseRetinue(s)).toBeNull();
     expect(s.retinue).toBe(true);
-    expect(s.res.weapons).toBe(0);
+    expect(s.res.gold).toBe(75);
     const wolves = EVENTS.find((e) => e.id === 'wolves')!;
     expect(wolves.choices(s)[0].label).toBe('Send the retinue');
     s.res.gold = RETINUE_PAY;
@@ -1072,6 +1062,7 @@ describe('harvest forecast', () => {
     farm.need = undefined;
     let field = null;
     for (let r = 3; r < 12 && !field; r++) field = placeZone(s, 'field', farm.x + r, farm.y, farm.x + r + 4, farm.y + 4) ?? placeZone(s, 'field', farm.x - r - 4, farm.y, farm.x - r, farm.y + 4);
+    if (field) field.recipe = 'wheat';
     expect(field).not.toBeNull();
     field!.build = 1;
     field!.growth = 1;
@@ -1096,6 +1087,7 @@ describe('farm barn', () => {
     farm.need = undefined;
     let field = null;
     for (let r = 3; r < 12 && !field; r++) field = placeZone(s, 'field', farm.x + r, farm.y, farm.x + r + 5, farm.y + 5) ?? placeZone(s, 'field', farm.x - r - 5, farm.y, farm.x - r, farm.y + 5);
+    if (field) field.recipe = 'wheat';
     field!.build = 1;
     field!.growth = 1;
     s.population = 12;
@@ -2262,20 +2254,21 @@ describe('knowledge and the monastery', () => {
   });
 
   it('the church teaches, and so do the homes of the well-to-do', async () => {
-    const { knowledgeIncome } = await import('../src/game/sim');
+    const { knowledgeIncome, ELDERS_LORE } = await import('../src/game/sim');
     const s = generateWorld(78);
     s.tier = 3;
     s.res.gold = 9999;
-    expect(knowledgeIncome(s)).toBe(0);
+    const base = knowledgeIncome(s);
+    expect(base).toBe(ELDERS_LORE);
     const c = placeNearRoad(s, 'church');
     c.build = 1;
-    expect(knowledgeIncome(s)).toBe(0.5);
+    expect(knowledgeIncome(s)).toBe(base + 0.5);
     c.level = 2;
-    expect(knowledgeIncome(s)).toBe(1);
+    expect(knowledgeIncome(s)).toBe(base + 1);
     const h = placeNearRoad(s, 'house');
     h.build = 1;
     h.level = 4;
     h.residents = 5;
-    expect(knowledgeIncome(s)).toBe(1.25);
+    expect(knowledgeIncome(s)).toBe(base + 1.25);
   });
 });

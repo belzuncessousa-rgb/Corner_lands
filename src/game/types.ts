@@ -24,7 +24,7 @@ export const RESOURCE_IDS = [
   'fish',
   'eggs',
   'berries',
-  'mushrooms',
+  'strawberries',
   'vegetables',
   'apples',
   'pears',
@@ -36,7 +36,6 @@ export const RESOURCE_IDS = [
   // Goods
   'grain',
   'barley',
-  'oats',
   'flour',
   'flax',
   'wool',
@@ -53,13 +52,13 @@ export const RESOURCE_IDS = [
   'medicine',
   'tools',
   'paper',
+  'parchment',
   'woad',
   'dyes',
   'fineclothes',
   'books',
   'jewellery',
   'pottery',
-  'weapons',
   // Currency
   'gold',
   'prestige',
@@ -403,6 +402,10 @@ export interface GameState {
   made?: Partial<Record<ResourceId, number>>;
   used?: Partial<Record<ResourceId, number>>;
   making?: Partial<Record<ResourceId, number>>;
+  /** Everything the town has ever made, by good (for learning by doing). */
+  madeEver?: Partial<Record<ResourceId, number>>;
+  /** Unlocks the town has learned (see unlocks.ts). */
+  learned?: string[];
   using?: Partial<Record<ResourceId, number>>;
   /** Whether the university had its books and wood parts this month. */
   universityOk?: boolean;

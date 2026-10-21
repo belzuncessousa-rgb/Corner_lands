@@ -47,6 +47,7 @@ import {
   moodYield,
   lockReason,
   prestigeIncome,
+  recipeKnown,
   knowledgeIncome,
   knowledgeOf,
   knowledgeSources,
@@ -873,7 +874,7 @@ export class Hud {
     const key = JSON.stringify([
       b.id, b.status, b.workers, b.builders, b.residents, b.build.toFixed(2), b.paused, b.level, b.lastOutput, b.growth.toFixed(2), b.want, b.priority, b.recipe, b.yard, b.flowers, b.trade, b.herd, JSON.stringify(b.animals ?? {}), b.owner, Math.floor(b.growth),
       s.tier, blocker, b.need, (b.upProgress ?? 0).toFixed(2), b.unmet, Math.floor(yardTotal(b)), b.hauled, s.buildings.length, Math.floor(s.res.gold / 10), s.population,
-      s.lastFeast, s.festivals, monthOf(s.day), b.type === 'market' ? s.day : 0, s.retinue, Math.floor(s.res.wood), Math.floor(totalFood(s)), b.barn, Math.floor(s.res.prestige), Math.floor(s.res.weapons),
+      s.lastFeast, s.festivals, monthOf(s.day), b.type === 'market' ? s.day : 0, s.retinue, Math.floor(s.res.wood), Math.floor(totalFood(s)), b.barn, Math.floor(s.res.prestige),
       JSON.stringify(b.orders ?? []), b.worn, b.beast, b.hungry, stalls(s).used, stalls(s).room,
       STORAGE_CAPACITY[b.type] ? RESOURCE_IDS.map((r) => (RESOURCE_STORAGE[r] ? Math.floor(s.res[r]) : 0)).join() : '',
     ]);
@@ -918,7 +919,7 @@ export class Hud {
       if (d.recipes) {
         // Fields, orchards and herds are always one thing; workshops may run on Auto.
         const fixed = !!d.zone || b.type === 'byre';
-        const avail = d.recipes.filter((r) => !r.charter || hasCharter(s, r.charter));
+        const avail = d.recipes.filter((r) => recipeKnown(s, b.type, r));
         const opts = fixed ? avail : [{ id: '', name: 'Auto' }, ...avail];
         const current = b.recipe ?? (fixed ? d.recipes[0].id : '');
         const label = b.type === 'field' ? 'Crop' : b.type === 'orchard' ? 'Fruit' : b.type === 'byre' ? 'Animals' : 'Product';
@@ -1965,7 +1966,7 @@ export class Hud {
             const staff = mine.reduce((a, b) => a + b.workers, 0);
             const stuck = mine.filter((b) => hasProblem(b));
             const slots = mine.reduce((a, b) => a + workersOf(b), 0);
-            const recipes = (d.recipes ?? [{ id: '', name: '', inputs: d.inputs, outputs: d.outputs }]).filter((r) => !r.charter || hasCharter(s, r.charter));
+            const recipes = (d.recipes ?? [{ id: '', name: '', inputs: d.inputs, outputs: d.outputs }]).filter((r) => recipeKnown(s, t, r));
             const icons = (ids: ResourceId[]) => ids.map((k) => `<span class="pg" data-tip="${GOODS[k].name}">${ICONS[k] ?? ''}</span>`).join('');
             const OWNERS: Partial<Record<BuildingType, string>> = {
               farm: 'Sows and reaps the fields drawn nearby',
