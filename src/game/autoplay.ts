@@ -9,6 +9,8 @@ import { startUpgrade, upgradeBlocker, upgradePlan } from './levels';
 import { StateRng } from './rng';
 import {
   addOrder,
+  improveError,
+  startImprove,
   keepOf,
   labourSummary,
   WALL_SAFE,
@@ -48,7 +50,8 @@ import {
 } from './sim';
 import type { BuildingType, Cost, GameState, ResourceId } from './types';
 import { idx, inBounds } from './world';
-import { knows, learn, learnError, unlockForBuilding } from './unlocks';
+import { knows, learn, learnError, unlockForBuilding, UNLOCKS } from './unlocks';
+import { improvementsFor } from './improve';
 
 /** Learns an unlock if it can; true when the town knows it. */
 function ensureLearned(s: GameState, id: string): boolean {
@@ -66,6 +69,9 @@ function ensureBuilding(s: GameState, type: BuildingType): boolean {
 
 /** The crop to sow: the one wanted if known (or learnable now), else what the town can grow. */
 function cropFor(s: GameState, want: string): string {
+  // Grain only once there is a mill and an oven for it; barley a brewhouse; flax a loom.
+  const use: Record<string, BuildingType[]> = { wheat: ['windmill', 'bakery'], barley: ['brewhouse'], flax: ['weaver'] };
+  if ((use[want] ?? []).some((t) => !hasBuilt(s, t))) return want === 'wheat' ? 'vegetables' : cropFor(s, 'wheat');
   if (want === 'vegetables' || ensureLearned(s, `r:field:${want}`)) return want;
   return knows(s, 'r:field:wheat') ? 'wheat' : 'vegetables';
 }
@@ -203,7 +209,7 @@ function drawFields(s: GameState): void {
     if (f.type !== 'field' || f.growth > 0.01) continue;
     if ((f.recipe === 'barley' && s.res.barley > 200) || (f.recipe === 'flax' && s.res.flax > 200)) f.recipe = cropFor(s, 'wheat');
     else if (f.recipe === 'wheat' && s.res.barley < 20 && count(s, 'brewhouse') > 0 && s.res.grain > 100) f.recipe = cropFor(s, 'barley');
-    else if ((f.recipe ?? 'vegetables') === 'vegetables' && knows(s, 'r:field:wheat')) f.recipe = 'wheat';
+    else if ((f.recipe ?? 'vegetables') === 'vegetables' && knows(s, 'r:field:wheat') && hasBuilt(s, 'bakery') && hasBuilt(s, 'windmill')) f.recipe = 'wheat';
   }
   for (const byre of s.buildings) {
     if (byre.type !== 'byre' || byre.build < 1 || zonesOf(s, byre).length) continue;
@@ -393,6 +399,33 @@ function shop(s: GameState): void {
   if (homes(3) && s.res.medicine < 3) buy('medicine', Math.min(8, homes(3)), 200);
 }
 
+/**
+ * Firewood for the hearths and the ovens: enough woodcutters set to cutting
+ * firewood that the store keeps ahead of the town (about two a villager).
+ */
+function fuel(s: GameState): void {
+  const cutters = s.buildings.filter((b) => b.type === 'woodcutter' && b.build >= 1);
+  if (cutters.length < 2) return;
+  const want = Math.max(1, Math.round(s.population / 25));
+  const low = s.res.firewood < s.population * 2;
+  const high = s.res.firewood > s.population * 4;
+  const on = cutters.filter((b) => b.recipe === 'firewood');
+  if (low && on.length < want && on.length < cutters.length - 1) cutters.find((b) => b.recipe !== 'firewood')!.recipe = 'firewood';
+  else if (high && on.length) on[0].recipe = undefined;
+}
+
+/**
+ * Knowledge to spare: learn the cheapest thing the town can use now, the
+ * first way of each choice, as a player filling in the board would.
+ */
+function study(s: GameState): void {
+  if (s.res.knowledge < SPARE_KNOWLEDGE) return;
+  const ready = UNLOCKS.filter((u) => !learnError(s, u.id) && (u.knowledge ?? 0) > 0).sort((a, b) => (a.knowledge ?? 0) - (b.knowledge ?? 0));
+  if (ready[0]) learn(s, ready[0].id);
+}
+/** Knowledge the bot keeps in hand for what it plans to build. */
+const SPARE_KNOWLEDGE = 12;
+
 /** Materials still owed to every unfinished site and renovation. */
 function promisedMaterials(s: GameState): Cost {
   const out: Cost = {};
@@ -413,7 +446,8 @@ function affordsWithPromises(s: GameState, cost: Cost): boolean {
 /** Raises the manor when possible, and a couple of homes at a time. */
 function renovate(s: GameState): void {
   // A manor for feasts and festivals, once the town is a Village with coins to spare.
-  if (s.tier >= 1 && !s.buildings.some((b) => b.type === 'townhall') && s.res.gold > (BUILDINGS.townhall.cost.gold ?? 0) + 150 && s.day % DAYS_PER_MONTH === 5) tryPlace(s, 'townhall');
+  // The manor hall comes early: taxes begin with it.
+  if (!s.buildings.some((b) => b.type === 'townhall') && s.population >= 12 && s.res.gold >= (BUILDINGS.townhall.cost.gold ?? 0) && s.day % DAYS_PER_MONTH === 5) tryPlace(s, 'townhall');
   const hall = s.buildings.find((b) => b.type === 'townhall' && b.build >= 1);
   const plan = hall ? upgradePlan(s, hall) : null;
   let saving = false;
@@ -430,6 +464,19 @@ function renovate(s: GameState): void {
         if (short > 0 && hasTrade(s) && s.res.gold > (plan.cost.gold ?? 0) + 60) trade(s, id, Math.min(short, roomFor(s, id)));
       }
       saving = true;
+    }
+  }
+  // The church in stone (a Borough needs it) and the alehouse into a tavern.
+  for (const b of s.buildings) {
+    if ((b.type !== 'church' && b.type !== 'tavern') || upgradeBlocker(s, b)) continue;
+    const p = upgradePlan(s, b)!;
+    if (affordsWithPromises(s, p.cost)) startUpgrade(s, b);
+  }
+  // Improvements the town has learned, onto the workplaces that can take them.
+  if (s.day % DAYS_PER_MONTH === 15 && s.res.gold > 80) {
+    for (const b of s.buildings) {
+      const imp = improvementsFor(b.type).find((i) => !improveError(s, b, i.id) && affordsWithPromises(s, i.cost));
+      if (imp && !startImprove(s, b, imp.id)) break;
     }
   }
   let busy = s.buildings.filter((b) => b.upgrading).length;
@@ -480,6 +527,8 @@ export function act(s: GameState, rand: () => number): void {
   if (s.pendingEvent) autoResolve(s, new StateRng(s));
   for (const id of BOT_CHARTERS) if (grantCharter(s, id)) break;
   shop(s);
+  fuel(s);
+  study(s);
   const pop = s.population;
   const food = totalFood(s);
   if (!feastError(s) && food > pop * 4) holdFeast(s);
@@ -495,7 +544,7 @@ export function act(s: GameState, rand: () => number): void {
   drawFields(s);
   const sites = s.buildings.filter((b) => b.build < 1).length;
   // Sites waiting for stone must not block the quarry that would supply it.
-  if (s.res.stone < 10 && count(s, 'quarry') === 0 && tryPlace(s, 'quarry')) return;
+  if (s.res.stone < 6 && count(s, 'quarry') === 0 && tryPlace(s, 'quarry')) return;
   if (sites >= 3) return;
   const idle = pop - s.buildings.reduce((a, b) => a + b.workers, 0);
   const foodMakers = count(s, 'forager') + count(s, 'hunter') + count(s, 'fisher') + count(s, 'bakery') * 2;
@@ -504,17 +553,21 @@ export function act(s: GameState, rand: () => number): void {
   if (count(s, 'tradingpost') === 0 && count(s, 'dock') === 0 && (s.res.tools < 2 || s.buildings.filter((b) => b.worn).length >= 2)) wants.push('tradingpost');
   // Key buildings for progression come first once unlocked.
   if (s.tier >= 1) {
-    for (const t of ['sawmill', 'carpenter', 'windmill', 'bakery', 'tradingpost', 'stonemason'] as BuildingType[]) {
+    for (const t of ['sawmill', 'carpenter', 'bakery', 'windmill', 'tradingpost', 'stonemason'] as BuildingType[]) {
       const ready = t === 'sawmill' || t === 'tradingpost' || (t === 'stonemason' ? hasTrade(s) : count(s, 'farm') > 0);
       if (count(s, t) === 0 && ready) wants.push(t);
     }
   }
-  // Timber Houses need a tavern: one, and a brewhouse for it, once there is a market.
-  if (s.tier >= 1 && hasBuilt(s, 'market')) {
-    for (const t of ['tavern', 'brewhouse'] as BuildingType[]) if (count(s, t) === 0) wants.push(t);
+  // A Town needs a church and a trading post; a Borough an alehouse and a stone church.
+  if (s.tier >= 1 && count(s, 'church') === 0) wants.unshift('church');
+  if (s.tier >= 1 && count(s, 'tradingpost') + count(s, 'dock') === 0) wants.unshift('tradingpost');
+  if (s.tier >= 2 && hasBuilt(s, 'market')) {
+    for (const t of ['tavern', 'brewhouse'] as BuildingType[]) if (count(s, t) === 0) wants.unshift(t);
   }
   if (s.tier >= 2) {
-    for (const t of ['smithy', 'church'] as BuildingType[]) if (count(s, t) === 0) wants.push(t);
+    for (const t of ['smithy'] as BuildingType[]) if (count(s, t) === 0) wants.push(t);
+    // Villagers past the manor clerk's reach pay nothing: a tax office for them.
+    if ((s.report.untaxed ?? 0) > 10 && count(s, 'taxoffice') < 1 + Math.floor((s.report.untaxed ?? 0) / 40)) wants.unshift('taxoffice');
   }
   // Rich enough for the great work: begin the cathedral before anything else.
   if ((s.tier >= 4 || (s.tier >= 3 && s.res.gold > 4000)) && count(s, 'cathedral') < 1 && s.day % DAYS_PER_MONTH === 0 && tryPlace(s, 'cathedral')) return;
@@ -530,19 +583,24 @@ export function act(s: GameState, rand: () => number): void {
   // Grain piling up: more mills and ovens before anything else.
   if (s.tier >= 1 && s.res.grain > 60 && count(s, 'windmill') < Math.min(1 + Math.floor(s.res.grain / 60), 1 + count(s, 'farm'))) wants.push('windmill');
   if (s.tier >= 1 && s.res.flour > 20 && count(s, 'bakery') < 1 + count(s, 'windmill')) wants.push('bakery');
+  // Game in the woods: a hunting camp as soon as there are hands for it.
+  if (pop >= 8 && count(s, 'hunter') < 1) wants.unshift('hunter');
   // Fish come in all year round, when the bushes are bare: one fisher at least.
   if (food < pop * 8 && count(s, 'fisher') < 1) wants.push('fisher');
   if (food < pop * 8 && foodMakers < 1 + pop / 6) {
-    if (s.tier >= 1 && count(s, 'farm') < 1 + Math.floor(pop / (idle > pop / 10 ? 25 : 40))) wants.push('farm');
-    if (count(s, 'forager') < 2) wants.push('forager');
+    // A farmstead's vegetables need no mill: the first comes early.
+    if ((s.tier >= 1 || pop >= 10) && count(s, 'farm') < 1 + Math.floor(pop / (idle > pop / 10 ? 25 : 40))) wants.unshift('farm');
+    if (count(s, 'forager') < (pop < 15 ? 1 : 2)) wants.push('forager');
     if (count(s, 'fisher') < 2 + Math.floor(pop / 30)) wants.push('fisher');
     if (count(s, 'hunter') < 2 + Math.floor(pop / 30)) wants.push('hunter');
   }
-  // A Village of thirty wants its first tavern to grow into a Town, short of hands or not.
-  if (s.tier >= 1 && pop >= 30 && count(s, 'tavern') < 1) wants.unshift('tavern');
+  // A Town wants its first alehouse to grow into a Borough, short of hands or not.
+  if (s.tier >= 2 && count(s, 'tavern') < 1) wants.unshift('tavern');
   // Homes no market can serve go without their goods: another square near them.
   {
-    const lone = s.buildings.find((h) => h.residents > 0 && !coveredBy(s, h, 'market'));
+    // Only while the squares there are have their vendors: an empty square serves no one.
+    const staffed = s.buildings.filter((m) => m.type === 'market').every((m) => m.workers > 0);
+    const lone = staffed && count(s, 'market') < 1 + Math.floor(pop / 30) && s.buildings.find((h) => h.residents > 0 && !coveredBy(s, h, 'market'));
     if (lone && drawMarket(s, bCenter(lone))) return;
   }
   // A harvest that will not fit spoils in the fields: a silo (needing no
@@ -552,16 +610,17 @@ export function act(s: GameState, rand: () => number): void {
   if (short >= 8) {
     // Fill the existing jobs first; homes still bring more hands.
     if (totalHousing(s) - pop < 4) wants.push('house');
-    for (const t of wants) if (BUILDINGS[t].tier <= s.tier && tryPlace(s, t)) return;
+    for (const t of wants) if (tryPlace(s, t)) return;
     // No room left by the lanes for the homes we need: lay more road.
     if (wants.includes('house')) growRoads(s, rand);
     return;
   }
   // Woods felled bare: plant before anything else, as a careful player would.
   if (count(s, 'forester') < count(s, 'woodcutter') && s.buildings.some((b) => b.type === 'woodcutter' && b.status === 'No trees in range')) wants.push('forester');
-  if (count(s, 'woodcutter') < 2 + Math.floor(pop / 15) || (s.res.wood < 25 && count(s, 'woodcutter') < 4 + Math.floor(pop / 10))) wants.push('woodcutter');
-  if (totalHousing(s) - pop < 4 && idle >= 0) wants.push('house');
-  if (count(s, 'quarry') < 1 + Math.floor(pop / 30)) {
+  // Homes first while the settlement is small: every family brings hands.
+  if (totalHousing(s) - pop < 4 && idle >= 0) wants.unshift('house');
+  if (count(s, 'woodcutter') < 1 + Math.floor(pop / 12) || (s.res.wood < 25 && count(s, 'woodcutter') < 2 + Math.floor(pop / 10))) wants.push('woodcutter');
+  if (pop >= 12 && count(s, 'quarry') < 1 + Math.floor(pop / 30)) {
     // Without stone nothing grand gets built: put the quarry first.
     if (s.res.stone < 20) wants.unshift('quarry');
     else wants.push('quarry');
@@ -610,7 +669,7 @@ export function act(s: GameState, rand: () => number): void {
     if (count(s, 'claypit') < 1) wants.push('claypit');
     if (count(s, 'claypit') > 0 && count(s, 'kiln') < 1) wants.push('kiln');
   }
-  if (s.tier >= 1 && count(s, 'tavern') < 1 + Math.floor(pop / 70)) wants.push('tavern');
+  if (s.tier >= 2 && count(s, 'tavern') < 1 + Math.floor(pop / 70)) wants.push('tavern');
   // Many idle hands: more workshops wherever their inputs are to hand; the
   // market sells what they make.
   if (s.tier >= 4 && idle > Math.max(10, pop * 0.15) && food >= pop * 3) {
@@ -630,10 +689,7 @@ export function act(s: GameState, rand: () => number): void {
     ];
     for (const [t, ok] of extra) if (ok && isUnlocked(s, t) && count(s, t) < 2 + Math.floor(pop / 20)) (idle > pop * 0.25 ? wants.unshift(t) : wants.push(t));
   }
-  for (const t of wants) {
-    if (BUILDINGS[t].tier > s.tier) continue;
-    if (tryPlace(s, t)) return;
-  }
+  for (const t of wants) if (tryPlace(s, t)) return;
   if (wants.length) growRoads(s, rand);
   void monthOf;
 }

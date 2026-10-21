@@ -2451,7 +2451,8 @@ export function paceOf(s: GameState, b: Building): number {
   const outs = d.recipes ? (chooseRecipe(s, b, true)?.outputs ?? d.outputs) : d.outputs;
   const ids = Object.keys(outs) as ResourceId[];
   if (!ids.length) return 1;
-  return ids.some((k) => GOODS[k].food) ? 1 : MATERIAL_PACE;
+  // The food chain (grain to flour, milk to cheese) keeps the old pace too.
+  return ids.some((k) => GOODS[k].food || RESOURCE_STORAGE[k] === 'food') ? 1 : MATERIAL_PACE;
 }
 
 /** Fuel a batch burns: the recipe's, else the building's (G18). */
