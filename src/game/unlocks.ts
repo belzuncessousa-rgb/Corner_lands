@@ -11,15 +11,14 @@ import type { BuildingType, GameState, ResourceId } from './types';
 export type UnlockKind = 'building' | 'recipe' | 'crop' | 'animal' | 'upgrade' | 'extension' | 'variant' | 'choice' | 'option';
 
 /** The learning board's tabs, by craft. */
-export type LearnTab = 'land' | 'farm' | 'herd' | 'cloth' | 'metal' | 'civic';
+export type LearnTab = 'land' | 'farm' | 'herd' | 'craft' | 'civic';
 
 export const LEARN_TABS: { id: LearnTab; name: string }[] = [
   { id: 'land', name: 'Timber & stone' },
   { id: 'farm', name: 'Farming & food' },
   { id: 'herd', name: 'Herds & orchards' },
-  { id: 'cloth', name: 'Cloth & dyes' },
-  { id: 'metal', name: 'Metal & glass' },
-  { id: 'civic', name: 'Town, learning & trade' },
+  { id: 'craft', name: 'Crafts: cloth, leather, metal & glass' },
+  { id: 'civic', name: 'Town, learning, trade & the manor' },
 ];
 
 /** Conditions that are not about goods made (see conditionMet). */
@@ -108,24 +107,24 @@ export const UNLOCKS: Unlock[] = [
   { id: r('orchard', 'plums'), name: 'Plums', kind: 'crop', tab: 'herd', group: 'Orchards', desc: 'Plum trees for the orchards.', knowledge: 1, needs: [b('orchardist')], recipe: { building: 'orchard', id: 'plums' }, icon: 'plums' },
 
   // ------------------------------------------------ cloth & dyes
-  { id: r('field', 'flax'), name: 'Flax', kind: 'crop', tab: 'cloth', group: 'Cloth', desc: 'Linen without sheep.', knowledge: 1, recipe: { building: 'field', id: 'flax' }, icon: 'flax' },
-  { id: b('weaver'), name: 'Weaver', kind: 'building', tab: 'cloth', group: 'Cloth', desc: 'Wool or flax into cloth.', knowledge: 2, building: 'weaver', icon: 'weaver' },
-  { id: b('tailor'), name: 'Tailor & Cobbler: clothes', kind: 'building', tab: 'cloth', group: 'Cloth', desc: 'Cloth into clothes.', knowledge: 2, building: 'tailor', icon: 'tailor' },
-  { id: b('tanner'), name: 'Tannery', kind: 'building', tab: 'cloth', group: 'Leather', desc: 'Hides into leather.', knowledge: 2, building: 'tanner', icon: 'tanner' },
-  { id: r('tailor', 'boots'), name: 'Tailor: boots', kind: 'recipe', tab: 'cloth', group: 'Leather', desc: 'Leather into boots.', knowledge: 3, needs: [b('tailor')], recipe: { building: 'tailor', id: 'boots' }, icon: 'boots' },
-  { id: r('tanner', 'parchment'), name: 'Tanner: parchment', kind: 'recipe', tab: 'cloth', group: 'Leather', desc: 'Hides scraped into parchment, for offices and books.', knowledge: 3, needs: [b('tanner')], recipe: { building: 'tanner', id: 'parchment' }, icon: 'parchment' },
-  { id: b('cobbler'), name: 'Cobbler', kind: 'building', tab: 'cloth', group: 'Leather', desc: 'Boots alone, quicker than the tailor.', knowledge: 6, needs: [r('tailor', 'boots')], building: 'cobbler', icon: 'cobbler' },
-  { id: b('embroiderer'), name: 'Embroiderer', kind: 'building', tab: 'cloth', group: 'Dyes', desc: 'Dyed cloth into fine clothes, a luxury.', knowledge: 10, building: 'embroiderer', icon: 'embroiderer' },
-  { id: r('field', 'woad'), name: 'Woad', kind: 'crop', tab: 'cloth', group: 'Dyes', desc: 'The blue dye plant.', knowledge: 3, recipe: { building: 'field', id: 'woad' }, icon: 'woad' },
-  { id: b('dyer'), name: "Dyer's Workshop", kind: 'building', tab: 'cloth', group: 'Dyes', desc: 'Woad or berries into dyes.', knowledge: 5, building: 'dyer', icon: 'dyer' },
+  { id: r('field', 'flax'), name: 'Flax', kind: 'crop', tab: 'craft', group: 'Cloth', desc: 'Linen without sheep.', knowledge: 1, recipe: { building: 'field', id: 'flax' }, icon: 'flax' },
+  { id: b('weaver'), name: 'Weaver', kind: 'building', tab: 'craft', group: 'Cloth', desc: 'Wool or flax into cloth.', knowledge: 2, building: 'weaver', icon: 'weaver' },
+  { id: b('tailor'), name: 'Tailor & Cobbler: clothes', kind: 'building', tab: 'craft', group: 'Cloth', desc: 'Cloth into clothes.', knowledge: 2, building: 'tailor', icon: 'tailor' },
+  { id: b('tanner'), name: 'Tannery', kind: 'building', tab: 'craft', group: 'Leather', desc: 'Hides into leather.', knowledge: 2, building: 'tanner', icon: 'tanner' },
+  { id: r('tailor', 'boots'), name: 'Tailor: boots', kind: 'recipe', tab: 'craft', group: 'Leather', desc: 'Leather into boots.', knowledge: 3, needs: [b('tailor')], recipe: { building: 'tailor', id: 'boots' }, icon: 'boots' },
+  { id: r('tanner', 'parchment'), name: 'Tanner: parchment', kind: 'recipe', tab: 'craft', group: 'Leather', desc: 'Hides scraped into parchment, for offices and books.', knowledge: 3, needs: [b('tanner')], recipe: { building: 'tanner', id: 'parchment' }, icon: 'parchment' },
+  { id: b('cobbler'), name: 'Cobbler', kind: 'building', tab: 'craft', group: 'Leather', desc: 'Boots alone, quicker than the tailor.', knowledge: 6, needs: [r('tailor', 'boots')], building: 'cobbler', icon: 'cobbler' },
+  { id: b('embroiderer'), name: 'Embroiderer', kind: 'building', tab: 'craft', group: 'Dyes', desc: 'Dyed cloth into fine clothes, a luxury.', knowledge: 10, building: 'embroiderer', icon: 'embroiderer' },
+  { id: r('field', 'woad'), name: 'Woad', kind: 'crop', tab: 'craft', group: 'Dyes', desc: 'The blue dye plant.', knowledge: 3, recipe: { building: 'field', id: 'woad' }, icon: 'woad' },
+  { id: b('dyer'), name: "Dyer's Workshop", kind: 'building', tab: 'craft', group: 'Dyes', desc: 'Woad or berries into dyes.', knowledge: 5, building: 'dyer', icon: 'dyer' },
 
   // ------------------------------------------------ metal & glass
-  { id: b('mine'), name: 'Bog Iron Pit', kind: 'building', tab: 'metal', group: 'Iron', desc: 'Digs bog ore.', knowledge: 4, building: 'mine', icon: 'mine' },
-  { id: b('collier'), name: 'Charcoal Burner', kind: 'building', tab: 'metal', group: 'Iron', desc: 'Timber into charcoal, the hot fuel.', knowledge: 3, building: 'collier', icon: 'collier' },
-  { id: b('bloomery'), name: 'Bloomery', kind: 'building', tab: 'metal', group: 'Iron', desc: 'Smelts ore into iron.', rank: 1, building: 'bloomery', icon: 'bloomery' },
-  { id: b('smithy'), name: 'Blacksmith', kind: 'building', tab: 'metal', group: 'Iron', desc: 'Iron and timber into tools.', knowledge: 2, building: 'smithy', icon: 'smithy' },
-  { id: b('glazier'), name: "Glazier's Workshop", kind: 'building', tab: 'metal', group: 'Glass', desc: 'Glass and dyes into stained glass.', knowledge: 10, building: 'glazier', icon: 'glazier' },
-  { id: b('glassworks'), name: 'Glassworks', kind: 'building', tab: 'metal', group: 'Glass', desc: 'Sand and charcoal into glass.', knowledge: 10, building: 'glassworks', icon: 'glassworks' },
+  { id: b('mine'), name: 'Bog Iron Pit', kind: 'building', tab: 'craft', group: 'Iron', desc: 'Digs bog ore.', knowledge: 4, building: 'mine', icon: 'mine' },
+  { id: b('collier'), name: 'Charcoal Burner', kind: 'building', tab: 'craft', group: 'Iron', desc: 'Timber into charcoal, the hot fuel.', knowledge: 3, building: 'collier', icon: 'collier' },
+  { id: b('bloomery'), name: 'Bloomery', kind: 'building', tab: 'craft', group: 'Iron', desc: 'Smelts ore into iron.', rank: 1, building: 'bloomery', icon: 'bloomery' },
+  { id: b('smithy'), name: 'Blacksmith', kind: 'building', tab: 'craft', group: 'Iron', desc: 'Iron and timber into tools.', knowledge: 2, building: 'smithy', icon: 'smithy' },
+  { id: b('glazier'), name: "Glazier's Workshop", kind: 'building', tab: 'craft', group: 'Glass', desc: 'Glass and dyes into stained glass.', knowledge: 10, building: 'glazier', icon: 'glazier' },
+  { id: b('glassworks'), name: 'Glassworks', kind: 'building', tab: 'craft', group: 'Glass', desc: 'Sand and charcoal into glass.', knowledge: 10, building: 'glassworks', icon: 'glassworks' },
 
   // ------------------------------------------------ town, learning & trade
   { id: b('church'), name: 'Wooden Church', kind: 'building', tab: 'civic', group: 'Faith & learning', desc: 'Worship, cheer and the first schooling.', rank: 1, building: 'church', icon: 'church' },
@@ -178,13 +177,13 @@ export const UNLOCKS: Unlock[] = [
   { id: r('orchard', 'strawberries'), name: 'Strawberries', kind: 'variant', tab: 'herd', group: 'Orchards', desc: 'Strawberry beds bear in their first year, and a fifth more.', knowledge: 12, needs: [b('orchardist')], recipe: { building: 'orchard', id: 'strawberries' }, icon: 'strawberries' },
   { id: 'c:skeps', name: 'Skeps', kind: 'choice', tab: 'herd', group: 'Orchards', choice: 'hives', desc: 'More honey, but now and then the bees swarm away.', knowledge: 5, needs: [b('beekeeper')], icon: 'honey' },
   { id: 'c:loghives', name: 'Log hives', kind: 'choice', tab: 'herd', group: 'Orchards', choice: 'hives', desc: 'Steady honey, a little more than before.', knowledge: 5, needs: [b('beekeeper')], icon: 'honey' },
-  { id: 'i:broadloom', name: 'Broadloom', kind: 'upgrade', tab: 'cloth', group: 'Cloth', desc: 'More cloth from the same wool or flax.', knowledge: 8, needs: [b('weaver')], condition: { made: { cloth: 100 }, label: '100 cloth woven' }, improvement: 'broadloom', icon: 'weaver' },
-  { id: 'o:tunics', name: 'Dyed tunics', kind: 'option', tab: 'cloth', group: 'Dyes', desc: 'Villagers in dyed colours: +2 happiness; a dye a year for every ten villagers.', knowledge: 4, needs: [b('dyer')], option: 'tunics', icon: 'dyes' },
-  { id: 'i:bellows', name: 'Water bellows', kind: 'extension', tab: 'metal', group: 'Iron', desc: 'Beside water: iron on half the fuel.', knowledge: 10, needs: [b('bloomery')], condition: { made: { iron: 100 }, label: '100 iron smelted' }, improvement: 'bellows', icon: 'bloomery' },
-  { id: 'i:farrier', name: 'Farrier', kind: 'extension', tab: 'metal', group: 'Iron', desc: 'Shod animals work a quarter better.', knowledge: 6, needs: [b('smithy')], condition: { test: 'animalwork', label: 'a draught animal at work' }, improvement: 'farrier', icon: 'smithy' },
-  { id: 'i:deepshaft', name: 'Deep shaft', kind: 'extension', tab: 'metal', group: 'Iron', desc: 'The ore lasts twice as long.', knowledge: 6, needs: [b('mine')], condition: { made: { ore: 200 }, label: '200 ore dug' }, improvement: 'deepshaft', icon: 'mine' },
-  { id: 'i:crownglass', name: 'Crown glass', kind: 'upgrade', tab: 'metal', group: 'Glass', desc: 'Each melt makes two glass.', knowledge: 12, needs: [b('glassworks')], condition: { made: { glass: 50 }, label: '50 glass made' }, improvement: 'crownglass', icon: 'glassworks' },
-  { id: 'o:windows', name: 'Church windows', kind: 'option', tab: 'metal', group: 'Glass', desc: 'Stained glass in the church and cathedral: more cheer and prestige; a stained glass each, once.', knowledge: 2, needs: [b('glazier')], option: 'windows', icon: 'stainedglass' },
+  { id: 'i:broadloom', name: 'Broadloom', kind: 'upgrade', tab: 'craft', group: 'Cloth', desc: 'More cloth from the same wool or flax.', knowledge: 8, needs: [b('weaver')], condition: { made: { cloth: 100 }, label: '100 cloth woven' }, improvement: 'broadloom', icon: 'weaver' },
+  { id: 'o:tunics', name: 'Dyed tunics', kind: 'option', tab: 'craft', group: 'Dyes', desc: 'Villagers in dyed colours: +2 happiness; a dye a year for every ten villagers.', knowledge: 4, needs: [b('dyer')], option: 'tunics', icon: 'dyes' },
+  { id: 'i:bellows', name: 'Water bellows', kind: 'extension', tab: 'craft', group: 'Iron', desc: 'Beside water: iron on half the fuel.', knowledge: 10, needs: [b('bloomery')], condition: { made: { iron: 100 }, label: '100 iron smelted' }, improvement: 'bellows', icon: 'bloomery' },
+  { id: 'i:farrier', name: 'Farrier', kind: 'extension', tab: 'craft', group: 'Iron', desc: 'Shod animals work a quarter better.', knowledge: 6, needs: [b('smithy')], condition: { test: 'animalwork', label: 'a draught animal at work' }, improvement: 'farrier', icon: 'smithy' },
+  { id: 'i:deepshaft', name: 'Deep shaft', kind: 'extension', tab: 'craft', group: 'Iron', desc: 'The ore lasts twice as long.', knowledge: 6, needs: [b('mine')], condition: { made: { ore: 200 }, label: '200 ore dug' }, improvement: 'deepshaft', icon: 'mine' },
+  { id: 'i:crownglass', name: 'Crown glass', kind: 'upgrade', tab: 'craft', group: 'Glass', desc: 'Each melt makes two glass.', knowledge: 12, needs: [b('glassworks')], condition: { made: { glass: 50 }, label: '50 glass made' }, improvement: 'crownglass', icon: 'glassworks' },
+  { id: 'o:windows', name: 'Church windows', kind: 'option', tab: 'craft', group: 'Glass', desc: 'Stained glass in the church and cathedral: more cheer and prestige; a stained glass each, once.', knowledge: 2, needs: [b('glazier')], option: 'windows', icon: 'stainedglass' },
   { id: 'i:secondvat', name: 'Second vat', kind: 'upgrade', tab: 'civic', group: 'Faith & learning', desc: 'One flax makes two paper.', knowledge: 6, needs: [b('papermill')], condition: { made: { paper: 100 }, label: '100 paper made' }, improvement: 'secondvat', icon: 'papermill' },
   { id: 'i:sundayschool', name: 'Sunday school', kind: 'extension', tab: 'civic', group: 'Faith & learning', desc: 'Knowledge from every home the church serves; all work 2% slower.', knowledge: 4, condition: { test: 'church10', label: 'a church serving 10 homes' }, improvement: 'sundayschool', icon: 'church' },
   { id: 'i:infirmary', name: 'Infirmary', kind: 'extension', tab: 'civic', group: 'Faith & learning', desc: 'Sickness passes lightly over homes nearby; a medicine a month.', knowledge: 8, needs: [b('monastery')], condition: { made: { medicine: 20 }, label: '20 medicine made' }, improvement: 'infirmary', icon: 'monastery' },

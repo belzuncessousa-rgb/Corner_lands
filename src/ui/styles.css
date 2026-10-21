@@ -2485,3 +2485,352 @@ button.plaque-btn.small {
 .upgrade-box.imps .imp-row button {
   padding: 1px 8px;
 }
+
+/* ---------------------------------------------------------------- the learning board */
+.modal.learning-modal {
+  width: min(1320px, 96vw);
+  max-width: 96vw;
+  height: min(860px, 92vh);
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px;
+}
+.lb {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.lb-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 6px;
+}
+.lb-title {
+  font-size: 22px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.lb-title svg {
+  width: 26px;
+  height: 26px;
+}
+.lb-have {
+  flex: 1;
+  opacity: 0.85;
+}
+.lb-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.lb-tab {
+  position: relative;
+  padding: 5px 12px;
+  border-radius: 6px 6px 0 0;
+}
+.lb-tab.active {
+  filter: brightness(1.25);
+  font-weight: bold;
+}
+.lb-badge {
+  display: inline-block;
+  margin-left: 6px;
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #d8a838;
+  color: #2a1a0a;
+  font-size: 11px;
+  font-weight: bold;
+}
+.lb-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 10px;
+}
+/* The board itself: planks of warm oak with the grain running across. */
+.lb-board {
+  flex: 1;
+  overflow: auto;
+  border-radius: 8px;
+  border: 6px solid #4a2e18;
+  box-shadow: inset 0 0 30px rgba(20, 10, 0, 0.55);
+  background:
+    repeating-linear-gradient(0deg, transparent 0 58px, rgba(30, 15, 5, 0.55) 58px 61px),
+    repeating-linear-gradient(90deg, rgba(255, 220, 160, 0.05) 0 3px, transparent 3px 9px),
+    repeating-linear-gradient(87deg, rgba(60, 30, 10, 0.12) 0 2px, transparent 2px 23px),
+    linear-gradient(180deg, #9a6a3e, #8a5c34 40%, #94653a);
+}
+.lb-pins {
+  position: relative;
+}
+.lb-threads {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+}
+.lb-thread {
+  fill: none;
+  stroke: rgba(232, 216, 176, 0.55);
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+}
+.lb-thread.lit {
+  stroke: rgba(240, 200, 90, 0.9);
+}
+/* A carved tag naming each craft's cluster. */
+.lb-label {
+  position: absolute;
+  padding: 2px 12px;
+  background: linear-gradient(#e8d4a4, #cdb07a);
+  color: #3a2410;
+  font-weight: bold;
+  font-size: 13px;
+  border-radius: 3px;
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.45);
+  transform: rotate(-2deg);
+}
+.lb-label::before,
+.lb-label::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  margin-top: -2.5px;
+  border-radius: 50%;
+  background: #5a4a3a;
+}
+.lb-label::before {
+  left: 3px;
+}
+.lb-label::after {
+  right: 3px;
+}
+.lb-or {
+  position: absolute;
+  width: 30px;
+  height: 22px;
+  line-height: 20px;
+  text-align: center;
+  font-style: italic;
+  font-weight: bold;
+  color: #f4e6c4;
+  background: #8a2a20;
+  border: 2px solid #e8c060;
+  border-radius: 11px;
+  z-index: 2;
+  pointer-events: none;
+}
+/* A patch: an embroidered roundel with a stitched rim, its name on a ribbon below. */
+.lb-patch {
+  position: absolute;
+  width: 96px;
+  height: 108px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  transform: rotate(var(--tilt));
+  transition: transform 0.12s;
+  z-index: 1;
+}
+.lb-patch:hover,
+.lb-patch.sel {
+  transform: rotate(0deg) scale(1.08);
+  z-index: 3;
+}
+.lb-disc {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 78px;
+  height: 78px;
+  margin: 0 auto;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #f6ead0, #dcc79c 70%, #c4ac7c);
+  border: 3px dashed #7a5a3a;
+  outline: 5px solid #5e4630;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.5);
+}
+.lb-disc svg {
+  width: 46px;
+  height: 46px;
+}
+.lb-disc.big {
+  width: 58px;
+  height: 58px;
+  flex: none;
+}
+.lb-disc.big svg {
+  width: 34px;
+  height: 34px;
+}
+.lb-name {
+  position: absolute;
+  left: -6px;
+  right: -6px;
+  top: 76px;
+  padding: 2px 3px;
+  font-size: 11px;
+  line-height: 1.1;
+  color: #f8ecd0;
+  background: #6a3a22;
+  border-radius: 2px;
+  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.4);
+  text-align: center;
+}
+.lb-price {
+  position: absolute;
+  right: -2px;
+  top: -2px;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 1px 5px 1px 3px;
+  font-size: 11px;
+  font-weight: bold;
+  color: #2a1a0a;
+  background: #f0dca0;
+  border: 1px solid #8a6a3a;
+  border-radius: 9px;
+}
+.lb-price svg {
+  width: 13px;
+  height: 13px;
+}
+.lb-price.rank {
+  background: #c8d4e0;
+}
+.lb-lock {
+  position: absolute;
+  left: 2px;
+  top: 0;
+  font-size: 14px;
+}
+.lb-patch.learned .lb-disc {
+  border-color: #c8901c;
+  outline-color: #e8b84a;
+  background: radial-gradient(circle at 40% 35%, #fff8e0, #f0d890 70%, #d8b060);
+}
+.lb-patch.learned .lb-name {
+  background: #8a6a1a;
+}
+.lb-patch.ready .lb-disc {
+  animation: lb-glow 1.6s ease-in-out infinite;
+}
+@keyframes lb-glow {
+  0%,
+  100% {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.5), 0 0 0 rgba(255, 220, 120, 0);
+  }
+  50% {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.5), 0 0 18px 6px rgba(255, 220, 120, 0.85);
+  }
+}
+.lb-patch.locked .lb-disc,
+.lb-patch.closed .lb-disc {
+  filter: grayscale(0.85) brightness(0.8);
+}
+.lb-patch.locked .lb-name,
+.lb-patch.closed .lb-name {
+  background: #4a3a2e;
+  color: #cbbca0;
+}
+.lb-patch.closed .lb-disc::after {
+  content: '✕';
+  position: absolute;
+  font-size: 54px;
+  color: rgba(140, 30, 20, 0.75);
+}
+.lb-patch.closed .lb-disc {
+  position: relative;
+}
+/* The close-up of the chosen patch. */
+.lb-detail {
+  width: 280px;
+  flex: none;
+  overflow: auto;
+}
+.lb-card-top {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.lb-card-name {
+  font-size: 18px;
+  font-weight: bold;
+}
+.lb-kind {
+  font-size: 12px;
+  opacity: 0.75;
+}
+.lb-needs > div {
+  margin: 3px 0;
+}
+.lb-needs .met {
+  color: #6a9a3a;
+}
+.lb-needs .unmet {
+  color: #c25a3a;
+}
+.lb-needs .progress {
+  height: 5px;
+  margin-top: 2px;
+}
+.lb-done {
+  font-weight: bold;
+  color: #c8901c;
+  margin-top: 8px;
+}
+.lb-closed,
+.lb-wait {
+  margin-top: 8px;
+  font-style: italic;
+  opacity: 0.85;
+}
+.lb-warn {
+  color: #c25a3a;
+}
+.lb-hint p {
+  margin: 0 0 8px;
+}
+/* The book in the top bar, and locked cards in the build menu. */
+.learn-chip {
+  cursor: pointer;
+  position: relative;
+}
+.learn-chip .badge {
+  background: #d8a838;
+  color: #2a1a0a;
+}
+.cards .card.locked {
+  filter: grayscale(0.8);
+  opacity: 0.7;
+}
+.cards .card.locked:hover {
+  filter: grayscale(0.3);
+  opacity: 1;
+}
+/* The patches are not painted buttons. */
+.lb-patch,
+.lb-patch:hover:not(:disabled),
+.lb-patch:active:not(:disabled) {
+  background: none;
+  border: 0;
+  box-shadow: none;
+  min-height: 0;
+  padding: 0;
+  text-shadow: none;
+}
+.lb-patch:active:not(:disabled) {
+  transform: rotate(0deg) scale(1.04);
+}

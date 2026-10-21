@@ -15,7 +15,7 @@ await page.click('text=New Settlement');
 await page.fill('#seed', '4242');
 await page.click('text=Found the Settlement');
 await page.waitForTimeout(600);
-await page.evaluate(() => { const g = window.game; g.setSpeed(0); g.state.tier = 1; g.state.res.wood = 300; g.state.res.planks = 60; g.state.res.stone = 60; g.state.res.gold = 500; g.hud.update(); });
+await page.evaluate(() => { const g = window.game; g.setSpeed(0); window.cl.learnEverything(g.state); g.state.tier = 1; g.state.res.wood = 300; g.state.res.planks = 60; g.state.res.stone = 60; g.state.res.gold = 500; g.hud.update(); });
 // The test raises the town's size by hand: carry on past the banner it shows (it pauses the game and takes clicks).
 const closeBanners = async () => {
   while (await page.$('.banner .carry-on')) await page.click('.banner .carry-on');
@@ -239,7 +239,7 @@ await page.waitForTimeout(300);
 await page.click('#inspector [data-action="feast"]');
 check('call a harvest feast', (await page.evaluate(() => window.game.state.lastFeast)) === 0);
 // Raise a retinue in a Borough.
-await page.evaluate(() => { const s = window.game.state; s.tier = 3; s.res.prestige = 100; s.res.weapons = 12; window.game.hud.update(); });
+await page.evaluate(() => { const s = window.game.state; s.tier = 3; s.res.prestige = 100; s.res.gold += 100; for (const type of ['barracks', 'armoury']) s.buildings.push({ ...s.buildings[0], id: 90000 + type.length, type, build: 1, x: 0, y: 0, residents: 0 }); window.game.hud.update(); });
 await page.waitForTimeout(300);
 await page.mouse.move(200, 600);
 await page.waitForTimeout(200);

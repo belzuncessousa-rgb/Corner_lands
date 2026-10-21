@@ -1,4 +1,5 @@
-import { knows } from '../game/unlocks';
+import { knows, learn, unlockForBuilding, UNLOCK_BY_ID, type LearnTab } from '../game/unlocks';
+import { boardHtml, readyCount, tabOf } from './learning';
 import { IMPROVEMENT_BY_ID, improvementsFor } from '../game/improve';
 import { OPTIONS, optionError, optionOn, optionOnce, setOption } from '../game/options';
 import { NEWS } from './news';
@@ -379,6 +380,18 @@ export class Hud {
           </div>`;
         })
         .join('');
+      // Buildings still to be learned: a locked card that opens the learning board at its patch.
+      cards += BUILD_ORDER.filter((t) => BUILDINGS[t].category === this.category && !isUnlocked(s, t) && unlockForBuilding(t) && !knows(s, unlockForBuilding(t)!.id) && !BUILDINGS[t].charter)
+        .map((t) => {
+          const d = BUILDINGS[t];
+          const u = unlockForBuilding(t)!;
+          return `<div class="card locked ${this.buildIcons ? 'icon-card' : ''}" data-action="learn-open" data-id="${u.id}" data-tip="${esc(`<b>${d.name}</b><br>${d.desc}<br><span class="neg">${lockReason(s, t) ?? 'Not learned yet'}</span><br><i>Click to see it on the learning board.</i>`)}">
+            ${this.buildIcons ? `<span class="bicon">${BUILDING_ICONS[t] ?? CATEGORY_ICONS[d.category]}</span>` : `<img src="${this.cardImage(t)}" alt="" draggable="false">`}
+            <div class="name">${d.name}</div>
+            <div class="cost">🔒 ${u.knowledge !== undefined ? `${ICONS.knowledge}${u.knowledge}` : 'learn'}</div>
+          </div>`;
+        })
+        .join('');
       if (!cards) cards = `<div class="cards-empty">Nothing here yet: more opens up as the town grows.</div>`;
     }
     this.el.buildbar.classList.toggle('open', !!this.category);
@@ -497,7 +510,11 @@ export class Hud {
       chip('materials', matFull ? 'full' : '', `${ICONS.materials}${sum('materials')}`),
       chip('goods', '', `${ICONS.goods}${sum('goods')}`),
       '<div class="sep"></div>',
-      chip('treasury', '', `${ICONS.gold}${Math.floor(s.res.gold)}${s.res.prestige > 0 || s.tier >= 1 ? `<span class="prestige">${ICONS.prestige}${Math.floor(s.res.prestige)}</span>` : ''}${s.res.knowledge > 0 ? `<span class="prestige">${ICONS.knowledge}${Math.floor(s.res.knowledge)}</span>` : ''}`),
+      chip('treasury', '', `${ICONS.gold}${Math.floor(s.res.gold)}${s.res.prestige > 0 || s.tier >= 1 ? `<span class="prestige">${ICONS.prestige}${Math.floor(s.res.prestige)}</span>` : ''}`),
+      (() => {
+        const ready = readyCount(s);
+        return `<button class="res chip learn-chip" data-action="learning" data-tip="<b>The learning board</b><br>Spend knowledge on new buildings, recipes and better ways of working.${ready ? `<br>${ready} can be learned now.` : ''}">📖${ICONS.knowledge}${Math.floor(s.res.knowledge)}${ready ? `<span class="badge">${ready}</span>` : ''}</button>`;
+      })(),
     ].join('');
     setHTML(this.el.topbar, html);
   }
@@ -2000,6 +2017,40 @@ export class Hud {
         this.update();
         break;
       }
+      case 'learning':
+        this.showLearning();
+        break;
+      case 'learn-open':
+        this.showLearning(t.dataset.id);
+        break;
+      case 'learn-tab':
+        this.learnTab = (t.dataset.tab as LearnTab) ?? 'land';
+        this.learnSel = null;
+        this.learnConfirm = null;
+        this.showLearning();
+        break;
+      case 'learn-sel':
+        this.learnSel = t.dataset.id ?? null;
+        this.learnConfirm = null;
+        this.showLearning();
+        break;
+      case 'learn-confirm':
+        this.learnConfirm = t.dataset.id ?? null;
+        this.showLearning();
+        break;
+      case 'learn-do': {
+        const id = t.dataset.id ?? '';
+        const err = learn(s, id);
+        if (err) this.flash(err);
+        else {
+          this.sound('fanfare');
+          log(s, `The town has learned: ${UNLOCK_BY_ID.get(id)?.name ?? id}.`, 'good');
+        }
+        this.learnConfirm = null;
+        this.showLearning();
+        this.renderBuildBar();
+        break;
+      }
       case 'close-modal':
         this.closeModal();
         break;
@@ -2077,6 +2128,37 @@ export class Hud {
   }
 
   private charterSel: string | null = null;
+  /** The learning board: its open tab, the patch looked at, and a choice awaiting a second click. */
+  private learnTab: LearnTab = 'land';
+  private learnSel: string | null = null;
+  private learnConfirm: string | null = null;
+
+  /** Opens (or redraws) the learning board, at a patch if one is given. */
+  showLearning(focus?: string): void {
+    const s = this.game.state;
+    if (focus) {
+      this.learnSel = focus;
+      this.learnTab = tabOf(focus) ?? this.learnTab;
+    }
+    // Keep the board's scroll as it is redrawn.
+    const old = this.modal?.querySelector('.lb-board') as HTMLElement | null;
+    const scroll = old ? [old.scrollLeft, old.scrollTop] : null;
+    const html = boardHtml(s, this.learnTab, this.learnSel, this.learnConfirm);
+    let root: HTMLElement;
+    if (this.modal && this.modal.querySelector('.lb')) {
+      root = this.modal.querySelector('.modal')!;
+      root.innerHTML = html;
+    } else {
+      root = this.openModal(html).querySelector('.modal')!;
+      root.classList.add('wide', 'learning-modal');
+    }
+    const board = root.querySelector('.lb-board') as HTMLElement | null;
+    if (board && scroll) [board.scrollLeft, board.scrollTop] = scroll;
+    else if (board && focus) {
+      const p = board.querySelector(`[data-id="${CSS.escape(focus)}"]`) as HTMLElement | null;
+      if (p) board.scrollTop = Math.max(0, p.offsetTop - board.clientHeight / 2);
+    }
+  }
 
   /** The charter tree: paths radiate from the Town Charter at the centre. */
   private showCharters(): void {
