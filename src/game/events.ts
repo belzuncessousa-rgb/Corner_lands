@@ -1,6 +1,6 @@
-import { DAYS_PER_MONTH, DAYS_PER_YEAR, GOODS } from './data';
+import { DAYS_PER_MONTH, DAYS_PER_YEAR } from './data';
 import type { StateRng } from './rng';
-import { checkMilestones, log, store, totalHousing, wallSections, watchKept, WALL_SAFE } from './sim';
+import { LUXURIES, checkMilestones, log, store, totalHousing, wallSections, watchKept, WALL_SAFE } from './sim';
 import type { BuildingType, Cost, GameState, MessageKind, ResourceId } from './types';
 import { FOOD_IDS } from './data';
 
@@ -74,7 +74,7 @@ export interface Festival {
   /** A building it needs, if any. */
   needs?: BuildingType;
   desc: string;
-  cost: (s: GameState) => { food: number; wood: number };
+  cost: (s: GameState) => { food: number; firewood: number };
   mood: number;
   prestige: number;
 }
@@ -87,7 +87,7 @@ export const FESTIVALS: Festival[] = [
     months: [1, 2],
     needs: 'maypole',
     desc: 'Garlands, ribbons and dancing round the maypole.',
-    cost: (s) => ({ food: Math.ceil(s.population / 4), wood: 0 }),
+    cost: (s) => ({ food: Math.ceil(s.population / 4), firewood: 0 }),
     mood: 6,
     prestige: 3,
   },
@@ -96,7 +96,7 @@ export const FESTIVALS: Festival[] = [
     name: 'Midsummer',
     months: [4, 5],
     desc: 'A great bonfire by the manor on the shortest night; the young leap the embers.',
-    cost: (s) => ({ food: Math.ceil(s.population / 4), wood: 20 }),
+    cost: (s) => ({ food: Math.ceil(s.population / 4), firewood: 10 }),
     mood: 6,
     prestige: 3,
   },
@@ -113,7 +113,7 @@ export function festivalError(s: GameState, id: string): string | null {
   if (s.population < 8) return 'Too few villagers';
   const c = f.cost(s);
   if (food(s) < c.food) return `Needs ${c.food} food`;
-  if (s.res.wood < c.wood) return `Needs ${c.wood} timber`;
+  if (s.res.firewood < c.firewood) return `Needs ${c.firewood} firewood`;
   return null;
 }
 
@@ -123,7 +123,7 @@ export function holdFestival(s: GameState, id: string): string | null {
   const f = FESTIVALS.find((x) => x.id === id)!;
   const c = f.cost(s);
   takeFood(s, c.food);
-  s.res.wood -= c.wood;
+  s.res.firewood -= c.firewood;
   addMood(s, f.name, f.mood, 3);
   s.res.prestige += f.prestige;
   s.festivals = { ...s.festivals, [id]: Math.floor(s.day / DAYS_PER_YEAR) };
@@ -138,12 +138,16 @@ export const FAIR_TIER = 2;
 
 /** Coins the next fair costs: each one grander than the last. */
 export function fairCost(s: GameState): number {
-  return Math.round(400 * Math.pow(1.5, s.fairs ?? 0));
+  return Math.round(FAIR_BASE * Math.pow(1.5, s.fairs ?? 0));
 }
 
-/** Prestige a fair brings: more for grander fairs. */
+/** Coins the first fair costs. */
+export const FAIR_BASE = 100;
+
+/** Prestige a fair brings: more for grander fairs, twice as much with jousting at a tiltyard. */
 export function fairPrestige(s: GameState): number {
-  return 15 + 5 * (s.fairs ?? 0);
+  const joust = s.buildings.some((b) => b.type === 'tiltyard' && b.build >= 1) ? 2 : 1;
+  return (15 + 5 * (s.fairs ?? 0)) * joust;
 }
 
 export function fairError(s: GameState): string | null {
@@ -170,8 +174,12 @@ export const TITLES = [
   { name: 'Lord', tier: 0, prestige: 0, boon: '' },
   { name: 'Baron', tier: 2, prestige: 500, boon: 'Taxes bring a tenth more' },
   { name: 'Earl', tier: 3, prestige: 1500, boon: 'Villagers are proud to serve an Earl: +3 happiness' },
-  { name: 'Duke', tier: 4, prestige: 4000, boon: 'Merchants come from afar: they buy half as much again' },
+  { name: 'Marquess', tier: 4, prestige: 3000, boon: 'Merchants come from afar: they buy half as much again' },
+  { name: 'Duke', tier: 4, prestige: 6000, boon: 'The realm looks to your house: a fifth more prestige every month' },
 ];
+
+/** The Duke's boon: prestige a month is a fifth more. */
+export const DUKE_PRESTIGE = 1.2;
 
 /** The next title, if any is left to take. */
 export function nextTitle(s: GameState): (typeof TITLES)[number] | null {
@@ -183,6 +191,7 @@ export function titleError(s: GameState): string | null {
   const t = nextTitle(s);
   if (!t) return 'You are a Duke: there is no higher title to take';
   if (s.tier < t.tier) return `A ${t.name} needs a ${['Hamlet', 'Village', 'Town', 'Borough', 'City'][t.tier]}`;
+  if (t.name === 'Duke' && !s.buildings.some((b) => b.type === 'townhall' && b.build >= 1 && b.level >= 4)) return 'A Duke needs a Palace';
   if (s.res.prestige < t.prestige) return `Needs ${t.prestige} prestige`;
   return null;
 }
@@ -200,34 +209,96 @@ export function takeTitle(s: GameState): string | null {
   return null;
 }
 
-/** Works of art bought with prestige once the great buildings stand: each lifts spirits for good. */
-export const COMMISSIONS = [
-  { id: 'tapestry', name: 'Great tapestry', desc: 'A tapestry of your house\'s deeds for the manor hall', prestige: 300, happiness: 2, needs: 'townhall' as const, goods: undefined as Cost | undefined },
-  { id: 'glass', name: 'Stained-glass windows', desc: 'Windows of coloured glass for the cathedral', prestige: 600, happiness: 3, needs: 'cathedral' as const, goods: { stainedglass: 12 } as Cost | undefined },
+/**
+ * Works of art: masterpieces the patrons' atelier makes now and then (see
+ * monthlyAtelier). Each is made once and does good for ever after.
+ */
+export const WORKS_OF_ART = [
+  { id: 'tapestry', name: 'Great tapestry', desc: "A tapestry of your house's deeds for the manor hall", happiness: 3, prestige: 0, knowledge: 0 },
+  { id: 'glass', name: 'Stained-glass windows', desc: 'Windows of coloured glass, the finest in the land', happiness: 3, prestige: 0, knowledge: 0 },
+  { id: 'statue', name: 'Renowned statue', desc: 'A statue the whole realm comes to see', happiness: 0, prestige: 2, knowledge: 0 },
+  { id: 'classic', name: 'A classic of literature', desc: 'A book read wherever there are readers', happiness: 0, prestige: 1, knowledge: 1 },
+  { id: 'treatise', name: 'Alchemical treatise', desc: 'A treatise on the secret workings of things', happiness: 0, prestige: 0, knowledge: 2 },
 ];
 
-/** Why a commission cannot be made, or null. */
-export function commissionError(s: GameState, id: string): string | null {
-  const c = COMMISSIONS.find((x) => x.id === id);
-  if (!c) return 'Unknown commission';
-  if (s.commissions?.includes(id)) return 'Already made';
-  if (!s.buildings.some((b) => b.type === c.needs && b.build >= 1)) return c.needs === 'cathedral' ? 'Needs a cathedral' : 'Needs the manor';
-  if (s.tier < 3) return 'Needs a Borough';
-  if (s.res.prestige < c.prestige) return `Needs ${c.prestige} prestige`;
-  for (const [id, n] of Object.entries(c.goods ?? {}) as [ResourceId, number][]) if (s.res[id] < n) return `Needs ${n} ${GOODS[id].name.toLowerCase()}`;
-  return null;
+/** What the atelier uses each month it is at work. */
+export const ATELIER_GOODS: Cost = { dyes: 1, dressedstone: 1, paper: 1 };
+export const ATELIER_LUXURIES = 2;
+export const ATELIER_COINS = 10;
+/** Each month fully supplied, the chance of a masterpiece grows by this much. */
+export const ATELIER_STEP = 0.01;
+/** Prestige a masterpiece brings at once. */
+export const MASTERPIECE_PRESTIGE = 60;
+
+/** The good a work of art does: happiness, prestige and knowledge a month from those made. */
+export function artBoons(s: GameState): { happiness: { label: string; value: number }[]; prestige: number; knowledge: number } {
+  const out = { happiness: [] as { label: string; value: number }[], prestige: 0, knowledge: 0 };
+  for (const w of WORKS_OF_ART) {
+    if (!s.commissions?.includes(w.id)) continue;
+    if (w.happiness) out.happiness.push({ label: w.name, value: w.happiness });
+    out.prestige += w.prestige;
+    out.knowledge += w.knowledge;
+  }
+  return out;
 }
 
-/** Pays for a commission; returns why not, or null. */
-export function commission(s: GameState, id: string): string | null {
-  const err = commissionError(s, id);
-  if (err) return err;
-  const c = COMMISSIONS.find((x) => x.id === id)!;
-  s.res.prestige -= c.prestige;
-  for (const [id, n] of Object.entries(c.goods ?? {}) as [ResourceId, number][]) s.res[id] -= n;
-  (s.commissions ??= []).push(id);
-  log(s, `${c.desc} is finished, and the whole town comes to see it.`, 'good');
-  return null;
+/**
+ * The patrons' atelier: each month it has its goods, the chance of a
+ * masterpiece grows a little; a month without them and the artists lose
+ * heart (the chance starts again). After a masterpiece they rest a year and
+ * begin again from half the chance they had.
+ */
+export function monthlyAtelier(s: GameState, rng: StateRng): void {
+  const at = s.buildings.find((b) => b.type === 'atelier' && b.build >= 1);
+  if (!at) return;
+  const a = (s.atelier ??= { chance: 0, rest: 0 });
+  if (a.rest > 0) {
+    a.rest--;
+    at.status = `Resting after a masterpiece (${a.rest} months)`;
+    return;
+  }
+  const lux = LUXURIES.filter((id) => s.res[id] >= 1);
+  const supplied =
+    at.workers > 0 &&
+    s.res.gold >= ATELIER_COINS &&
+    Object.entries(ATELIER_GOODS).every(([id, n]) => s.res[id as ResourceId] >= (n ?? 0)) &&
+    lux.reduce((n, id) => n + Math.floor(s.res[id]), 0) >= ATELIER_LUXURIES;
+  if (!supplied) {
+    a.chance = 0;
+    at.status = at.workers > 0 ? 'Short of what the artists need: their hopes start over' : 'No artists';
+    return;
+  }
+  s.res.gold -= ATELIER_COINS;
+  for (const [id, n] of Object.entries(ATELIER_GOODS)) s.res[id as ResourceId] -= n ?? 0;
+  let left = ATELIER_LUXURIES;
+  for (const id of lux) {
+    const n = Math.min(left, Math.floor(s.res[id]));
+    s.res[id] -= n;
+    left -= n;
+    if (!left) break;
+  }
+  a.chance += ATELIER_STEP;
+  at.status = `At work: ${Math.round(a.chance * 100)}% chance of a masterpiece this month`;
+  if (rng.next() >= a.chance) return;
+  // A masterpiece: one not yet made (the Drapers' Guild makes the tapestry twice as likely).
+  const left2 = WORKS_OF_ART.filter((w) => !s.commissions?.includes(w.id));
+  s.res.prestige += MASTERPIECE_PRESTIGE;
+  if (left2.length) {
+    const weights = left2.map((w) => (w.id === 'tapestry' && s.charters?.includes('craft3a') ? 2 : 1));
+    let r = rng.next() * weights.reduce((x, y) => x + y, 0);
+    let pick = left2[0];
+    for (let k = 0; k < left2.length; k++) {
+      r -= weights[k];
+      if (r < 0) {
+        pick = left2[k];
+        break;
+      }
+    }
+    (s.commissions ??= []).push(pick.id);
+    log(s, `A masterpiece from the atelier: ${pick.desc.toLowerCase()}. +${MASTERPIECE_PRESTIGE} prestige.`, 'good', at);
+  } else log(s, `Another masterpiece from the atelier. +${MASTERPIECE_PRESTIGE} prestige.`, 'good', at);
+  a.rest = 12;
+  a.chance /= 2;
 }
 
 /** Why the lord cannot call a feast now, or null. */
@@ -362,7 +433,7 @@ export const EVENTS: DecisionEvent[] = [
         label: 'Quarantine the sick lanes',
         detail: 'About one in twenty is lost; happiness −4 for a season.',
         apply: (st) => {
-          const n = Math.max(1, Math.round(st.population * 0.05));
+          const n = Math.max(1, Math.round(st.population * 0.05 * sickShare(st)));
           st.population -= n;
           addMood(st, 'The quarantine', -4, 3);
           return { text: `The sick lanes were closed off. ${n} villagers did not live to see them opened.`, kind: 'bad' };
@@ -372,7 +443,7 @@ export const EVENTS: DecisionEvent[] = [
         label: 'Pray for deliverance',
         detail: 'About one in ten is lost; happiness −6 for a season.',
         apply: (st) => {
-          const n = Math.max(1, Math.round(st.population * 0.1));
+          const n = Math.max(1, Math.round(st.population * 0.1 * sickShare(st)));
           st.population -= n;
           addMood(st, 'The fever', -6, 3);
           return { text: `The bells rang day and night. ${n} villagers were buried before the fever broke.`, kind: 'bad' };
@@ -1404,4 +1475,9 @@ export function autoResolve(s: GameState, rng: StateRng): void {
   }
   const i = e.choices(s).findIndex((c) => !c.blocked?.(s));
   if (i < 0 || !resolveEvent(s, rng, i)) s.pendingEvent = undefined;
+}
+
+/** Share of the usual losses to sickness: an infirmary with its medicine halves them. */
+function sickShare(s: GameState): number {
+  return s.buildings.some((b) => b.type === 'monastery' && b.build >= 1 && b.supplied && b.improved?.includes('infirmary')) ? 0.5 : 1;
 }

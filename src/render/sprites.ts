@@ -1,3 +1,4 @@
+import { optionOn } from '../game/options';
 import { drawHorse } from './horse';
 import { mulberry32 } from '../game/rng';
 import { HERALDRY } from './heraldry';
@@ -642,6 +643,70 @@ export function pavedTile(season: Season, mask: number, layer: 'edge' | 'fill', 
 }
 
 /** Cobbled street (dressed stone): rounded setts over the whole roadway. */
+/**
+ * The Royal Road: broad slabs of pale dressed stone paving the whole tile,
+ * so its two lanes side by side read as one wide way, kerbed where it ends.
+ */
+export function royalTile(season: Season, mask: number, layer: 'edge' | 'fill'): Sprite {
+  return makeSprite(TW + 28, TH + 28, TW / 2 + 14, 14, (ctx) => {
+    const cy = TH / 2;
+    const diamond = (grow: number) => {
+      ctx.beginPath();
+      ctx.moveTo(0, cy - TH / 2 - grow / 2);
+      ctx.lineTo(TW / 2 + grow, cy);
+      ctx.lineTo(0, cy + TH / 2 + grow / 2);
+      ctx.lineTo(-TW / 2 - grow, cy);
+      ctx.closePath();
+    };
+    if (layer === 'edge') {
+      ctx.fillStyle = season === 3 ? 'rgba(170,165,155,0.5)' : 'rgba(120,105,80,0.45)';
+      diamond(5);
+      ctx.fill();
+      return;
+    }
+    ctx.fillStyle = season === 3 ? '#d8d6d0' : '#c9bfa8';
+    diamond(1);
+    ctx.fill();
+    // Slabs in courses across the tile.
+    ctx.strokeStyle = season === 3 ? '#b8b4ac' : '#9c917a';
+    ctx.lineWidth = 0.7;
+    const rand = mulberry32(mask * 29 + 5);
+    for (let k = 1; k < 4; k++) {
+      const t = k / 4;
+      ctx.beginPath();
+      ctx.moveTo(-TW / 2 + (TW / 2) * t, cy - (TH / 2) * t);
+      ctx.lineTo((TW / 2) * t, cy + TH / 2 - (TH / 2) * t);
+      ctx.stroke();
+    }
+    for (let k = 0; k < 8; k++) {
+      const u = rand() - 0.5;
+      const v = rand() - 0.5;
+      const x = (u - v) * (TW / 2);
+      const y = cy + (u + v) * (TH / 2);
+      ctx.beginPath();
+      ctx.moveTo(x - 3, y - 1.5);
+      ctx.lineTo(x + 3, y + 1.5);
+      ctx.stroke();
+    }
+    // A kerb where the road stops (sides with no road beside).
+    ctx.strokeStyle = season === 3 ? '#a8a49c' : '#7e735e';
+    ctx.lineWidth = 1.4;
+    const sides: [number, [number, number], [number, number]][] = [
+      [1, [TW / 2, cy], [0, cy + TH / 2]],
+      [2, [0, cy + TH / 2], [-TW / 2, cy]],
+      [4, [-TW / 2, cy], [0, cy - TH / 2]],
+      [8, [0, cy - TH / 2], [TW / 2, cy]],
+    ];
+    for (const [bit, a, b] of sides) {
+      if (mask & bit) continue;
+      ctx.beginPath();
+      ctx.moveTo(a[0], a[1]);
+      ctx.lineTo(b[0], b[1]);
+      ctx.stroke();
+    }
+  });
+}
+
 export function cobbleTile(season: Season, mask: number, layer: 'edge' | 'fill'): Sprite {
   return makeSprite(TW + 28, TH + 28, TW / 2 + 14, 14, (ctx) => {
     const cx = 0;
@@ -1170,13 +1235,20 @@ export function variantOf(s: GameState, b: Building): number {
     }
     return fore > side ? 1 : 0;
   }
+  // Stained-glass windows once the town has them put in.
+  if (b.type === 'church') return optionOn(s, 'windows') && (s.glazed ?? 0) > 0 ? 1 : 0;
   if (b.type !== 'house') return 0;
   const trade = b.trade ? HOME_TRADES.indexOf(b.trade) + 1 : 0;
   // Colours, yard, craft and the shape of the house, which the id picks.
   const forms = HOUSE_FORMS[Math.max(1, Math.min(4, b.level))] || 5;
   const form = (((b.id * 2654435761) >>> 0) >>> 7) % forms;
-  return ((b.id * 7 + b.x) % 4) + 4 * Math.max(0, YARD_CODES.indexOf(b.yard ?? null)) + 16 * trade + 128 * form;
+  return ((b.id * 7 + b.x) % 4) + 4 * Math.max(0, YARD_CODES.indexOf(b.yard ?? null)) + 16 * trade + 128 * form + (b.limewashed ? 1024 : 0);
 }
+
+/** Panes of stained glass: ruby, sapphire, gold, emerald. */
+const GLASS = ['#b83a3a', '#3a5ab8', '#d8a83a', '#3a8a5a'];
+/** Limewashed walls. */
+const LIMEWASH = '#fbfaf5';
 
 const STONE_COLORS = new Set([STONE, '#c8c0b0', '#9d9488', '#b0a898', '#b6ae9f', '#9d978c', '#a49c8e', '#c8c2b6', '#9b9284']);
 
@@ -1184,7 +1256,7 @@ const STONE_COLORS = new Set([STONE, '#c8c0b0', '#9d9488', '#b0a898', '#b6ae9f',
 function wallMaterial(color: string): Material | undefined {
   if (STONE_COLORS.has(color)) return 'stone';
   if (color === WOOD) return 'plank';
-  if (color === PLASTER || color === '#e8d4b0' || HOUSE_VARIANTS.some((v) => v.wall === color)) return 'plaster';
+  if (color === PLASTER || color === '#e8d4b0' || color === LIMEWASH || HOUSE_VARIANTS.some((v) => v.wall === color)) return 'plaster';
   return undefined;
 }
 
@@ -2601,10 +2673,10 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
         p.box(0.75, 1.15, 2.25, 3.55, 0, 3, STONE);
         p.box(0.78, 1.18, 2.22, 3.52, 3, 19, WOOD);
         for (const y of [1.5, 2.1, 2.7, 3.25]) p.line([2.22, y, 3], [2.22, y, 22], '#5a3a22', 1.4);
-        for (const y of [1.7, 2.3, 2.9]) {
+        [1.7, 2.3, 2.9].forEach((y, k) => {
           p.wallR(2.222, y, y + 0.14, 9, 17, '#2e2a38');
-          p.wallR(2.223, y + 0.02, y + 0.12, 10, 16, season === 3 ? '#e8b850' : '#6a7a9a');
-        }
+          p.wallR(2.223, y + 0.02, y + 0.12, 10, 16, season === 3 ? '#e8b850' : variant ? GLASS[k % GLASS.length] : '#6a7a9a');
+        });
         p.roofY(0.78, 1.18, 2.22, 3.52, 22, 30, 'shingle', WOOD, 0.12);
         // A carved cross on the gable and a gabled porch at the door.
         p.line([1.5, 3.525, 34], [1.5, 3.525, 44], '#5a3a22', 1.4);
@@ -2628,11 +2700,13 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       // Nave.
       p.box(0.6, 1.2, 2.4, 3.65, 0, 32, '#b6ae9f');
       // Buttresses and tall windows.
-      for (const y of [1.6, 2.2, 2.8, 3.4]) {
+      [1.6, 2.2, 2.8, 3.4].forEach((y, k) => {
         p.box(2.4, y - 0.05, 2.5, y + 0.05, 0, 20, '#a49c8e');
         p.wallR(2.402, y + 0.12, y + 0.26, 10, 26, '#3a3a52');
-        p.wallR(2.403, y + 0.14, y + 0.24, 11, 25, season === 3 ? '#e8b850' : '#5a6a9a');
-      }
+        p.wallR(2.403, y + 0.14, y + 0.24, 11, 25, season === 3 ? '#e8b850' : variant ? GLASS[k % GLASS.length] : '#5a6a9a');
+        // Stained glass: leading across the panes.
+        if (variant && season !== 3) p.line([2.404, y + 0.14, 18], [2.404, y + 0.24, 18], '#2a2a3a', 0.6);
+      });
       // Front gable with door and rose window.
       p.roofY(0.6, 1.2, 2.4, 3.65, 32, 26, 'slate', '#b6ae9f', 0.1);
       p.wallL(3.652, 1.3, 1.7, 0, 18, '#4a2f1b');
@@ -2646,6 +2720,20 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       p.ctx.beginPath();
       p.ctx.arc(rx, ry, 3.5, 0, Math.PI * 2);
       p.ctx.fill();
+      if (variant && season !== 3) {
+        // A rose of coloured petals.
+        for (let k = 0; k < 6; k++) {
+          p.ctx.fillStyle = GLASS[k % GLASS.length];
+          p.ctx.beginPath();
+          p.ctx.moveTo(rx, ry);
+          p.ctx.arc(rx, ry, 3.5, (k * Math.PI) / 3, ((k + 1) * Math.PI) / 3);
+          p.ctx.fill();
+        }
+        p.ctx.fillStyle = '#e8c860';
+        p.ctx.beginPath();
+        p.ctx.arc(rx, ry, 1.1, 0, Math.PI * 2);
+        p.ctx.fill();
+      }
       break;
     }
     case 'monastery': {
@@ -2762,6 +2850,279 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
         }
         c.fillStyle = '#3a2a1a';
         c.fillRect(sx - 0.6, sy - 1.2, 1.2, 1.2);
+      }
+      break;
+    }
+    case 'beekeeper': {
+      // A little hut, a bench of straw skeps in the meadow and a veil on a peg.
+      p.shadow(0.3, 0.3, 1.1, 1.0);
+      p.box(0.3, 0.3, 1.05, 0.95, 0, 11, PLASTER);
+      p.timber(0.3, 0.3, 1.05, 0.95, 0, 11, BEAM);
+      p.doorL(0.95, 0.6, 0.18, 9);
+      p.roofX(0.3, 0.3, 1.05, 0.95, 11, 10, 'thatch', PLASTER, 0.1);
+      if (season !== 3) for (const [x, y] of [[1.35, 0.5], [1.65, 0.9], [0.5, 1.45]] as const) p.bush(x, y, 3, '#c8a8d8');
+      p.box(0.85, 1.25, 1.8, 1.4, 4, 1.2, '#8a6440');
+      for (const x of [0.88, 1.77]) p.line([x, 1.38, 0], [x, 1.38, 4], BEAM, 1);
+      for (const x of [1.0, 1.25, 1.5, 1.72]) skep(p, x, 1.32, 5.2);
+      p.box(1.3, 0.35, 1.75, 0.6, 0, 3, '#7b5a36');
+      skep(p, 1.42, 0.47, 3);
+      skep(p, 1.62, 0.47, 3);
+      break;
+    }
+    case 'papermill': {
+      // A stone mill on the water: the wheel drives the stampers; sheets dry on lines.
+      p.shadow(0.3, 0.3, 1.35, 1.6);
+      p.box(0.3, 0.3, 1.35, 1.6, 0, 10, STONE, undefined, 'stone');
+      p.box(0.28, 0.28, 1.37, 1.62, 10, 10, PLASTER);
+      p.timber(0.28, 0.28, 1.37, 1.62, 10, 10, BEAM);
+      p.doorL(1.6, 0.55, 0.2, 10);
+      // Louvred drying loft.
+      for (let k = 0; k < 4; k++) p.wallL(1.623, 0.85 + k * 0.12, 0.93 + k * 0.12, 12, 18, '#5a4030');
+      p.roofX(0.28, 0.28, 1.37, 1.62, 20, 15, 'tile', PLASTER, 0.1);
+      waterWheel(p, 1.62, 0.95, 11, 0.45, 11, season);
+      // Sheets of paper drying on a line by the door.
+      p.line([0.35, 1.8, 0], [0.35, 1.8, 12], BEAM, 1);
+      p.line([1.15, 1.8, 0], [1.15, 1.8, 12], BEAM, 1);
+      p.line([0.35, 1.8, 12], [1.15, 1.8, 12], '#6a5a4a', 0.5);
+      for (let k = 0; k < 5; k++) p.wallL(1.801, 0.42 + k * 0.15, 0.53 + k * 0.15, 6.5, 11.8, k % 2 ? '#f4ecd8' : '#ece4d0');
+      break;
+    }
+    case 'embroiderer': {
+      // A tall shop with a wide window, a gown on a stand and bolts of dyed cloth.
+      p.shadow(0.3, 0.3, 1.4, 1.3);
+      p.box(0.3, 0.3, 1.35, 1.25, 0, 12, STONE, undefined, 'stone');
+      p.box(0.28, 0.28, 1.37, 1.27, 12, 11, '#e6d2b0');
+      p.timber(0.28, 0.28, 1.37, 1.27, 12, 11, BEAM);
+      p.wallL(1.252, 0.4, 0.95, 3, 10, '#4a3020');
+      p.wallL(1.253, 0.43, 0.92, 4, 9, season === 3 ? '#e8b850' : '#3a3540');
+      p.doorL(1.25, 1.05, 0.18, 10);
+      p.windowL(1.27, 0.6, 15, 0.14, 5);
+      p.roofX(0.28, 0.28, 1.37, 1.27, 23, 14, 'tile', '#e6d2b0', 0.1);
+      // An awning over the window, striped in the lord's colours.
+      for (let k = 0; k < 6; k++) p.poly([[0.38 + k * 0.1, 1.27, 11], [0.48 + k * 0.1, 1.27, 11], [0.48 + k * 0.1, 1.45, 8.5], [0.38 + k * 0.1, 1.45, 8.5]], k % 2 ? '#7a3ab0' : '#e8d8b0');
+      gown(p, 1.62, 1.55, '#7a3ab0');
+      for (const [x, y, c] of [[1.62, 0.55, '#2f4fa8'], [1.72, 0.78, '#a83a2a'], [1.62, 1.0, '#4f8a3c']] as [number, number, string][]) p.line([x, y - 0.1, 3], [x, y + 0.1, 3], c, 5);
+      break;
+    }
+    case 'glazier': {
+      // A stone workshop with a kiln, a bench of coloured panes and finished windows.
+      p.shadow(0.3, 0.3, 1.4, 1.3);
+      p.box(0.3, 0.3, 1.3, 1.2, 0, 15, STONE, undefined, 'stone');
+      p.doorL(1.2, 0.85, 0.18, 10);
+      lancetL(p, 1.202, 0.45, 0.16, 5, 11, season === 3);
+      p.roofX(0.3, 0.3, 1.3, 1.2, 15, 12, 'slate', STONE, 0.1);
+      smoke.push(p.chimney(0.45, 0.45, 24, 10, '#7a7268'));
+      // Panes leaning on a rack.
+      p.box(1.45, 0.35, 1.85, 1.05, 0, 1, '#8a6440');
+      const cols = ['#3a62c4', '#c42b3a', '#d8a838', '#4f8a3c', '#7a3ab0'];
+      for (let k = 0; k < 5; k++) {
+        const y = 0.42 + k * 0.12;
+        p.poly([[1.5, y, 1], [1.5, y + 0.1, 1], [1.56, y + 0.1, 11], [1.56, y, 11]], cols[k]);
+        p.poly([[1.5, y, 1], [1.5, y + 0.1, 1], [1.56, y + 0.1, 11], [1.56, y, 11]], null, '#2a2a30', 0.5);
+      }
+      // A finished window crated for the church.
+      p.crate(0.5, 1.45, 0.24);
+      p.wallL(1.692, 0.54, 0.7, 4, 9.5, '#3a62c4');
+      p.wallL(1.693, 0.54, 0.7, 6.5, 7.5, '#d8a838');
+      break;
+    }
+    case 'cobbler': {
+      // A small shop with a boot sign and a last on the bench outside.
+      p.shadow(0.35, 0.3, 1.4, 1.3);
+      p.box(0.35, 0.35, 1.35, 1.25, 0, 12, '#dfbd88');
+      p.timber(0.35, 0.35, 1.35, 1.25, 0, 12, BEAM);
+      p.doorL(1.25, 0.75, 0.2, 10);
+      p.windowL(1.25, 0.45, 4, 0.14, 5, season === 3);
+      p.roofX(0.35, 0.35, 1.35, 1.25, 12, 11, 'shingle', '#dfbd88', 0.12);
+      p.line([1.36, 1.2, 14], [1.55, 1.35, 14], '#3b2a1a', 1.2);
+      bootSign(p, 1.5, 1.33, 8);
+      p.box(1.45, 0.45, 1.85, 0.75, 5, 1.2, '#8a6440');
+      for (const x of [1.48, 1.82]) p.line([x, 0.72, 0], [x, 0.72, 5], BEAM, 1);
+      bootSign(p, 1.6, 0.6, 6.2);
+      bootSign(p, 1.74, 0.6, 6.2);
+      p.sack(0.55, 1.6, '#7a4a2a');
+      break;
+    }
+    case 'watersawmill': {
+      // An open-sided timber mill on the water: the wheel drives a frame saw.
+      p.shadow(0.3, 0.3, 1.4, 1.6);
+      p.logPile(0.3, 0.2, 2);
+      p.box(0.3, 0.3, 1.35, 1.6, 0, 3, STONE, undefined, 'stone');
+      for (const [x, y] of [[0.35, 0.35], [1.3, 0.35], [0.35, 1.55], [1.3, 1.55]]) p.line([x, y, 3], [x, y, 16], BEAM, 2);
+      // The saw frame and a log on the carriage.
+      p.line([0.8, 0.95, 3], [0.8, 0.95, 14], '#5a3e26', 1.4);
+      p.line([0.8, 1.15, 3], [0.8, 1.15, 14], '#5a3e26', 1.4);
+      p.line([0.8, 1.05, 4], [0.8, 1.05, 13], '#c8ccd4', 1);
+      p.line([0.45, 1.05, 5], [1.2, 1.05, 5], '#8a6236', 5);
+      p.roofX(0.28, 0.28, 1.37, 1.0, 16, 10, 'shingle', WOOD, 0.06);
+      waterWheel(p, 1.62, 0.95, 9, 0.42, 9, season);
+      for (let i = 0; i < 3; i++) p.box(0.4, 1.7, 1.2, 1.85, i * 2.2, 2, i % 2 ? '#d7b47c' : '#c8a46c');
+      break;
+    }
+    case 'silvermine': {
+      // An adit into the rock with a timber frame, a windlass, and a heap of bright ore.
+      for (const [x, y, r] of [[0.5, 0.4, 14], [1.1, 0.3, 16], [1.6, 0.55, 12]] as const) rockLump(p, x, y, r, '#8a8478', 3);
+      rockLump(p, 1.0, 0.8, 13, '#8a8478', 5);
+      p.wallL(0.952, 0.82, 1.18, 0, 10, '#141210');
+      p.line([0.78, 0.96, 0], [0.78, 0.96, 12], BEAM, 2);
+      p.line([1.22, 0.96, 0], [1.22, 0.96, 12], BEAM, 2);
+      p.line([0.74, 0.96, 12], [1.26, 0.96, 12], BEAM, 2.2);
+      // Windlass.
+      p.line([1.5, 1.2, 0], [1.5, 1.2, 9], BEAM, 1.4);
+      p.line([1.5, 1.5, 0], [1.5, 1.5, 9], BEAM, 1.4);
+      p.line([1.5, 1.2, 9], [1.5, 1.5, 9], '#6b4a2e', 3);
+      for (const [dx, dy] of [[0, 0], [0.12, 0.06], [-0.08, 0.1], [0.05, 0.16]]) {
+        rockLump(p, 0.7 + dx, 1.5 + dy, 3.5, '#9a9aa4', 7);
+        const [sx, sy] = iso(0.7 + dx, 1.5 + dy, 2);
+        p.ctx.fillStyle = '#eef2f8';
+        p.ctx.fillRect(sx - 1, sy - 2, 1.6, 1.2);
+      }
+      p.barrel(1.2, 1.65);
+      break;
+    }
+    case 'bathhouse': {
+      // A low stone house with a tiled roof, steam from the vents and a woodpile.
+      p.shadow(0.2, 0.25, 2.8, 1.7);
+      p.box(0.25, 0.3, 2.75, 1.6, 0, 14, STONE, undefined, 'stone');
+      p.doorL(1.6, 1.3, 0.24, 11);
+      for (const x of [0.5, 0.85, 2.0, 2.35]) p.windowL(1.6, x, 6, 0.14, 5, true);
+      p.windowR(2.75, 0.8, 6, 0.14, 5, true);
+      p.roofX(0.25, 0.3, 2.75, 1.6, 14, 13, 'tile', STONE, 0.1);
+      for (const x of [0.9, 1.9]) {
+        p.box(x, 0.85, x + 0.18, 1.05, 21, 4, '#8a7d70', undefined, 'stone');
+        smoke.push([x + 0.09, 0.95, 26]);
+      }
+      p.logPile(0.3, 1.9, 2);
+      tub(p, 2.5, 1.85, 6, 5, '#7ab0c8');
+      break;
+    }
+    case 'school': {
+      // A schoolroom with tall windows, a bell on the gable and a yard with a slate board.
+      p.shadow(0.25, 0.3, 2.75, 1.5);
+      p.box(0.25, 0.3, 2.7, 1.45, 0, 14, PLASTER);
+      p.timber(0.25, 0.3, 2.7, 1.45, 0, 14, BEAM);
+      p.doorL(1.45, 1.35, 0.2, 10);
+      for (const x of [0.45, 0.8, 1.75, 2.1, 2.4]) p.windowL(1.452, x, 4, 0.16, 7, season === 3);
+      p.roofX(0.25, 0.3, 2.7, 1.45, 14, 12, 'tile', PLASTER, 0.1);
+      // Bell-cote on the near gable.
+      p.box(2.55, 0.8, 2.75, 0.95, 26, 6, '#8a7d70');
+      p.wallR(2.752, 0.83, 0.92, 27, 31, '#2a2522');
+      p.circle(2.75, 0.875, 28.5, 1.4, '#c89a38');
+      // A slate board on legs in the yard.
+      p.line([1.0, 1.75, 0], [1.0, 1.75, 9], BEAM, 1);
+      p.line([1.5, 1.75, 0], [1.5, 1.75, 9], BEAM, 1);
+      p.wallL(1.75, 0.95, 1.55, 4, 10, '#7a5230');
+      p.wallL(1.751, 0.99, 1.51, 4.6, 9.4, '#33403a');
+      p.line([1.08, 1.752, 8], [1.3, 1.752, 6], '#f2ece0', 0.5);
+      break;
+    }
+    case 'taxoffice': {
+      // A sober stone office: barred window, a chest by the door, the lord's arms over it.
+      p.shadow(0.3, 0.3, 1.4, 1.3);
+      p.box(0.3, 0.3, 1.35, 1.25, 0, 16, '#b6ae9f', undefined, 'stone');
+      p.doorL(1.25, 0.95, 0.2, 11);
+      p.windowL(1.25, 0.45, 5, 0.18, 7);
+      for (const t of [0.5, 0.56]) p.line([t, 1.253, 5], [t, 1.253, 12], '#2a2a2a', 0.7);
+      p.roofPyramid(0.3, 0.3, 1.35, 1.25, 16, 12, 'slate');
+      p.flag(1.05, 1.252, 13, 5, '#c42b3a');
+      p.box(0.55, 1.4, 0.85, 1.6, 0, 5, '#6a4426');
+      p.box(0.55, 1.4, 0.85, 1.6, 5, 0.8, '#c89a38');
+      p.sack(1.5, 0.8, '#d8c79c');
+      break;
+    }
+    case 'courthouse': {
+      // A great hall of dressed stone with a porch on columns and a watch at the door.
+      p.shadow(0.2, 0.2, 2.8, 2.8);
+      p.box(0.3, 0.3, 2.7, 2.2, 0, 22, '#cfc8b8', undefined, 'stone');
+      for (const x of [0.6, 1.0, 1.9, 2.3]) lancetL(p, 2.202, x, 0.16, 8, 15, season === 3);
+      p.roofX(0.3, 0.3, 2.7, 2.2, 22, 16, 'slate', '#cfc8b8', 0.1);
+      // The porch.
+      p.box(1.25, 2.2, 1.75, 2.75, 0, 1.5, '#b8b0a0');
+      for (const x of [1.3, 1.7]) p.line([x, 2.7, 1.5], [x, 2.7, 13], '#e0dacc', 2.2);
+      p.wallL(2.202, 1.38, 1.62, 0, 11, '#4a2f1b');
+      p.roofY(1.22, 2.2, 1.78, 2.78, 13, 7, 'slate', '#cfc8b8', 0.04);
+      // Scales of justice carved over the door.
+      const [sx, sy] = iso(1.5, 2.781, 17);
+      p.ctx.strokeStyle = '#c89a38';
+      p.ctx.lineWidth = 0.8;
+      p.ctx.beginPath();
+      p.ctx.moveTo(sx, sy - 3);
+      p.ctx.lineTo(sx, sy + 1.5);
+      p.ctx.moveTo(sx - 3, sy - 2);
+      p.ctx.lineTo(sx + 3, sy - 2);
+      p.ctx.stroke();
+      p.flag(2.65, 2.2, 22, 8, '#2f4fa8');
+      break;
+    }
+    case 'atelier': {
+      // A palace studio: tall north windows, an easel in the yard, a loom inside.
+      p.shadow(0.3, 0.3, 1.45, 1.4);
+      p.box(0.3, 0.3, 1.4, 1.3, 0, 18, '#e6dcc6', undefined, 'stone');
+      for (const x of [0.45, 0.8]) p.windowL(1.302, x, 6, 0.2, 10, true);
+      p.doorL(1.3, 1.1, 0.18, 10);
+      p.roofX(0.3, 0.3, 1.4, 1.3, 18, 9, 'slate', '#e6dcc6', 0.1);
+      // Easel with a painting in progress.
+      p.line([1.6, 1.4, 0], [1.66, 1.5, 13], '#7a5230', 1.2);
+      p.line([1.78, 1.4, 0], [1.72, 1.5, 13], '#7a5230', 1.2);
+      p.line([1.69, 1.62, 0], [1.69, 1.5, 12], '#7a5230', 1);
+      p.wallL(1.52, 1.55, 1.85, 5, 12, '#f4ecd8');
+      p.wallL(1.521, 1.58, 1.82, 6, 11, '#6a9ad0');
+      p.wallL(1.522, 1.58, 1.82, 6, 8, '#5a8a4a');
+      p.circle(1.75, 1.522, 10, 1.2, '#f2d34a');
+      p.bush(0.55, 1.65, 4, '#4f8a3c');
+      break;
+    }
+    case 'barracks': {
+      // A long stone barracks with a weapon rack and a guard's banner.
+      p.shadow(0.25, 0.3, 1.6, 1.5);
+      p.box(0.3, 0.3, 1.6, 1.4, 0, 14, '#a49c8e', undefined, 'stone');
+      p.doorL(1.4, 1.1, 0.22, 11);
+      for (const x of [0.45, 0.75]) p.windowL(1.402, x, 6, 0.12, 4);
+      p.roofX(0.3, 0.3, 1.6, 1.4, 14, 10, 'slate', '#a49c8e', 0.1);
+      p.line([0.4, 1.75, 0], [0.4, 1.75, 14], BEAM, 1.2);
+      p.flag(0.4, 1.75, 14, 7, '#c42b3a');
+      // Spears in a rack.
+      p.box(1.0, 1.65, 1.5, 1.72, 0, 6, '#7b5a36');
+      for (let k = 0; k < 5; k++) {
+        const x = 1.04 + k * 0.1;
+        p.line([x, 1.68, 0], [x, 1.68, 15], '#8a6440', 0.8);
+        p.line([x, 1.68, 15], [x, 1.68, 17], '#c8ccd4', 1.2);
+      }
+      break;
+    }
+    case 'stewpond': {
+      // A stone-edged pond with lilies, a little sluice and a net drying.
+      p.poly([[0.25, 0.3, 0], [1.75, 0.3, 0], [1.75, 1.7, 0], [0.25, 1.7, 0]], '#9d978c');
+      p.poly([[0.35, 0.4, 0], [1.65, 0.4, 0], [1.65, 1.6, 0], [0.35, 1.6, 0]], season === 3 ? '#cfe0e8' : '#4a7ab0');
+      if (season !== 3) {
+        for (const [x, y] of [[0.6, 0.7], [1.2, 1.1], [0.9, 1.4], [1.4, 0.6]]) {
+          p.ellipse(x, y, 0, 3, 1.4, '#4f8a3c');
+          p.circle(x + 0.03, y, 0.5, 0.8, '#f2d0e0');
+        }
+        const [fx, fy] = iso(1.05, 0.8, 0);
+        p.ctx.strokeStyle = 'rgba(220,235,245,0.7)';
+        p.ctx.lineWidth = 0.6;
+        p.ctx.beginPath();
+        p.ctx.ellipse(fx, fy, 4, 1.6, 0, 0, Math.PI * 2);
+        p.ctx.stroke();
+      }
+      p.line([1.85, 0.5, 0], [1.85, 0.5, 8], BEAM, 1);
+      p.line([1.85, 1.1, 0], [1.85, 1.1, 8], BEAM, 1);
+      p.wallR(1.85, 0.52, 1.08, 3, 8, 'rgba(120,100,70,0.45)');
+      break;
+    }
+    case 'tiltyard': {
+      // A lists: a long barrier, stands at one side, pennants on poles.
+      p.poly([[0.2, 0.2, 0], [3.8, 0.2, 0], [3.8, 1.8, 0], [0.2, 1.8, 0]], season === 3 ? '#e4e8e8' : '#c8b480');
+      p.box(0.4, 0.95, 3.6, 1.05, 0, 4, '#a83a2a');
+      for (let k = 0; k <= 8; k++) p.line([0.4 + k * 0.4, 1.0, 0], [0.4 + k * 0.4, 1.0, 5], '#e8d8b0', 1);
+      // Stands.
+      p.box(1.2, 0.2, 2.8, 0.5, 0, 6, '#8a6440');
+      p.box(1.2, 0.2, 2.8, 0.35, 6, 4, '#7b5a36');
+      p.roofX(1.15, 0.15, 2.85, 0.55, 12, 4, 'plank', WOOD, 0.04);
+      for (const [x, c] of [[0.3, '#c42b3a'], [1.3, '#2f4fa8'], [2.7, '#d8a838'], [3.7, '#4f8a3c']] as [number, string][]) {
+        p.line([x, 1.7, 0], [x, 1.7, 18], BEAM, 1);
+        p.flag(x, 1.7, 18, 5, c);
       }
       break;
     }
@@ -3692,25 +4053,7 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       if (season !== 3) p.poly([[1.42, 0.22, 25], [1.83, 0.22, 25], [1.83, 0.34, 25], [1.42, 0.34, 25]], '#6aa0c0');
       p.line([1.84, 0.28, 0], [1.84, 0.28, 22], BEAM, 1.6);
       // The wheel, upright beside the wall.
-      const wx = 1.62;
-      const wy = 0.95;
-      const wz = 12;
-      const R = 0.5;
-      const RZ = 12;
-      const ring = (k: number, r: number): V3 => [wx, wy + Math.cos(k) * r, wz + Math.sin(k) * (RZ * r) / R];
-      const pts: V3[] = [];
-      for (let k = 0; k < 24; k++) pts.push(ring((k / 24) * Math.PI * 2, R));
-      p.poly(pts, null, '#5a3e26', 2.2);
-      const inner: V3[] = [];
-      for (let k = 0; k < 24; k++) inner.push(ring((k / 24) * Math.PI * 2, R * 0.82));
-      p.poly(inner, null, '#6b4a2c', 1);
-      for (let k = 0; k < 8; k++) {
-        const a = (k / 8) * Math.PI * 2;
-        p.line([wx, wy, wz], ring(a, R), '#6b4a2c', 1);
-        const o = ring(a, R);
-        p.line(o, [o[0] + 0.08, o[1], o[2]], '#8a6440', 2);
-      }
-      p.circle(wx, wy, wz, 2, '#4a3020');
+      waterWheel(p, 1.62, 0.95, 12, 0.5, 12, season);
       if (season !== 3) {
         // Water spilling off the paddles into the stream.
         p.line([1.7, 0.42, 22], [1.7, 0.5, 12], 'rgba(170,210,230,0.8)', 1.4);
@@ -4313,11 +4656,13 @@ export const HOUSE_FORMS = [0, 5, 5, 3, 3];
 
 /** Splits a house variant: colours, yard extension, home craft and shape. */
 function homeParts(variant: number) {
+  const hv = HOUSE_VARIANTS[variant % HOUSE_VARIANTS.length];
   return {
-    hv: HOUSE_VARIANTS[variant % HOUSE_VARIANTS.length],
+    // Limewashed homes are white whatever their colour was.
+    hv: variant >= 1024 ? { ...hv, wall: LIMEWASH } : hv,
     yard: YARD_CODES[Math.floor(variant / HOUSE_VARIANTS.length) % YARD_CODES.length] ?? null,
     trade: HOME_TRADES[(Math.floor(variant / 16) % 8) - 1] ?? null,
-    form: Math.floor(variant / 128),
+    form: Math.floor(variant / 128) % 8,
   };
 }
 
@@ -5147,8 +5492,53 @@ export function stallSprite(kind: number, season: Season, open: boolean): Sprite
   });
 }
 
+/** A strawberry bed: low leafy plants on straw, white flowers in spring and red berries in summer. */
+function strawberrySprite(season: Season, stage: number, fruiting: boolean, blossom: boolean): Sprite {
+  return makeSprite(56, 28, 28, 16, (ctx) => {
+    const winter = season === 3;
+    // Two ridges of straw down the bed.
+    for (const dy of [-3, 3]) {
+      ctx.fillStyle = winter ? '#e4e8ea' : '#d8c084';
+      ctx.beginPath();
+      ctx.ellipse(0, dy, 20, 3.2, -0.46, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (winter) return;
+    const rand = mulberry32(11);
+    const k = 0.5 + 0.5 * stage;
+    for (let i = 0; i < 9; i++) {
+      const t = i / 8 - 0.5;
+      const row = i % 2 ? 3 : -3;
+      const x = t * 34 + (rand() - 0.5) * 2;
+      const y = row - t * 15;
+      for (const [dx, dy] of [
+        [-1.6, -0.6],
+        [1.6, -0.8],
+        [0, -2],
+      ]) {
+        ctx.fillStyle = rand() < 0.5 ? '#4e8a36' : '#5e9a3e';
+        ctx.beginPath();
+        ctx.ellipse(x + dx * k, y + dy * k - 1, 2 * k, 1.4 * k, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      if (blossom || (stage >= 1 && !fruiting && season === 0)) {
+        ctx.fillStyle = '#f8f4ea';
+        ctx.fillRect(x - 0.6, y - 4 * k, 1.3, 1.3);
+      }
+      if (fruiting) {
+        ctx.fillStyle = '#d8323a';
+        ctx.beginPath();
+        ctx.arc(x + 1.4, y - 0.4, 1.1, 0, Math.PI * 2);
+        ctx.arc(x - 1.2, y + 0.2, 1, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  });
+}
+
 export function fruitTreeSprite(fruit: string, season: Season, stage: number, fruiting: boolean, blossom = false): Sprite {
   if (fruit === 'grapes') return vineSprite(season, stage, fruiting);
+  if (fruit === 'strawberries') return strawberrySprite(season, stage, fruiting, blossom);
   return makeSprite(36, 48, 18, 42, (ctx) => {
     const k = 0.45 + 0.55 * stage;
     const trunkH = 9 * k;
@@ -5255,6 +5645,90 @@ export function oreHeap(p: Pen, x: number, y: number, n = 5): void {
 }
 
 /** Squared, freshly cut blocks of pale stone, stacked. */
+/** A water wheel standing upright on the +x side of a mill, in its race. */
+function waterWheel(p: Pen, wx: number, wy: number, wz: number, R: number, RZ: number, season: Season): void {
+  const ring = (k: number, r: number): V3 => [wx, wy + Math.cos(k) * r, wz + Math.sin(k) * (RZ * r) / R];
+  const pts: V3[] = [];
+  for (let k = 0; k < 24; k++) pts.push(ring((k / 24) * Math.PI * 2, R));
+  p.poly(pts, null, '#5a3e26', 2.2);
+  const inner: V3[] = [];
+  for (let k = 0; k < 24; k++) inner.push(ring((k / 24) * Math.PI * 2, R * 0.82));
+  p.poly(inner, null, '#6b4a2c', 1);
+  for (let k = 0; k < 8; k++) {
+    const a = (k / 8) * Math.PI * 2;
+    p.line([wx, wy, wz], ring(a, R), '#6b4a2c', 1);
+    const o = ring(a, R);
+    p.line(o, [o[0] + 0.08, o[1], o[2]], '#8a6440', 2);
+  }
+  p.circle(wx, wy, wz, 2, '#4a3020');
+  if (season !== 3) p.line([wx + 0.08, wy - R, 1], [wx + 0.08, wy + R * 1.6, 0], 'rgba(200,230,240,0.6)', 1);
+}
+
+/** A straw bee skep on a bench (z), coiled in rings, with its little door. */
+function skep(p: Pen, x: number, y: number, z: number): void {
+  const [sx, sy] = iso(x, y, z);
+  const c = p.ctx;
+  c.fillStyle = '#c8a050';
+  c.beginPath();
+  c.moveTo(sx - 3, sy);
+  c.quadraticCurveTo(sx - 3.2, sy - 6, sx, sy - 6.5);
+  c.quadraticCurveTo(sx + 3.2, sy - 6, sx + 3, sy);
+  c.closePath();
+  c.fill();
+  c.strokeStyle = '#9a7a38';
+  c.lineWidth = 0.5;
+  for (const h of [1.8, 3.6, 5]) {
+    c.beginPath();
+    c.moveTo(sx - 3 + h * 0.15, sy - h);
+    c.lineTo(sx + 3 - h * 0.15, sy - h);
+    c.stroke();
+  }
+  c.fillStyle = '#3a2a1a';
+  c.fillRect(sx - 0.6, sy - 1.2, 1.2, 1.2);
+}
+
+/** A gown on a dress form. */
+function gown(p: Pen, x: number, y: number, color: string): void {
+  const [gx, gy] = iso(x, y, 0);
+  const c = p.ctx;
+  c.fillStyle = 'rgba(30,24,12,0.22)';
+  c.beginPath();
+  c.ellipse(gx + 1, gy, 4.5, 1.8, 0, 0, Math.PI * 2);
+  c.fill();
+  c.fillStyle = color;
+  c.beginPath();
+  c.moveTo(gx - 1.6, gy - 15);
+  c.lineTo(gx + 1.6, gy - 15);
+  c.lineTo(gx + 1.2, gy - 11);
+  c.lineTo(gx + 4, gy - 3);
+  c.lineTo(gx - 4, gy - 3);
+  c.lineTo(gx - 1.2, gy - 11);
+  c.closePath();
+  c.fill();
+  c.strokeStyle = '#e0b840';
+  c.lineWidth = 0.8;
+  c.beginPath();
+  c.moveTo(gx - 1.3, gy - 11);
+  c.lineTo(gx + 1.3, gy - 11);
+  c.moveTo(gx - 4, gy - 3.2);
+  c.lineTo(gx + 4, gy - 3.2);
+  c.stroke();
+  c.strokeStyle = '#5e4129';
+  c.lineWidth = 1;
+  c.beginPath();
+  c.moveTo(gx, gy);
+  c.lineTo(gx, gy - 3);
+  c.stroke();
+}
+
+/** A boot, as a shop sign or on the bench (z). */
+function bootSign(p: Pen, x: number, y: number, z: number): void {
+  const [bx, by] = iso(x, y, z);
+  p.ctx.fillStyle = '#6a3e22';
+  p.ctx.fillRect(bx - 2, by - 5, 3, 5);
+  p.ctx.fillRect(bx - 2, by - 1, 6, 2);
+}
+
 /** A pointed window of coloured glass in a wall facing +y, its panes leaded in bands. */
 function lancetL(p: Pen, y: number, x: number, w: number, z0: number, z1: number, lit: boolean): void {
   p.wallL(y, x - 0.025, x + w + 0.025, z0 - 1, z1, '#3a3a44');
@@ -5465,6 +5939,10 @@ function drawManor(p: Pen, level: number, season: Season, smoke: V3[]): void {
     p.bush(0.85, 2.35, 3.5, '#4f6f34');
     return;
   }
+  if (level >= 4) {
+    drawPalace(p, season, smoke);
+    return;
+  }
   // Stone Manor: three storeys of dressed stone, a matching wing and a
   // corner tower, on grounds of 4x4.
   const ST = '#b6ae9f';
@@ -5515,6 +5993,70 @@ function drawManor(p: Pen, level: number, season: Season, smoke: V3[]): void {
   p.box(1.55, 2.9, 2.1, 3.15, 0, 2, '#9b9284');
   p.wallL(2.905, 1.48, 1.57, 17, 28, arms.field);
   p.wallL(2.905, 2.09, 2.18, 17, 28, arms.field);
+}
+
+/**
+ * The Palace: a pale stone house of state round a gravelled forecourt, two
+ * wings ending in corner pavilions, a columned portico under a pediment and a
+ * copper dome over the hall, the lord's banner flying from its lantern.
+ */
+function drawPalace(p: Pen, season: Season, smoke: V3[]): void {
+  const winter = season === 3;
+  const arms = HERALDRY.current;
+  const ST = '#d4ccbc';
+  const ROOFC = 'slate';
+  p.shadow(0.2, 0.2, 3.85, 3.3);
+  // The forecourt: gravel, with a round basin in the middle.
+  p.poly([[1.1, 2.95, 0], [2.9, 2.95, 0], [3.0, 3.95, 0], [1.0, 3.95, 0]], winter ? '#d8dcda' : '#d2c4a0');
+  p.ellipse(2.0, 3.45, 1, 13, 6.5, '#a8a093');
+  p.ellipse(2.0, 3.45, 2, 11, 5.4, winter ? '#dde8ee' : '#5a8ab0');
+  p.line([2.0, 3.45, 2], [2.0, 3.45, 9], '#bab3a6', 1.6);
+  // Left wing, ridge front to back.
+  p.box(0.3, 0.45, 1.3, 2.95, 0, 36, ST, undefined, 'stone');
+  for (const z of [5, 19]) p.windowL(2.95, 0.55, z, 0.16, 9, winter && z === 5);
+  p.roofY(0.3, 0.45, 1.3, 2.95, 36, 22, ROOFC, ST, 0.08);
+  // The central block of state rooms.
+  p.box(1.3, 0.6, 2.7, 2.6, 0, 46, ST, undefined, 'stone');
+  for (const z of [6, 22]) for (const x of [1.45, 1.75, 2.25, 2.55]) p.windowL(2.6, x, z, 0.14, z === 22 ? 12 : 9, winter && z === 6);
+  for (const x of [1.45, 1.75, 2.0, 2.25, 2.55]) p.windowL(2.6, x - 0.04, 37, 0.12, 5);
+  // A balustrade along the top, and a low hipped roof behind it.
+  p.wallL(2.603, 1.3, 2.7, 43, 46, '#c4bcac');
+  p.roofPyramid(1.3, 0.6, 2.7, 2.6, 46, 12, ROOFC, 0.02);
+  // The dome over the great hall, its lantern and the lord's banner.
+  p.box(1.72, 1.32, 2.28, 1.88, 52, 8, ST);
+  p.ellipse(2.0, 1.6, 60, 22, 11, winter ? '#e6ecee' : '#5f9a86');
+  p.ellipse(2.0, 1.6, 66, 16, 8, winter ? '#f2f6f8' : '#6faa94');
+  p.ellipse(2.0, 1.6, 71, 9, 5, winter ? '#f6f9fa' : '#7cb8a2');
+  p.box(1.94, 1.54, 2.06, 1.66, 74, 6, ST);
+  p.lordFlag(2.0, 1.6, 80, 20);
+  smoke.push(p.chimney(1.45, 0.85, 50, 10, '#a8a093'));
+  // Right wing, ridge front to back.
+  p.box(2.7, 0.45, 3.7, 2.95, 0, 36, ST, undefined, 'stone');
+  for (const y of [0.75, 1.35, 1.95, 2.55]) for (const z of [5, 19]) p.windowR(3.7, y, z, 0.15, 9, winter && z === 5 && y === 1.35);
+  for (const z of [5, 19]) p.windowL(2.95, 3.25, z, 0.16, 9);
+  p.roofY(2.7, 0.45, 3.7, 2.95, 36, 22, ROOFC, ST, 0.08);
+  smoke.push(p.chimney(3.2, 0.8, 52, 12, '#a8a093'));
+  // Corner pavilions at the front of each wing, a storey higher, under tall roofs.
+  for (const x0 of [0.22, 3.08]) {
+    p.box(x0, 2.45, x0 + 0.7, 3.15, 0, 50, ST, undefined, 'stone');
+    for (const z of [6, 22, 38]) p.windowL(3.15, x0 + 0.27, z, 0.15, 9);
+    p.windowR(x0 + 0.7, 2.72, 22, 0.14, 9);
+    p.roofPyramid(x0, 2.45, x0 + 0.7, 3.15, 50, 26, ROOFC, 0.05);
+    p.line([x0 + 0.35, 2.8, 76], [x0 + 0.35, 2.8, 84], '#d8b84a', 1.2);
+  }
+  // The portico: four columns under a pediment carved with the arms.
+  p.box(1.5, 2.6, 2.5, 2.95, 0, 2.5, '#c4bcac');
+  for (const x of [1.58, 1.84, 2.16, 2.42]) {
+    p.line([x, 2.9, 2.5], [x, 2.9, 30], '#efe9dc', 2.4);
+    p.line([x + 0.03, 2.9, 2.5], [x + 0.03, 2.9, 30], 'rgba(120,110,95,0.35)', 0.8);
+  }
+  p.box(1.5, 2.6, 2.5, 2.95, 30, 3, '#e2dccd');
+  p.poly([[1.5, 2.95, 33], [2.5, 2.95, 33], [2.0, 2.95, 43]], '#e8e2d4', '#b8b0a0', 0.8);
+  p.circle(2.0, 2.952, 37, 2.6, arms.field);
+  p.wallL(2.602, 1.86, 2.14, 2.5, 18, '#4a2f1b');
+  // Hangings in the lord's colours either side of the door.
+  p.wallL(2.604, 1.62, 1.7, 14, 26, arms.field);
+  p.wallL(2.604, 2.3, 2.38, 14, 26, arms.field);
 }
 
 /** Ground tile for building yards drawn under some buildings. */

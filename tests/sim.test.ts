@@ -17,7 +17,15 @@ import {
   totalHousing,
 } from '../src/game/sim';
 import type { Building, BuildingType, GameState } from '../src/game/types';
-import { generateWorld, idx } from '../src/game/world';
+import { generateWorld as freshWorld, idx } from '../src/game/world';
+import { learnEverything } from '../src/game/unlocks';
+
+/** A new world where everything is already learned, for testing other systems. */
+function generateWorld(seed: number, opts?: Parameters<typeof freshWorld>[1]): GameState {
+  const s = freshWorld(seed, opts);
+  learnEverything(s);
+  return s;
+}
 
 function hall(s: GameState) {
   return s.buildings.find((b) => (b.type === 'townhall' || b.type === 'camp'))!;
@@ -278,7 +286,7 @@ describe('yards and haulers', () => {
     s.dirty = true;
     recompute(s);
     s.res.wood = 0;
-    run(s, 6);
+    run(s, 12);
     // No storehouse yet: timber goes straight into the manor's store.
     expect(wc.hauled).toBe(false);
     expect(s.res.wood).toBeGreaterThan(0);
@@ -347,7 +355,7 @@ describe('planned roads', () => {
 describe('relaxed mode', () => {
   it('starts with more supplies and nobody leaves when starving', () => {
     const s = generateWorld(5, { relaxed: true });
-    expect(s.res.wood).toBe(140);
+    expect(s.res.wood).toBe(60);
     for (const f of ['berries', 'meat'] as const) s.res[f] = 0;
     run(s, DAYS_PER_MONTH * 3);
     expect(s.population).toBe(8);
@@ -454,6 +462,7 @@ describe('levels', () => {
     const m = manorFor(s);
     expect(placementError(s, 'townhall', 1, 1)).toMatch(/has its manor/);
     s.res.wood = 100;
+    s.res.planks = 50;
     s.res.stone = 40;
     s.res.gold = 200;
     expect(startUpgrade(s, m)).toBe(true);
@@ -466,18 +475,18 @@ describe('levels', () => {
     if (blocker) expect(blocker).toMatch(/ground|coins/);
   });
 
-  it('a cottage needs a well and a market before becoming a Timber House', async () => {
+  it('a cottage needs a church, a well and a market before becoming a Timber House', async () => {
     const { upgradeBlocker, houseNeeds } = await import('../src/game/levels');
     const s = generateWorld(15);
     s.tier = 1;
     hall(s).level = 2;
     const house = placeNearRoad(s, 'house');
     house.build = 1;
-    expect(upgradeBlocker(s, house)).toMatch(/well/);
+    expect(upgradeBlocker(s, house)).toMatch(/church/);
     expect(houseNeeds(s, house, 2).filter((n) => !n.met).length).toBeGreaterThan(0);
   });
 
-  it('the manor stops at the Stone Manor, which opens the garden, watch towers and walls', async () => {
+  it('the Stone Manor opens the garden, watch towers and walls, and the manor stops at the Palace', async () => {
     const { upgradePlan } = await import('../src/game/levels');
     const { isUnlocked, lockReason } = await import('../src/game/sim');
     const s = generateWorld(17);
@@ -489,6 +498,8 @@ describe('levels', () => {
     expect(lockReason(s, 'watchtower')).toMatch(/Stone Manor/);
     expect(upgradePlan(s, m)?.name).toBe('Stone Manor');
     m.level = 3;
+    expect(upgradePlan(s, m)?.name).toBe('Palace');
+    m.level = 4;
     expect(upgradePlan(s, m)).toBeNull();
     for (const t of ['manorgarden', 'watchtower', 'wall'] as const) expect(isUnlocked(s, t)).toBe(true);
   });
@@ -521,7 +532,7 @@ describe('levels', () => {
     s.res.dressedstone = 10;
     expect(buildRoad(s, x, y, 2)).toBe(true);
     expect(buildRoad(s, x, y, 3)).toBe(true);
-    expect(s.res.dressedstone).toBe(9);
+    expect(s.res.dressedstone).toBe(8);
     const i = y * s.width + x;
     expect(s.road[i]).toBe(3);
     s.road[i + 1] = 2;
@@ -574,28 +585,6 @@ describe('labour', () => {
     expect(f.workers).toBeGreaterThan(0);
   });
 
-  it('foragers on auto turn to mushrooms in autumn', async () => {
-    const { chooseRecipe } = await import('../src/game/sim');
-    const s = generateWorld(23);
-    const f = placeNearRoad(s, 'forager');
-    f.build = 1;
-    // A ring of mushrooms in a copse nearby (wild food is sparse near the start).
-    s.mushroomsMax = {};
-    s.mushrooms = {};
-    for (let k = 0; k < 4; k++) {
-      const i = idx(s, f.x + 4 + k, f.y + 4);
-      s.trees[i] = 2;
-      s.mushroomsMax[i] = 2;
-      s.mushrooms[i] = 2;
-    }
-    s.day = DAYS_PER_MONTH * 8; // late autumn: no berries
-    expect(chooseRecipe(s, f)?.id).toBe('mushrooms');
-    f.recipe = 'herbs';
-    expect(chooseRecipe(s, f)?.id).toBe('herbs');
-  });
-});
-
-describe('paved roads', () => {
   it('cost stone (from the start) and make walking cheaper', async () => {
     const { stepCost, roadError } = await import('../src/game/sim');
     const s = generateWorld(24);
@@ -627,6 +616,8 @@ describe('fields, herds, orchards and backyards', () => {
     for (let r = 1; r < 12; r++) {
       for (const [dx, dy] of [[r, 0], [0, r], [-r - w, 0], [0, -r - h], [r, r], [-r - w, -r - h]]) {
         const z = placeZone(s, type, near.x + dx, near.y + dy, near.x + dx + w - 1, near.y + dy + h - 1);
+        // These tests were written for wheat fields.
+        if (z && type === 'field') z.recipe ??= 'wheat';
         if (z) return z;
       }
     }
@@ -744,11 +735,11 @@ describe('workshops and household goods', () => {
     expect(s.res.cider).toBeLessThan(5);
   });
 
-  it('timber houses use up clothes every few months', () => {
+  it('townhouses use up clothes (or boots) every few months', () => {
     const s = generateWorld(42);
     const h = placeNearRoad(s, 'house');
     h.build = 1;
-    h.level = 2;
+    h.level = 3;
     marketBy(s, h);
     // The manor hall fills first.
     s.population = 15;
@@ -855,11 +846,11 @@ describe('charter goods', () => {
     expect(chooseRecipe(s, o, true)?.id).toBe('grapes');
   });
 
-  it('townhouses enjoy luxuries and pay more for them', () => {
+  it("merchant's houses enjoy luxuries and pay more for them", () => {
     const s = generateWorld(62);
     const h = placeNearRoad(s, 'house');
     h.build = 1;
-    h.level = 3;
+    h.level = 4;
     marketBy(s, h);
     s.population = 17;
     s.res.wine = 2;
@@ -922,13 +913,13 @@ describe('batch work', () => {
     k.need = undefined;
     s.population = 10;
     s.res.clay = 8;
-    s.res.firewood = 20;
+    s.res.firewood = 60;
     s.dirty = true;
     run(s, 2);
     expect(k.workers).toBe(0);
     expect(k.status).toMatch(/full batch/);
     s.res.clay = 12;
-    run(s, 30);
+    run(s, 60);
     expect(s.res.tiles).toBeGreaterThan(0);
     expect(k.batchOn).toBe(false);
     run(s, 1);
@@ -976,7 +967,7 @@ describe('steward', () => {
     s.advice = { housing: s.day, 'food-low': s.day, firewood: s.day };
     advise(s, 3);
     const msg = s.messages.find((m) => m.kind === 'advice');
-    expect(msg?.text).toMatch(/storehouses are full, mostly \w+ \(\d+\) and planks/);
+    expect(msg?.text).toMatch(/storehouses are full, mostly planks \(\d+\)/);
   });
 });
 
@@ -1004,7 +995,7 @@ describe('harvest feast', () => {
 });
 
 describe('mead', () => {
-  it('the brewhouse brews mead only for Meadmakers, and taverns pour it', async () => {
+  it('the brewhouse brews mead once it is learned, and taverns pour it', async () => {
     const { chooseRecipe, serveAle } = await import('../src/game/sim');
     const s = generateWorld(86);
     s.tier = 1;
@@ -1016,8 +1007,9 @@ describe('mead', () => {
     bh.need = undefined;
     bh.recipe = 'mead';
     s.res.honey = 30;
+    s.learned = s.learned!.filter((id) => id !== 'r:brewhouse:mead');
     expect(chooseRecipe(s, bh)).toBeNull();
-    s.charters = ['orchard1', 'orchard2', 'orchard3b'];
+    s.learned.push('r:brewhouse:mead');
     expect(chooseRecipe(s, bh)?.id).toBe('mead');
     s.population = 8;
     s.dirty = true;
@@ -1042,12 +1034,16 @@ describe('retinue', () => {
     const { EVENTS } = await import('../src/game/events');
     const s = generateWorld(87);
     s.res.prestige = 100;
-    s.res.weapons = 10;
+    s.res.gold = 100;
     expect(retinueError(s)).toMatch(/Borough/);
     s.tier = 3;
+    expect(retinueError(s)).toMatch(/barracks/);
+    s.buildings.push({ ...s.buildings[0], id: 9998, type: 'barracks', build: 1 });
+    expect(retinueError(s)).toMatch(/armoury/);
+    s.buildings.push({ ...s.buildings[0], id: 9999, type: 'armoury', build: 1 });
     expect(raiseRetinue(s)).toBeNull();
     expect(s.retinue).toBe(true);
-    expect(s.res.weapons).toBe(0);
+    expect(s.res.gold).toBe(75);
     const wolves = EVENTS.find((e) => e.id === 'wolves')!;
     expect(wolves.choices(s)[0].label).toBe('Send the retinue');
     s.res.gold = RETINUE_PAY;
@@ -1072,6 +1068,7 @@ describe('harvest forecast', () => {
     farm.need = undefined;
     let field = null;
     for (let r = 3; r < 12 && !field; r++) field = placeZone(s, 'field', farm.x + r, farm.y, farm.x + r + 4, farm.y + 4) ?? placeZone(s, 'field', farm.x - r - 4, farm.y, farm.x - r, farm.y + 4);
+    if (field) field.recipe = 'wheat';
     expect(field).not.toBeNull();
     field!.build = 1;
     field!.growth = 1;
@@ -1096,6 +1093,7 @@ describe('farm barn', () => {
     farm.need = undefined;
     let field = null;
     for (let r = 3; r < 12 && !field; r++) field = placeZone(s, 'field', farm.x + r, farm.y, farm.x + r + 5, farm.y + 5) ?? placeZone(s, 'field', farm.x - r - 5, farm.y, farm.x - r, farm.y + 5);
+    if (field) field.recipe = 'wheat';
     field!.build = 1;
     field!.growth = 1;
     s.population = 12;
@@ -1345,7 +1343,7 @@ describe('review fixes', () => {
 });
 
 describe('seasonal festivals', () => {
-  it('May Day needs a maypole in spring; Midsummer burns timber in summer', async () => {
+  it('May Day needs a maypole in spring; Midsummer burns firewood in summer', async () => {
     const { festivalError, holdFestival } = await import('../src/game/events');
     const s = generateWorld(101);
     s.population = 16;
@@ -1363,9 +1361,9 @@ describe('seasonal festivals', () => {
     expect(festivalError(s, 'mayday')).toMatch(/this year/);
     expect(festivalError(s, 'midsummer')).toMatch(/midsummer/);
     s.day = 4 * DAYS_PER_MONTH;
-    const wood = s.res.wood;
+    s.res.firewood = 40;
     expect(holdFestival(s, 'midsummer')).toBeNull();
-    expect(s.res.wood).toBe(wood - 20);
+    expect(s.res.firewood).toBe(30);
     expect(s.festivalDay?.id).toBe('midsummer');
   });
 });
@@ -1469,20 +1467,25 @@ describe('protected woods', () => {
 });
 
 describe('titles', () => {
-  it('prestige buys Baron, Earl and Duke in turn, each needing a larger town', async () => {
+  it('prestige buys Baron, Earl, Marquess and Duke in turn, each needing a larger town', async () => {
     const { takeTitle, titleError } = await import('../src/game/events');
     const s = generateWorld(4);
-    s.res.prestige = 10000;
+    s.res.prestige = 20000;
     expect(titleError(s)).toMatch(/Baron needs a Town/);
     s.tier = 2;
     expect(takeTitle(s)).toBeNull();
     expect(s.title).toBe(1);
-    expect(s.res.prestige).toBe(9500);
+    expect(s.res.prestige).toBe(19500);
     expect(titleError(s)).toMatch(/Earl needs a Borough/);
     s.tier = 4;
     expect(takeTitle(s)).toBeNull();
     expect(takeTitle(s)).toBeNull();
     expect(s.title).toBe(3);
+    expect(titleError(s)).toMatch(/Palace/);
+    const manor = manorFor(s);
+    manor.level = 4;
+    expect(takeTitle(s)).toBeNull();
+    expect(s.title).toBe(4);
     expect(titleError(s)).toMatch(/no higher title/);
     expect(s.milestones!.map((m) => m.id)).toEqual(expect.arrayContaining(['title1', 'title2', 'title3']));
   });
@@ -1538,23 +1541,34 @@ describe('year goals', () => {
   });
 });
 
-describe('commissions', () => {
-  it('prestige buys each work of art once, for lasting cheer', async () => {
-    const { commission, commissionError } = await import('../src/game/events');
-    const { updateHappiness } = await import('../src/game/sim');
+describe('works of art', () => {
+  it('a supplied atelier grows its chance month by month and, at last, makes a masterpiece', async () => {
+    const { monthlyAtelier, artBoons } = await import('../src/game/events');
+    const { StateRng } = await import('../src/game/rng');
     const s = generateWorld(15);
-    s.tier = 3;
-    s.res.wood = 100;
-    s.res.planks = 40;
-    s.res.stone = 40;
-    manorFor(s);
-    s.res.prestige = 1000;
-    expect(commissionError(s, 'glass')).toMatch(/cathedral/);
-    expect(commission(s, 'tapestry')).toBeNull();
-    expect(s.res.prestige).toBe(700);
-    expect(commissionError(s, 'tapestry')).toMatch(/Already/);
-    updateHappiness(s);
-    expect(s.happinessFactors.some((f) => f.label === 'The great tapestry' && f.value === 2)).toBe(true);
+    const { makeBuilding, placeBuilding } = await import('../src/game/world');
+    const at = makeBuilding(s.nextId++, 'atelier', 2, 2);
+    placeBuilding(s, at);
+    at.build = 1;
+    at.workers = 2;
+    const stock = () => Object.assign(s.res, { gold: 1000, dyes: 50, dressedstone: 50, paper: 50, jewellery: 50 });
+    stock();
+    const rng = new StateRng(s);
+    monthlyAtelier(s, rng);
+    expect(s.atelier!.chance).toBeCloseTo(0.01);
+    // A month without paper: the chance starts over.
+    s.res.paper = 0;
+    monthlyAtelier(s, rng);
+    expect(s.atelier!.chance).toBe(0);
+    let months = 0;
+    while (!s.commissions?.length && months++ < 400) {
+      stock();
+      monthlyAtelier(s, rng);
+    }
+    expect(s.commissions?.length).toBe(1);
+    expect(s.atelier!.rest).toBe(12);
+    const b = artBoons(s);
+    expect(b.happiness.length + b.prestige + b.knowledge).toBeGreaterThan(0);
   });
 });
 
@@ -1726,6 +1740,8 @@ describe('trade audit', () => {
     const { buyPrice, exportUnitPrice, sellPrice } = await import('../src/game/sim');
     const s = tradeTown();
     s.charters = ['trade1', 'trade2', 'trade3a'];
+    // Toll navigation and trade deals are the merchants' concession on top of this rule.
+    s.learned = (s.learned ?? []).filter((id) => id !== 'x:tollnav' && id !== 'x:tradedeals');
     const guild = placeNearRoad(s, 'guildhall');
     guild.build = 1;
     guild.need = undefined;
@@ -2057,10 +2073,19 @@ describe('draught animals', () => {
     const post = placeNearRoad(s, 'tradingpost');
     post.build = 1;
     post.need = undefined;
+    // The pack horse pulls the goods cart.
+    post.improved = ['goodscart'];
     recompute(s);
     post.workers = 2;
     return { s, post };
   };
+
+  it('a trading post keeps no pack horse until it has a goods cart', async () => {
+    const { buyDraughtError } = await import('../src/game/sim');
+    const { s, post } = town();
+    post.improved = [];
+    expect(buyDraughtError(s, post)).toMatch(/Nothing here/);
+  });
 
   it('a trading post buys a pack horse only into a free stall, and carries half as much again', async () => {
     const { buyDraught, buyDraughtError, tradeCapacity, stalls, STABLE_STALLS } = await import('../src/game/sim');
@@ -2135,12 +2160,12 @@ describe('upkeep and crates', () => {
     q.need = undefined;
     q.workers = BUILDINGS.quarry.workers;
     s.res.tools = 3;
-    // 0.2 tools a month with a full crew: five months wear out one.
-    for (let d = 0; d < DAYS_PER_MONTH * 5; d++) dailyUpkeep(s);
+    // A tool and a half a year with a full crew: about eight months wear out one.
+    for (let d = 0; d < DAYS_PER_MONTH * 9; d++) dailyUpkeep(s);
     expect(s.res.tools).toBe(2);
     expect(q.worn).toBeFalsy();
     s.res.tools = 0;
-    for (let d = 0; d < DAYS_PER_MONTH * 5; d++) dailyUpkeep(s);
+    for (let d = 0; d < DAYS_PER_MONTH * 8; d++) dailyUpkeep(s);
     expect(q.worn).toBe(true);
     expect(wornYield(q)).toBe(WORN_YIELD);
     s.res.tools = 5;
@@ -2179,14 +2204,14 @@ describe('alehouse and tavern, and fields far from their farm', () => {
     t.build = 1;
     t.need = undefined;
     expect(buildingName(t)).toBe('Alehouse');
-    expect(workersOf(t)).toBe(1);
+    expect(workersOf(t)).toBe(2);
     const r = reachOf(t);
     const plan = upgradePlan(s, t);
     expect(plan?.name).toBe('Tavern');
     t.level = plan!.to;
     finishUpgrade(s, t);
     expect(buildingName(t)).toBe('Tavern');
-    expect(workersOf(t)).toBe(2);
+    expect(workersOf(t)).toBe(3);
     expect(reachOf(t)).toBe(r * 2);
     // Saves from before the alehouse: their taverns are full taverns.
     const old = JSON.parse(serialize(s));
@@ -2262,20 +2287,161 @@ describe('knowledge and the monastery', () => {
   });
 
   it('the church teaches, and so do the homes of the well-to-do', async () => {
-    const { knowledgeIncome } = await import('../src/game/sim');
+    const { knowledgeIncome, eldersLore } = await import('../src/game/sim');
     const s = generateWorld(78);
     s.tier = 3;
     s.res.gold = 9999;
-    expect(knowledgeIncome(s)).toBe(0);
+    const base = knowledgeIncome(s);
+    expect(base).toBe(eldersLore(s));
     const c = placeNearRoad(s, 'church');
     c.build = 1;
-    expect(knowledgeIncome(s)).toBe(0.5);
+    expect(knowledgeIncome(s)).toBe(base + 0.25);
     c.level = 2;
-    expect(knowledgeIncome(s)).toBe(1);
+    expect(knowledgeIncome(s)).toBe(base + 1);
     const h = placeNearRoad(s, 'house');
     h.build = 1;
     h.level = 4;
     h.residents = 5;
-    expect(knowledgeIncome(s)).toBe(1.25);
+    expect(knowledgeIncome(s)).toBe(base + 1.25);
+  });
+});
+
+describe('improvements, choices and town options', () => {
+  const built = (s: GameState, type: BuildingType) => {
+    const b = placeNearRoad(s, type);
+    b.build = 1;
+    b.need = undefined;
+    recompute(s);
+    return b;
+  };
+  const finish = async (s: GameState, b: Building) => {
+    const { finishUpgrade } = await import('../src/game/levels');
+    finishUpgrade(s, b);
+  };
+
+  it('an improvement must be learned, is built by builders, and then counts', async () => {
+    const { improveError, startImprove } = await import('../src/game/sim');
+    const { workersOf } = await import('../src/game/levels');
+    const s = freshWorld(41);
+    s.res.gold = 500;
+    const wc = built(s, 'woodcutter');
+    expect(improveError(s, wc, 'biglodge')).toMatch(/learned/);
+    learnEverything(s);
+    const places = workersOf(wc);
+    expect(startImprove(s, wc, 'biglodge')).toBeNull();
+    expect(wc.need).toEqual({ wood: 6 });
+    expect(improveError(s, wc, 'oxshed')).toMatch(/already at work/);
+    await finish(s, wc);
+    expect(wc.improved).toEqual(['biglodge']);
+    expect(workersOf(wc)).toBe(places + 2);
+    expect(improveError(s, wc, 'biglodge')).toMatch(/Already/);
+  });
+
+  it('the improved store needs its loft first, and holds twice as much', async () => {
+    const { improveError, storageCap } = await import('../src/game/sim');
+    const s = generateWorld(42);
+    const before = storageCap(s, 'materials');
+    const st = built(s, 'storehouse');
+    const one = storageCap(s, 'materials') - before;
+    expect(improveError(s, st, 'bigstore')).toMatch(/loft/);
+    st.improved = ['loft'];
+    expect(storageCap(s, 'materials') - before).toBe(one * 1.5);
+    st.improved = ['loft', 'bigstore'];
+    expect(storageCap(s, 'materials') - before).toBe(one * 2);
+  });
+
+  it('a lathe makes wood parts from two planks, and a firing chamber halves the fuel', async () => {
+    const { produceOnce } = await import('../src/game/sim');
+    const s = generateWorld(43);
+    const c = built(s, 'carpenter');
+    c.improved = ['lathe'];
+    s.res.planks = 10;
+    expect(produceOnce(s, c)).toBeNull();
+    expect(s.res.planks).toBe(8);
+    const k = built(s, 'kiln');
+    k.improved = ['firingchamber'];
+    s.res.clay = 40;
+    s.res.firewood = 40;
+    produceOnce(s, k);
+    produceOnce(s, k);
+    expect(s.res.firewood).toBe(39);
+  });
+
+  it('coppice and high forest are a choice: taking one closes the other', async () => {
+    const { learn, learnError } = await import('../src/game/unlocks');
+    const s = generateWorld(44);
+    s.res.knowledge = 100;
+    s.madeEver = { wood: 500 };
+    expect(learn(s, 'c:coppice')).toBeNull();
+    expect(learnError(s, 'c:highforest')).toMatch(/chosen/);
+  });
+
+  it('goats need little pasture; Frisians milk twice and Highlanders give twice the meat', async () => {
+    const { buyAnimalError, breedMilk, breedMeat } = await import('../src/game/sim');
+    const s = generateWorld(33);
+    built(s, 'tradingpost');
+    const byre = built(s, 'byre');
+    s.res.gold = 500;
+    s.learned = (s.learned ?? []).filter((id) => id !== 'a:goats');
+    expect(buyAnimalError(s, byre, 'goats')).toMatch(/goats/);
+    expect(breedMilk(s)).toBe(1);
+    s.learned = ['c:frisian'];
+    expect(breedMilk(s)).toBe(2);
+    expect(breedMeat(s)).toBeLessThan(1);
+    s.learned = ['c:highland'];
+    expect(breedMeat(s)).toBe(2);
+  });
+
+  it('town options cost something to switch on and run, and give happiness or prestige', async () => {
+    const { setOption, monthlyOptions, optionHappiness, optionPrestige } = await import('../src/game/options');
+    const s = generateWorld(46);
+    expect(setOption(s, 'banners', true)).toMatch(/cloth/);
+    s.res.cloth = 10;
+    s.res.dyes = 10;
+    const p = optionPrestige(s);
+    expect(setOption(s, 'banners', true)).toBeNull();
+    expect(s.res.cloth).toBe(6);
+    expect(optionPrestige(s)).toBe(p + 1);
+    // Taken down and put back up again: the banners are already made.
+    setOption(s, 'banners', false);
+    setOption(s, 'banners', true);
+    expect(s.res.cloth).toBe(6);
+    s.population = 120;
+    expect(setOption(s, 'tunics', true)).toBeNull();
+    expect(optionHappiness(s).some((f) => f.label === 'Dyed tunics')).toBe(true);
+    s.res.dyes = 0;
+    for (let m = 0; m < 12; m++) monthlyOptions(s);
+    expect(optionHappiness(s).some((f) => f.label === 'Dyed tunics')).toBe(false);
+  });
+
+  it('toll navigation and trade deals each make imports cheaper and exports dearer', async () => {
+    const { buyPrice, exportUnitPrice } = await import('../src/game/sim');
+    const s = freshWorld(47);
+    const buy = buyPrice(s, 'tools', 100);
+    const sell = exportUnitPrice(s, 'tools');
+    s.learned = ['x:tollnav', 'x:tradedeals'];
+    expect(buyPrice(s, 'tools', 100)).toBeLessThan(buy);
+    expect(exportUnitPrice(s, 'tools')).toBeGreaterThan(sell);
+  });
+
+  it('feats are noticed once: a draught animal at work', async () => {
+    const { checkFeats } = await import('../src/game/sim');
+    const s = generateWorld(48);
+    const y = built(s, 'builderyard');
+    checkFeats(s);
+    expect(s.feats).not.toContain('animalwork');
+    y.beast = true;
+    checkFeats(s);
+    expect(s.feats).toContain('animalwork');
+  });
+
+  it('stone roads and cobbles must be learned', async () => {
+    const { roadError } = await import('../src/game/sim');
+    const s = freshWorld(49);
+    const h = hall(s);
+    s.res.stone = 50;
+    expect(roadError(s, h.x - 3, h.y + 6, 2)).toMatch(/Learn/);
+    s.learned = ['x:stoneroad'];
+    expect(roadError(s, h.x - 3, h.y + 6, 2)).toBeNull();
   });
 });

@@ -24,7 +24,7 @@ export const RESOURCE_IDS = [
   'fish',
   'eggs',
   'berries',
-  'mushrooms',
+  'strawberries',
   'vegetables',
   'apples',
   'pears',
@@ -36,7 +36,6 @@ export const RESOURCE_IDS = [
   // Goods
   'grain',
   'barley',
-  'oats',
   'flour',
   'flax',
   'wool',
@@ -53,13 +52,13 @@ export const RESOURCE_IDS = [
   'medicine',
   'tools',
   'paper',
+  'parchment',
   'woad',
   'dyes',
   'fineclothes',
   'books',
   'jewellery',
   'pottery',
-  'weapons',
   // Currency
   'gold',
   'prestige',
@@ -147,7 +146,23 @@ export type BuildingType =
   | 'collier'
   | 'glassworks'
   | 'dyer'
-  | 'monastery';
+  | 'monastery'
+  | 'beekeeper'
+  | 'papermill'
+  | 'embroiderer'
+  | 'glazier'
+  | 'cobbler'
+  | 'watersawmill'
+  | 'silvermine'
+  | 'deerpark'
+  | 'bathhouse'
+  | 'school'
+  | 'taxoffice'
+  | 'courthouse'
+  | 'atelier'
+  | 'barracks'
+  | 'stewpond'
+  | 'tiltyard';
 
 export type Category = 'housing' | 'resources' | 'farming' | 'food' | 'industry' | 'civic' | 'manor' | 'works' | 'decor';
 
@@ -193,6 +208,16 @@ export interface Building {
   builders?: number;
   /** Level a renovation is raising the building to. */
   upgrading?: number;
+  /** An improvement (upgrade or extension, see improve.ts) being built onto a workplace. */
+  improveTo?: string;
+  /** Improvements a workplace has. */
+  improved?: string[];
+  /** A home painted white with limewash (a town option). */
+  limewashed?: boolean;
+  /** Fuel owed from half-fuel batches, paid once it comes to a whole unit. */
+  fuelDebt?: number;
+  /** The day until which a beekeeper's bees are gone (swarmed). */
+  swarmed?: number;
   /** Materials being carried for a renovation (fractional loads). */
   carry?: number;
   /** Renovation progress 0..1 once materials are delivered. */
@@ -269,6 +294,8 @@ export interface Building {
   flowers?: boolean;
   /** Monasteries: whether the monks had their book this month. */
   reading?: boolean;
+  /** Tax offices and courthouses: whether they had their paper this month. */
+  supplied?: boolean;
   /** Hedges and flower beds laid in one go share a group: beds in a group grow into one. */
   group?: number;
   /** Units produced in the last month, for display. */
@@ -297,6 +324,8 @@ export interface MonthReport {
   /** Share of the hearths left unheated last winter month. */
   coldShare?: number;
   taxes: number;
+  /** Villagers beyond what the manor and tax offices can tax. */
+  untaxed?: number;
   arrived: number;
   left: number;
   /** Gold earned from merchants last month. */
@@ -403,6 +432,24 @@ export interface GameState {
   made?: Partial<Record<ResourceId, number>>;
   used?: Partial<Record<ResourceId, number>>;
   making?: Partial<Record<ResourceId, number>>;
+  /** Everything the town has ever made, by good (for learning by doing). */
+  madeEver?: Partial<Record<ResourceId, number>>;
+  /** Unlocks the town has learned (see unlocks.ts). */
+  learned?: string[];
+  /** Goods ever traded through trading posts and docks. */
+  tradedEver?: number;
+  /** Things the town has done, for learning conditions (a church serving ten homes...). */
+  feats?: string[];
+  /** Town options switched on (limewash, dyed tunics...). */
+  options?: string[];
+  /** One-off option costs already paid (banners stay made when taken down). */
+  optionsPaid?: string[];
+  /** Running option costs owed, paid as whole units. */
+  optionUse?: Partial<Record<ResourceId, number>>;
+  /** Churches glazed with stained-glass windows. */
+  glazed?: number;
+  /** No dye this month: the tunics are plain. */
+  tunicsBare?: boolean;
   using?: Partial<Record<ResourceId, number>>;
   /** Whether the university had its books and wood parts this month. */
   universityOk?: boolean;
@@ -431,6 +478,8 @@ export interface GameState {
   stumps?: Record<number, number>;
   /** Herds of game that keep to their part of the woods. */
   herds?: Herd[];
+  /** Silver veins the Deep Veins charter revealed (tile indices). */
+  silver?: number[];
   /** Where fish shoal in the rivers and lakes. */
   shoals?: Shoal[];
   /** Mushrooms on the forest floor: tile -> how many can be picked now. */
@@ -439,6 +488,8 @@ export interface GameState {
   mushroomsMax?: Record<number, number>;
   /** Road tiles drawn by the player and not laid yet: tile index * 4 + kind (1 dirt, 2 stone, 3 cobbled), in order. */
   roadPlan?: number[];
+  /** The Royal Road joins two opposite edges of the land. */
+  royalLinked?: boolean;
   /** Progress towards laying the next planned road tile (in tiles). */
   roadWork?: number;
   /** Months in a row of hunger or deep gloom (villagers leave from the second). */
@@ -457,6 +508,10 @@ export interface GameState {
   name?: string;
   /** Works of art commissioned with prestige (see COMMISSIONS). */
   commissions?: string[];
+  /** The lord leaves the horse in the stable and goes on foot. */
+  lordWalks?: boolean;
+  /** The atelier's hopes: this month's chance of a masterpiece, and months of rest left after one. */
+  atelier?: { chance: number; rest: number };
   /** The lord's rank: 0 Lord, 1 Baron, 2 Earl, 3 Duke (see TITLES). */
   title?: number;
   /** Woods the woodcutters leave standing (tile rectangles). */

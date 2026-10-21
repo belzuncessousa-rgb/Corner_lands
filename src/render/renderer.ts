@@ -1,7 +1,9 @@
 import { BUILDINGS, DAYS_PER_MONTH, DAYS_PER_YEAR, RESOURCE_STORAGE, STORAGE_CAPACITY, type StorageKind } from '../game/data';
 import { MANOR_SIZE, marketStalls, upgradeBlocker } from '../game/levels';
-import { hasCharter } from '../game/charters';
-import { ANIMAL_KINDS, LOW_EFFICIENCY, animalsOf, deliveredTo, hasProblem, herdTotal, lordRides, monthOf, nearestShoal, orchardMaturity, seasonOf, seatOf, storageCap, stored } from '../game/sim';
+import { knows } from '../game/unlocks';
+import { optionOn } from '../game/options';
+import { drawImprovements } from './props';
+import { estateTiles, ANIMAL_KINDS, LOW_EFFICIENCY, animalsOf, deliveredTo, hasProblem, herdTotal, lordRides, monthOf, nearestShoal, orchardMaturity, seasonOf, seatOf, storageCap, stored } from '../game/sim';
 import type { Building, BuildingType, GameState, ResourceId, Season } from '../game/types';
 import { idx, inBounds } from '../game/world';
 import { type Agent, LEISURE_ACTS } from './agents';
@@ -31,6 +33,7 @@ import {
   homeWindow,
   pavedTile,
   cobbleTile,
+  royalTile,
   rockSprite,
   bogSprite,
   stallSprite,
@@ -321,6 +324,8 @@ export class Renderer {
           const sp =
             s.terrain[i] === 1
               ? this.sprite(`br:${season}:${mask}:${layer}`, () => bridgeTile(season, mask, layer))
+              : s.road[i] === 4
+                ? this.sprite(`ry:${season}:${mask}:${layer}`, () => royalTile(season, mask, layer))
               : s.road[i] === 3
                 ? this.sprite(`rc:${season}:${mask}:${layer}`, () => cobbleTile(season, mask, layer))
               : s.road[i] === 2
@@ -331,6 +336,37 @@ export class Renderer {
       }
     }
 
+    // Silver veins the prospectors found: a grey outcrop glinting with ore.
+    for (const i of s.silver ?? []) {
+      if (s.occ[i] >= 0) continue;
+      const x = i % W;
+      const y = (i / W) | 0;
+      const [wx, wy] = iso(x + 0.5, y + 0.5);
+      if (!visible(wx, wy)) continue;
+      this.blit(this.sprite(`k:silver:${season === 3}`, () => rockSprite(false, 1, season === 3 ? 3 : 0)), wx, wy);
+      const c = this.ctx;
+      // Veins of bright metal threading the rock.
+      c.strokeStyle = '#dfe6ee';
+      c.lineWidth = 1.2;
+      c.beginPath();
+      c.moveTo(wx - 12, wy - 3);
+      c.lineTo(wx - 7, wy - 7);
+      c.lineTo(wx - 3, wy - 5);
+      c.moveTo(wx - 4, wy - 1);
+      c.lineTo(wx + 1, wy - 5);
+      c.stroke();
+      const tw = 0.5 + 0.5 * Math.sin(this.time * 3 + i);
+      c.fillStyle = `rgba(240,248,255,${0.5 + 0.5 * tw})`;
+      for (const [dx, dy] of [
+        [-8, -6],
+        [-2, -3],
+        [-6, -9],
+      ]) {
+        c.beginPath();
+        c.arc(wx + dx, wy + dy, 0.8 + tw * 0.5, 0, Math.PI * 2);
+        c.fill();
+      }
+    }
     this.mark('shimmer+fields+roads');
     this.drawGroundOverlays(s, ov);
     this.mark('overlays');
@@ -668,7 +704,30 @@ export class Renderer {
     c.globalAlpha = 1;
   }
 
+  private estateCache = { key: '', tiles: [] as number[] };
+
+  /** The manor's grounds: the grass under the manor and its buildings worn into one gravelled shape. */
+  private drawGrounds(s: GameState, season: Season): void {
+    const key = `${s.buildings.length}:${s.nextId}:${s.buildings.find((b) => b.type === 'townhall')?.w ?? 0}`;
+    if (this.estateCache.key !== key) this.estateCache = { key, tiles: [...estateTiles(s)] };
+    const c = this.ctx;
+    c.fillStyle = season === 3 ? 'rgba(205,200,190,0.55)' : 'rgba(168,146,104,0.5)';
+    c.beginPath();
+    for (const i of this.estateCache.tiles) {
+      const x = i % s.width;
+      const y = (i / s.width) | 0;
+      // Each tile a little overgrown so neighbours run together.
+      const g = 0.12;
+      const pts = [iso(x - g, y - g), iso(x + 1 + g, y - g), iso(x + 1 + g, y + 1 + g), iso(x - g, y + 1 + g)];
+      c.moveTo(pts[0][0], pts[0][1]);
+      for (const [px, py] of pts.slice(1)) c.lineTo(px, py);
+      c.closePath();
+    }
+    c.fill();
+  }
+
   private drawFields(s: GameState, season: Season, selected?: number): void {
+    this.drawGrounds(s, season);
     const p = new Pen(this.ctx);
     const month = monthOf(s.day);
     const herds = new Map<number, number>();
@@ -690,6 +749,8 @@ export class Renderer {
         this.drawField(p, b, season, month);
       } else if (b.type === 'pasture') {
         this.drawPasture(p, s, b, season, herds);
+      } else if (b.type === 'deerpark') {
+        this.drawDeerPark(p, b, season);
       } else if (b.type === 'orchard') {
         // Mown grass between the rows.
         p.poly(
@@ -723,7 +784,7 @@ export class Renderer {
   private fieldCache = new Map<number, { key: string; sp: Sprite }>();
 
   private drawField(_p: Pen, b: Building, season: Season, month: number): void {
-    const crop = b.recipe ?? 'wheat';
+    const crop = b.recipe ?? 'vegetables';
     // The crop's stage: bare, sprouting, young, tall, ripe, stooked or stubble.
     let stage = 'bare';
     if (month <= 5 && b.growth > 0) stage = b.growth < 0.2 ? 'sprout' : b.growth < 0.5 ? 'young' : b.growth < 0.8 ? 'tall' : 'full';
@@ -745,6 +806,54 @@ export class Renderer {
     }
     const [wx, wy] = iso(b.x, b.y);
     this.blit(hit.sp, wx, wy);
+  }
+
+  /** The deer park: rough grass inside a paling fence, a few trees, and the deer grazing. */
+  private drawDeerPark(p: Pen, b: Building, season: Season): void {
+    const x0 = b.x;
+    const y0 = b.y;
+    const x1 = b.x + b.w;
+    const y1 = b.y + b.h;
+    const winter = season === 3;
+    p.poly(
+      [
+        [x0, y0, 0],
+        [x1, y0, 0],
+        [x1, y1, 0],
+        [x0, y1, 0],
+      ],
+      winter ? 'rgba(240,244,246,0.3)' : 'rgba(70,110,40,0.28)',
+    );
+    const post = '#6b4a2e';
+    p.fence([x0 + 0.05, y0 + 0.05], [x1 - 0.05, y0 + 0.05], post);
+    p.fence([x0 + 0.05, y0 + 0.05], [x0 + 0.05, y1 - 0.05], post);
+    const rand = mulberry32(b.id * 13 + 1);
+    // A few old trees inside the paling, drawn from back to front.
+    const trees: [number, number][] = [];
+    for (let k = 0; k < Math.max(2, Math.floor((b.w * b.h) / 6)); k++) trees.push([x0 + 0.6 + rand() * (b.w - 1.2), y0 + 0.6 + rand() * (b.h - 1.2)]);
+    // The deer: a few grazing, wandering slowly about the park.
+    const deer = Math.min(8, Math.max(2, Math.floor((b.w * b.h) / 4)));
+    const items: { x: number; y: number; tree?: boolean; j?: number }[] = trees.map(([x, y]) => ({ x, y, tree: true }));
+    for (let j = 0; j < deer; j++) {
+      const r1 = rand();
+      const r2 = rand();
+      const t = this.time * 0.04 + r1 * 10;
+      items.push({ x: x0 + 0.4 + (b.w - 0.8) * (0.5 + 0.45 * Math.sin(r1 * 6.283 + t * 0.5)), y: y0 + 0.4 + (b.h - 0.8) * (0.5 + 0.45 * Math.sin(r2 * 6.283 + t * 0.4)), j });
+    }
+    items.sort((a, c) => a.x + a.y - (c.x + c.y));
+    for (const it of items) {
+      if (it.tree) {
+        const tv = Math.floor(it.x * 7 + it.y * 3) % TREE_VARIANTS;
+        const sp = this.sprite(`t:oak:${season}:${tv}`, () => treeSprite('oak', season, tv));
+        const [wx, wy] = iso(it.x, it.y);
+        this.blit(sp, wx, wy, 1, TREE_SCALE * 0.9);
+      } else {
+        const [sx, sy] = iso(it.x, it.y);
+        drawDeer(p.ctx, sx, sy, Math.sin(this.time * 0.02 + it.j!) > 0 ? 1 : -1, it.j! % 3 === 0);
+      }
+    }
+    p.fence([x1 - 0.05, y0 + 0.05], [x1 - 0.05, y1 - 0.05], post);
+    p.fence([x0 + 0.05, y1 - 0.05], [x1 - 0.05, y1 - 0.05], post);
   }
 
   private drawPasture(p: Pen, s: GameState, b: Building, season: Season, herds: Map<number, number>): void {
@@ -778,6 +887,7 @@ export class Renderer {
       herds.set(owner.id, used + n);
       // The farm's animals, kind by kind, shared out over its pastures.
       const a = animalsOf(owner);
+      const breed = knows(s, 'c:frisian') ? 'frisian' : knows(s, 'c:highland') ? 'highland' : 'cattle';
       const flock: string[] = [];
       for (const k of ANIMAL_KINDS) for (let i = 0; i < (a[k] ?? 0); i++) flock.push(k);
       const mine = flock.slice(used, used + Math.min(n, 40));
@@ -798,7 +908,8 @@ export class Renderer {
       for (const { kind, ax, ay, f, j } of beasts) {
         const [sx, sy] = iso(ax, ay);
         if (kind === 'sheep') drawSheep(p.ctx, sx, sy, f, season === 3 ? '#e2ddd2' : '#f2ece0');
-        else drawBeast(p.ctx, sx, sy, f, kind, j);
+        else if (kind === 'goats') drawGoat(p.ctx, sx, sy, f, j);
+        else drawBeast(p.ctx, sx, sy, f, kind === 'cattle' ? breed : kind, j);
       }
     }
     p.fence([x1 - 0.05, y0 + 0.05], [x1 - 0.05, y1 - 0.05], post);
@@ -1009,7 +1120,7 @@ export class Renderer {
     const orchard = this.orchardTiles.get(i);
     if (orchard) {
       const fruit = orchard.recipe ?? 'apples';
-      const stage = Math.round(orchardMaturity(orchard, hasCharter(s, 'orchard2')) * 4) / 4;
+      const stage = Math.round(orchardMaturity(s, orchard) * 4) / 4;
       const month = monthOf(s.day);
       const fruiting = stage >= 1 && month >= 3 && month <= 6 && (month < 5 || orchard.growth > 0);
       const blossom = month <= 1 && stage >= 0.5;
@@ -1150,6 +1261,7 @@ export class Renderer {
     this.blit(sp, wx, wy);
     this.drawDoor(s, b);
     if (b.type === 'house' && b.flowers) this.drawDoorFlowers(b, season);
+    if (b.improved?.length) drawImprovements(c, b, season, this.time);
     if (turning) {
       const [hx, hy] = iso(b.x + 1.0, b.y + 1.42, 34);
       drawSails(c, hx, hy, this.time * 0.9 + b.id, season);
@@ -1182,7 +1294,7 @@ export class Renderer {
     const fest = s.festivalDay && s.day - s.festivalDay.day < DAYS_PER_MONTH ? s.festivalDay.id : null;
     if (fest === 'mayday' && b.type === 'maypole') this.drawMayDance(b);
     if (fest === 'midsummer' && b.type === 'townhall') this.drawBonfire(b);
-    if (b.type === 'townhall' && s.commissions?.includes('tapestry')) this.drawHeraldry(b);
+    if (b.type === 'townhall' && (s.commissions?.includes('tapestry') || optionOn(s, 'banners'))) this.drawHeraldry(b);
     // Lamplight in lived-in homes and the tavern as evening falls.
     if (this.dusk > 0.25 && b.build >= 1 && (b.residents > 0 || (b.type === 'tavern' && b.workers > 0))) this.drawLamplight(s, b);
     if (b.upgrading) this.drawScaffold(b);
@@ -1981,8 +2093,8 @@ export class Renderer {
     c.setLineDash([3, 3]);
     c.lineWidth = 1.2;
     for (let k = 0; k < plan.length; k++) {
-      const i = plan[k] >> 2;
-      const paved = (plan[k] & 3) >= 2;
+      const i = plan[k] >> 3;
+      const paved = (plan[k] & 7) >= 2;
       const x = i % W;
       const y = (i / W) | 0;
       const [cx, cy] = iso(x + 0.5, y + 0.5);
@@ -4339,7 +4451,10 @@ const fract = (v: number) => v - Math.floor(v);
 /** A cow or a pig at a screen point. */
 function drawBeast(c: CanvasRenderingContext2D, x: number, y: number, f: number, kind: string, j: number): void {
   const pig = kind === 'pigs';
-  const coat = pig ? '#e8a8a0' : ['#8a5a3a', '#f2ece0', '#3a3028', '#b0703a'][j % 4];
+  // Frisians black and white; Highlanders shaggy and russet, with long horns.
+  const highland = kind === 'highland';
+  const frisian = kind === 'frisian';
+  const coat = pig ? '#e8a8a0' : highland ? ['#b0602a', '#c8783a', '#9a5024'][j % 3] : frisian ? '#f4f0e6' : ['#8a5a3a', '#f2ece0', '#3a3028', '#b0703a'][j % 4];
   const len = pig ? 4.5 : 6.5;
   const tall = pig ? 2.5 : 5;
   c.fillStyle = 'rgba(20,20,10,0.22)';
@@ -4358,11 +4473,27 @@ function drawBeast(c: CanvasRenderingContext2D, x: number, y: number, f: number,
   c.beginPath();
   c.ellipse(x, y - tall - 2.2, len, pig ? 2.8 : 3.4, 0, 0, Math.PI * 2);
   c.fill();
-  if (!pig && j % 4 === 1) {
-    c.fillStyle = '#3a3028';
+  if (frisian || (!pig && !highland && j % 4 === 1)) {
+    c.fillStyle = '#2a2420';
     c.beginPath();
     c.ellipse(x - 1.5 * f, y - tall - 2.6, 1.8, 1.3, 0, 0, Math.PI * 2);
     c.fill();
+    if (frisian) {
+      c.beginPath();
+      c.ellipse(x + 2.4 * f, y - tall - 1.6, 1.5, 1.2, 0, 0, Math.PI * 2);
+      c.fill();
+    }
+  }
+  if (highland) {
+    // A shaggy fringe of coat along the belly.
+    c.strokeStyle = '#8a4420';
+    c.lineWidth = 0.8;
+    c.beginPath();
+    for (let i = -4; i <= 4; i += 2) {
+      c.moveTo(x + i, y - tall - 0.4);
+      c.lineTo(x + i + 0.4, y - tall + 0.9);
+    }
+    c.stroke();
   }
   // Head, lowered to graze.
   c.fillStyle = coat;
@@ -4372,6 +4503,15 @@ function drawBeast(c: CanvasRenderingContext2D, x: number, y: number, f: number,
   if (pig) {
     c.fillStyle = '#d88a84';
     c.fillRect(x + (len + 2.4) * f - 0.8, y - tall - 1.8, 1.6, 1.4);
+  } else if (highland) {
+    c.strokeStyle = '#efe4c8';
+    c.lineWidth = 0.9;
+    c.beginPath();
+    c.moveTo(x + (len + 1) * f, y - tall - 1.8);
+    c.quadraticCurveTo(x + (len - 1.5) * f, y - tall - 2.6, x + (len - 2.2) * f, y - tall - 4.6);
+    c.moveTo(x + (len + 1) * f, y - tall - 1.8);
+    c.quadraticCurveTo(x + (len + 3.5) * f, y - tall - 2.6, x + (len + 4) * f, y - tall - 4.4);
+    c.stroke();
   } else {
     c.strokeStyle = '#e8dcc4';
     c.lineWidth = 0.7;
@@ -4380,6 +4520,104 @@ function drawBeast(c: CanvasRenderingContext2D, x: number, y: number, f: number,
     c.lineTo(x + (len - 0.6) * f, y - tall - 3.8);
     c.stroke();
   }
+}
+
+/** A fallow deer: dappled back, white rump, a stag with antlers. */
+function drawDeer(c: CanvasRenderingContext2D, x: number, y: number, f: number, stag: boolean): void {
+  const len = 4.6;
+  const tall = 4.6;
+  c.fillStyle = 'rgba(20,20,10,0.22)';
+  c.beginPath();
+  c.ellipse(x, y, len + 0.8, 1.5, 0, 0, Math.PI * 2);
+  c.fill();
+  c.strokeStyle = '#5a3a20';
+  c.lineWidth = 0.9;
+  c.beginPath();
+  for (const lx of [-len * 0.6, len * 0.55]) {
+    c.moveTo(x + lx, y - tall);
+    c.lineTo(x + lx, y);
+  }
+  c.stroke();
+  c.fillStyle = '#a8683a';
+  c.beginPath();
+  c.ellipse(x, y - tall - 1.8, len, 2.3, 0, 0, Math.PI * 2);
+  c.fill();
+  c.fillStyle = '#f2ead8';
+  c.beginPath();
+  c.ellipse(x - len * 0.85 * f, y - tall - 1.6, 1.1, 1.4, 0, 0, Math.PI * 2);
+  c.fill();
+  for (const dx of [-1.6, 0, 1.6]) c.fillRect(x + dx, y - tall - 2.8, 0.7, 0.7);
+  const hx = x + (len + 0.4) * f;
+  const hy = y - tall - 4.4;
+  c.fillStyle = '#a8683a';
+  c.beginPath();
+  c.moveTo(x + (len - 1.4) * f, y - tall - 2.4);
+  c.lineTo(hx, hy + 0.8);
+  c.lineTo(hx - 0.6 * f, hy + 2.2);
+  c.closePath();
+  c.fill();
+  c.beginPath();
+  c.ellipse(hx + 0.6 * f, hy + 0.4, 1.5, 1, 0.3 * f, 0, Math.PI * 2);
+  c.fill();
+  if (stag) {
+    c.strokeStyle = '#d8c4a0';
+    c.lineWidth = 0.7;
+    c.beginPath();
+    c.moveTo(hx, hy - 0.4);
+    c.lineTo(hx - 1 * f, hy - 3.4);
+    c.lineTo(hx - 2.4 * f, hy - 4);
+    c.moveTo(hx - 0.6 * f, hy - 2.2);
+    c.lineTo(hx + 0.6 * f, hy - 3.6);
+    c.stroke();
+  }
+}
+
+/** A goat: small and wiry, with swept-back horns and a beard, head up and browsing. */
+function drawGoat(c: CanvasRenderingContext2D, x: number, y: number, f: number, j: number): void {
+  const coat = ['#e8e2d6', '#9a8a78', '#5a4a3c', '#c8b49a'][j % 4];
+  const len = 3.6;
+  const tall = 3.2;
+  c.fillStyle = 'rgba(20,20,10,0.22)';
+  c.beginPath();
+  c.ellipse(x, y, len + 0.8, 1.4, 0, 0, Math.PI * 2);
+  c.fill();
+  c.strokeStyle = '#3a3028';
+  c.lineWidth = 1;
+  c.beginPath();
+  for (const lx of [-len * 0.6, len * 0.55]) {
+    c.moveTo(x + lx, y - tall);
+    c.lineTo(x + lx, y);
+  }
+  c.stroke();
+  c.fillStyle = coat;
+  c.beginPath();
+  c.ellipse(x, y - tall - 1.6, len, 2.2, 0, 0, Math.PI * 2);
+  c.fill();
+  // Neck and head held high.
+  const hx = x + (len + 0.6) * f;
+  const hy = y - tall - 4.2;
+  c.beginPath();
+  c.moveTo(x + (len - 1.2) * f, y - tall - 2.6);
+  c.lineTo(hx, hy + 0.6);
+  c.lineTo(hx - 0.4 * f, hy + 2);
+  c.closePath();
+  c.fill();
+  c.beginPath();
+  c.ellipse(hx + 0.6 * f, hy + 0.4, 1.6, 1.1, 0.3 * f, 0, Math.PI * 2);
+  c.fill();
+  // Beard and horns.
+  c.strokeStyle = '#5a4a3c';
+  c.lineWidth = 0.7;
+  c.beginPath();
+  c.moveTo(hx + 1.4 * f, hy + 1.2);
+  c.lineTo(hx + 1.2 * f, hy + 2.6);
+  c.stroke();
+  c.strokeStyle = '#d8ccb0';
+  c.lineWidth = 0.8;
+  c.beginPath();
+  c.moveTo(hx, hy - 0.4);
+  c.quadraticCurveTo(hx - 0.6 * f, hy - 2.4, hx - 2 * f, hy - 2);
+  c.stroke();
 }
 
 /** How visible a villager is while stepping through a door: fading out as they cross the sill, in as they leave it. */
@@ -4472,7 +4710,6 @@ function drawGood(p: Pen, id: ResourceId, x: number, y: number): void {
     }
     case 'flour':
     case 'barley':
-    case 'oats':
     case 'herbs':
       p.sack(x - 0.08, y, id === 'flour' ? '#efe6d4' : '#d8c890');
       p.sack(x + 0.08, y + 0.05, id === 'flour' ? '#e8dcc4' : '#cdbb8e');
@@ -4532,10 +4769,10 @@ function drawGood(p: Pen, id: ResourceId, x: number, y: number): void {
     case 'apples':
     case 'pears':
     case 'plums':
-    case 'mushrooms':
+    case 'strawberries':
     case 'vegetables':
     case 'eggs': {
-      const fill = { apples: '#c4322a', pears: '#c8c040', plums: '#6a3a80', mushrooms: '#a8603a', vegetables: '#5d9a3a', eggs: '#f2e8d4' }[id];
+      const fill = { apples: '#c4322a', pears: '#c8c040', plums: '#6a3a80', strawberries: '#d8323a', vegetables: '#5d9a3a', eggs: '#f2e8d4' }[id];
       const [bx, by] = iso(x, y, 0);
       p.ctx.fillStyle = '#a07a40';
       p.ctx.beginPath();
@@ -4672,14 +4909,13 @@ const CARRY_SHAPES: Partial<Record<ResourceId, CarryShape>> = {
   planks: 'log',
   grain: 'sack',
   barley: 'sack',
-  oats: 'sack',
   flour: 'sack',
   wool: 'sack',
   herbs: 'sack',
   clay: 'sack',
   ore: 'sack',
   berries: 'basket',
-  mushrooms: 'basket',
+  strawberries: 'basket',
   apples: 'basket',
   pears: 'basket',
   plums: 'basket',
@@ -4700,6 +4936,7 @@ const CARRY_SHAPES: Partial<Record<ResourceId, CarryShape>> = {
   clothes: 'bundle',
   flax: 'bundle',
   paper: 'bundle',
+  parchment: 'bundle',
   sand: 'sack',
   mortar: 'sack',
   charcoal: 'sack',
@@ -4712,13 +4949,12 @@ const CARRY_SHAPES: Partial<Record<ResourceId, CarryShape>> = {
 const GOOD_COLORS: Partial<Record<ResourceId, string>> = {
   firewood: '#9a6a3a',
   barley: '#e0cc84',
-  oats: '#e0d090',
   flour: '#efe6d4',
   wool: '#f2ece0',
   herbs: '#6aa04a',
   clay: '#b0643a',
   ore: '#6a5a50',
-  mushrooms: '#a8603a',
+  strawberries: '#d8323a',
   apples: '#c4322a',
   pears: '#c8c040',
   plums: '#6a3a80',
@@ -4739,7 +4975,7 @@ const GOOD_COLORS: Partial<Record<ResourceId, string>> = {
   silver: '#c8ccd4',
   jewellery: '#d8a838',
   books: '#3a5a8a',
-  weapons: '#8a8e94',
+  parchment: '#e8dcc0',
   medicine: '#6aa0a0',
   boots: '#6a3e22',
   sand: '#e2c98a',
@@ -4766,8 +5002,9 @@ function drawFieldPicture(p: Pen, b: Building, crop: string, stage: string, seas
   const rand = (k: number) => fract(Math.sin(b.id * 91.7 + k * 12.9898) * 43758.5453);
   const rowsPerTile = 4;
   const rows = Math.round(b.h * rowsPerTile);
-  const green = crop === 'barley' ? '#7aa83e' : crop === 'flax' ? '#5a8a4a' : '#5e9a34';
-  const gold = crop === 'barley' ? '#e0cc84' : crop === 'flax' ? '#b8a060' : '#d8b44a';
+  // Rye stands blue-green and ripens a dusky grey-gold.
+  const green = crop === 'barley' ? '#7aa83e' : crop === 'flax' ? '#5a8a4a' : crop === 'rye' ? '#6a9a78' : '#5e9a34';
+  const gold = crop === 'barley' ? '#e0cc84' : crop === 'flax' ? '#b8a060' : crop === 'rye' ? '#b8a478' : '#d8b44a';
   const tall: Record<string, number> = { sprout: 2.5, young: 5, tall: 8, full: 11, flower: 11, ripe: 12, stubble: 1.6 };
   const h = tall[stage] ?? 0;
   let k = 0;
@@ -4783,6 +5020,14 @@ function drawFieldPicture(p: Pen, b: Building, crop: string, stage: string, seas
     if (!h || winter) continue;
     if (crop === 'woad') {
       k = woadRow(p, a, z, y, stage, k, rand);
+      continue;
+    }
+    if (crop === 'vegetables') {
+      k = vegetableRow(p, a, z, y, stage, k, rand, r);
+      continue;
+    }
+    if (crop === 'beans') {
+      k = beanRow(p, a, z, y, stage, k, rand);
       continue;
     }
     for (let x = a; x < z; x += 0.055) {
@@ -4848,7 +5093,28 @@ function drawFieldPicture(p: Pen, b: Building, crop: string, stage: string, seas
       }
     }
   }
-  if (stage === 'stooks' && !winter && crop === 'woad') {
+  if (stage === 'stooks' && !winter && crop === 'vegetables') {
+    // The crop lifted into baskets along the rows.
+    for (let yy = 0.6; yy < b.h - 0.3; yy += 1.2) {
+      for (let xx = 0.6; xx < b.w - 0.3; xx += 1.1) {
+        const [sx, sy] = iso(xx + ((b.id + Math.floor(yy)) % 2) * 0.3, yy);
+        c.fillStyle = 'rgba(30,20,10,0.2)';
+        c.beginPath();
+        c.ellipse(sx + 1, sy, 5, 2, 0, 0, Math.PI * 2);
+        c.fill();
+        c.fillStyle = '#a07a40';
+        c.beginPath();
+        c.ellipse(sx, sy - 3, 4.5, 3.5, 0, 0, Math.PI);
+        c.fill();
+        for (const [dx, col] of [[-2, '#7ab04a'], [0.5, '#e8e0c8'], [2.5, '#6aa040']] as [number, string][]) {
+          c.fillStyle = col;
+          c.beginPath();
+          c.arc(sx + dx, sy - 3.6, 1.8, 0, Math.PI * 2);
+          c.fill();
+        }
+      }
+    }
+  } else if (stage === 'stooks' && !winter && crop === 'woad') {
     // The cut leaves piled in heaps along the rows, to be carted to the dyer.
     for (let yy = 0.6; yy < b.h - 0.3; yy += 1.2) {
       for (let xx = 0.6; xx < b.w - 0.3; xx += 1.1) {
@@ -4897,6 +5163,112 @@ function drawFieldPicture(p: Pen, b: Building, crop: string, stage: string, seas
       }
     }
   }
+}
+
+/**
+ * One row of vegetables: cabbages in one row, the feathery tops of turnips
+ * and leeks in the next, swelling from shoots to round heads by harvest.
+ */
+/** A row of field beans: leafy bushes, white flowers in early summer, dark pods when ripe. */
+function beanRow(p: Pen, a: number, z: number, y: number, stage: string, k: number, rand: (k: number) => number): number {
+  const c = p.ctx;
+  const size: Record<string, number> = { sprout: 1.2, young: 2.2, tall: 3.2, full: 3.8, flower: 3.8, ripe: 3.8, stubble: 0.8 };
+  const r = size[stage] ?? 0;
+  for (let x = a + 0.04; x < z; x += 0.1) {
+    k++;
+    const [sx, sy] = iso(x + (rand(k) - 0.5) * 0.03, y);
+    const rr = r * (0.85 + rand(k + 7) * 0.3);
+    if (stage === 'stubble') {
+      c.fillStyle = '#5a4a30';
+      c.fillRect(sx - 0.5, sy - 1.6, 1, 1.6);
+      continue;
+    }
+    c.strokeStyle = '#4a7a30';
+    c.lineWidth = 0.7;
+    c.beginPath();
+    c.moveTo(sx, sy);
+    c.lineTo(sx, sy - rr * 1.6);
+    c.stroke();
+    c.fillStyle = stage === 'ripe' ? '#7a8a40' : '#4e8a36';
+    for (const [dx, dz] of [
+      [-1.2, 0.8],
+      [1.1, 1.1],
+      [-0.6, 1.5],
+    ]) {
+      c.beginPath();
+      c.ellipse(sx + dx * rr * 0.5, sy - rr * dz, rr * 0.45, rr * 0.3, 0, 0, Math.PI * 2);
+      c.fill();
+    }
+    if (stage === 'full' && rand(k + 3) < 0.6) {
+      c.fillStyle = '#f4f0e6';
+      c.fillRect(sx - 0.6, sy - rr * 1.2, 1.2, 1);
+    }
+    if (stage === 'ripe') {
+      c.fillStyle = '#3a3a24';
+      c.fillRect(sx + 0.6, sy - rr * 1.1, 0.8, 2);
+    }
+  }
+  return k;
+}
+
+function vegetableRow(p: Pen, a: number, z: number, y: number, stage: string, k: number, rand: (k: number) => number, row: number): number {
+  const c = p.ctx;
+  const size: Record<string, number> = { sprout: 1.2, young: 2, tall: 2.8, full: 3.4, flower: 3.4, ripe: 3.6, stubble: 0.8 };
+  const r = size[stage] ?? 0;
+  const cabbage = row % 2 === 0;
+  for (let x = a + 0.05; x < z; x += 0.14) {
+    k++;
+    const [sx, sy] = iso(x + (rand(k) - 0.5) * 0.03, y);
+    const rr = r * (0.85 + rand(k + 7) * 0.3);
+    if (stage === 'stubble') {
+      c.fillStyle = '#6a7a48';
+      c.fillRect(sx - 0.7, sy - 1, 1.4, 1);
+      continue;
+    }
+    c.fillStyle = 'rgba(30,20,10,0.28)';
+    c.beginPath();
+    c.ellipse(sx + 0.5, sy, rr, rr * 0.45, 0, 0, Math.PI * 2);
+    c.fill();
+    if (cabbage) {
+      // Outer leaves, then the pale heart.
+      c.fillStyle = stage === 'sprout' ? '#8ac060' : '#5e9a3e';
+      c.beginPath();
+      c.ellipse(sx, sy - rr * 0.45, rr, rr * 0.62, 0, 0, Math.PI * 2);
+      c.fill();
+      if (stage !== 'sprout') {
+        c.fillStyle = '#a8d070';
+        c.beginPath();
+        c.arc(sx - rr * 0.1, sy - rr * 0.6, rr * 0.48, 0, Math.PI * 2);
+        c.fill();
+        c.strokeStyle = 'rgba(60,100,40,0.6)';
+        c.lineWidth = 0.4;
+        c.beginPath();
+        c.arc(sx - rr * 0.1, sy - rr * 0.6, rr * 0.3, 0.5, 2.6);
+        c.stroke();
+      }
+    } else {
+      // Turnip tops: a spray of leaves over a white-and-purple shoulder.
+      if (stage === 'full' || stage === 'ripe' || stage === 'flower') {
+        c.fillStyle = '#e8e0d0';
+        c.beginPath();
+        c.arc(sx, sy - 0.6, 1.2, 0, Math.PI * 2);
+        c.fill();
+        c.fillStyle = '#9a5aa0';
+        c.beginPath();
+        c.arc(sx, sy - 1.1, 1.1, Math.PI, 0);
+        c.fill();
+      }
+      c.strokeStyle = '#4f8a3c';
+      c.lineWidth = 0.8;
+      for (let j = -2; j <= 2; j++) {
+        c.beginPath();
+        c.moveTo(sx, sy - 1);
+        c.quadraticCurveTo(sx + j * rr * 0.3, sy - rr * 1.2, sx + j * rr * 0.5, sy - rr * 1.6);
+        c.stroke();
+      }
+    }
+  }
+  return k;
 }
 
 /**

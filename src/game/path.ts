@@ -67,8 +67,12 @@ export const WOODS_SLOWDOWN = 1.4;
  * Time to cross a tile, in dirt-road tiles: what walkers take, what the
  * paths minimise and what the workplaces' travel times count.
  */
+/** The Royal Road: going is 30% quicker than on cobbles. */
+export const ROYAL_ROAD_PACE = 1.3;
+
 export function tileCost(s: GameState, i: number): number {
   const r = s.road[i];
+  if (r === 4) return ROAD_TILES_PER_DAY / (COBBLE_TILES_PER_DAY * ROYAL_ROAD_PACE);
   if (r === 3) return ROAD_TILES_PER_DAY / COBBLE_TILES_PER_DAY;
   if (r === 2) return ROAD_TILES_PER_DAY / STONE_ROAD_TILES_PER_DAY;
   if (r) return 1;
@@ -80,8 +84,9 @@ export function tileCost(s: GameState, i: number): number {
 function cheapestTile(s: GameState): number {
   let best = 1;
   for (let i = 0; i < s.road.length; i++) {
-    if (s.road[i] === 3) return ROAD_TILES_PER_DAY / COBBLE_TILES_PER_DAY;
-    if (s.road[i] === 2) best = ROAD_TILES_PER_DAY / STONE_ROAD_TILES_PER_DAY;
+    if (s.road[i] === 4) return ROAD_TILES_PER_DAY / (COBBLE_TILES_PER_DAY * ROYAL_ROAD_PACE);
+    if (s.road[i] === 3) best = Math.min(best, ROAD_TILES_PER_DAY / COBBLE_TILES_PER_DAY);
+    if (s.road[i] === 2) best = Math.min(best, ROAD_TILES_PER_DAY / STONE_ROAD_TILES_PER_DAY);
   }
   return best;
 }

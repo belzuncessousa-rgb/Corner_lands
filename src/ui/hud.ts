@@ -1,3 +1,7 @@
+import { knows, learn, unlockForBuilding, UNLOCK_BY_ID, type LearnTab } from '../game/unlocks';
+import { boardHtml, readyCount, tabOf } from './learning';
+import { IMPROVEMENT_BY_ID, improvementsFor } from '../game/improve';
+import { OPTIONS, optionError, optionOn, optionOnce, setOption } from '../game/options';
 import { NEWS } from './news';
 import { drawTapestry } from './tapestry';
 import { TUTORIAL_SEED } from './tutorial';
@@ -24,7 +28,7 @@ import {
   EXPORT_PER_MARKET,
   UPKEEP,
 } from '../game/data';
-import { commission, commissionError, COMMISSIONS, nextTitle, takeTitle, titleError, TITLES, fairCost, fairError, fairPrestige, FAIR_TIER, feastCost, feastError, FESTIVALS, festivalError, getEvent, holdFair, holdFeast, holdFestival, resolveEvent } from '../game/events';
+import { WORKS_OF_ART, nextTitle, takeTitle, titleError, TITLES, fairCost, fairError, fairPrestige, FAIR_TIER, feastCost, feastError, FESTIVALS, festivalError, getEvent, holdFair, holdFeast, holdFestival, resolveEvent } from '../game/events';
 import { CHARTERS, CHARTER_TIER, PATHS, charterCost, charterError, grantCharter, hasCharter } from '../game/charters';
 import { CHURCH_LEVELS, TAVERN_LEVELS, HOUSE_LEVELS, MANOR_LEVELS, buildingName, houseNeeds, marketStalls, startUpgrade, upgradeBlocker, upgradePlan, workersOf } from '../game/levels';
 import { activeQuests } from '../game/quests';
@@ -47,11 +51,16 @@ import {
   moodYield,
   lockReason,
   prestigeIncome,
+  MANOR_TAX_REACH,
+  TAX_OFFICE_REACH,
+  recipeKnown,
   knowledgeIncome,
   knowledgeOf,
   knowledgeSources,
   MONASTERY_KNOWLEDGE,
   setTrade,
+  startImprove,
+  improveError,
   workDef,
   HOME_TRADES,
   HOME_TRADE_COST,
@@ -79,10 +88,10 @@ import {
   labourSummary,
   bCenter,
   coveredBy,
-  PAVING_TIER,
   PAVING_COST,
   COBBLE_COST,
-  COBBLE_TIER,
+  ROYAL_COST,
+  ROYAL_TIER,
   setWorkers,
   setPriority,
   setRecipe,
@@ -371,6 +380,18 @@ export class Hud {
           </div>`;
         })
         .join('');
+      // Buildings still to be learned: a locked card that opens the learning board at its patch.
+      cards += BUILD_ORDER.filter((t) => BUILDINGS[t].category === this.category && !isUnlocked(s, t) && unlockForBuilding(t) && !knows(s, unlockForBuilding(t)!.id) && !BUILDINGS[t].charter)
+        .map((t) => {
+          const d = BUILDINGS[t];
+          const u = unlockForBuilding(t)!;
+          return `<div class="card locked ${this.buildIcons ? 'icon-card' : ''}" data-action="learn-open" data-id="${u.id}" data-tip="${esc(`<b>${d.name}</b><br>${d.desc}<br><span class="neg">${lockReason(s, t) ?? 'Not learned yet'}</span><br><i>Click to see it on the learning board.</i>`)}">
+            ${this.buildIcons ? `<span class="bicon">${BUILDING_ICONS[t] ?? CATEGORY_ICONS[d.category]}</span>` : `<img src="${this.cardImage(t)}" alt="" draggable="false">`}
+            <div class="name">${d.name}</div>
+            <div class="cost">🔒 ${u.knowledge !== undefined ? `${ICONS.knowledge}${u.knowledge}` : 'learn'}</div>
+          </div>`;
+        })
+        .join('');
       if (!cards) cards = `<div class="cards-empty">Nothing here yet: more opens up as the town grows.</div>`;
     }
     this.el.buildbar.classList.toggle('open', !!this.category);
@@ -384,14 +405,15 @@ export class Hud {
     const tool = this.game.tool;
     const kinds = [
       { paved: false, cobbled: false, key: 'R', name: 'Dirt road', icon: ICONS.road, cost: 'Free', open: true },
-      { paved: true, cobbled: false, key: 'T', name: 'Stone road', icon: ICONS.paved, cost: `${costHtml(PAVING_COST, s.res)} a tile`, open: s.tier >= PAVING_TIER },
-      { paved: false, cobbled: true, key: 'Y', name: 'Cobbled street', icon: ICONS.cobbles, cost: `${costHtml(COBBLE_COST, s.res)} a tile`, open: s.tier >= COBBLE_TIER },
+      { paved: true, cobbled: false, key: 'T', name: 'Stone road', icon: ICONS.paved, cost: `${costHtml(PAVING_COST, s.res)} a tile`, open: knows(s, 'x:stoneroad') },
+      { paved: false, cobbled: true, key: 'Y', name: 'Cobbled street', icon: ICONS.cobbles, cost: `${costHtml(COBBLE_COST, s.res)} a tile`, open: knows(s, 'x:cobbles') },
+      { paved: false, cobbled: false, royal: true, key: 'K', name: 'The Royal Road', icon: ICONS.royalroad, cost: `${costHtml(ROYAL_COST, s.res)} a tile, two abreast; joined from one edge of the land to the other it is a Great Work: 30% quicker than cobbles, and every bargain 0.15 better`, open: s.tier >= ROYAL_TIER },
     ];
     return `<span class="road-pop">${kinds
       .filter((k) => k.open)
       .map((k) => {
-        const sel = tool.kind === 'road' && !!tool.paved === k.paved && !!tool.cobbled === k.cobbled;
-        return `<button class="road-kind ${sel ? 'active' : ''}" data-action="road-kind" ${k.paved ? 'data-paved="1"' : ''} ${k.cobbled ? 'data-cobbled="1"' : ''} data-tip="${esc(`<b>${k.name}</b> (${k.key})<br>${k.cost}`)}" aria-label="${k.name}">${k.icon}</button>`;
+        const sel = tool.kind === 'road' && !!tool.paved === k.paved && !!tool.cobbled === k.cobbled && !!tool.royal === !!k.royal;
+        return `<button class="road-kind ${sel ? 'active' : ''}" data-action="road-kind" ${k.paved ? 'data-paved="1"' : ''} ${k.cobbled ? 'data-cobbled="1"' : ''} ${k.royal ? 'data-royal="1"' : ''} data-tip="${esc(`<b>${k.name}</b> (${k.key})<br>${k.cost}`)}" aria-label="${k.name}">${k.icon}</button>`;
       })
       .join('')}</span>`;
   }
@@ -488,7 +510,11 @@ export class Hud {
       chip('materials', matFull ? 'full' : '', `${ICONS.materials}${sum('materials')}`),
       chip('goods', '', `${ICONS.goods}${sum('goods')}`),
       '<div class="sep"></div>',
-      chip('treasury', '', `${ICONS.gold}${Math.floor(s.res.gold)}${s.res.prestige > 0 || s.tier >= 1 ? `<span class="prestige">${ICONS.prestige}${Math.floor(s.res.prestige)}</span>` : ''}${s.res.knowledge > 0 ? `<span class="prestige">${ICONS.knowledge}${Math.floor(s.res.knowledge)}</span>` : ''}`),
+      chip('treasury', '', `${ICONS.gold}${Math.floor(s.res.gold)}${s.res.prestige > 0 || s.tier >= 1 ? `<span class="prestige">${ICONS.prestige}${Math.floor(s.res.prestige)}</span>` : ''}`),
+      (() => {
+        const ready = readyCount(s);
+        return `<button class="res chip learn-chip" data-action="learning" data-tip="<b>The learning board</b><br>Spend knowledge on new buildings, recipes and better ways of working.${ready ? `<br>${ready} can be learned now.` : ''}">📖${ICONS.knowledge}${Math.floor(s.res.knowledge)}${ready ? `<span class="badge">${ready}</span>` : ''}</button>`;
+      })(),
     ].join('');
     setHTML(this.el.topbar, html);
   }
@@ -596,19 +622,24 @@ export class Hud {
       <p class="note">Select a workplace to set its workers and priority. Idle villagers help on building sites.</p>`;
   }
 
-  /** Works of art prestige can buy once the great buildings stand. */
+  /** Works of art: masterpieces from the patrons' atelier, now and then. */
   private commissionRows(): string {
     const s = this.game.state;
-    if (s.tier < 3) return '';
-    return COMMISSIONS.map((c) => {
-      const done = s.commissions?.includes(c.id);
-      const err = commissionError(s, c.id);
-      const goods = Object.entries(c.goods ?? {}).map(([id, n]) => `${n} ${GOODS[id as ResourceId].name.toLowerCase()}`);
-      const tip = `<b>${c.name}</b><br>${esc(c.desc)}. +${c.happiness} happiness for good.<br>Costs ${c.prestige} prestige${goods.map((g) => ` and ${g}`).join('')}`;
-      return `<div class="kv feast" data-tip="${esc(tip)}"><span>${c.name}</span><span>${
-        done ? '<span class="pos">Made ✓</span>' : `<button data-action="commission" data-id="${c.id}" ${err ? `disabled title="${esc(err)}"` : ''}>Commission <small>${c.prestige} ${ICONS.prestige}</small></button>`
-      }</span></div>`;
-    }).join('');
+    const atelier = s.buildings.some((b) => b.type === 'atelier' && b.build >= 1);
+    if (!atelier && !s.commissions?.length) return '';
+    const head = atelier
+      ? `<div class="kv" data-tip="Each month the atelier has its goods, the chance of a masterpiece grows by 1%; a month without them and it starts over. After a masterpiece the artists rest a year."><span>The atelier</span><span>${
+          (s.atelier?.rest ?? 0) > 0 ? `resting ${s.atelier!.rest} months` : `${Math.round((s.atelier?.chance ?? 0) * 100)}% a month`
+        }</span></div>`
+      : '';
+    return (
+      head +
+      WORKS_OF_ART.map((w) => {
+        const done = s.commissions?.includes(w.id);
+        const boon = [w.happiness && `+${w.happiness} happiness`, w.prestige && `+${w.prestige} prestige a month`, w.knowledge && `+${w.knowledge} knowledge a month`].filter(Boolean).join(', ');
+        return `<div class="kv feast" data-tip="${esc(`<b>${w.name}</b><br>${w.desc}. ${boon}, for good.<br>Made by the patrons' atelier, by chance.`)}"><span>${w.name}</span><span>${done ? '<span class="pos">Made ✓</span>' : '<small class="muted">awaiting a masterpiece</small>'}</span></div>`;
+      }).join('')
+    );
   }
 
   /** The lord's title, and the next one prestige can buy. */
@@ -629,6 +660,7 @@ export class Hud {
     return `<h3>${ICONS.gold} Treasury</h3>
       <div class="kv"><span>Coins</span><b>${Math.floor(s.res.gold)}</b></div>
       <div class="kv"><span>Taxes last month</span><span class="pos">+${r.taxes}</span></div>
+      ${!s.buildings.some((b) => b.type === 'townhall' && b.build >= 1) ? '<div class="kv" data-tip="Taxes are collected only once there is a manor."><span>Taxes</span><span class="neg">No manor yet: no taxes</span></div>' : r.untaxed ? `<div class="kv" data-tip="The manor taxes up to ${MANOR_TAX_REACH} villagers; each tax office ${TAX_OFFICE_REACH} more, with paper or parchment."><span>Untaxed villagers</span><span class="neg">${r.untaxed}: build a tax office</span></div>` : ''}
       ${r.trade ? `<div class="kv"><span>Merchants last month</span><span class="pos">+${r.trade}</span></div>` : ''}
       <div class="sub">Taxes</div>
       <div class="tax">${TAX_LEVELS.map(
@@ -873,7 +905,7 @@ export class Hud {
     const key = JSON.stringify([
       b.id, b.status, b.workers, b.builders, b.residents, b.build.toFixed(2), b.paused, b.level, b.lastOutput, b.growth.toFixed(2), b.want, b.priority, b.recipe, b.yard, b.flowers, b.trade, b.herd, JSON.stringify(b.animals ?? {}), b.owner, Math.floor(b.growth),
       s.tier, blocker, b.need, (b.upProgress ?? 0).toFixed(2), b.unmet, Math.floor(yardTotal(b)), b.hauled, s.buildings.length, Math.floor(s.res.gold / 10), s.population,
-      s.lastFeast, s.festivals, monthOf(s.day), b.type === 'market' ? s.day : 0, s.retinue, Math.floor(s.res.wood), Math.floor(totalFood(s)), b.barn, Math.floor(s.res.prestige), Math.floor(s.res.weapons),
+      s.lastFeast, s.festivals, monthOf(s.day), b.type === 'market' ? s.day : 0, s.retinue, Math.floor(s.res.wood), Math.floor(totalFood(s)), b.barn, Math.floor(s.res.prestige),
       JSON.stringify(b.orders ?? []), b.worn, b.beast, b.hungry, stalls(s).used, stalls(s).room,
       STORAGE_CAPACITY[b.type] ? RESOURCE_IDS.map((r) => (RESOURCE_STORAGE[r] ? Math.floor(s.res[r]) : 0)).join() : '',
     ]);
@@ -918,7 +950,7 @@ export class Hud {
       if (d.recipes) {
         // Fields, orchards and herds are always one thing; workshops may run on Auto.
         const fixed = !!d.zone || b.type === 'byre';
-        const avail = d.recipes.filter((r) => !r.charter || hasCharter(s, r.charter));
+        const avail = d.recipes.filter((r) => recipeKnown(s, b.type, r));
         const opts = fixed ? avail : [{ id: '', name: 'Auto' }, ...avail];
         const current = b.recipe ?? (fixed ? d.recipes[0].id : '');
         const label = b.type === 'field' ? 'Crop' : b.type === 'orchard' ? 'Fruit' : b.type === 'byre' ? 'Animals' : 'Product';
@@ -962,7 +994,7 @@ export class Hud {
           rows.push(`<div class="kv feast" data-tip="${esc(`<b>${f.name}</b><br>${f.desc}<br>+${f.mood} happiness for a season, +${f.prestige} prestige.`)}"><span>${f.name}</span><span>${
             err
               ? `<small class="muted">${esc(err)}</small>`
-              : `<button data-action="festival" data-id="${f.id}">Celebrate <small>${c.food} food${c.wood ? ` · ${c.wood} timber` : ''}</small></button>`
+              : `<button data-action="festival" data-id="${f.id}">Celebrate <small>${c.food} food${c.firewood ? ` · ${c.firewood} firewood` : ''}</small></button>`
           }</span></div>`);
         }
         if (s.tier >= RETINUE_TIER - 1) {
@@ -974,6 +1006,9 @@ export class Hud {
                 ? `<small class="muted">${esc(err)}</small>`
                 : `<button data-action="retinue">Raise <small>${costHtml(RETINUE_COST)}</small></button>`
           }</span></div>`);
+        }
+        if (s.buildings.some((o) => o.type === 'stable' && o.build >= 1)) {
+          rows.push(`<div class="kv feast" data-tip="With a groom at the stable the lord rides about the land, quicker than on foot."><span>The lord goes</span><span class="seg"><button data-action="lord-walk" data-on="0" class="${s.lordWalks ? '' : 'on'}">🐎 Riding</button><button data-action="lord-walk" data-on="1" class="${s.lordWalks ? 'on' : ''}">🚶 On foot</button></span></div>`);
         }
       }
       const cap = housingOf(b);
@@ -1003,7 +1038,7 @@ export class Hud {
       }
       if (b.upgrading) {
         const note = b.upNote ?? 'Waiting for builders';
-        rows.push(`<div class="upgrade-box"><b>Upgrading to ${esc(upgradeName(b))}</b>${needLine()}
+        rows.push(`<div class="upgrade-box"><b>${b.improveTo ? 'Building the' : 'Upgrading to'} ${esc(upgradeName(b))}</b>${needLine()}
           <div class="kv"><span>Now</span><span class="${/^Waiting/.test(note) ? 'neg' : ''}">${esc(note)}</span></div>
           <div class="kv"><span>Work</span><span>${Math.floor((b.upProgress ?? 0) * 100)}% · ${b.builders ?? 0} builders</span></div>
           <div class="progress"><i style="width:${(b.upProgress ?? 0) * 100}%"></i></div></div>`);
@@ -1021,6 +1056,35 @@ export class Hud {
           <div class="reqs">${plan.reqs.map((r) => `<span class="${r.met ? 'met' : 'unmet'}">${r.met ? '✓' : '✗'} ${esc(r.label)}</span>`).join('')}</div>
           <div class="costline">${costHtml(plan.cost, s.res)}</div>
           <button class="primary" data-action="upgrade" ${blocker ? 'disabled' : ''}>⬆ ${b.type === 'townhall' ? 'Raise the manor' : 'Upgrade'}</button></div>`);
+      }
+      const imps = b.build >= 1 ? improvementsFor(b.type) : [];
+      if (imps.length) {
+        const list = imps.map((imp) => {
+          const done = b.improved?.includes(imp.id);
+          const err = done ? null : improveError(s, b, imp.id);
+          const learned = knows(s, `i:${imp.id}`);
+          const upkeep = imp.upkeep ? ` · upkeep ${Object.entries(imp.upkeep).map(([k, v]) => `${v} ${GOODS[k as ResourceId].name.toLowerCase()}`).join(', ')} a year` : '';
+          const tip = `<b>${esc(imp.name)}</b> <small>(${imp.kind})</small><br>${esc(imp.desc)}<br>${esc(costText(imp.cost))}${upkeep}${!learned ? '<br><i>Learn it on the learning board first.</i>' : err && !done ? `<br><i>${esc(err)}</i>` : ''}`;
+          const right = done
+            ? '<span class="pos">✓ built</span>'
+            : learned
+              ? `<span class="costline">${costHtml(imp.cost, s.res)}</span><button data-action="improve" data-i="${imp.id}" ${err ? 'disabled' : ''}>Build</button>`
+              : '<span class="muted">🔒 not learned</span>';
+          return `<div class="kv imp-row ${done ? 'done' : learned ? '' : 'locked'}" data-tip="${tip}"><span>${esc(imp.name)}</span><span>${right}</span></div>`;
+        });
+        rows.push(`<div class="upgrade-box imps"><b>Improvements</b>${list.join('')}</div>`);
+      }
+      if (b.type === 'townhall' && b.build >= 1) {
+        const opts = OPTIONS.map((o) => {
+          const on = optionOn(s, o.id);
+          const learned = knows(s, `o:${o.id}`);
+          const err = on ? null : optionError(s, o.id);
+          const once = optionOnce(s, o.id);
+          const tip = `<b>${esc(o.name)}</b><br>${esc(o.desc)}${Object.keys(once).length && !(s.optionsPaid ?? []).includes(o.id) ? `<br>To begin: ${esc(costText(once))}` : ''}${!learned ? '<br><i>Learn it on the learning board first.</i>' : err ? `<br><i>${esc(err)}</i>` : ''}`;
+          const right = learned ? `<button data-action="option" data-o="${o.id}" data-on="${on ? 0 : 1}" ${err ? 'disabled' : ''}>${on ? '✓ On' : 'Off'}</button>` : '<span class="muted">🔒 not learned</span>';
+          return `<div class="kv imp-row ${learned ? '' : 'locked'}" data-tip="${tip}"><span>${esc(o.name)}</span><span>${right}</span></div>`;
+        });
+        rows.push(`<div class="upgrade-box imps"><b>Town options</b>${opts.join('')}</div>`);
       }
     }
     const warn = hasProblem(b) || /Waiting|rotted|untended/.test(b.status);
@@ -1269,7 +1333,7 @@ export class Hud {
         rows.push(`<div class="kv" data-tip="Richer soil yields up to twice as much as poor soil. Look for dark green, lush ground."><span>Soil</span><span class="${fc.soil < 0.4 ? 'neg' : ''}">${fc.soil < 0.4 ? 'Poor' : fc.soil < 0.7 ? 'Fair' : 'Rich'} (${Math.round(fc.soil * 100)}%)</span></div>`);
         if (b.lastCrop) rows.push(`<div class="kv" data-tip="Growing the same crop two years running yields less."><span>Last year</span><span>${esc(b.lastCrop)}${b.lastCrop === (b.recipe ?? 'wheat') ? ' <span class="neg">(same crop: −15%)</span>' : ''}</span></div>`);
       } else if (b.type === 'orchard') {
-        const m = orchardMaturity(b, hasCharter(s, 'orchard2'));
+        const m = orchardMaturity(s, b);
         rows.push(`<div class="kv"><span>Trees</span><span>${m < 1 ? `${Math.round(m * 100)}% grown` : 'Bearing fruit'}</span></div>${m < 1 ? bar(m) : ''}`);
         if (b.growth > 0) rows.push(`<div class="kv"><span>Fruit on the trees</span><span>${Math.floor(b.growth)}</span></div>`);
       }
@@ -1289,10 +1353,11 @@ export class Hud {
     if (b.type === 'byre' && b.build >= 1) {
       const room = herdRoom(s, b);
       const a = animalsOf(b);
-      rows.push(`<div class="kv" data-tip="A sheep needs 2 tiles of pasture, a pig 3, a cow 4; kinds share the pastures. Animals do not breed: buy them at the trading post."><span>Pasture used</span><span class="${room.used >= room.room ? 'neg' : ''}">${room.used} of ${room.room} tiles</span></div>`);
+      rows.push(`<div class="kv" data-tip="A goat needs 1 tile of pasture, a sheep 2, a pig 3, a cow 4; kinds share the pastures. Animals do not breed: buy them at the trading post."><span>Pasture used</span><span class="${room.used >= room.room ? 'neg' : ''}">${room.used} of ${room.room} tiles</span></div>`);
       for (const k of ANIMAL_KINDS) {
         const h = HERDS[k];
         const n = a[k] ?? 0;
+        if (!n && ((k === 'cattle' && !knows(s, 'a:cattle')) || (k === 'goats' && !knows(s, 'a:goats')))) continue;
         const err = buyAnimalError(s, b, k);
         const meat = Object.entries(h.meat).map(([id, v]) => `${v} ${GOODS[id as ResourceId].name.toLowerCase()}`).join(' and ');
         rows.push(`<div class="kv herd-row"><span>${n} ${n === 1 ? h.name : h.plural}</span><span>
@@ -1663,7 +1728,7 @@ export class Hud {
         g.setTool(g.tool.kind === 'road' && !g.tool.wall ? { kind: 'select' } : { kind: 'road' });
         break;
       case 'road-kind':
-        g.setTool({ kind: 'road', paved: !!t.dataset.paved, cobbled: !!t.dataset.cobbled });
+        g.setTool({ kind: 'road', paved: !!t.dataset.paved, cobbled: !!t.dataset.cobbled, royal: !!t.dataset.royal });
         break;
       case 'grove':
         this.category = null;
@@ -1790,6 +1855,31 @@ export class Hud {
         }
         break;
       }
+      case 'improve': {
+        const b = this.selectedBuilding();
+        if (b) {
+          const err = startImprove(s, b, t.dataset.i ?? '');
+          if (err) this.flash(err);
+          else this.sound('place');
+          this.lastInspectorKey = '';
+          this.update();
+        }
+        break;
+      }
+      case 'lord-walk': {
+        s.lordWalks = t.dataset.on === '1' || undefined;
+        this.lastInspectorKey = '';
+        this.update();
+        break;
+      }
+      case 'option': {
+        const err = setOption(s, t.dataset.o ?? '', t.dataset.on === '1');
+        if (err) this.flash(err);
+        else this.sound('place');
+        this.lastInspectorKey = '';
+        this.update();
+        break;
+      }
       case 'upgrade': {
         const b = this.selectedBuilding();
         if (b && startUpgrade(s, b)) this.sound('place');
@@ -1872,13 +1962,6 @@ export class Hud {
         this.lastInspectorKey = '';
         break;
       }
-      case 'commission': {
-        const err = commission(s, t.dataset.id ?? '');
-        if (err) this.flash(err);
-        else this.sound('fanfare');
-        this.renderChipPanel();
-        break;
-      }
       case 'title': {
         const err = takeTitle(s);
         if (err) this.flash(err);
@@ -1934,6 +2017,40 @@ export class Hud {
         this.update();
         break;
       }
+      case 'learning':
+        this.showLearning();
+        break;
+      case 'learn-open':
+        this.showLearning(t.dataset.id);
+        break;
+      case 'learn-tab':
+        this.learnTab = (t.dataset.tab as LearnTab) ?? 'land';
+        this.learnSel = null;
+        this.learnConfirm = null;
+        this.showLearning();
+        break;
+      case 'learn-sel':
+        this.learnSel = t.dataset.id ?? null;
+        this.learnConfirm = null;
+        this.showLearning();
+        break;
+      case 'learn-confirm':
+        this.learnConfirm = t.dataset.id ?? null;
+        this.showLearning();
+        break;
+      case 'learn-do': {
+        const id = t.dataset.id ?? '';
+        const err = learn(s, id);
+        if (err) this.flash(err);
+        else {
+          this.sound('fanfare');
+          log(s, `The town has learned: ${UNLOCK_BY_ID.get(id)?.name ?? id}.`, 'good');
+        }
+        this.learnConfirm = null;
+        this.showLearning();
+        this.renderBuildBar();
+        break;
+      }
       case 'close-modal':
         this.closeModal();
         break;
@@ -1965,7 +2082,7 @@ export class Hud {
             const staff = mine.reduce((a, b) => a + b.workers, 0);
             const stuck = mine.filter((b) => hasProblem(b));
             const slots = mine.reduce((a, b) => a + workersOf(b), 0);
-            const recipes = (d.recipes ?? [{ id: '', name: '', inputs: d.inputs, outputs: d.outputs }]).filter((r) => !r.charter || hasCharter(s, r.charter));
+            const recipes = (d.recipes ?? [{ id: '', name: '', inputs: d.inputs, outputs: d.outputs }]).filter((r) => recipeKnown(s, t, r));
             const icons = (ids: ResourceId[]) => ids.map((k) => `<span class="pg" data-tip="${GOODS[k].name}">${ICONS[k] ?? ''}</span>`).join('');
             const OWNERS: Partial<Record<BuildingType, string>> = {
               farm: 'Sows and reaps the fields drawn nearby',
@@ -2011,6 +2128,37 @@ export class Hud {
   }
 
   private charterSel: string | null = null;
+  /** The learning board: its open tab, the patch looked at, and a choice awaiting a second click. */
+  private learnTab: LearnTab = 'land';
+  private learnSel: string | null = null;
+  private learnConfirm: string | null = null;
+
+  /** Opens (or redraws) the learning board, at a patch if one is given. */
+  showLearning(focus?: string): void {
+    const s = this.game.state;
+    if (focus) {
+      this.learnSel = focus;
+      this.learnTab = tabOf(focus) ?? this.learnTab;
+    }
+    // Keep the board's scroll as it is redrawn.
+    const old = this.modal?.querySelector('.lb-board') as HTMLElement | null;
+    const scroll = old ? [old.scrollLeft, old.scrollTop] : null;
+    const html = boardHtml(s, this.learnTab, this.learnSel, this.learnConfirm);
+    let root: HTMLElement;
+    if (this.modal && this.modal.querySelector('.lb')) {
+      root = this.modal.querySelector('.modal')!;
+      root.innerHTML = html;
+    } else {
+      root = this.openModal(html).querySelector('.modal')!;
+      root.classList.add('wide', 'learning-modal');
+    }
+    const board = root.querySelector('.lb-board') as HTMLElement | null;
+    if (board && scroll) [board.scrollLeft, board.scrollTop] = scroll;
+    else if (board && focus) {
+      const p = board.querySelector(`[data-id="${CSS.escape(focus)}"]`) as HTMLElement | null;
+      if (p) board.scrollTop = Math.max(0, p.offsetTop - board.clientHeight / 2);
+    }
+  }
 
   /** The charter tree: paths radiate from the Town Charter at the centre. */
   private showCharters(): void {
@@ -2869,6 +3017,7 @@ export class Hud {
 
 function upgradeName(b: Building): string {
   if (b.craftTo) return `a ${BUILDINGS[b.craftTo].name}`;
+  if (b.improveTo) return (IMPROVEMENT_BY_ID.get(b.improveTo)?.name ?? '').toLowerCase();
   const to = b.upgrading ?? b.level + 1;
   if (b.type === 'house') return HOUSE_LEVELS[to]?.name ?? '';
   if (b.type === 'church') return CHURCH_LEVELS[to]?.name ?? '';
