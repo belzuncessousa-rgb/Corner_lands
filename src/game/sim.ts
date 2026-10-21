@@ -2332,14 +2332,6 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
       return null;
     }
     case 'fisher': {
-      if (has(b, 'fishpond') && !nearestShoal(s, b)) {
-        // The pond by the hut: a shoal that never wanders off, fished more lightly.
-        const fish = { fish: Math.max(1, Math.round((d.outputs.fish ?? 0) * 0.5 * (season === 3 ? 0.5 : 1))) };
-        if (!canHold(s, b, fish)) return 'Storage full';
-        b.resDist = 1;
-        addOutput(s, b, fish);
-        return null;
-      }
       const sh = nearestShoal(s, b);
       if (!sh) return nearestShoal(s, b, true) ? 'The fish are fished out for now' : 'No fish within reach';
       const fish = { fish: Math.max(1, Math.round((d.outputs.fish ?? 0) * (season === 3 ? 0.5 : 1))) };
@@ -2883,10 +2875,13 @@ export function herdTotal(b: Building): number {
 
 /** Pasture an animal farm's fences hold, and how much its animals take. */
 export function herdRoom(s: GameState, b: Building): { used: number; room: number } {
-  const mult = (hasCharter(s, 'herd2') ? 1.5 : 1) * (onPath(s, 'farm') ? 0.8 : 1) * (has(b, 'animalsheds') ? 1.15 : 1);
+  const mult = (hasCharter(s, 'herd2') ? 1.5 : 1) * (onPath(s, 'farm') ? 0.8 : 1);
   let used = 0;
   for (const k of ANIMAL_KINDS) used += (animalsOf(b)[k] ?? 0) * HERDS[k].tiles;
-  return { used, room: Math.floor(zoneArea(zonesOf(s, b)) * mult) };
+  // A pasture with animal sheds carries a sixth or so more.
+  const zones = zonesOf(s, b);
+  const room = zones.reduce((a, z) => a + zoneArea([z]) * (has(z, 'animalsheds') ? 1.15 : 1), 0);
+  return { used, room: Math.floor(room * mult) };
 }
 
 /** Takes animals away (lost to sickness, wolves or a shrinking pasture), the commonest first. */
@@ -3696,8 +3691,6 @@ export const MARKET_GRACE_DAYS = DAYS_PER_MONTH * 2;
 
 /** Households one staffed market stall can serve. */
 export const HOMES_PER_STALL = 10;
-/** A market cross: each stall serves this many homes more. */
-export const MARKET_CROSS_HOMES = 2;
 
 let servedCache: { key: string; set: Set<number> } = { key: '', set: new Set() };
 
@@ -3747,12 +3740,6 @@ function monthlyCivic(s: GameState): void {
         if (!b.hungry) s.res.grain -= 1;
       }
     }
-    // Travellers lodge at the inn: coins, and they eat.
-    if (b.type === 'tavern' && has(b, 'innrooms')) {
-      s.res.gold += INN_COINS;
-      const food = (['bread', 'meat', 'fish', 'vegetables', 'cheese'] as ResourceId[]).find((k) => s.res[k] >= INN_FOOD);
-      if (food) s.res[food] -= INN_FOOD;
-    }
     // The infirmary's medicine; the hunters' dogs' meat.
     if (b.type === 'monastery' && has(b, 'infirmary')) b.supplied = s.res.medicine >= 1 ? (s.res.medicine--, true) : false;
     if (b.type === 'hunter' && has(b, 'kennels') && s.res.meat >= 1) s.res.meat -= 1;
@@ -3775,10 +3762,8 @@ export function checkFeats(s: GameState): void {
     for (const id of crewAssign(s, type).values()) counts.set(id, (counts.get(id) ?? 0) + 1);
     return counts;
   };
-  add('tavern10', () => [...crewServed('tavern').values()].some((n) => n >= 10));
   add('church10', () => s.buildings.some((o) => o.type === 'church' && o.build >= 1 && served(o) >= 10));
   add('well8', () => s.buildings.some((o) => o.type === 'well' && o.build >= 1 && served(o) >= 8));
-  add('market4', () => s.buildings.some((o) => o.type === 'market' && o.build >= 1 && o.workers >= 4));
   add('courtfull', () => {
     const counts = crewServed('courthouse');
     return s.buildings.some((o) => o.type === 'courthouse' && o.workers >= workersOf(o) && (counts.get(o.id) ?? 0) >= o.workers * (HOMES_PER_WORKER.courthouse ?? 12) * 0.9);
@@ -3815,9 +3800,6 @@ export const GARRISON_FOOD = 2;
 /** Chance each month that a beekeeper's skeps swarm away. */
 export const SKEP_SWARM = 0.08;
 
-/** What travellers at an inn pay each month, and the food they eat. */
-export const INN_COINS = 6;
-export const INN_FOOD = 2;
 
 /** Villagers the manor's clerk can tax, and each tax office (with its paper; half without). */
 export const MANOR_TAX_REACH = 45;
@@ -3891,7 +3873,7 @@ export function marketServed(s: GameState): Set<number> {
   for (const m of markets) {
     const n = Math.min(m.workers, marketStalls(m));
     stalls += n;
-    serves += n * (HOMES_PER_STALL + (has(m, 'marketcross') ? MARKET_CROSS_HOMES : 0));
+    serves += n * HOMES_PER_STALL;
   }
   const key = `${s.day}:${s.buildings.length}:${s.nextId}:${stalls}:${s.population}`;
   if (servedCache.key === key) return servedCache.set;
@@ -4358,9 +4340,6 @@ function monthlyPrestige(s: GameState): void {
 export const MAX_HISTORY = 360;
 
 /** Decoration beauty enjoyed by a home, capped. */
-/** A market cross graces the homes around it. */
-export const MARKET_CROSS_BEAUTY = 2;
-export const MARKET_CROSS_REACH = 8;
 
 export function beautyAt(s: GameState, home: Building): number {
   const c = bCenter(home);
@@ -4370,7 +4349,6 @@ export function beautyAt(s: GameState, home: Building): number {
     const d = BUILDINGS[o.type];
     const oc = bCenter(o);
     if (d.beauty && Math.hypot(oc.x - c.x, oc.y - c.y) <= d.radius) total += d.beauty;
-    if (has(o, 'marketcross') && Math.hypot(oc.x - c.x, oc.y - c.y) <= MARKET_CROSS_REACH) total += MARKET_CROSS_BEAUTY;
   }
   if (home.flowers) total += FLOWERS_BEAUTY;
   if (home.limewashed) total += 1;

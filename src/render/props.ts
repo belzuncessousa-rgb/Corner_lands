@@ -60,14 +60,12 @@ function cart(p: Pen, x: number, y: number, big = false): void {
     p.ctx.stroke();
   }
   p.line([x + l, y, 6], [x + l + 0.3, y - 0.05, 4], DARK, 1);
-  p.sack(x - 0.05, y - 0.02);
+  // The load sits on the cart bed.
+  p.sack(x - 0.06, y - 0.02, undefined, 8);
+  if (big) p.sack(x + 0.12, y + 0.01, '#cdbb8e', 8);
 }
 
 const PROPS: Record<string, Prop> = {
-  biglodge: (p, x, y) => {
-    p.logPile(x - 0.1, y, 3);
-    p.logPile(x + 0.1, y + 0.25, 2);
-  },
   oxshed: (p, x, y, _b, snow) => {
     shed(p, x, y, snow);
     // The yoke hung on the post.
@@ -103,7 +101,7 @@ const PROPS: Record<string, Prop> = {
     p.box(tip[0] - 0.08, tip[1] - 0.06, tip[0] + 0.08, tip[1] + 0.06, 8, 4, '#a8a093');
   },
   firingchamber: (p, x, y, _b, snow) => {
-    p.shadow(x - 0.25, y - 0.22, x + 0.25, y + 0.22);
+    p.ellipse(x + 0.04, y + 0.03, 0, 11, 5.5, 'rgba(30,30,10,0.22)');
     p.ellipse(x, y, 4, 9, 6, '#a4523a');
     p.ellipse(x, y, 9, 8, 5, snow ? SNOW : '#b8634a');
     const [sx, sy] = iso(x, y + 0.2, 3);
@@ -129,19 +127,6 @@ const PROPS: Record<string, Prop> = {
     const greens = ['#6a9a44', '#8ab05a', '#5a8a6a', '#a0b860'];
     for (let i = 0; i < 6; i++) p.bush(x - 0.2 + (i % 3) * 0.18, y - 0.05 + Math.floor(i / 3) * 0.2, 2.2, greens[i % greens.length]);
   },
-  fishpond: (p, x, y, _b, snow, time) => {
-    p.ellipse(x, y, 0, 13, 6, '#6b5a3e');
-    p.ellipse(x, y, 0.2, 11, 5, snow ? '#d8e8f0' : '#4a7a9a');
-    if (!snow) {
-      const r = (time * 2 + x) % 3;
-      p.ctx.strokeStyle = 'rgba(255,255,255,0.4)';
-      p.ctx.lineWidth = 0.6;
-      const [sx, sy] = iso(x, y, 0.2);
-      p.ctx.beginPath();
-      p.ctx.ellipse(sx + 2, sy, r * 2, r, 0, 0, Math.PI * 2);
-      p.ctx.stroke();
-    }
-  },
   fishingboat: (p, x, y) => {
     // A rowing boat drawn up on the bank, oars across it.
     p.shadow(x - 0.32, y - 0.12, x + 0.32, y + 0.12);
@@ -166,40 +151,26 @@ const PROPS: Record<string, Prop> = {
     p.line([x - 0.2, y - 0.2, 6], [x + 0.25, y + 0.1, 6], '#b08a58', 1);
   },
   kennels: (p, x, y, _b, snow, time) => {
-    p.shadow(x - 0.15, y - 0.12, x + 0.15, y + 0.12);
-    p.box(x - 0.13, y - 0.1, x + 0.13, y + 0.1, 0, 6, '#9a7247');
-    p.poly(
-      [
-        [x - 0.16, y - 0.13, 6],
-        [x + 0.16, y - 0.13, 6],
-        [x, y, 11],
-      ],
-      snow ? SNOW : ROOF,
-    );
-    p.poly(
-      [
-        [x + 0.16, y - 0.13, 6],
-        [x + 0.16, y + 0.13, 6],
-        [x, y, 11],
-      ],
-      snow ? '#dfe6ea' : '#6a4026',
-    );
-    // A hound lying by the door, its tail wagging.
-    const [sx, sy] = iso(x - 0.05, y + 0.3, 0);
-    const c = p.ctx;
-    c.fillStyle = '#8a6a48';
-    c.beginPath();
-    c.ellipse(sx, sy - 2, 4, 2, 0, 0, Math.PI * 2);
-    c.fill();
-    c.beginPath();
-    c.ellipse(sx + 4, sy - 3.4, 1.8, 1.5, 0, 0, Math.PI * 2);
-    c.fill();
-    c.strokeStyle = '#8a6a48';
-    c.lineWidth = 1;
-    c.beginPath();
-    c.moveTo(sx - 4, sy - 2);
-    c.lineTo(sx - 6, sy - 3 + Math.sin(time * 6) * 1.5);
-    c.stroke();
+    // A kennel with a pitched roof and an arched door, in a little fenced run.
+    const x0 = x - 0.35;
+    const y0 = y - 0.25;
+    p.fence([x0, y0], [x0 + 0.75, y0], '#7b5a36');
+    p.fence([x0, y0], [x0, y0 + 0.6], '#7b5a36');
+    p.shadow(x0 + 0.05, y0 + 0.05, x0 + 0.35, y0 + 0.3);
+    p.box(x0 + 0.05, y0 + 0.05, x0 + 0.33, y0 + 0.28, 0, 6, '#9a7247');
+    const [dx, dy] = iso(x0 + 0.33, y0 + 0.17, 0);
+    p.ctx.fillStyle = '#2a1a10';
+    p.ctx.beginPath();
+    p.ctx.ellipse(dx + 1, dy - 1, 1.6, 3.2, 0, Math.PI, 0);
+    p.ctx.fill();
+    p.roofX(x0 + 0.05, y0 + 0.05, x0 + 0.33, y0 + 0.28, 6, 5, snow ? 'thatch' : 'shingle', '#9a7247', 0.04);
+    // One hound sits by the kennel; the other trots up and down the run.
+    hound(p.ctx, ...iso(x0 + 0.3, y0 + 0.45, 0), 1, true, time);
+    const t = (Math.sin(time * 0.9 + x) + 1) / 2;
+    const run: [number, number] = [x0 + 0.5 + t * 0.15, y0 + 0.15 + t * 0.35];
+    hound(p.ctx, ...iso(run[0], run[1], 0), Math.cos(time * 0.9 + x) > 0 ? 1 : -1, false, time);
+    p.fence([x0 + 0.75, y0], [x0 + 0.75, y0 + 0.6], '#7b5a36');
+    p.fence([x0, y0 + 0.6], [x0 + 0.75, y0 + 0.6], '#7b5a36');
   },
   bellows: (p, x, y) => {
     p.box(x - 0.2, y - 0.08, x + 0.2, y + 0.08, 2, 3, '#5e3e22');
@@ -266,16 +237,6 @@ const PROPS: Record<string, Prop> = {
         '#f4f0e6',
       );
   },
-  marketcross: (p, _x, _y, b) => {
-    // A stone cross on stepped plinths in the middle of the market.
-    const x = b.x + b.w / 2;
-    const y = b.y + b.h / 2;
-    p.shadow(x - 0.3, y - 0.3, x + 0.3, y + 0.3);
-    p.box(x - 0.28, y - 0.28, x + 0.28, y + 0.28, 0, 3, '#a8a093', '#bab3a6');
-    p.box(x - 0.18, y - 0.18, x + 0.18, y + 0.18, 3, 3, '#a8a093', '#bab3a6');
-    p.box(x - 0.05, y - 0.05, x + 0.05, y + 0.05, 6, 22, '#b0a89a');
-    p.box(x - 0.16, y - 0.04, x + 0.16, y + 0.04, 22, 3, '#b0a89a');
-  },
   goodscart: (p, x, y) => cart(p, x, y),
   oxcarts: (p, x, y) => cart(p, x, y, true),
   mountedguard: (p, x, y) => {
@@ -292,7 +253,6 @@ const PROPS: Record<string, Prop> = {
     p.ellipse(x, y, 4, 6, 5, '#b8703a');
     p.ellipse(x, y, 8, 5, 2.4, '#d08848');
   },
-  animalsheds: (p, x, y, _b, snow) => shed(p, x, y, snow),
   cheesecellar: (p, x, y) => {
     // The cellar hatch, and cheeses set out to dry.
     p.poly(
@@ -329,33 +289,6 @@ const PROPS: Record<string, Prop> = {
     shed(p, x, y, snow, '#b0a89a');
     p.box(x - 0.1, y + 0.3, x + 0.1, y + 0.42, 0, 4, '#c8c0b2');
   },
-  innrooms: (p, x, y) => {
-    // A hanging sign and a bench for travellers.
-    p.line([x + 0.2, y - 0.2, 0], [x + 0.2, y - 0.2, 18], DARK, 1.2);
-    p.line([x + 0.2, y - 0.2, 18], [x - 0.05, y - 0.2, 18], DARK, 1);
-    p.poly(
-      [
-        [x, y - 0.2, 17],
-        [x + 0.15, y - 0.2, 17],
-        [x + 0.15, y - 0.2, 11],
-        [x, y - 0.2, 11],
-      ],
-      '#c89a3a',
-      DARK,
-    );
-    p.box(x - 0.25, y + 0.15, x + 0.15, y + 0.25, 2, 1.5, WOODC);
-  },
-  loft: (p, x, y) => {
-    // A hoist beam high on the wall, a sack on its rope.
-    p.line([x - 0.25, y, 30], [x + 0.05, y, 30], DARK, 1.4);
-    p.line([x + 0.05, y, 30], [x + 0.05, y, 18], '#3a3028', 0.6);
-    p.sack(x + 0.05, y);
-  },
-  bigstore: (p, x, y) => {
-    p.crate(x - 0.1, y);
-    p.crate(x + 0.12, y + 0.05);
-    p.crate(x, y + 0.25);
-  },
   pump: (p, _x, _y, b) => {
     // The pump's iron handle over the well head.
     const x = b.x + b.w / 2 + 0.25;
@@ -389,3 +322,107 @@ const PROPS: Record<string, Prop> = {
     p.sack(x + 0.1, y + 0.3, '#c8b070');
   },
 };
+
+/** Animal sheds in a pasture's back corner: a long open-fronted shelter with hay in its racks. */
+export function pastureShed(p: Pen, x: number, y: number, snow: boolean): void {
+  p.shadow(x, y, x + 1.3, y + 0.55);
+  p.box(x, y, x + 1.3, y + 0.12, 0, 14, '#8a6238');
+  p.box(x, y, x + 0.1, y + 0.55, 0, 14, '#8a6238');
+  for (const px of [0.45, 0.88, 1.28]) p.line([x + px, y + 0.53, 0], [x + px, y + 0.53, 12], DARK, 1.4);
+  if (!snow) for (let k = 0; k < 3; k++) p.ellipse(x + 0.3 + k * 0.38, y + 0.25, 2, 6, 3, '#d8b860');
+  p.poly(
+    [
+      [x - 0.05, y - 0.05, 17],
+      [x + 1.38, y - 0.05, 17],
+      [x + 1.38, y + 0.62, 11],
+      [x - 0.05, y + 0.62, 11],
+    ],
+    snow ? SNOW : ROOF,
+    '#3d2614',
+    0.6,
+  );
+}
+
+/** A hound: brown and white, ears down, tail up; sitting, or trotting with its legs going. */
+function hound(c: CanvasRenderingContext2D, sx: number, sy: number, dir: number, sitting: boolean, time: number): void {
+  const coat = '#8a5a32';
+  const pale = '#efe6d4';
+  c.save();
+  c.translate(sx, sy);
+  c.scale(dir * 1.5, 1.5);
+  c.fillStyle = 'rgba(30,24,12,0.22)';
+  c.beginPath();
+  c.ellipse(0, 0, 4.5, 1.4, 0, 0, Math.PI * 2);
+  c.fill();
+  c.strokeStyle = coat;
+  c.lineWidth = 1;
+  if (sitting) {
+    // Haunches down, chest up, forelegs straight.
+    c.fillStyle = coat;
+    c.beginPath();
+    c.ellipse(-1.2, -2.2, 2.6, 2.2, 0, 0, Math.PI * 2);
+    c.fill();
+    c.beginPath();
+    c.ellipse(1, -4.2, 1.6, 2.6, -0.3, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = pale;
+    c.beginPath();
+    c.ellipse(1.6, -3.6, 0.9, 1.8, -0.3, 0, Math.PI * 2);
+    c.fill();
+    c.beginPath();
+    c.moveTo(1.4, -2.2);
+    c.lineTo(1.4, 0);
+    c.moveTo(2.2, -2.2);
+    c.lineTo(2.2, 0);
+    c.strokeStyle = pale;
+    c.stroke();
+    c.save();
+    c.translate(1.8, -7);
+  } else {
+    // Body level, legs swinging, tail up.
+    const sw = Math.sin(time * 12) * 1.2;
+    c.beginPath();
+    c.moveTo(-2.5, -3);
+    c.lineTo(-2.5 + sw, 0);
+    c.moveTo(-1.6, -3);
+    c.lineTo(-1.6 - sw, 0);
+    c.moveTo(1.8, -3);
+    c.lineTo(1.8 - sw, 0);
+    c.moveTo(2.6, -3);
+    c.lineTo(2.6 + sw, 0);
+    c.stroke();
+    c.fillStyle = coat;
+    c.beginPath();
+    c.ellipse(0, -3.6, 3.6, 1.7, 0, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = pale;
+    c.beginPath();
+    c.ellipse(0.4, -3, 2.2, 0.8, 0, 0, Math.PI * 2);
+    c.fill();
+    c.beginPath();
+    c.moveTo(-3.4, -4);
+    c.quadraticCurveTo(-5, -6, -4.6, -7.4);
+    c.strokeStyle = coat;
+    c.stroke();
+    c.save();
+    c.translate(3.6, -5.6);
+  }
+  // The head: skull, a long muzzle with a dark nose, a drooping ear.
+  c.fillStyle = coat;
+  c.beginPath();
+  c.ellipse(0, 0, 1.6, 1.4, 0, 0, Math.PI * 2);
+  c.fill();
+  c.beginPath();
+  c.ellipse(1.6, 0.5, 1.4, 0.8, 0.2, 0, Math.PI * 2);
+  c.fill();
+  c.fillStyle = '#2a1a10';
+  c.beginPath();
+  c.arc(2.9, 0.6, 0.45, 0, Math.PI * 2);
+  c.fill();
+  c.fillStyle = '#5a3a1e';
+  c.beginPath();
+  c.ellipse(-0.6, 0.8, 0.7, 1.4, 0.3, 0, Math.PI * 2);
+  c.fill();
+  c.restore();
+  c.restore();
+}

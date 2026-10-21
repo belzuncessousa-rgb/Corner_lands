@@ -252,12 +252,13 @@ export function generateWorld(seed: number, opts: { relaxed?: boolean; hardy?: b
       }
   }
   if (land !== 'meadow') s.land = land;
-  s.res.wood = 30;
+  // Enough timber for a home, a woodcutter and a food camp; a little coin.
+  s.res.wood = 15;
   s.res.stone = 10;
   s.res.planks = 0;
   s.res.berries = 40;
   s.res.meat = 20;
-  s.res.gold = 50;
+  s.res.gold = 10;
   // The settlers bring tools for two years of their first workplaces, and spare cart parts.
   s.res.tools = 11;
   s.res.woodparts = 4;

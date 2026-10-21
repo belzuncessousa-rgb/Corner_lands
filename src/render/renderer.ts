@@ -2,7 +2,7 @@ import { BUILDINGS, DAYS_PER_MONTH, DAYS_PER_YEAR, RESOURCE_STORAGE, STORAGE_CAP
 import { MANOR_SIZE, marketStalls, upgradeBlocker } from '../game/levels';
 import { knows } from '../game/unlocks';
 import { optionOn } from '../game/options';
-import { drawImprovements } from './props';
+import { drawImprovements, pastureShed } from './props';
 import { estateTiles, ANIMAL_KINDS, LOW_EFFICIENCY, animalsOf, deliveredTo, hasProblem, herdTotal, lordRides, monthOf, nearestShoal, orchardMaturity, seasonOf, seatOf, storageCap, stored } from '../game/sim';
 import type { Building, BuildingType, GameState, ResourceId, Season } from '../game/types';
 import { idx, inBounds } from '../game/world';
@@ -958,6 +958,7 @@ export class Renderer {
     const post = '#7b5a36';
     p.fence([x0 + 0.05, y0 + 0.05], [x1 - 0.05, y0 + 0.05], post);
     p.fence([x0 + 0.05, y0 + 0.05], [x0 + 0.05, y1 - 0.05], post);
+    if (b.improved?.includes('animalsheds')) this.late.push({ x: x0 + 0.9, y: y0 + 0.5, fn: () => pastureShed(p, x0 + 0.2, y0 + 0.2, season === 3) });
     // Animals, shared out between the owner's pastures by area.
     const owner = s.buildings.find((o) => o.id === b.owner);
     // In deep winter the herd shelters in the byre.
@@ -2205,9 +2206,10 @@ export class Renderer {
   private drawShoals(s: GameState, visible: (x: number, y: number) => boolean): void {
     const c = this.ctx;
     (s.shoals ?? []).forEach((sh, k) => {
-      if (sh.n < 1) return;
       const [cx, cy] = iso(sh.x, sh.y);
       if (!visible(cx, cy)) return;
+      if (sh.pen !== undefined && s.buildings.some((b) => b.id === sh.pen)) this.drawFishPen(sh.x, sh.y);
+      if (sh.n < 1) return;
       const n = Math.ceil(sh.n / 4);
       // A darker patch of water where they gather, and silver backs turning in it.
       c.fillStyle = 'rgba(20,40,60,0.18)';
@@ -2242,6 +2244,37 @@ export class Renderer {
         c.stroke();
       }
     });
+  }
+
+  /** A ring of wooden stakes in the water, with a rail, where pisciculture keeps its shoal. */
+  private drawFishPen(x: number, y: number): void {
+    const c = this.ctx;
+    const r = 0.95;
+    const n = 22;
+    const pts: [number, number][] = [];
+    for (let k = 0; k < n; k++) {
+      const a = (k / n) * Math.PI * 2;
+      pts.push(iso(x + Math.cos(a) * r, y + Math.sin(a) * r));
+    }
+    // The back half first, then the rail, then the front stakes over it.
+    const stake = (k: number) => {
+      const [sx, sy] = pts[k];
+      c.fillStyle = '#5a3e26';
+      c.fillRect(sx - 1, sy - 6, 2, 7);
+      c.fillStyle = '#7a5a3a';
+      c.fillRect(sx - 1, sy - 6, 1, 7);
+      c.fillStyle = 'rgba(220,235,245,0.5)';
+      c.fillRect(sx - 2, sy, 4, 1);
+    };
+    const back = (k: number) => pts[k][1] < iso(x, y)[1];
+    for (let k = 0; k < n; k++) if (back(k)) stake(k);
+    c.strokeStyle = '#6b4a2e';
+    c.lineWidth = 1.4;
+    c.beginPath();
+    pts.forEach(([sx, sy], k) => (k ? c.lineTo(sx, sy - 4.5) : c.moveTo(sx, sy - 4.5)));
+    c.closePath();
+    c.stroke();
+    for (let k = 0; k < n; k++) if (!back(k)) stake(k);
   }
 
   /** For each fishery, the open water tile its boat rows out to (or -1). */
@@ -2471,6 +2504,8 @@ export class Renderer {
       for (let k = 0; k < sacks; k++) p.sack(b.x + 2.35 + (k % 3) * 0.17, b.y + 0.9 + Math.floor(k / 3) * 0.2 + (k % 2) * 0.04, k % 2 ? '#cdbb8e' : '#d8c79c');
       return;
     }
+    // The improved store has built over its yard: everything is inside.
+    if (b.improved?.includes('bigstore')) return;
     const kinds: StorageKind[] = b.type === 'storehouse' ? ['materials'] : ['food'];
     const slots: [number, number][] =
       b.type === 'townhall'

@@ -2,6 +2,7 @@ import { BUILDINGS, TIERS } from '../game/data';
 import { lockReason } from '../game/sim';
 import type { GameState } from '../game/types';
 import { LEARN_TABS, UNLOCKS, UNLOCK_BY_ID, conditionMet, conditionProgress, knows, learnError, type LearnTab, type Unlock } from '../game/unlocks';
+import { fingaButton } from './fingahelp';
 import { BUILDING_ICONS, ICONS } from './icons';
 
 /**
@@ -283,7 +284,7 @@ export function boardHtml(s: GameState, tab: LearnTab, sel: string | null, confi
       <svg class="lb-threads" width="${w}" height="${h}"><defs><marker id="lb-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 1L9 5L0 9z" fill="#7a5530"/></marker></defs>${threads.join('')}</svg>
       ${ors.join('')}${patches}</div></div>`;
   return `<div class="lb">
-    <div class="lb-head"><div class="lb-title">${ICONS.knowledge} The learning board</div><div class="lb-have">${Math.floor(s.res.knowledge)} knowledge to spend</div><button class="plaque-btn small" data-action="close-modal">Close</button></div>
+    <div class="lb-head"><div class="lb-title">${ICONS.knowledge} The learning board</div><div class="lb-have">${Math.floor(s.res.knowledge)} knowledge to spend</div>${fingaButton('learning')}<button class="plaque-btn small" data-action="close-modal">Close</button></div>
     <div class="lb-tabs">${tabs}</div>
     <div class="lb-body">${board}<div class="lb-detail">${detailHtml(s, sel, confirm)}</div></div>
   </div>`;

@@ -60,7 +60,7 @@ import type { Agent } from './render/agents';
 import { AgentSystem } from './render/agents';
 import { knows, learnEverything } from './game/unlocks';
 import { grantCharter } from './game/charters';
-import { reachOf } from './game/levels';
+import { penShoal, reachOf } from './game/levels';
 import { Wildlife } from './render/wildlife';
 import { type Overlay, Renderer } from './render/renderer';
 import { Tutor } from './ui/tutorial';
@@ -1198,7 +1198,7 @@ function rangeHighlighter(s: GameState, type: BuildingType): ((i: number) => boo
 const game = new Game();
 // Handy hooks for debugging and automated screenshots.
 (window as unknown as Record<string, unknown>).game = game;
-(window as unknown as Record<string, unknown>).cl = { defs: BUILDINGS, placeOrder, buildRoad, planRoad, buyAnimal, stepDay, recompute, placementError, playBot, placeZone, setYard, keepOf, log, learnEverything, grantCharter };
+(window as unknown as Record<string, unknown>).cl = { defs: BUILDINGS, placeOrder, buildRoad, planRoad, buyAnimal, stepDay, recompute, placementError, playBot, placeZone, setYard, keepOf, log, learnEverything, grantCharter, penShoal };
 
 /** Hands the player a file to save. */
 function download(blob: Blob, name: string): void {

@@ -368,6 +368,8 @@ export interface Shoal {
   y: number;
   n: number;
   max: number;
+  /** The fisher whose pisciculture keeps it, inside a ring of stakes. */
+  pen?: number;
 }
 
 /** Kinds of land a new settlement may be founded on. */

@@ -1,4 +1,5 @@
 import { optionOn } from '../game/options';
+import { has } from '../game/improve';
 import { drawHorse } from './horse';
 import { mulberry32 } from '../game/rng';
 import { HERALDRY } from './heraldry';
@@ -1178,6 +1179,9 @@ export function variantOf(s: GameState, b: Building): number {
     }
     return fore > side ? 1 : 0;
   }
+  // Upgrades rebuild the building itself: a bigger lodge, a lofted or enlarged store.
+  if (b.type === 'woodcutter') return has(b, 'biglodge') ? 1 : 0;
+  if (b.type === 'storehouse' || b.type === 'granary') return has(b, 'bigstore') ? 2 : has(b, 'loft') ? 1 : 0;
   // Stained-glass windows once the town has them put in.
   if (b.type === 'church') return optionOn(s, 'windows') && (s.glazed ?? 0) > 0 ? 1 : 0;
   if (b.type !== 'house') return 0;
@@ -1191,36 +1195,21 @@ export function variantOf(s: GameState, b: Building): number {
 /**
  * The church rebuilt in dressed stone: a Gothic church on the same ground. A
  * tall nave with a clerestory above lower aisles, flying buttresses along
- * the side, a great tower and spire behind the nave, and a rose window over
- * a deep pointed portal in the buttressed west front.
+ * the side, twin towers with spires flanking the west front, a great rose
+ * window over a deep pointed portal, and a slender flèche over the crossing.
  */
 function drawGothicChurch(p: Pen, season: Season, glazed: number): void {
   const winter = season === 3;
   const ST = '#ddd4c0';
   const ST2 = '#cfc5ae';
   const pane = (k: number) => (winter ? '#e8b850' : glazed ? GLASS[k % GLASS.length] : '#5a6a9a');
-  p.shadow(0.3, 0.2, 2.75, 3.85);
-  // The great tower at the east end, behind the nave, with a tall spire.
-  p.box(1.05, 0.12, 1.95, 1.02, 0, 96, ST, undefined, 'stone');
-  for (const z of [56, 76]) {
-    p.wallL(1.022, 1.32, 1.68, z, z + 14, '#2a2522');
-    p.wallR(1.952, 0.39, 0.75, z, z + 14, '#221e1b');
-  }
-  p.wallR(1.953, 0.47, 0.67, 30, 44, '#2e2e40');
-  p.wallR(1.954, 0.5, 0.64, 31, 43, pane(0));
-  for (const [px, py] of [
-    [1.09, 0.98],
-    [1.91, 0.98],
-    [1.91, 0.16],
-    [1.09, 0.16],
-  ])
-    p.poly([[px - 0.05, py, 96], [px + 0.05, py, 96], [px, py, 110]], ST, '#9a927f', 0.5);
-  p.roofPyramid(1.12, 0.19, 1.88, 0.95, 96, 58, 'slate', 0.03);
-  p.line([1.5, 0.57, 154], [1.5, 0.57, 166], '#d8b84a', 1.5);
-  p.line([1.44, 0.63, 161], [1.56, 0.51, 161], '#d8b84a', 1.5);
+  p.shadow(0.3, 0.3, 2.68, 3.35, 0.05);
+  // A small apse at the east end.
+  p.box(1.05, 0.3, 1.95, 0.7, 0, 30, ST2, undefined, 'stone');
+  p.roofPyramid(1.05, 0.3, 1.95, 0.7, 30, 12, 'slate', 0.04);
   // The aisles: low, with lean-to roofs against the nave.
-  p.box(0.45, 0.75, 2.55, 3.3, 0, 20, ST2, undefined, 'stone');
-  p.poly([[2.55, 0.75, 20], [2.55, 3.3, 20], [2.2, 3.3, 27], [2.2, 0.75, 27]], '#5d6670', '#3a4048', 0.6);
+  p.box(0.45, 0.75, 2.55, 3.35, 0, 20, ST2, undefined, 'stone');
+  p.poly([[2.55, 0.75, 20], [2.55, 3.35, 20], [2.2, 3.35, 27], [2.2, 0.75, 27]], '#5d6670', '#3a4048', 0.6);
   for (let k = 0; k < 4; k++) {
     const y = 0.95 + k * 0.6;
     p.wallR(2.552, y, y + 0.16, 5, 16, '#2e2e40');
@@ -1241,7 +1230,11 @@ function drawGothicChurch(p: Pen, season: Season, glazed: number): void {
     p.poly([[2.6, y, 30], [2.62, y, 38], [2.61, y, 44]], ST2, '#9a927f', 0.6);
     p.line([2.6, y, 28], [2.22, y, 42], '#b8ae98', 2.2);
   }
-  // The west front: a tall gable between buttresses, a rose window, a deep portal.
+  // A slender flèche over the crossing.
+  p.box(1.38, 1.38, 1.62, 1.62, 70, 10, ST);
+  p.roofPyramid(1.38, 1.38, 1.62, 1.62, 80, 30, 'slate', 0.02);
+  p.line([1.5, 1.5, 110], [1.5, 1.5, 118], '#d8b84a', 1.3);
+  // The west front: the gable between twin towers, a rose window, a deep portal.
   p.poly([[0.8, 3.352, 46], [2.2, 3.352, 46], [1.5, 3.352, 74]], ST, '#9a927f', 0.6);
   const [rx, ry] = iso(1.5, 3.352, 46);
   const c = p.ctx;
@@ -1265,10 +1258,23 @@ function drawGothicChurch(p: Pen, season: Season, glazed: number): void {
   p.wallL(3.356, 1.36, 1.64, 0, 18, '#4a2f1b');
   p.line([1.5, 3.358, 0], [1.5, 3.358, 18], '#2e1d10', 0.8);
   p.poly([[1.26, 3.36, 22], [1.74, 3.36, 22], [1.5, 3.36, 31]], ST2, '#9a927f', 0.6);
-  // Buttresses at the corners of the front, crowned with pinnacles.
-  for (const x0 of [0.72, 2.12]) {
-    p.box(x0, 3.28, x0 + 0.16, 3.46, 0, 54, ST2, undefined, 'stone');
-    p.poly([[x0, 3.46, 54], [x0 + 0.16, 3.46, 54], [x0 + 0.08, 3.37, 68]], ST, '#9a927f', 0.5);
+  // The twin towers with their spires and pinnacles.
+  for (const x0 of [0.3, 2.2]) {
+    const x1 = x0 + 0.5;
+    p.box(x0, 2.74, x1, 3.35, 0, 70, ST, undefined, 'stone');
+    p.wallL(3.352, x0 + 0.15, x0 + 0.35, 50, 64, '#2a2522');
+    p.wallR(x1 + 0.002, 2.94, 3.16, 50, 64, '#221e1b');
+    p.wallL(3.352, x0 + 0.18, x0 + 0.32, 20, 34, '#2e2e40');
+    p.wallL(3.353, x0 + 0.2, x0 + 0.3, 21, 33, pane(x0 > 1 ? 2 : 3));
+    p.roofPyramid(x0, 2.74, x1, 3.35, 70, 44, 'slate', 0.03);
+    for (const [px, py] of [
+      [x0 + 0.03, 3.32],
+      [x1 - 0.03, 3.32],
+      [x1 - 0.03, 2.77],
+    ])
+      p.poly([[px - 0.04, py, 70], [px + 0.04, py, 70], [px, py, 82]], ST, '#9a927f', 0.5);
+    p.line([(x0 + x1) / 2, 3.05, 114], [(x0 + x1) / 2, 3.05, 124], '#d8b84a', 1.4);
+    p.line([(x0 + x1) / 2 - 0.05, 3.1, 120], [(x0 + x1) / 2 + 0.05, 3.0, 120], '#d8b84a', 1.4);
   }
 }
 
@@ -1628,7 +1634,8 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       break;
     }
     case 'kiln': {
-      p.shadow(0.3, 0.3, 1.7, 1.6);
+      // A round shadow under the round kiln, falling a little to the right.
+      p.ellipse(0.97, 0.94, 0, 30, 15, 'rgba(30,30,10,0.22)');
       // Beehive kiln of brick with a glowing mouth.
       const [kx, ky] = iso(0.9, 0.9, 0);
       const c = p.ctx;
@@ -2047,6 +2054,19 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       p.windowR(1.3, 0.6, 7, 0.14, 4);
       p.roofX(0.3, 0.3, 1.3, 1.2, 15, 13, 'shingle', WOOD, 0.12);
       smoke.push(p.chimney(0.55, 0.85, 20, 10, '#7f7468'));
+      if (variant === 1) {
+        // The large lodge: a second room on the right, and an open log store in front of it.
+        p.box(1.3, 0.4, 1.8, 1.15, 0, 13, WOOD, undefined, 'log');
+        p.windowR(1.8, 0.75, 6, 0.13, 4);
+        p.roofX(1.3, 0.4, 1.8, 1.15, 13, 10, 'shingle', WOOD, 0.1);
+        // Back posts, the stacked logs, the roof, then the front posts over them.
+        for (const x of [1.35, 1.8]) p.line([x, 1.3, 0], [x, 1.3, 13], '#5e4129', 1.4);
+        p.logPile(1.57, 1.55, 3);
+        p.poly([[1.28, 1.25, 14], [1.88, 1.25, 14], [1.88, 1.85, 10], [1.28, 1.85, 10]], p.snow ? '#eef2f4' : '#6a4a2e', '#3d2614', 0.6);
+        for (const x of [1.35, 1.8]) p.line([x, 1.8, 0], [x, 1.8, 10.5], '#5e4129', 1.4);
+        p.logPile(0.4, 1.75, 2);
+        break;
+      }
       p.logPile(1.45, 0.7, 3);
       p.logPile(0.4, 1.75, 2);
       // Chopping block with an axe.
@@ -2571,9 +2591,47 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
         ],
         season === 3 ? '#d4d8d6' : '#a8946a',
       );
+      if (variant === 2) {
+        // The improved store: one great warehouse over the whole plot, a crane at its loft door.
+        p.shadow(0.25, 0.25, 2.75, 2.75);
+        p.box(0.25, 0.25, 2.75, 2.75, 0, 12, '#9a9288', undefined, 'stone');
+        p.box(0.25, 0.25, 2.75, 2.75, 12, 20, WOOD);
+        p.timber(0.25, 0.25, 2.75, 2.75, 12, 20, '#5a3a22');
+        for (const x of [0.7, 1.5, 2.3]) {
+          p.wallL(2.752, x - 0.25, x + 0.25, 0, 11, '#5b3a22');
+          p.line([x, 2.754, 0], [x, 2.754, 11], '#3d2614', 0.8);
+        }
+        for (const y of [0.7, 1.5, 2.3]) p.windowR(2.75, y, 18, 0.14, 6);
+        p.wallL(2.753, 1.3, 1.7, 17, 29, '#4a3020');
+        p.roofX(0.25, 0.25, 2.75, 2.75, 32, 30, 'shingle', WOOD, 0.14);
+        // The wall crane: a post up the wall, a jib out over the door, a rope and a bale.
+        p.line([1.15, 2.78, 12], [1.15, 2.78, 40], '#5a3a22', 2);
+        p.line([1.15, 2.78, 38], [1.15, 3.25, 36], '#5a3a22', 1.8);
+        p.line([1.15, 2.78, 30], [1.15, 3.2, 36.5], '#5a3a22', 1);
+        p.line([1.15, 3.22, 36], [1.15, 3.22, 16], '#c8b48c', 0.6);
+        p.box(1.07, 3.15, 1.23, 3.29, 11, 5, '#c8a868');
+        break;
+      }
       p.fence([0.15, 2.92], [1.1, 2.92]);
       p.fence([1.9, 2.92], [2.85, 2.92]);
       p.fence([2.92, 1.45], [2.92, 2.85]);
+      if (variant === 1) {
+        // The loft: the barn raised a storey, a loft door and a hoist beam over the doors.
+        p.shadow(0.3, 0.25, 2.7, 1.35);
+        p.box(0.3, 0.25, 2.7, 1.35, 0, 34, WOOD);
+        p.timber(0.3, 0.25, 2.7, 1.35, 0, 34, '#5a3a22');
+        p.line([0.3, 1.352, 20], [2.7, 1.352, 20], '#5a3a22', 1.6);
+        p.wallL(1.352, 1.15, 1.85, 0, 17, '#5b3a22');
+        p.line([1.15, 1.354, 0], [1.85, 1.354, 17], '#3d2614', 1);
+        p.line([1.85, 1.354, 0], [1.15, 1.354, 17], '#3d2614', 1);
+        p.line([1.5, 1.354, 0], [1.5, 1.354, 17], '#3d2614', 1);
+        p.wallL(1.353, 1.35, 1.65, 22, 31, '#4a3020');
+        p.roofX(0.3, 0.25, 2.7, 1.35, 34, 22, 'shingle', WOOD, 0.14);
+        p.line([1.5, 1.36, 33], [1.5, 1.75, 33], '#5a3a22', 1.8);
+        p.line([1.5, 1.72, 33], [1.5, 1.72, 22], '#c8b48c', 0.6);
+        p.sack(1.5, 1.72);
+        break;
+      }
       p.shadow(0.3, 0.25, 2.7, 1.35);
       p.box(0.3, 0.25, 2.7, 1.35, 0, 22, WOOD);
       p.timber(0.3, 0.25, 2.7, 1.35, 0, 22, '#5a3a22');
@@ -2597,28 +2655,35 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
         }
       }
       p.box(0.25, 0.25, 1.75, 1.75, 7, 2, '#6b4a2c');
-      p.box(0.28, 0.28, 1.72, 1.72, 9, 20, BOARD);
+      // The loft raises it a storey; the improved granary adds a lean-to store as well.
+      const top = variant ? 38 : 29;
+      if (variant === 2) {
+        p.box(0.3, 1.78, 1.7, 1.98, 0, 13, '#8a6238');
+        for (const x of [0.6, 1.0, 1.4]) p.line([x, 1.982, 0], [x, 1.982, 13], '#5a3a22', 1);
+        p.poly([[0.25, 1.72, 18], [1.75, 1.72, 18], [1.75, 2.03, 13], [0.25, 2.03, 13]], p.snow ? '#eef2f4' : '#c8a458', '#7a5a2a', 0.6);
+      }
+      p.box(0.28, 0.28, 1.72, 1.72, 9, top - 9, BOARD);
       // Weatherboards and corner posts.
-      for (let z = 12; z < 29; z += 2.6) {
+      for (let z = 12; z < top; z += 2.6) {
         p.line([0.28, 1.72, z], [1.72, 1.72, z], '#8a6236', 0.55);
         p.line([1.72, 0.28, z], [1.72, 1.72, z], '#7a5230', 0.55);
       }
       for (const t of [0.28, 1.0, 1.72]) {
-        p.line([t, 1.72, 9], [t, 1.72, 29], '#5a3a22', 1.4);
-        p.line([1.72, t, 9], [1.72, t, 29], '#4e3220', 1.4);
+        p.line([t, 1.72, 9], [t, 1.72, top], '#5a3a22', 1.4);
+        p.line([1.72, t, 9], [1.72, t, top], '#4e3220', 1.4);
       }
       // Loft door on the front, steps leading up beside it (with a gap).
       p.wallL(1.722, 0.62, 0.92, 9, 23, '#5b3a22');
       p.line([0.77, 1.724, 9], [0.77, 1.724, 23], '#3d2614', 0.7);
       for (let k = 0; k < 3; k++) p.box(0.58, 1.86 + k * 0.1, 0.96, 1.96 + k * 0.1, 0, 7.5 - k * 2.4, '#a8a093');
       // Vents high on the right side.
-      for (const y of [0.55, 1.25]) p.wallR(1.722, y, y + 0.18, 22, 25, '#3a2a1c');
-      p.roofX(0.28, 0.28, 1.72, 1.72, 29, 30, 'thatch', BOARD, 0.2);
+      for (const y of [0.55, 1.25]) p.wallR(1.722, y, y + 0.18, top - 7, top - 4, '#3a2a1c');
+      p.roofX(0.28, 0.28, 1.72, 1.72, top, 30, 'thatch', BOARD, 0.2);
       // A hatch in the gable, and the hoist beam over it with its rope.
-      p.wallR(1.724, 0.88, 1.12, 33, 41, '#4a3020');
-      p.line([1.72, 1.0, 47], [2.02, 1.0, 47], '#5a3a22', 2);
-      p.line([1.99, 1.0, 47], [1.99, 1.0, 30], '#c8b48c', 0.6);
-      p.line([1.96, 1.0, 30], [2.02, 1.0, 30], '#5a3a22', 1);
+      p.wallR(1.724, 0.88, 1.12, top + 4, top + 12, '#4a3020');
+      p.line([1.72, 1.0, top + 18], [2.02, 1.0, top + 18], '#5a3a22', 2);
+      p.line([1.99, 1.0, top + 18], [1.99, 1.0, top + 1], '#c8b48c', 0.6);
+      p.line([1.96, 1.0, top + 1], [2.02, 1.0, top + 1], '#5a3a22', 1);
       break;
     }
     case 'silo': {
@@ -6372,20 +6437,12 @@ function drawPalace(p: Pen, season: Season, smoke: V3[]): void {
   const arms = HERALDRY.current;
   const ST = '#d4ccbc';
   const ROOFC = 'slate';
-  p.shadow(0.2, 0.2, 3.85, 3.3);
+  p.shadow(0.3, 0.45, 3.7, 2.95, 0.05);
   // The forecourt: gravel, with a round basin in the middle.
   sandPatch(p, [[1.1, 2.95], [2.9, 2.95], [3.0, 3.95], [1.0, 3.95]], winter ? '#d8dcda' : '#d2c4a0', 4, 1.6);
   p.ellipse(2.0, 3.45, 1, 13, 6.5, '#a8a093');
   p.ellipse(2.0, 3.45, 2, 11, 5.4, winter ? '#dde8ee' : '#5a8ab0');
   p.line([2.0, 3.45, 2], [2.0, 3.45, 9], '#bab3a6', 1.6);
-  // Corner towers at the back of each wing, rising over the roofs.
-  for (const x0 of [0.3, 3.0]) {
-    p.box(x0, 0.1, x0 + 0.7, 0.8, 0, 58, ST, undefined, 'stone');
-    for (const z of [40, 50]) p.windowL(0.8, x0 + 0.35, z, 0.14, 6);
-    if (x0 > 1) for (const z of [40, 50]) p.windowR(3.7, 0.3, z, 0.12, 6);
-    p.roofPyramid(x0, 0.1, x0 + 0.7, 0.8, 58, 28, ROOFC, 0.05);
-    p.line([x0 + 0.35, 0.45, 86], [x0 + 0.35, 0.45, 94], '#d8b84a', 1.2);
-  }
   // Left wing, ridge front to back.
   p.box(0.3, 0.45, 1.3, 2.95, 0, 36, ST, undefined, 'stone');
   for (const z of [5, 19]) p.windowL(2.95, 0.55, z, 0.16, 9, winter && z === 5);
@@ -6411,6 +6468,19 @@ function drawPalace(p: Pen, season: Season, smoke: V3[]): void {
   for (const z of [5, 19]) p.windowL(2.95, 3.25, z, 0.16, 9);
   p.roofY(2.7, 0.45, 3.7, 2.95, 36, 22, ROOFC, ST, 0.08);
   smoke.push(p.chimney(3.2, 0.8, 52, 12, '#a8a093'));
+  // Corner pavilions at the front of each wing, a storey higher, under tall roofs.
+  // Flush with the wings' fronts and sides, so all stand on one line of ground.
+  for (const x0 of [0.3, 3.0]) {
+    p.box(x0, 2.25, x0 + 0.7, 2.95, 0, 50, ST, undefined, 'stone');
+    for (const z of [6, 22, 38]) p.windowL(2.95, x0 + 0.27, z, 0.15, 9);
+    p.windowR(x0 + 0.7, 2.52, 22, 0.14, 9);
+    p.roofPyramid(x0, 2.25, x0 + 0.7, 2.95, 50, 26, ROOFC, 0.05);
+    p.line([x0 + 0.35, 2.6, 76], [x0 + 0.35, 2.6, 84], '#d8b84a', 1.2);
+  }
+  // The door and the hangings in the lord's colours, on the wall behind the portico.
+  p.wallL(2.602, 1.86, 2.14, 2.5, 18, '#4a2f1b');
+  p.wallL(2.604, 1.62, 1.7, 14, 26, arms.field);
+  p.wallL(2.604, 2.3, 2.38, 14, 26, arms.field);
   // The portico: four columns under a pediment carved with the arms.
   p.box(1.5, 2.6, 2.5, 2.95, 0, 2.5, '#c4bcac');
   for (const x of [1.58, 1.84, 2.16, 2.42]) {
@@ -6420,10 +6490,6 @@ function drawPalace(p: Pen, season: Season, smoke: V3[]): void {
   p.box(1.5, 2.6, 2.5, 2.95, 30, 3, '#e2dccd');
   p.poly([[1.5, 2.95, 33], [2.5, 2.95, 33], [2.0, 2.95, 43]], '#e8e2d4', '#b8b0a0', 0.8);
   p.circle(2.0, 2.952, 37, 2.6, arms.field);
-  p.wallL(2.602, 1.86, 2.14, 2.5, 18, '#4a2f1b');
-  // Hangings in the lord's colours either side of the door.
-  p.wallL(2.604, 1.62, 1.7, 14, 26, arms.field);
-  p.wallL(2.604, 2.3, 2.38, 14, 26, arms.field);
 }
 
 /** Ground tile for building yards drawn under some buildings. */

@@ -14,7 +14,7 @@ import {
   recompute,
 } from './sim';
 import type { Building, BuildingType, Cost, GameState } from './types';
-import { idx, inBounds } from './world';
+import { SHOAL_MAX, idx, inBounds } from './world';
 
 /**
  * Building levels: houses grow as their needs are met, and the manor grows
@@ -289,6 +289,7 @@ export function finishUpgrade(s: GameState, b: Building): void {
   if (b.improveTo) {
     const imp = IMPROVEMENT_BY_ID.get(b.improveTo);
     (b.improved ??= []).push(b.improveTo);
+    if (b.improveTo === 'fishpond') penShoal(s, b);
     b.improveTo = undefined;
     b.upgrading = undefined;
     b.upProgress = undefined;
@@ -325,3 +326,23 @@ export function isProject(b: Building): boolean {
 }
 
 export { needsMaterials };
+
+/** Pisciculture: a new shoal in the water nearest the fisher's hut, kept there in a ring of stakes. */
+export function penShoal(s: GameState, b: Building): void {
+  if ((s.shoals ?? []).some((h) => h.pen === b.id)) return;
+  const cx = b.x + b.w / 2;
+  const cy = b.y + b.h / 2;
+  let best: { x: number; y: number; d: number } | null = null;
+  for (let y = Math.floor(cy) - 8; y <= cy + 8; y++) {
+    for (let x = Math.floor(cx) - 8; x <= cx + 8; x++) {
+      if (!inBounds(s, x, y) || s.terrain[idx(s, x, y)] !== 1) continue;
+      // Open water a tile out from the bank, so the ring sits in the water.
+      let wet = 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (inBounds(s, x + dx, y + dy) && s.terrain[idx(s, x + dx, y + dy)] === 1) wet++;
+      const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy) + (wet < 9 ? 3 : 0);
+      if (!best || d < best.d) best = { x, y, d };
+    }
+  }
+  if (!best) return;
+  (s.shoals ??= []).push({ x: best.x + 0.5, y: best.y + 0.5, n: SHOAL_MAX, max: SHOAL_MAX, pen: b.id });
+}

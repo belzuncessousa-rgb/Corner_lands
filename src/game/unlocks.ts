@@ -22,7 +22,7 @@ export const LEARN_TABS: { id: LearnTab; name: string }[] = [
 ];
 
 /** Conditions that are not about goods made (see conditionMet). */
-export type ConditionTest = 'herd15' | 'herd30' | 'greatwork' | 'storefull' | 'tavern10' | 'church10' | 'well8' | 'market4' | 'courtfull' | 'stablefull' | 'animalwork' | 'trade200' | 'trade250' | 'trade500' | 'trade600' | 'trade1000';
+export type ConditionTest = 'herd15' | 'herd30' | 'greatwork' | 'storefull' | 'church10' | 'well8' | 'courtfull' | 'stablefull' | 'animalwork' | 'trade200' | 'trade250' | 'trade500' | 'trade600' | 'trade1000';
 
 export interface Condition {
   /** Goods the town must have made in total. */
@@ -187,12 +187,10 @@ export const UNLOCKS: Unlock[] = [
   { id: 'i:secondvat', name: 'Second vat', kind: 'upgrade', tab: 'civic', group: 'Faith & learning', desc: 'One flax makes two paper.', knowledge: 6, needs: [b('papermill')], condition: { made: { paper: 100 }, label: '100 paper made' }, improvement: 'secondvat', icon: 'papermill' },
   { id: 'i:sundayschool', name: 'Sunday school', kind: 'extension', tab: 'civic', group: 'Faith & learning', desc: 'Knowledge from every home the church serves; all work 2% slower.', knowledge: 4, condition: { test: 'church10', label: 'a church serving 10 homes' }, improvement: 'sundayschool', icon: 'church' },
   { id: 'i:infirmary', name: 'Infirmary', kind: 'extension', tab: 'civic', group: 'Faith & learning', desc: 'Sickness passes lightly over homes nearby; a medicine a month.', knowledge: 8, needs: [b('monastery')], condition: { made: { medicine: 20 }, label: '20 medicine made' }, improvement: 'infirmary', icon: 'monastery' },
-  { id: 'i:innrooms', name: 'Inn rooms', kind: 'upgrade', tab: 'civic', group: 'Services', desc: 'Travellers pay to stay; they eat a little.', knowledge: 6, needs: [b('tavern')], condition: { test: 'tavern10', label: 'a tavern serving 10 homes' }, improvement: 'innrooms', icon: 'tavern' },
   { id: 'i:loft', name: 'Loft', kind: 'upgrade', tab: 'civic', group: 'Services', desc: 'Stores hold half as much again.', knowledge: 4, condition: { test: 'storefull', label: '300 goods in store' }, improvement: 'loft', icon: 'storage' },
   { id: 'i:bigstore', name: 'Improved stores', kind: 'upgrade', tab: 'civic', group: 'Services', desc: 'Stores hold twice as much as at first, with two more haulers.', knowledge: 6, needs: ['i:loft'], condition: { test: 'storefull', label: '300 goods in store' }, improvement: 'bigstore', icon: 'storage' },
   { id: 'i:oxcarts', name: 'Ox-carts', kind: 'extension', tab: 'civic', group: 'Services', desc: 'Haulers with an ox carry twice as much.', knowledge: 4, needs: ['i:bigstore', b('draughtstable')], improvement: 'oxcarts', icon: 'storage' },
   { id: 'i:pump', name: 'Pump', kind: 'upgrade', tab: 'civic', group: 'Services', desc: 'A well reaches half as far again.', knowledge: 3, condition: { test: 'well8', label: 'a well serving 8 homes' }, improvement: 'pump', icon: 'well' },
-  { id: 'i:marketcross', name: 'Market cross', kind: 'extension', tab: 'civic', group: 'Services', desc: 'Beauty around it; each stall serves two more homes.', knowledge: 5, condition: { test: 'market4', label: 'a market of four stalls' }, improvement: 'marketcross', icon: 'market' },
   { id: 'i:mountedguard', name: 'Mounted guard', kind: 'extension', tab: 'civic', group: 'Services', desc: 'The watch on horseback keeps order in half as many homes again.', knowledge: 8, needs: [b('courthouse')], condition: { test: 'courtfull', label: 'a courthouse with its hands full' }, improvement: 'mountedguard', icon: 'courthouse' },
   { id: 'i:goodscart', name: 'Goods cart', kind: 'extension', tab: 'civic', group: 'Trade', desc: 'A trading post may keep a pack horse.', knowledge: 4, condition: { test: 'trade200', label: '200 goods traded' }, improvement: 'goodscart', icon: 'tradingpost' },
   { id: 'i:tradecentre', name: 'Trade centre', kind: 'upgrade', tab: 'civic', group: 'Trade', desc: 'Two more places; carts carry twice as much.', knowledge: 8, condition: { test: 'trade600', label: '600 goods traded' }, improvement: 'tradecentre', icon: 'tradingpost' },

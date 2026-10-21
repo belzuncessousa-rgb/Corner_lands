@@ -702,8 +702,8 @@ export class Pen {
   }
 
   /** A filled sack standing upright, tied at the neck. */
-  sack(x: number, y: number, color = '#d8c79c'): void {
-    const [sx, sy] = iso(x, y, 0);
+  sack(x: number, y: number, color = '#d8c79c', z = 0): void {
+    const [sx, sy] = iso(x, y, z);
     const c = this.ctx;
     c.fillStyle = 'rgba(30,24,12,0.2)';
     c.beginPath();

@@ -2203,7 +2203,8 @@ export class Hud {
       root = this.modal.querySelector('.modal')!;
       root.innerHTML = html;
     } else {
-      this.modalHelp = 'learning';
+      // Its help button sits in the board's own header, beside Close.
+      this.modalHelp = undefined;
       root = this.openModal(html).querySelector('.modal')!;
       root.classList.add('wide', 'learning-modal');
     }

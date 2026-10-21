@@ -99,6 +99,7 @@ describe('world generation', () => {
 describe('simulation', () => {
   it('builders carry materials over, then raise a house', () => {
     const s = generateWorld(7);
+    s.res.wood = 30;
     recompute(s);
     const before = totalHousing(s);
     const house = placeNearRoad(s, 'house');
@@ -355,7 +356,7 @@ describe('planned roads', () => {
 describe('relaxed mode', () => {
   it('starts with more supplies and nobody leaves when starving', () => {
     const s = generateWorld(5, { relaxed: true });
-    expect(s.res.wood).toBe(60);
+    expect(s.res.wood).toBe(30);
     for (const f of ['berries', 'meat'] as const) s.res[f] = 0;
     run(s, DAYS_PER_MONTH * 3);
     expect(s.population).toBe(8);
@@ -704,6 +705,7 @@ describe('fields, herds, orchards and backyards', () => {
     const h = placeNearRoad(s, 'house');
     h.build = 1;
     s.res.wood = 20;
+    s.res.gold = 50;
     expect(setYard(s, h, 'hens')).toBeNull();
     expect(s.res.wood).toBe(12);
     expect(setYard(s, h, 'bees')).toMatch(/Village/);
@@ -2336,6 +2338,28 @@ describe('improvements, choices and town options', () => {
     expect(wc.improved).toEqual(['biglodge']);
     expect(workersOf(wc)).toBe(places + 2);
     expect(improveError(s, wc, 'biglodge')).toMatch(/Already/);
+  });
+
+  it('animal sheds are built onto a pasture, and that pasture carries more', async () => {
+    const { placeZone, startImprove, herdRoom } = await import('../src/game/sim');
+    const s = generateWorld(71);
+    s.tier = 1;
+    s.res.wood = 150;
+    s.res.gold = 400;
+    s.res.planks = 40;
+    s.population = 12;
+    learnEverything(s);
+    const byre = built(s, 'byre');
+    let z = null;
+    for (let r = 1; r < 10 && !z; r++) z = placeZone(s, 'pasture', byre.x + 2 + r, byre.y, byre.x + 7 + r, byre.y + 5) ?? placeZone(s, 'pasture', byre.x, byre.y + 2 + r, byre.x + 5, byre.y + 7 + r);
+    expect(z).not.toBeNull();
+    run(s, 5);
+    const before = herdRoom(s, byre).room;
+    expect(startImprove(s, byre, 'animalsheds')).toMatch(/Not for this/);
+    expect(startImprove(s, z!, 'animalsheds')).toBeNull();
+    run(s, 60);
+    expect(z!.improved).toEqual(['animalsheds']);
+    expect(herdRoom(s, byre).room).toBe(Math.floor(before * 1.15));
   });
 
   it('the improved store needs its loft first, and holds twice as much', async () => {

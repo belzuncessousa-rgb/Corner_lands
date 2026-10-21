@@ -2835,9 +2835,9 @@ button.finga-help svg {
   top: 10px;
   right: 10px;
 }
-.modal.learning-modal > button.finga-help {
-  right: 96px;
-  top: 16px;
+.lb-head button.finga-help {
+  position: static;
+  flex: none;
 }
 #chip-panel > button.finga-help {
   right: 6px;
