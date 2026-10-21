@@ -1330,7 +1330,8 @@ export class Renderer {
   private drawBuilding(s: GameState, b: Building, season: Season, selected: boolean): void {
     // A mill that ground grain lately turns its sails (drawn live, not in the picture).
     const turning = b.type === 'windmill' && b.build >= 1 && !this.light && b.workers > 0 && !b.paused && (b.output > 0 || b.lastOutput > 0);
-    const sp = this.buildingSprite(b.type, b.level, season, turning ? 1 : variantOf(s, b));
+    const look = variantOf(s, b);
+    const sp = this.buildingSprite(b.type, b.level, season, turning ? look | 1 : look);
     const [wx, wy] = iso(b.x, b.y);
     const c = this.ctx;
     if (b.build < 1) {

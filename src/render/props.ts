@@ -127,29 +127,6 @@ const PROPS: Record<string, Prop> = {
     const greens = ['#6a9a44', '#8ab05a', '#5a8a6a', '#a0b860'];
     for (let i = 0; i < 6; i++) p.bush(x - 0.2 + (i % 3) * 0.18, y - 0.05 + Math.floor(i / 3) * 0.2, 2.2, greens[i % greens.length]);
   },
-  fishingboat: (p, x, y) => {
-    // A rowing boat drawn up on the bank, oars across it.
-    p.shadow(x - 0.32, y - 0.12, x + 0.32, y + 0.12);
-    p.poly(
-      [
-        [x - 0.35, y, 5],
-        [x + 0.35, y, 5],
-        [x + 0.22, y, 0],
-        [x - 0.22, y, 0],
-      ],
-      '#7a5230',
-    );
-    p.poly(
-      [
-        [x - 0.35, y, 5],
-        [x + 0.35, y, 5],
-        [x + 0.28, y - 0.12, 5],
-        [x - 0.28, y - 0.12, 5],
-      ],
-      '#5e3e22',
-    );
-    p.line([x - 0.2, y - 0.2, 6], [x + 0.25, y + 0.1, 6], '#b08a58', 1);
-  },
   kennels: (p, x, y, _b, snow, time) => {
     // A kennel with a pitched roof and an arched door, in a little fenced run.
     const x0 = x - 0.35;
@@ -245,81 +222,6 @@ const PROPS: Record<string, Prop> = {
     p.line([x + 0.3, y, 0], [x + 0.3, y, 8], DARK, 1.3);
     p.line([x - 0.32, y, 8], [x + 0.32, y, 8], WOODC, 1.5);
     p.sack(x, y + 0.2, '#c8b070');
-  },
-  // ---- upgrades: the building is rebuilt; a telling detail beside it.
-  towermill: (p, x, y) => p.stonePile(x, y, 3),
-  secondcopper: (p, x, y) => {
-    p.shadow(x - 0.15, y - 0.15, x + 0.15, y + 0.15);
-    p.ellipse(x, y, 4, 6, 5, '#b8703a');
-    p.ellipse(x, y, 8, 5, 2.4, '#d08848');
-  },
-  cheesecellar: (p, x, y) => {
-    // The cellar hatch, and cheeses set out to dry.
-    p.poly(
-      [
-        [x - 0.18, y - 0.12, 0],
-        [x + 0.18, y - 0.12, 0],
-        [x + 0.18, y + 0.12, 4],
-        [x - 0.18, y + 0.12, 4],
-      ],
-      '#6b4a2e',
-    );
-    for (let i = 0; i < 3; i++) p.ellipse(x - 0.15 + i * 0.15, y + 0.3, 1.5, 3, 1.5, '#e8c460');
-  },
-  broadloom: (p, x, y) => {
-    for (let i = 0; i < 3; i++) p.box(x - 0.2 + i * 0.13, y - 0.05, x - 0.1 + i * 0.13, y + 0.05, i * 0.5, 3, ['#b8483a', '#e8dcc0', '#3a5a8a'][i]);
-  },
-  crownglass: (p, x, y) => {
-    // Spun crowns of glass leaning on a rack.
-    p.line([x - 0.2, y, 8], [x + 0.2, y, 8], WOODC, 1);
-    for (let i = 0; i < 2; i++) {
-      const [sx, sy] = iso(x - 0.08 + i * 0.16, y + 0.02, 5);
-      p.ctx.fillStyle = 'rgba(160,210,220,0.85)';
-      p.ctx.beginPath();
-      p.ctx.ellipse(sx, sy, 2.6, 4, 0.2, 0, Math.PI * 2);
-      p.ctx.fill();
-    }
-  },
-  secondvat: (p, x, y) => {
-    p.shadow(x - 0.18, y - 0.18, x + 0.18, y + 0.18);
-    p.ellipse(x, y, 3, 7, 3.5, '#7a5230');
-    p.ellipse(x, y, 6.5, 6, 2.6, '#c8d4d8');
-  },
-  masonslodge: (p, x, y, _b, snow) => {
-    shed(p, x, y, snow, '#b0a89a');
-    p.box(x - 0.1, y + 0.3, x + 0.1, y + 0.42, 0, 4, '#c8c0b2');
-  },
-  pump: (p, _x, _y, b) => {
-    // The pump's iron handle over the well head.
-    const x = b.x + b.w / 2 + 0.25;
-    const y = b.y + b.h / 2 + 0.25;
-    p.box(x - 0.05, y - 0.05, x + 0.05, y + 0.05, 0, 12, '#5a5a62');
-    p.line([x, y, 12], [x - 0.2, y + 0.1, 15], '#3a3a40', 1.3);
-  },
-  tradecentre: (p, x, y) => {
-    p.crate(x - 0.15, y);
-    p.barrel(x + 0.12, y + 0.05);
-    p.crate(x, y + 0.25);
-  },
-  hugeships: (p, x, y, _b, _snow, time) => {
-    // The masts of a great ship at the quay.
-    const sway = Math.sin(time * 0.7 + x) * 0.03;
-    p.line([x, y, 0], [x + sway, y, 52], '#5e3e22', 2);
-    p.line([x + 0.25, y + 0.1, 0], [x + 0.25 + sway, y + 0.1, 40], '#5e3e22', 1.6);
-    p.line([x - 0.2, y, 44], [x + 0.2, y, 44], '#5e3e22', 1);
-    p.poly(
-      [
-        [x - 0.18, y, 43],
-        [x + 0.18, y, 43],
-        [x + 0.2 + sway, y, 26],
-        [x - 0.2 + sway, y, 26],
-      ],
-      '#efe6d2',
-    );
-  },
-  bigstable: (p, x, y, _b, snow) => {
-    shed(p, x, y, snow);
-    p.sack(x + 0.1, y + 0.3, '#c8b070');
   },
 };
 

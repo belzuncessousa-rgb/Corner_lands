@@ -1165,8 +1165,28 @@ export function buildingSprite(type: BuildingType, w: number, h: number, level: 
   });
 }
 
+/** A flag on a picture's variant: the building has had its upgrade, and is drawn rebuilt. */
+export const UPGRADED = 1 << 16;
+
+/** The upgrade that rebuilds each kind of building (extensions stand beside it instead). */
+const UPGRADE_LOOKS: Partial<Record<BuildingType, string>> = {
+  windmill: 'towermill',
+  brewhouse: 'secondcopper',
+  dairy: 'cheesecellar',
+  fisher: 'fishingboat',
+  weaver: 'broadloom',
+  glassworks: 'crownglass',
+  papermill: 'secondvat',
+  stonemason: 'masonslodge',
+  well: 'pump',
+  tradingpost: 'tradecentre',
+  dock: 'hugeships',
+  draughtstable: 'bigstable',
+};
+
 /** Which look a building's picture takes: the house forms and colours, the dock's side, the cathedral's glass. */
 export function variantOf(s: GameState, b: Building): number {
+  const up = UPGRADE_LOOKS[b.type] && has(b, UPGRADE_LOOKS[b.type]!) ? UPGRADED : 0;
   // The cathedral shows its stained glass once commissioned.
   if (b.type === 'cathedral') return s.commissions?.includes('glass') ? 1 : 0;
   // A dock builds its quay out over whichever side has more water.
@@ -1177,14 +1197,14 @@ export function variantOf(s: GameState, b: Building): number {
       if (s.terrain[(b.y + k) * s.width + b.x + b.w] === 1) side++;
       if (s.terrain[(b.y + b.h) * s.width + b.x + k] === 1) fore++;
     }
-    return fore > side ? 1 : 0;
+    return (fore > side ? 1 : 0) + up;
   }
   // Upgrades rebuild the building itself: a bigger lodge, a lofted or enlarged store.
   if (b.type === 'woodcutter') return has(b, 'biglodge') ? 1 : 0;
   if (b.type === 'storehouse' || b.type === 'granary') return has(b, 'bigstore') ? 2 : has(b, 'loft') ? 1 : 0;
   // Stained-glass windows once the town has them put in.
   if (b.type === 'church') return optionOn(s, 'windows') && (s.glazed ?? 0) > 0 ? 1 : 0;
-  if (b.type !== 'house') return 0;
+  if (b.type !== 'house') return up;
   const trade = b.trade ? HOME_TRADES.indexOf(b.trade) + 1 : 0;
   // Colours, yard, craft and the shape of the house, which the id picks.
   const forms = HOUSE_FORMS[Math.max(1, Math.min(5, b.level))] || 5;
@@ -1194,88 +1214,96 @@ export function variantOf(s: GameState, b: Building): number {
 
 /**
  * The church rebuilt in dressed stone: a Gothic church on the same ground. A
- * tall nave with a clerestory above lower aisles, flying buttresses along
- * the side, twin towers with spires flanking the west front, a great rose
- * window over a deep pointed portal, and a slender flèche over the crossing.
+ * tall nave with a clerestory above lower aisles, flying buttresses along the
+ * side, a south porch, and a great west tower on the front, flush with the
+ * aisles, rising in three stages to battlements, pinnacles and a spire.
  */
 function drawGothicChurch(p: Pen, season: Season, glazed: number): void {
   const winter = season === 3;
   const ST = '#ddd4c0';
   const ST2 = '#cfc5ae';
+  const LINE = '#9a927f';
   const pane = (k: number) => (winter ? '#e8b850' : glazed ? GLASS[k % GLASS.length] : '#5a6a9a');
-  p.shadow(0.3, 0.3, 2.68, 3.35, 0.05);
+  // A pointed lancet window on the front (L) or right (R) face.
+  const lancet = (face: 'L' | 'R', at: number, a: number, b: number, z0: number, z1: number, k: number) => {
+    const m = (a + b) / 2;
+    const pts = (inset: number, dz: number): V3[] =>
+      face === 'L'
+        ? [[a + inset, at, z0 + dz], [b - inset, at, z0 + dz], [b - inset, at, z1 - 4], [m, at, z1 - dz], [a + inset, at, z1 - 4]]
+        : [[at, a + inset, z0 + dz], [at, b - inset, z0 + dz], [at, b - inset, z1 - 4], [at, m, z1 - dz], [at, a + inset, z1 - 4]];
+    p.poly(pts(0, 0), '#3a3a4a');
+    p.poly(pts(0.02, 1), pane(k));
+  };
+  p.shadow(0.45, 0.3, 2.55, 3.55, 0.05);
   // A small apse at the east end.
   p.box(1.05, 0.3, 1.95, 0.7, 0, 30, ST2, undefined, 'stone');
   p.roofPyramid(1.05, 0.3, 1.95, 0.7, 30, 12, 'slate', 0.04);
-  // The aisles: low, with lean-to roofs against the nave.
-  p.box(0.45, 0.75, 2.55, 3.35, 0, 20, ST2, undefined, 'stone');
-  p.poly([[2.55, 0.75, 20], [2.55, 3.35, 20], [2.2, 3.35, 27], [2.2, 0.75, 27]], '#5d6670', '#3a4048', 0.6);
-  for (let k = 0; k < 4; k++) {
-    const y = 0.95 + k * 0.6;
-    p.wallR(2.552, y, y + 0.16, 5, 16, '#2e2e40');
-    p.wallR(2.553, y + 0.02, y + 0.14, 6, 15, pane(k));
-  }
-  // The nave rises above them, with tall clerestory windows.
-  p.box(0.8, 0.7, 2.2, 3.35, 0, 46, ST, undefined, 'stone');
-  for (let k = 0; k < 4; k++) {
-    const y = 0.95 + k * 0.6;
-    p.wallR(2.202, y, y + 0.14, 30, 43, '#2e2e40');
-    p.wallR(2.203, y + 0.02, y + 0.12, 31, 42, pane(k + 1));
-  }
-  p.roofY(0.8, 0.7, 2.2, 3.35, 46, 34, 'slate', ST, 0.06);
+  // The aisles, low under lean-to roofs, reaching the front either side of the tower.
+  p.box(0.45, 0.75, 2.55, 3.55, 0, 20, ST2, undefined, 'stone');
+  p.poly([[2.55, 0.75, 20], [2.55, 3.55, 20], [2.2, 3.55, 27], [2.2, 0.75, 27]], '#5d6670', '#3a4048', 0.6);
+  for (let k = 0; k < 4; k++) lancet('R', 2.552, 0.95 + k * 0.55, 1.12 + k * 0.55, 4, 17, k);
+  for (const [xa, xb] of [[0.55, 0.9], [2.1, 2.45]] as const) lancet('L', 3.552, xa + 0.1, xb - 0.1, 4, 17, 2);
+  // The nave above them, with its clerestory.
+  p.box(0.8, 0.7, 2.2, 3.0, 0, 46, ST, undefined, 'stone');
+  for (let k = 0; k < 4; k++) lancet('R', 2.202, 0.95 + k * 0.5, 1.1 + k * 0.5, 29, 43, k + 1);
+  p.roofY(0.8, 0.7, 2.2, 3.0, 46, 34, 'slate', ST, 0.06);
   // Flying buttresses from the aisle wall up to the nave.
   for (let k = 0; k < 5; k++) {
-    const y = 0.8 + k * 0.6;
+    const y = 0.8 + k * 0.5;
     p.box(2.55, y - 0.04, 2.68, y + 0.04, 0, 30, ST2);
-    p.poly([[2.6, y, 30], [2.62, y, 38], [2.61, y, 44]], ST2, '#9a927f', 0.6);
+    p.poly([[2.6, y, 30], [2.62, y, 38], [2.61, y, 44]], ST2, LINE, 0.6);
     p.line([2.6, y, 28], [2.22, y, 42], '#b8ae98', 2.2);
   }
-  // A slender flèche over the crossing.
-  p.box(1.38, 1.38, 1.62, 1.62, 70, 10, ST);
-  p.roofPyramid(1.38, 1.38, 1.62, 1.62, 80, 30, 'slate', 0.02);
-  p.line([1.5, 1.5, 110], [1.5, 1.5, 118], '#d8b84a', 1.3);
-  // The west front: the gable between twin towers, a rose window, a deep portal.
-  p.poly([[0.8, 3.352, 46], [2.2, 3.352, 46], [1.5, 3.352, 74]], ST, '#9a927f', 0.6);
-  const [rx, ry] = iso(1.5, 3.352, 46);
-  const c = p.ctx;
-  c.fillStyle = '#3a3a52';
-  c.beginPath();
-  c.arc(rx, ry, 8, 0, Math.PI * 2);
-  c.fill();
-  for (let k = 0; k < 8; k++) {
-    c.fillStyle = winter ? '#e8b850' : glazed ? GLASS[k % GLASS.length] : k % 2 ? '#6a5a9a' : '#7a6aaa';
-    c.beginPath();
-    c.moveTo(rx, ry);
-    c.arc(rx, ry, 6.5, (k * Math.PI) / 4, ((k + 1) * Math.PI) / 4);
-    c.fill();
+  // A porch on the south side, over the side door.
+  p.box(2.68, 2.55, 2.98, 2.95, 0, 13, ST2, undefined, 'stone');
+  p.wallR(2.982, 2.67, 2.83, 0, 10, '#4a2f1b');
+  p.roofX(2.68, 2.55, 2.98, 2.95, 13, 7, 'slate', ST2, 0.03);
+  // The great west tower, flush with the front: three stages, battlements and a spire.
+  const X0 = 1.0;
+  const X1 = 2.0;
+  const Y0 = 2.75;
+  const Y1 = 3.55;
+  const H = 82;
+  p.box(X0, Y0, X1, Y1, 0, H, ST, undefined, 'stone');
+  // Paler pilasters up its corners, and string courses between the stages.
+  for (const [x, y] of [[X0, Y1], [X1, Y1], [X1, Y0]] as const) p.line([x, y, 0], [x, y, H], '#ece6d8', 3);
+  for (const z of [26, 54]) {
+    p.wallL(Y1 + 0.002, X0, X1, z, z + 2, ST2);
+    p.wallR(X1 + 0.002, Y0, Y1, z, z + 2, ST2);
   }
-  c.fillStyle = '#e8c860';
-  c.beginPath();
-  c.arc(rx, ry, 1.5, 0, Math.PI * 2);
-  c.fill();
-  // The portal, its arch stepped in, under a little gable.
-  p.wallL(3.354, 1.3, 1.7, 0, 22, '#8a8070');
-  p.wallL(3.356, 1.36, 1.64, 0, 18, '#4a2f1b');
-  p.line([1.5, 3.358, 0], [1.5, 3.358, 18], '#2e1d10', 0.8);
-  p.poly([[1.26, 3.36, 22], [1.74, 3.36, 22], [1.5, 3.36, 31]], ST2, '#9a927f', 0.6);
-  // The twin towers with their spires and pinnacles.
-  for (const x0 of [0.3, 2.2]) {
-    const x1 = x0 + 0.5;
-    p.box(x0, 2.74, x1, 3.35, 0, 70, ST, undefined, 'stone');
-    p.wallL(3.352, x0 + 0.15, x0 + 0.35, 50, 64, '#2a2522');
-    p.wallR(x1 + 0.002, 2.94, 3.16, 50, 64, '#221e1b');
-    p.wallL(3.352, x0 + 0.18, x0 + 0.32, 20, 34, '#2e2e40');
-    p.wallL(3.353, x0 + 0.2, x0 + 0.3, 21, 33, pane(x0 > 1 ? 2 : 3));
-    p.roofPyramid(x0, 2.74, x1, 3.35, 70, 44, 'slate', 0.03);
-    for (const [px, py] of [
-      [x0 + 0.03, 3.32],
-      [x1 - 0.03, 3.32],
-      [x1 - 0.03, 2.77],
-    ])
-      p.poly([[px - 0.04, py, 70], [px + 0.04, py, 70], [px, py, 82]], ST, '#9a927f', 0.5);
-    p.line([(x0 + x1) / 2, 3.05, 114], [(x0 + x1) / 2, 3.05, 124], '#d8b84a', 1.4);
-    p.line([(x0 + x1) / 2 - 0.05, 3.1, 120], [(x0 + x1) / 2 + 0.05, 3.0, 120], '#d8b84a', 1.4);
+  // The west door: a deep pointed arch under a little gable.
+  p.poly([[1.3, Y1 + 0.003, 0], [1.7, Y1 + 0.003, 0], [1.7, Y1 + 0.003, 14], [1.5, Y1 + 0.003, 22], [1.3, Y1 + 0.003, 14]], '#8a8070');
+  p.poly([[1.36, Y1 + 0.005, 0], [1.64, Y1 + 0.005, 0], [1.64, Y1 + 0.005, 13], [1.5, Y1 + 0.005, 19], [1.36, Y1 + 0.005, 13]], '#4a2f1b');
+  p.line([1.5, Y1 + 0.006, 0], [1.5, Y1 + 0.006, 18], '#2e1d10', 0.8);
+  p.poly([[1.26, Y1 + 0.007, 21], [1.74, Y1 + 0.007, 21], [1.5, Y1 + 0.007, 29]], ST2, LINE, 0.6);
+  // The great west window, and its fellow on the side.
+  lancet('L', Y1 + 0.003, 1.38, 1.62, 31, 51, 0);
+  lancet('R', X1 + 0.003, 3.03, 3.27, 31, 51, 3);
+  // The belfry: paired louvred openings on each face.
+  for (const [a, b] of [[1.22, 1.42], [1.58, 1.78]] as const) {
+    p.poly([[a, Y1 + 0.003, 58], [b, Y1 + 0.003, 58], [b, Y1 + 0.003, 70], [(a + b) / 2, Y1 + 0.003, 76], [a, Y1 + 0.003, 70]], '#2a2522');
+    for (let z = 61; z < 72; z += 3) p.line([a + 0.02, Y1 + 0.004, z], [b - 0.02, Y1 + 0.004, z], '#6a5a48', 0.8);
   }
+  for (const [a, b] of [[2.93, 3.11], [3.19, 3.37]] as const) {
+    p.poly([[X1 + 0.003, a, 58], [X1 + 0.003, b, 58], [X1 + 0.003, b, 70], [X1 + 0.003, (a + b) / 2, 76], [X1 + 0.003, a, 70]], '#221e1b');
+    for (let z = 61; z < 72; z += 3) p.line([X1 + 0.004, a + 0.02, z], [X1 + 0.004, b - 0.02, z], '#5a4a3a', 0.8);
+  }
+  // Battlements along the top, pinnacles at the corners.
+  p.box(X0 - 0.03, Y0 - 0.03, X1 + 0.03, Y1 + 0.03, H, 3, ST2);
+  for (let k = 0; k < 5; k++) {
+    const x = X0 + 0.02 + k * 0.24;
+    p.box(x, Y1 - 0.05, x + 0.12, Y1 + 0.03, H + 3, 4, ST2);
+    const y = Y0 + 0.02 + k * 0.2;
+    p.box(X1 - 0.05, y, X1 + 0.03, y + 0.1, H + 3, 4, ST2);
+  }
+  // The spire, set within the battlements.
+  p.roofPyramid(X0 + 0.14, Y0 + 0.14, X1 - 0.14, Y1 - 0.14, H + 3, 52, 'slate', 0);
+  for (const [x, y] of [[X0 + 0.04, Y1 - 0.04], [X1 - 0.04, Y1 - 0.04], [X1 - 0.04, Y0 + 0.04], [X0 + 0.04, Y0 + 0.04]] as const)
+    p.poly([[x - 0.05, y, H + 3], [x + 0.05, y, H + 3], [x, y, H + 20]], ST, LINE, 0.5);
+  const cx = (X0 + X1) / 2;
+  const cy = (Y0 + Y1) / 2;
+  p.line([cx, cy, H + 55], [cx, cy, H + 67], '#d8b84a', 1.5);
+  p.line([cx - 0.05, cy + 0.05, H + 63], [cx + 0.05, cy - 0.05, H + 63], '#d8b84a', 1.5);
 }
 
 /**
@@ -1420,6 +1448,8 @@ function drawBuilding(p: Pen, type: BuildingType, level: number, season: Season,
 }
 
 function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Season, variant: number, smoke: V3[]): V3[] {
+  const up = variant >= UPGRADED;
+  if (up) variant -= UPGRADED;
   switch (type) {
     case 'townhall': {
       drawManor(p, level, season, smoke);
@@ -1686,6 +1716,22 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       break;
     }
     case 'stonemason': {
+      if (up) {
+        // The mason's lodge: a proper timber-framed lodge where the masters draw out their work.
+        p.shadow(0.3, 0.3, 1.5, 0.95);
+        p.box(0.3, 0.3, 1.5, 0.95, 0, 14, PLASTER);
+        p.timber(0.3, 0.3, 1.5, 0.95, 0, 14, BEAM);
+        p.wallL(0.952, 0.45, 0.85, 0, 11, '#3a2a1e');
+        p.windowL(0.95, 1.05, 6, 0.24, 5);
+        p.windowR(1.5, 0.5, 6, 0.14, 5);
+        p.roofX(0.3, 0.3, 1.5, 0.95, 14, 10, 'tile', PLASTER, 0.08);
+        smoke.push(p.chimney(1.25, 0.45, 20, 8, '#8a7d70'));
+        cutBlocks(p, 0.35, 1.25, 3);
+        cutBlocks(p, 0.45, 1.6, 2);
+        for (const [x, y, r] of [[1.35, 1.35, 4.5], [1.55, 1.45, 4], [1.4, 1.6, 3.5]] as const) rockLump(p, x, y, r, '#a8a49a', 7);
+        p.box(1.05, 1.2, 1.25, 1.35, 0, 4, '#cac4b6');
+        break;
+      }
       p.shadow(0.2, 0.2, 1.7, 1.7);
       for (const [x, y] of [
         [0.3, 0.3],
@@ -1764,6 +1810,76 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       break;
     }
     case 'windmill': {
+      if (up) {
+        // The tower mill: a tapering stone tower under a wooden cap that turns to the wind.
+        p.ellipse(1.04, 1.02, 0, 27, 13, 'rgba(30,30,10,0.22)');
+        const c = p.ctx;
+        const [cx, by] = iso(1.0, 1.0, 0);
+        const [, ty] = iso(1.0, 1.0, 38);
+        const r0 = 21;
+        const r1 = 15;
+        const body = () => {
+          c.beginPath();
+          c.moveTo(cx - r0, by);
+          c.lineTo(cx - r1, ty);
+          c.lineTo(cx + r1, ty);
+          c.lineTo(cx + r0, by);
+          c.ellipse(cx, by, r0, r0 / 2, 0, 0, Math.PI);
+          c.closePath();
+        };
+        const g = c.createLinearGradient(cx - r0, 0, cx + r0, 0);
+        g.addColorStop(0, '#d8d0c0');
+        g.addColorStop(0.5, '#b8b0a2');
+        g.addColorStop(1, '#8a8478');
+        c.fillStyle = g;
+        body();
+        c.fill();
+        c.save();
+        body();
+        c.clip();
+        c.strokeStyle = 'rgba(90,80,70,0.45)';
+        c.lineWidth = 0.6;
+        for (let k = 1; k < 10; k++) {
+          const t = k / 10;
+          const r = r0 + (r1 - r0) * t;
+          c.beginPath();
+          c.ellipse(cx, by + (ty - by) * t, r, r / 2, 0, 0, Math.PI);
+          c.stroke();
+        }
+        c.restore();
+        // A door at the foot, little windows up the tower, a reefing stage round it.
+        c.fillStyle = '#4a2f1b';
+        c.fillRect(cx - 12, by - 2, 6, 11);
+        c.fillStyle = '#2b2a2e';
+        c.fillRect(cx - 9, by - 22, 3.5, 5);
+        c.fillRect(cx + 4, by - 38, 3, 5);
+        c.strokeStyle = '#5e4129';
+        c.lineWidth = 1.4;
+        c.beginPath();
+        c.ellipse(cx, by - 16, r0 + 2, (r0 + 2) / 2, 0, 0, Math.PI);
+        c.stroke();
+        // The cap: a boat-shaped wooden hood.
+        c.fillStyle = '#5a3a22';
+        c.beginPath();
+        c.ellipse(cx, ty, r1 + 2, (r1 + 2) / 2, 0, 0, Math.PI * 2);
+        c.fill();
+        const cg = c.createLinearGradient(cx - r1, 0, cx + r1, 0);
+        cg.addColorStop(0, season === 3 ? '#f4f6f8' : '#9a7048');
+        cg.addColorStop(1, season === 3 ? '#c8d0d4' : '#5e3e22');
+        c.fillStyle = cg;
+        c.beginPath();
+        c.moveTo(cx - r1 - 2, ty);
+        c.bezierCurveTo(cx - r1, ty - 14, cx + r1, ty - 14, cx + r1 + 2, ty);
+        c.ellipse(cx, ty, r1 + 2, (r1 + 2) / 2, 0, 0, Math.PI);
+        c.fill();
+        if (variant !== 1) {
+          const [hx, hy] = iso(1.0, 1.42, 34);
+          drawSails(p.ctx, hx, hy, 0, season);
+        }
+        p.sack(1.65, 1.3, '#efe6d4');
+        p.sack(1.75, 1.5, '#e8dcc4');
+        break;
+      }
       // Post mill: a stone base, a boarded body and four lattice sails.
       p.shadow(0.4, 0.4, 1.6, 1.6);
       p.box(0.55, 0.55, 1.45, 1.45, 0, 10, STONE);
@@ -1793,12 +1909,28 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       p.box(0.85, 0.75, 1.05, 0.95, 30, 6, WOOD);
       p.roofPyramid(0.85, 0.75, 1.05, 0.95, 36, 5, 'tile', 0.03);
       smoke.push([0.95, 0.85, 40]);
-      for (const [x, y] of [
-        [1.6, 0.6],
-        [1.7, 0.85],
-        [1.55, 1.1],
-        [1.75, 1.4],
-      ]) p.barrel(x, y);
+      if (up) {
+        // The second copper in a stone brew-house of its own, with its own steam vent.
+        p.box(1.45, 0.45, 1.88, 1.25, 0, 15, STONE, undefined, 'stone');
+        p.wallR(1.882, 0.62, 0.9, 0, 11, '#4a2f1b');
+        p.windowR(1.88, 1.0, 7, 0.12, 4, season === 3);
+        p.roofX(1.45, 0.45, 1.88, 1.25, 15, 10, 'tile', STONE, 0.06);
+        p.box(1.58, 0.76, 1.74, 0.92, 22, 5, WOOD);
+        p.roofPyramid(1.58, 0.76, 1.74, 0.92, 27, 4, 'tile', 0.03);
+        smoke.push([1.66, 0.84, 30]);
+      }
+      for (const [x, y] of (up
+        ? [
+            [1.55, 1.5],
+            [1.75, 1.6],
+            [1.62, 1.75],
+          ]
+        : [
+            [1.6, 0.6],
+            [1.7, 0.85],
+            [1.55, 1.1],
+            [1.75, 1.4],
+          ]) as [number, number][]) p.barrel(x, y);
       p.sack(0.45, 1.65, '#d8c070');
       break;
     }
@@ -1808,6 +1940,14 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       p.doorL(1.3, 0.8, 0.18, 10);
       p.windowR(1.45, 0.7, 6, 0.12, 4);
       p.roofX(0.4, 0.4, 1.45, 1.3, 14, 13, 'slate', STONE, 0.1);
+      if (up) {
+        // The cheese cellar: vents low in the wall, and steps down under a little stone porch.
+        for (const x of [0.5, 0.65, 1.1]) p.wallL(1.302, x, x + 0.08, 0.5, 2.5, '#2a2a2a');
+        p.box(1.5, 0.5, 1.85, 0.88, 0, 7, STONE, undefined, 'stone');
+        p.wallR(1.852, 0.58, 0.8, 0, 6, '#241a12');
+        for (let k = 0; k < 3; k++) p.line([1.86, 0.6, 1 + k * 1.6], [1.86, 0.78, 1 + k * 1.6], '#6a6258', 0.7);
+        p.roofX(1.5, 0.5, 1.85, 0.88, 7, 5, 'slate', STONE, 0.04);
+      }
       // Cheese wheels maturing on a rack and milk churns.
       p.box(0.45, 1.5, 1.05, 1.65, 0, 2, '#7b5a36');
       p.box(0.45, 1.5, 1.05, 1.65, 6, 1.5, '#7b5a36');
@@ -1815,10 +1955,15 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
         p.ellipse(x, 1.57, 2, 4, 2.2, '#f0c850');
         p.ellipse(x, 1.57, 7.5, 3.6, 2, '#e8c040');
       }
-      for (const [x, y] of [
-        [1.6, 1.0],
-        [1.7, 1.2],
-      ]) {
+      for (const [x, y] of (up
+        ? [
+            [1.62, 1.18],
+            [1.75, 1.36],
+          ]
+        : [
+            [1.6, 1.0],
+            [1.7, 1.2],
+          ]) as [number, number][]) {
         p.box(x - 0.05, y - 0.05, x + 0.05, y + 0.05, 0, 8, '#b8bcc0');
         p.ellipse(x, y, 8, 2.5, 1.2, '#8a8e94');
       }
@@ -1870,6 +2015,33 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       break;
     }
     case 'weaver': {
+      if (up) {
+        // Rebuilt round the broadloom: a longer weaving shed, its big loom seen through wide windows.
+        p.shadow(0.3, 0.3, 1.85, 1.4);
+        p.box(0.3, 0.35, 1.82, 1.35, 0, 16, PLASTER);
+        p.timber(0.3, 0.35, 1.82, 1.35, 0, 16, BEAM);
+        for (const [a, b] of [[0.42, 0.95], [1.05, 1.58]] as const) {
+          p.wallL(1.352, a, b, 4, 13, '#4a3020');
+          p.wallL(1.353, a + 0.03, b - 0.03, 5, 12, season === 3 ? '#e0b04e' : '#3a3540');
+        }
+        // The loom's frame and warp behind the glass.
+        p.line([0.5, 1.354, 6], [1.5, 1.354, 6], '#a07a4a', 1);
+        p.line([0.5, 1.354, 11], [1.5, 1.354, 11], '#a07a4a', 1);
+        for (let k = 0; k < 14; k++) p.line([0.52 + k * 0.07, 1.355, 6], [0.52 + k * 0.07, 1.355, 11], k % 2 ? '#e8dcc0' : '#c8b890', 0.4);
+        p.doorL(1.35, 1.62, 0.16, 10);
+        p.windowR(1.82, 0.7, 6, 0.14, 5);
+        p.roofX(0.3, 0.35, 1.82, 1.35, 16, 15, 'thatch', PLASTER, 0.12);
+        smoke.push(p.chimney(1.5, 0.8, 24, 10));
+        for (const [x, y, c] of [
+          [1.05, 1.62, '#5a7ab0'],
+          [1.3, 1.65, '#8a3b2e'],
+          [1.55, 1.62, '#c8b890'],
+        ] as [number, number, string][])
+          p.line([x - 0.1, y, 3], [x + 0.1, y, 3], c, 5);
+        p.sack(0.45, 1.65, '#f2ece0');
+        p.sack(0.65, 1.75, '#ece4d4');
+        break;
+      }
       p.shadow(0.3, 0.3, 1.65, 1.4);
       p.box(0.3, 0.35, 1.5, 1.35, 0, 16, PLASTER);
       p.timber(0.3, 0.35, 1.5, 1.35, 0, 16, BEAM);
@@ -2261,11 +2433,14 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       break;
     }
     case 'fisher': {
+      // Rebuilt for the fishing boat: a loft for the sails and oars, and the boat itself.
+      const hh = up ? 18 : 13;
       p.shadow(0.3, 0.3, 1.2, 1.1);
-      p.box(0.3, 0.3, 1.2, 1.1, 0, 13, WOOD);
+      p.box(0.3, 0.3, 1.2, 1.1, 0, hh, WOOD);
       p.doorL(1.1, 0.55, 0.17, 10);
       p.windowR(1.2, 0.5, 6, 0.13, 4);
-      p.roofX(0.3, 0.3, 1.2, 1.1, 13, 12, 'thatch', WOOD, 0.12);
+      if (up) p.wallR(1.202, 0.62, 0.82, 12, 17, '#3a2618');
+      p.roofX(0.3, 0.3, 1.2, 1.1, hh, 12, 'thatch', WOOD, 0.12);
       // Net rack.
       p.line([1.4, 0.4, 0], [1.4, 0.4, 13], '#5e4129', 1.3);
       p.line([1.4, 1.1, 0], [1.4, 1.1, 13], '#5e4129', 1.3);
@@ -2282,8 +2457,57 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
         p.ctx.stroke();
       }
       for (let z = 4; z <= 12; z += 2) p.line([1.4, 0.45, z], [1.4, 1.05, z], 'rgba(70,60,50,0.7)', 0.5);
-      // Upturned boat.
+      // Upturned boat, or the bigger sailing boat on its trestles.
       const [bx, by] = iso(0.75, 1.65, 0);
+      if (up) {
+        const c = p.ctx;
+        for (const dx of [-9, 9]) {
+          c.strokeStyle = '#5e4129';
+          c.lineWidth = 1.2;
+          c.beginPath();
+          c.moveTo(bx + dx - 3, by + 1 - dx * 0.46);
+          c.lineTo(bx + dx, by - 5 - dx * 0.46);
+          c.lineTo(bx + dx + 3, by + 1 - dx * 0.46);
+          c.stroke();
+        }
+        // A clinker-built hull on the trestles: dark planked side, pale gunwale, a thwart and the mast laid along it.
+        const y0 = by - 4;
+        c.fillStyle = '#5a3a22';
+        c.beginPath();
+        c.moveTo(bx - 22, y0 + 10);
+        c.lineTo(bx + 22, y0 - 11);
+        c.quadraticCurveTo(bx + 14, y0 + 4, bx - 14, y0 + 17);
+        c.closePath();
+        c.fill();
+        c.strokeStyle = 'rgba(30,18,8,0.5)';
+        c.lineWidth = 0.6;
+        for (const k of [0.35, 0.65]) {
+          c.beginPath();
+          c.moveTo(bx - 22 + 4 * k, y0 + 10 + 4 * k);
+          c.quadraticCurveTo(bx + 4, y0 + 4 * k + 2, bx + 22 - 6 * k, y0 - 11 + 9 * k);
+          c.stroke();
+        }
+        c.fillStyle = '#7a5434';
+        c.beginPath();
+        c.moveTo(bx - 22, y0 + 10);
+        c.quadraticCurveTo(bx - 2, y0 - 6, bx + 22, y0 - 11);
+        c.quadraticCurveTo(bx + 2, y0 + 3, bx - 22, y0 + 10);
+        c.fill();
+        c.strokeStyle = '#c8a070';
+        c.lineWidth = 1.2;
+        c.beginPath();
+        c.moveTo(bx - 22, y0 + 10);
+        c.quadraticCurveTo(bx - 2, y0 - 6, bx + 22, y0 - 11);
+        c.stroke();
+        c.strokeStyle = '#4a3020';
+        c.lineWidth = 1.6;
+        c.beginPath();
+        c.moveTo(bx - 16, y0 + 4);
+        c.lineTo(bx + 18, y0 - 11);
+        c.stroke();
+        p.barrel(1.55, 1.55);
+        break;
+      }
       p.ctx.fillStyle = '#6b4a2e';
       p.ctx.beginPath();
       p.ctx.ellipse(bx, by - 3, 15, 5, -0.46, 0, Math.PI * 2);
@@ -2394,6 +2618,33 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       break;
     }
     case 'well': {
+      if (up) {
+        // The pump: the well capped with a stone slab, an iron pump with its handle, a trough.
+        const [px, py] = iso(0.5, 0.5, 0);
+        const c = p.ctx;
+        c.fillStyle = 'rgba(30,30,10,0.25)';
+        c.beginPath();
+        c.ellipse(px + 3, py + 2, 15, 7, 0, 0, Math.PI * 2);
+        c.fill();
+        c.fillStyle = '#8f877a';
+        c.fillRect(px - 12, py - 5, 24, 5);
+        c.beginPath();
+        c.ellipse(px, py, 12, 6, 0, 0, Math.PI);
+        c.fill();
+        c.fillStyle = '#b8b0a2';
+        c.beginPath();
+        c.ellipse(px, py - 5, 12, 6, 0, 0, Math.PI * 2);
+        c.fill();
+        // A slim iron pump on the slab: its column, cap, long handle and spout.
+        p.box(0.47, 0.44, 0.53, 0.5, 3, 11, '#4a4a52');
+        p.box(0.455, 0.425, 0.545, 0.515, 14, 1.5, '#3a3a40');
+        p.line([0.5, 0.47, 14.5], [0.28, 0.47, 18], '#3a3a40', 1.2);
+        p.circle(0.28, 0.47, 18, 1, '#3a3a40');
+        p.line([0.5, 0.5, 10], [0.5, 0.66, 9], '#3a3a40', 1.4);
+        p.box(0.38, 0.72, 0.78, 0.88, 0, 4, '#8f877a');
+        p.box(0.41, 0.74, 0.75, 0.86, 4, 0.1, season === 3 ? '#dde8ee' : '#5a8ab0');
+        break;
+      }
       const [cx, cy] = iso(0.5, 0.5, 0);
       const c = p.ctx;
       c.fillStyle = 'rgba(30,30,10,0.25)';
@@ -2553,24 +2804,36 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       p.line([1.0, 1.15, 31], [1.0, 1.45, 31], '#4a3020', 1.6);
       p.line([1.0, 1.45, 31], [1.0, 1.45, 22], '#6b5a44', 0.6);
       p.box(0.93, 1.4, 1.07, 1.5, 19, 3, '#c8a46c');
-      // Lean-to loading bay on posts.
-      for (const [x, y] of [
-        [2.2, 0.3],
-        [2.85, 0.3],
-        [2.2, 1.1],
-        [2.85, 1.1],
-      ] as const)
-        p.line([x, y, 0], [x, y, 14], '#5e4129', 1.4);
-      p.poly(
-        [
-          [2.1, 0.25, 17],
-          [2.92, 0.25, 13],
-          [2.92, 1.15, 13],
-          [2.1, 1.15, 17],
-        ],
-        p.snow ? '#eef2f4' : '#8a5a3a',
-        '#4a3020',
-      );
+      if (up) {
+        // The trade centre: the loading bay closed in as a warehouse, with its own doors and loft.
+        p.box(2.1, 0.25, 2.9, 1.15, 0, 18, WOOD, undefined, 'plank');
+        p.timber(2.1, 0.25, 2.9, 1.15, 0, 18, BEAM);
+        p.wallR(2.902, 0.45, 0.95, 0, 13, '#3a2a1e');
+        p.line([2.903, 0.7, 0], [2.903, 0.7, 13], '#2a1a10', 0.8);
+        p.wallL(1.152, 2.35, 2.65, 0, 12, '#3a2a1e');
+        p.roofX(2.1, 0.25, 2.9, 1.15, 18, 12, 'tile', WOOD, 0.08);
+        p.line([2.5, 1.15, 26], [2.5, 1.42, 26], '#4a3020', 1.6);
+        p.line([2.5, 1.42, 26], [2.5, 1.42, 16], '#6b5a44', 0.6);
+      } else {
+        // Lean-to loading bay on posts.
+        for (const [x, y] of [
+          [2.2, 0.3],
+          [2.85, 0.3],
+          [2.2, 1.1],
+          [2.85, 1.1],
+        ] as const)
+          p.line([x, y, 0], [x, y, 14], '#5e4129', 1.4);
+        p.poly(
+          [
+            [2.1, 0.25, 17],
+            [2.92, 0.25, 13],
+            [2.92, 1.15, 13],
+            [2.1, 1.15, 17],
+          ],
+          p.snow ? '#eef2f4' : '#8a5a3a',
+          '#4a3020',
+        );
+      }
       // Bales and crates on the forecourt, ready for the carts.
       bale(p, 0.45, 1.4, '#d8c8a0');
       bale(p, 0.5, 1.62, '#c8b48c');
@@ -3036,9 +3299,16 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       p.box(0.28, 0.28, 1.37, 1.62, 10, 10, PLASTER);
       p.timber(0.28, 0.28, 1.37, 1.62, 10, 10, BEAM);
       p.doorL(1.6, 0.55, 0.2, 10);
-      // Louvred drying loft.
+      // Louvred drying loft; with the second vat the mill gains another storey of it.
       for (let k = 0; k < 4; k++) p.wallL(1.623, 0.85 + k * 0.12, 0.93 + k * 0.12, 12, 18, '#5a4030');
-      p.roofX(0.28, 0.28, 1.37, 1.62, 20, 15, 'tile', PLASTER, 0.1);
+      const ph = up ? 29 : 20;
+      if (up) {
+        p.box(0.28, 0.28, 1.37, 1.62, 20, 9, PLASTER);
+        p.timber(0.28, 0.28, 1.37, 1.62, 20, 9, BEAM);
+        for (let k = 0; k < 7; k++) p.wallL(1.623, 0.38 + k * 0.13, 0.46 + k * 0.13, 21.5, 27, '#5a4030');
+        for (let k = 0; k < 6; k++) p.wallR(1.372, 0.4 + k * 0.19, 0.5 + k * 0.19, 21.5, 27, '#4a3428');
+      }
+      p.roofX(0.28, 0.28, 1.37, 1.62, ph, 15, 'tile', PLASTER, 0.1);
       waterWheel(p, 1.62, 0.95, 11, 0.45, 11, season);
       // Sheets of paper drying on a line by the door.
       p.line([0.35, 1.8, 0], [0.35, 1.8, 12], BEAM, 1);
@@ -3655,19 +3925,23 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       // A plain plank barn: four stalls with half-doors, a hay loft in the
       // gable, a water trough and a pile of hay before it.
       p.shadow(0.18, 0.18, 2.88, 1.35);
-      p.box(0.22, 0.22, 2.82, 1.22, 0, 12, '#9a7448', undefined, 'plank');
-      p.timber(0.22, 0.22, 2.82, 1.22, 0, 12, BEAM);
-      for (const x of [0.4, 1.02, 1.64, 2.26]) {
-        p.wallL(1.222, x, x + 0.4, 5, 10, '#2a1c12');
-        p.wallL(1.222, x, x + 0.4, 0, 5, '#7a5634');
-        p.line([x, 1.222, 5], [x + 0.4, 1.222, 5], BEAM, 1);
-        p.line([x, 1.222, 0.4], [x + 0.4, 1.222, 4.6], BEAM, 0.7);
-        p.line([x + 0.4, 1.222, 0.4], [x, 1.222, 4.6], BEAM, 0.7);
+      // Expanded, it stands a loft higher with six narrower stalls along its front.
+      const dh = up ? 17 : 12;
+      p.box(0.22, 0.22, 2.82, 1.22, 0, dh, '#9a7448', undefined, 'plank');
+      p.timber(0.22, 0.22, 2.82, 1.22, 0, dh, BEAM);
+      if (up) for (const x of [0.6, 1.4, 2.2]) p.wallL(1.222, x, x + 0.18, 12, 16, '#2a1c12');
+      for (const x of up ? [0.32, 0.74, 1.16, 1.58, 2.0, 2.42] : [0.4, 1.02, 1.64, 2.26]) {
+        const sw = up ? 0.32 : 0.4;
+        p.wallL(1.222, x, x + sw, 5, 10, '#2a1c12');
+        p.wallL(1.222, x, x + sw, 0, 5, '#7a5634');
+        p.line([x, 1.222, 5], [x + sw, 1.222, 5], BEAM, 1);
+        p.line([x, 1.222, 0.4], [x + sw, 1.222, 4.6], BEAM, 0.7);
+        p.line([x + sw, 1.222, 0.4], [x, 1.222, 4.6], BEAM, 0.7);
       }
-      p.roofX(0.22, 0.22, 2.82, 1.22, 12, 12, 'thatch', '#9a7448', 0.12);
+      p.roofX(0.22, 0.22, 2.82, 1.22, dh, 12, 'thatch', '#9a7448', 0.12);
       // The loft door high in the gable, hay spilling from it.
-      p.wallR(2.822, 0.55, 0.88, 13, 18, '#2a1c12');
-      p.poly([[2.83, 0.5, 12.5], [2.83, 0.95, 12.5], [2.92, 0.9, 11], [2.92, 0.55, 11]], '#d8b858');
+      p.wallR(2.822, 0.55, 0.88, dh + 1, dh + 6, '#2a1c12');
+      p.poly([[2.83, 0.5, dh + 0.5], [2.83, 0.95, dh + 0.5], [2.92, 0.9, dh - 1], [2.92, 0.55, dh - 1]], '#d8b858');
       // Trough and hay.
       p.box(0.5, 1.42, 1.15, 1.58, 0, 2.6, '#6e5034');
       p.box(0.54, 1.45, 1.11, 1.55, 2.4, 0.2, '#5f9ab8');
@@ -3984,18 +4258,22 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
     case 'glassworks': {
       p.shadow(0.25, 0.25, 1.65, 1.5);
       // A stone furnace house with a tall stack, its working ports glowing white-hot.
-      p.box(0.3, 0.3, 1.45, 1.3, 0, 17, STONE, undefined, 'stone');
+      // Rebuilt for crown glass: a storey higher, its stack twice as tall.
+      const gh = up ? 25 : 17;
+      p.box(0.3, 0.3, 1.45, 1.3, 0, gh, STONE, undefined, 'stone');
       p.doorL(1.3, 1.1, 0.18, 11);
       p.windowL(1.3, 0.75, 6, 0.16, 6, season === 3);
+      if (up) for (const x of [0.5, 0.95]) p.windowL(1.3, x, 16, 0.14, 5);
       for (const y of [0.5, 0.9]) {
         p.wallR(1.452, y, y + 0.18, 3, 9, '#3a2418');
         p.wallR(1.453, y + 0.03, y + 0.15, 3.5, 8, '#f8b040');
         p.wallR(1.454, y + 0.06, y + 0.12, 4, 6.5, '#fff0b0');
       }
-      p.roofX(0.3, 0.3, 1.45, 1.3, 17, 13, 'tile', STONE, 0.1);
-      p.box(0.95, 0.5, 1.2, 0.75, 22, 20, '#8a7d70', undefined, 'stone');
-      p.box(0.93, 0.48, 1.22, 0.77, 40, 2, '#6e645a');
-      smoke.push([1.075, 0.625, 46]);
+      p.roofX(0.3, 0.3, 1.45, 1.3, gh, 13, 'tile', STONE, 0.1);
+      const sh = up ? 34 : 20;
+      p.box(0.95, 0.5, 1.2, 0.75, gh + 5, sh, '#8a7d70', undefined, 'stone');
+      p.box(0.93, 0.48, 1.22, 0.77, gh + 3 + sh, 2, '#6e645a');
+      smoke.push([1.075, 0.625, gh + 9 + sh]);
       // Sand heaped by the door, charcoal sacks, and a rack of new glass.
       mound(p, 1.75, 0.55, 9, '#eed69a', '#c09a5a');
       p.sack(1.72, 0.95, '#3e3a36');
@@ -4405,12 +4683,26 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
         const [cx, cy] = P(2.85, 0.58);
         p.crate(cx, cy, 0.14);
       }
-      // A cog moored on the water side.
+      // A cog moored on the water side; with the great ships, a big two-masted one.
       {
         const c = p.ctx;
         const [ox, oy] = P(3.35, 1.5);
         const [bx, by] = iso(ox, oy, 0);
         const f = front ? -1 : 1;
+        c.save();
+        if (up) {
+          c.translate(bx, by);
+          c.scale(1.25, 1.25);
+          c.translate(-bx, -by);
+          c.strokeStyle = '#4a3020';
+          c.lineWidth = 1.2;
+          c.beginPath();
+          c.moveTo(bx + 14 * f, by - 7);
+          c.lineTo(bx + 14 * f, by - 36);
+          c.stroke();
+          c.fillStyle = season === 3 ? '#e8e4dc' : '#efe6d4';
+          c.fillRect(bx + 14 * f - 7, by - 33, 14, 14);
+        }
         c.fillStyle = 'rgba(30,40,50,0.25)';
         c.beginPath();
         c.ellipse(bx + 2, by + 2, 26, 9, -0.46 * f, 0, Math.PI * 2);
@@ -4447,6 +4739,7 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
         c.fill();
         c.fillStyle = HERALDRY.current.field;
         c.fillRect(bx - 1, by - 52, 8, 5);
+        c.restore();
       }
       p.flag(0.25, 1.4, 0, 30, '#c8962a');
       break;
@@ -6432,64 +6725,156 @@ function drawManor(p: Pen, level: number, season: Season, smoke: V3[]): void {
  * wings ending in corner pavilions, a columned portico under a pediment and a
  * copper dome over the hall, the lord's banner flying from its lantern.
  */
+/**
+ * A copper dome seen from the side: a swelling, curved profile on a round
+ * drum, lit from the left, ribbed, with a small lantern and a finial on top.
+ * r is its half-width and h its height, in pixels on the picture.
+ */
+function dome(p: Pen, x: number, y: number, z: number, r: number, h: number, [lit, dark]: [string, string], banner = false): void {
+  const c = p.ctx;
+  const [cx, by] = iso(x, y, z);
+  const ry = r / 2;
+  const top = by - h;
+  const profile = () => {
+    c.beginPath();
+    c.moveTo(cx - r, by);
+    c.bezierCurveTo(cx - r * 1.04, by - h * 0.62, cx - r * 0.42, top + h * 0.06, cx, top);
+    c.bezierCurveTo(cx + r * 0.42, top + h * 0.06, cx + r * 1.04, by - h * 0.62, cx + r, by);
+    c.ellipse(cx, by, r, ry, 0, 0, Math.PI);
+    c.closePath();
+  };
+  // The drum's rim under it.
+  c.fillStyle = '#c4bcac';
+  c.beginPath();
+  c.ellipse(cx, by + 1.5, r + 1.5, ry + 1, 0, 0, Math.PI * 2);
+  c.fill();
+  const g = c.createLinearGradient(cx - r, 0, cx + r, 0);
+  g.addColorStop(0, lit);
+  g.addColorStop(0.45, mix(lit, dark, 0.35));
+  g.addColorStop(1, dark);
+  c.fillStyle = g;
+  profile();
+  c.fill();
+  // Ribs running up to the lantern, and a highlight on the lit side.
+  c.save();
+  profile();
+  c.clip();
+  c.strokeStyle = 'rgba(30,60,50,0.35)';
+  c.lineWidth = 0.8;
+  for (const k of [-0.62, -0.25, 0.25, 0.62]) {
+    c.beginPath();
+    c.moveTo(cx + k * r, by + ry * Math.sqrt(1 - k * k));
+    c.quadraticCurveTo(cx + k * r * 0.95, by - h * 0.55, cx, top + 2);
+    c.stroke();
+  }
+  c.strokeStyle = 'rgba(255,255,255,0.35)';
+  c.lineWidth = 2;
+  c.beginPath();
+  c.moveTo(cx - r * 0.72, by - 2);
+  c.quadraticCurveTo(cx - r * 0.72, by - h * 0.55, cx - r * 0.25, top + h * 0.18);
+  c.stroke();
+  c.restore();
+  // The lantern: a little drum with openings, a cap and a gilt finial.
+  const lw = Math.max(3, r * 0.2);
+  c.fillStyle = '#ddd5c6';
+  c.fillRect(cx - lw, top - 7, lw * 2, 7);
+  c.fillStyle = '#3a3530';
+  c.fillRect(cx - lw * 0.5, top - 6, lw * 0.35, 4.5);
+  c.fillRect(cx + lw * 0.15, top - 6, lw * 0.35, 4.5);
+  c.fillStyle = dark;
+  c.beginPath();
+  c.moveTo(cx - lw - 1, top - 7);
+  c.quadraticCurveTo(cx, top - 14, cx + lw + 1, top - 7);
+  c.fill();
+  if (!banner) {
+    c.strokeStyle = '#d8b84a';
+    c.lineWidth = 1.2;
+    c.beginPath();
+    c.moveTo(cx, top - 12);
+    c.lineTo(cx, top - 19);
+    c.stroke();
+    c.fillStyle = '#e8c860';
+    c.beginPath();
+    c.arc(cx, top - 13, 1.4, 0, Math.PI * 2);
+    c.fill();
+  }
+}
+
 function drawPalace(p: Pen, season: Season, smoke: V3[]): void {
   const winter = season === 3;
   const arms = HERALDRY.current;
   const ST = '#d4ccbc';
-  const ROOFC = 'slate';
-  p.shadow(0.3, 0.45, 3.7, 2.95, 0.05);
-  // The forecourt: gravel, with a round basin in the middle.
-  sandPatch(p, [[1.1, 2.95], [2.9, 2.95], [3.0, 3.95], [1.0, 3.95]], winter ? '#d8dcda' : '#d2c4a0', 4, 1.6);
+  const QUOIN = '#ebe5d8';
+  const CORNICE = '#c4bcac';
+  const COPPER: [string, string] = winter ? ['#f4f8fa', '#c8d2d6'] : ['#86c2ac', '#3f7a66'];
+  p.shadow(0.3, 0.35, 3.7, 3.25, 0.05);
+  // The court between the wings: gravel, with a round basin in the middle.
+  sandPatch(p, [[1.2, 2.55], [2.8, 2.55], [2.85, 3.95], [1.15, 3.95]], winter ? '#d8dcda' : '#d2c4a0', 4, 1.6);
   p.ellipse(2.0, 3.45, 1, 13, 6.5, '#a8a093');
   p.ellipse(2.0, 3.45, 2, 11, 5.4, winter ? '#dde8ee' : '#5a8ab0');
   p.line([2.0, 3.45, 2], [2.0, 3.45, 9], '#bab3a6', 1.6);
-  // Left wing, ridge front to back.
-  p.box(0.3, 0.45, 1.3, 2.95, 0, 36, ST, undefined, 'stone');
-  for (const z of [5, 19]) p.windowL(2.95, 0.55, z, 0.16, 9, winter && z === 5);
-  p.roofY(0.3, 0.45, 1.3, 2.95, 36, 22, ROOFC, ST, 0.08);
-  // The central block of state rooms.
-  p.box(1.3, 0.6, 2.7, 2.6, 0, 46, ST, undefined, 'stone');
-  for (const z of [6, 22]) for (const x of [1.45, 1.75, 2.25, 2.55]) p.windowL(2.6, x, z, 0.14, z === 22 ? 12 : 9, winter && z === 6);
-  for (const x of [1.45, 1.75, 2.0, 2.25, 2.55]) p.windowL(2.6, x - 0.04, 37, 0.12, 5);
-  // A balustrade along the top, and a low hipped roof behind it.
-  p.wallL(2.603, 1.3, 2.7, 43, 46, '#c4bcac');
-  p.roofPyramid(1.3, 0.6, 2.7, 2.6, 46, 12, ROOFC, 0.02);
-  // The dome over the great hall, its lantern and the lord's banner.
-  p.box(1.72, 1.32, 2.28, 1.88, 52, 8, ST);
-  p.ellipse(2.0, 1.6, 60, 22, 11, winter ? '#e6ecee' : '#5f9a86');
-  p.ellipse(2.0, 1.6, 66, 16, 8, winter ? '#f2f6f8' : '#6faa94');
-  p.ellipse(2.0, 1.6, 71, 9, 5, winter ? '#f6f9fa' : '#7cb8a2');
-  p.box(1.94, 1.54, 2.06, 1.66, 74, 6, ST);
-  p.lordFlag(2.0, 1.6, 80, 20);
-  smoke.push(p.chimney(1.45, 0.85, 50, 10, '#a8a093'));
-  // Right wing, ridge front to back.
-  p.box(2.7, 0.45, 3.7, 2.95, 0, 36, ST, undefined, 'stone');
-  for (const y of [0.75, 1.35, 1.95, 2.55]) for (const z of [5, 19]) p.windowR(3.7, y, z, 0.15, 9, winter && z === 5 && y === 1.35);
-  for (const z of [5, 19]) p.windowL(2.95, 3.25, z, 0.16, 9);
-  p.roofY(2.7, 0.45, 3.7, 2.95, 36, 22, ROOFC, ST, 0.08);
-  smoke.push(p.chimney(3.2, 0.8, 52, 12, '#a8a093'));
-  // Corner pavilions at the front of each wing, a storey higher, under tall roofs.
-  // Flush with the wings' fronts and sides, so all stand on one line of ground.
-  for (const x0 of [0.3, 3.0]) {
-    p.box(x0, 2.25, x0 + 0.7, 2.95, 0, 50, ST, undefined, 'stone');
-    for (const z of [6, 22, 38]) p.windowL(2.95, x0 + 0.27, z, 0.15, 9);
-    p.windowR(x0 + 0.7, 2.52, 22, 0.14, 9);
-    p.roofPyramid(x0, 2.25, x0 + 0.7, 2.95, 50, 26, ROOFC, 0.05);
-    p.line([x0 + 0.35, 2.6, 76], [x0 + 0.35, 2.6, 84], '#d8b84a', 1.2);
+  // Light dressed stones up the corners of a block.
+  const quoins = (x0: number, y0: number, x1: number, y1: number, h: number) => {
+    for (const [x, y] of [[x0, y1], [x1, y1], [x1, y0]] as const) {
+      for (let z = 0, k = 0; z < h - 3; z += 5, k++) p.line([x, y, z + 0.5], [x, y, z + 4], k % 2 ? '#ddd6c8' : QUOIN, 1.5);
+    }
+  };
+  // A corner tower: the front end of a wing raised two storeys, under a copper bell dome.
+  const T = 50;
+  const tower = (x0: number, right: boolean) => {
+    const x1 = x0 + 0.9;
+    p.box(x0, 2.45, x1, 3.25, 0, T, ST, undefined, 'stone');
+    quoins(x0, 2.45, x1, 3.25, T);
+    for (const z of [6, 21]) p.windowL(3.25, x0 + 0.36, z, 0.18, 10, winter && z === 6);
+    p.windowL(3.25, x0 + 0.38, 37, 0.14, 7);
+    for (const z of [6, 21]) p.windowR(x1, 2.76, z, 0.18, 10);
+    if (right) p.windowR(x1, 2.78, 37, 0.14, 7);
+    // String courses between the storeys, a cornice on top.
+    for (const z of [17, 33]) {
+      p.wallL(3.252, x0, x1, z, z + 1.5, CORNICE);
+      p.wallR(x1 + 0.002, 2.45, 3.25, z, z + 1.5, CORNICE);
+    }
+    p.box(x0 - 0.03, 2.42, x1 + 0.03, 3.28, T, 3, CORNICE);
+    const cx = (x0 + x1) / 2;
+    p.box(cx - 0.3, 2.55, cx + 0.3, 3.15, T + 3, 4, ST);
+    dome(p, cx, 2.85, T + 7, 18, 21, COPPER);
+  };
+  // The left wing.
+  p.box(0.3, 0.35, 1.2, 3.25, 0, 36, ST, undefined, 'stone');
+  p.roofPyramid(0.3, 0.35, 1.2, 2.5, 36, 16, 'slate', 0.06);
+  // The main block of state rooms, a balustrade along its top.
+  p.box(1.2, 0.6, 2.8, 2.55, 0, 44, ST, undefined, 'stone');
+  for (const z of [6, 22]) for (const x of [1.32, 1.58, 2.28, 2.54]) p.windowL(2.55, x, z, 0.14, z === 22 ? 12 : 9, winter && z === 6);
+  for (const x of [1.32, 1.58, 1.94, 2.28, 2.54]) p.windowL(2.55, x, 35, 0.14, 4);
+  p.wallL(2.552, 1.2, 2.8, 17, 18.5, CORNICE);
+  p.wallL(2.553, 1.2, 2.8, 41, 44, CORNICE);
+  p.roofPyramid(1.2, 0.6, 2.8, 2.55, 44, 13, 'slate', 0.03);
+  // The great dome over the hall, its lantern and the lord's banner.
+  smoke.push(p.chimney(1.3, 0.75, 50, 9, '#a8a093'));
+  smoke.push(p.chimney(2.6, 0.75, 50, 9, '#a8a093'));
+  p.box(1.72, 1.32, 2.28, 1.88, 50, 8, ST);
+  for (let k = 0; k < 4; k++) p.windowL(1.88, 1.78 + k * 0.12, 51.5, 0.06, 4);
+  dome(p, 2.0, 1.6, 58, 22, 25, COPPER, true);
+  p.lordFlag(2.0, 1.6, 78, 18);
+  tower(0.3, false);
+  // The door and the hangings in the lord's colours, behind a portico of four columns.
+  p.wallL(2.552, 1.86, 2.14, 1.5, 17, '#4a2f1b');
+  p.wallL(2.554, 1.64, 1.72, 13, 25, arms.field);
+  p.wallL(2.554, 2.28, 2.36, 13, 25, arms.field);
+  p.box(1.55, 2.55, 2.45, 2.92, 0, 2.5, '#c4bcac');
+  for (const x of [1.63, 1.87, 2.13, 2.37]) {
+    p.line([x, 2.87, 2.5], [x, 2.87, 30], '#efe9dc', 2.4);
+    p.line([x + 0.03, 2.87, 2.5], [x + 0.03, 2.87, 30], 'rgba(120,110,95,0.35)', 0.8);
   }
-  // The door and the hangings in the lord's colours, on the wall behind the portico.
-  p.wallL(2.602, 1.86, 2.14, 2.5, 18, '#4a2f1b');
-  p.wallL(2.604, 1.62, 1.7, 14, 26, arms.field);
-  p.wallL(2.604, 2.3, 2.38, 14, 26, arms.field);
-  // The portico: four columns under a pediment carved with the arms.
-  p.box(1.5, 2.6, 2.5, 2.95, 0, 2.5, '#c4bcac');
-  for (const x of [1.58, 1.84, 2.16, 2.42]) {
-    p.line([x, 2.9, 2.5], [x, 2.9, 30], '#efe9dc', 2.4);
-    p.line([x + 0.03, 2.9, 2.5], [x + 0.03, 2.9, 30], 'rgba(120,110,95,0.35)', 0.8);
-  }
-  p.box(1.5, 2.6, 2.5, 2.95, 30, 3, '#e2dccd');
-  p.poly([[1.5, 2.95, 33], [2.5, 2.95, 33], [2.0, 2.95, 43]], '#e8e2d4', '#b8b0a0', 0.8);
-  p.circle(2.0, 2.952, 37, 2.6, arms.field);
+  p.box(1.55, 2.55, 2.45, 2.92, 30, 3, '#e2dccd');
+  p.poly([[1.55, 2.92, 33], [2.45, 2.92, 33], [2.0, 2.92, 42]], '#e8e2d4', '#b8b0a0', 0.8);
+  p.circle(2.0, 2.922, 36.5, 2.6, arms.field);
+  // The right wing, its long side to the garden.
+  p.box(2.8, 0.35, 3.7, 3.25, 0, 36, ST, undefined, 'stone');
+  for (const y of [0.55, 0.95, 1.35, 1.75, 2.15]) for (const z of [6, 21]) p.windowR(3.7, y, z, 0.15, 10, winter && z === 6 && y === 1.35);
+  p.wallR(3.702, 0.35, 2.45, 18, 19.5, CORNICE);
+  p.roofPyramid(2.8, 0.35, 3.7, 2.5, 36, 16, 'slate', 0.06);
+  tower(2.8, true);
 }
 
 /** Ground tile for building yards drawn under some buildings. */
