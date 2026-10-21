@@ -17,8 +17,8 @@ export const LEARN_TABS: { id: LearnTab; name: string }[] = [
   { id: 'land', name: 'Timber & stone' },
   { id: 'farm', name: 'Farming & food' },
   { id: 'herd', name: 'Herds & orchards' },
-  { id: 'craft', name: 'Crafts: cloth, leather, metal & glass' },
-  { id: 'civic', name: 'Town, learning, trade & the manor' },
+  { id: 'craft', name: 'Crafts' },
+  { id: 'civic', name: 'Civics' },
 ];
 
 /** Conditions that are not about goods made (see conditionMet). */
@@ -84,10 +84,10 @@ export const UNLOCKS: Unlock[] = [
 
   // ------------------------------------------------ farming & food
   { id: b('windmill'), name: 'Windmill and wheat', kind: 'building', tab: 'farm', group: 'Grain', desc: 'Wheat for the fields and a mill to grind it into flour.', knowledge: 1, building: 'windmill', grants: [r('field', 'wheat')], icon: 'windmill' },
-  { id: r('field', 'wheat'), name: 'Wheat', kind: 'crop', tab: 'farm', group: 'Grain', desc: 'The bread grain.', needs: [b('windmill')], recipe: { building: 'field', id: 'wheat' }, icon: 'grain' },
+  { id: r('field', 'wheat'), name: 'Wheat', kind: 'crop', tab: 'farm', group: 'Grain', desc: 'The bread grain, learned with the windmill.', recipe: { building: 'field', id: 'wheat' }, icon: 'grain' },
   { id: b('bakery'), name: 'Bakery', kind: 'building', tab: 'farm', group: 'Grain', desc: 'Bakes flour into bread.', knowledge: 1, building: 'bakery', icon: 'bakery' },
   { id: b('watermill'), name: 'Watermill', kind: 'building', tab: 'farm', group: 'Grain', desc: 'The big mill, on a river.', knowledge: 5, building: 'watermill', icon: 'watermill' },
-  { id: b('silo'), name: 'Silo', kind: 'building', tab: 'farm', group: 'Grain', desc: 'Keeps grain dry for years.', knowledge: 1, building: 'silo', icon: 'silo' },
+  { id: b('silo'), name: 'Silo', kind: 'building', tab: 'farm', group: 'Grain', desc: 'Keeps grain dry for years.', knowledge: 1, needs: [r('field', 'wheat')], building: 'silo', icon: 'silo' },
   { id: r('field', 'barley'), name: 'Barley', kind: 'crop', tab: 'farm', group: 'Drink', desc: 'The brewing grain.', knowledge: 1, recipe: { building: 'field', id: 'barley' }, icon: 'barley' },
   { id: b('brewhouse'), name: 'Brewhouse', kind: 'building', tab: 'farm', group: 'Drink', desc: 'Opened by the first drink learned.', building: 'brewhouse', icon: 'brewhouse' },
   { id: r('brewhouse', 'ale'), name: 'Brewhouse: ale', kind: 'recipe', tab: 'farm', group: 'Drink', desc: 'Brews barley into ale. The first drink learned opens the brewhouse.', knowledge: 1, recipe: { building: 'brewhouse', id: 'ale' }, grants: [b('brewhouse')], icon: 'ale' },
