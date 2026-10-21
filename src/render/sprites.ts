@@ -6783,11 +6783,11 @@ function drawPalace(p: Pen, season: Season, smoke: V3[]): void {
   const ROOFC = 'slate';
   // Shadows fall away from the light, to the right of each part, never out in front of a wall.
   castShadows(p, [
-    [0.3, 0.45, 1.3, 2.95, 0.3],
+    [0.3, 0.45, 1.3, 2.6, 0.3],
     [1.3, 0.6, 2.7, 2.6, 0.4],
-    [2.7, 0.45, 3.7, 2.95, 0.35],
-    [0.22, 2.45, 0.92, 3.15, 0.45],
-    [3.08, 2.45, 3.78, 3.15, 0.45],
+    [2.7, 0.45, 3.7, 2.6, 0.35],
+    [0.3, 2.6, 1.3, 3.3, 0.45],
+    [2.7, 2.6, 3.7, 3.3, 0.45],
     [1.5, 2.6, 2.5, 2.95, 0.15],
   ]);
   // The forecourt: gravel, with a round basin in the middle.
@@ -6795,19 +6795,25 @@ function drawPalace(p: Pen, season: Season, smoke: V3[]): void {
   p.ellipse(2.0, 3.45, 1, 13, 6.5, '#a8a093');
   p.ellipse(2.0, 3.45, 2, 11, 5.4, winter ? '#dde8ee' : '#5a8ab0');
   p.line([2.0, 3.45, 2], [2.0, 3.45, 9], '#bab3a6', 1.6);
-  // A corner pavilion a storey higher than the wings, under a tall roof.
-  const pavilion = (x0: number, y0: number, h: number) => {
-    const y1 = y0 + 0.7;
-    p.box(x0, y0, x0 + 0.7, y1, 0, h, ST, undefined, 'stone');
-    for (let z = 6; z < h - 8; z += 16) p.windowL(y1, x0 + 0.27, z, 0.15, 9);
-    for (let z = 22; z < h - 8; z += 16) p.windowR(x0 + 0.7, y0 + 0.27, z, 0.14, 9);
-    p.roofPyramid(x0, y0, x0 + 0.7, y1, h, 26, ROOFC, 0.05);
-    p.line([x0 + 0.35, y0 + 0.35, h + 26], [x0 + 0.35, y0 + 0.35, h + 34], '#d8b84a', 1.2);
+  // A corner pavilion: the whole front end of a wing, a storey higher, under a tall roof.
+  // It takes the wing's full width and starts where the main block's front
+  // does, so no wall stands in front of its sides.
+  const pavilion = (x0: number) => {
+    const x1 = x0 + 1.0;
+    const y0 = 2.6;
+    const y1 = 3.3;
+    const h = 54;
+    p.box(x0, y0, x1, y1, 0, h, ST, undefined, 'stone');
+    for (let z = 6; z < h - 8; z += 16) for (const x of [x0 + 0.2, x0 + 0.66]) p.windowL(y1, x, z, 0.15, 9);
+    for (let z = 6; z < h - 8; z += 16) p.windowR(x1, y0 + 0.28, z, 0.14, 9);
+    p.wallL(y1 + 0.002, x0, x1, h - 3, h, '#c4bcac');
+    p.wallR(x1 + 0.002, y0, y1, h - 3, h, '#bab2a2');
+    p.roofPyramid(x0, y0, x1, y1, h, 26, ROOFC, 0.05);
+    p.line([(x0 + x1) / 2, 2.95, h + 22], [(x0 + x1) / 2, 2.95, h + 32], '#d8b84a', 1.2);
   };
   // Left wing, ridge front to back.
-  p.box(0.3, 0.45, 1.3, 2.95, 0, 36, ST, undefined, 'stone');
-  for (const z of [5, 19]) p.windowL(2.95, 0.55, z, 0.16, 9, winter && z === 5);
-  p.roofY(0.3, 0.45, 1.3, 2.95, 36, 22, ROOFC, ST, 0.08);
+  p.box(0.3, 0.45, 1.3, 2.6, 0, 36, ST, undefined, 'stone');
+  p.roofY(0.3, 0.45, 1.3, 2.6, 36, 22, ROOFC, ST, 0.08);
   // The central block of state rooms.
   p.box(1.3, 0.6, 2.7, 2.6, 0, 46, ST, undefined, 'stone');
   for (const z of [6, 22]) for (const x of [1.45, 1.75, 2.25, 2.55]) p.windowL(2.6, x, z, 0.14, z === 22 ? 12 : 9, winter && z === 6);
@@ -6824,20 +6830,12 @@ function drawPalace(p: Pen, season: Season, smoke: V3[]): void {
   p.lordFlag(2.0, 1.6, 80, 20);
   smoke.push(p.chimney(1.45, 0.85, 50, 10, '#a8a093'));
   // Right wing, ridge front to back.
-  p.box(2.7, 0.45, 3.7, 2.95, 0, 36, ST, undefined, 'stone');
-  for (const y of [0.75, 1.35, 1.95, 2.55]) for (const z of [5, 19]) p.windowR(3.7, y, z, 0.15, 9, winter && z === 5 && y === 1.35);
-  for (const z of [5, 19]) p.windowL(2.95, 3.25, z, 0.16, 9);
-  p.roofY(2.7, 0.45, 3.7, 2.95, 36, 22, ROOFC, ST, 0.08);
+  p.box(2.7, 0.45, 3.7, 2.6, 0, 36, ST, undefined, 'stone');
+  for (const y of [0.7, 1.25, 1.8]) for (const z of [5, 19]) p.windowR(3.7, y, z, 0.15, 9, winter && z === 5 && y === 1.25);
+  p.roofY(2.7, 0.45, 3.7, 2.6, 36, 22, ROOFC, ST, 0.08);
   smoke.push(p.chimney(3.2, 0.8, 52, 12, '#a8a093'));
-  pavilion(0.22, 2.45, 50);
-  // The back of the left pavilion's side stands behind the left wing's front:
-  // lay that strip of the wing (and its gable) over it again.
-  inFront(p, [[0.92, 2.952, 0], [1.3, 2.952, 0], [1.3, 2.952, 36], [0.92, 2.952, 52.7]], () => {
-    p.box(0.3, 0.45, 1.3, 2.95, 0, 36, ST, undefined, 'stone');
-    for (const z of [5, 19]) p.windowL(2.95, 0.55, z, 0.16, 9, winter && z === 5);
-    p.roofY(0.3, 0.45, 1.3, 2.95, 36, 22, ROOFC, ST, 0.08);
-  });
-  pavilion(3.08, 2.45, 50);
+  pavilion(0.3);
+  pavilion(2.7);
   // The door and the hangings in the lord's colours, on the wall behind the portico.
   p.wallL(2.602, 1.86, 2.14, 2.5, 18, '#4a2f1b');
   p.wallL(2.604, 1.62, 1.7, 14, 26, arms.field);
