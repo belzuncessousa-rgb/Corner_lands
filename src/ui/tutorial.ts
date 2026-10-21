@@ -464,7 +464,7 @@ export class Tutor {
     window.addEventListener(
       'keydown',
       (e) => {
-        if (e.key !== 'Enter' || !this.active || this.root.style.display === 'none' || this.game.modalOpen) return;
+        if (e.key !== 'Enter' || !this.active || this.root.style.display === 'none' || (this.game.modalOpen && !this.help)) return;
         if ((e.target as HTMLElement).tagName === 'INPUT') return;
         e.preventDefault();
         e.stopImmediatePropagation();
@@ -479,9 +479,28 @@ export class Tutor {
     this.guide.style.height = '64px';
   }
 
-  /** The view stays where the guide puts it while he leads. */
+  /** The view stays where the guide puts it while he leads (not while he only explains a panel). */
   get locksCamera(): boolean {
-    return this.active;
+    return this.active && !this.help;
+  }
+
+  /** A panel he has been asked to explain, and its key. */
+  private help: Step | null = null;
+  private helpKey = '';
+
+  /**
+   * Asked (by the little portrait on a panel) to explain it: he pops up beside
+   * the panel, says his piece, and goes when clicked.
+   */
+  explain(key: string, text: string, show?: string): void {
+    this.help = { say: text, show };
+    this.helpKey = `${key}:${Date.now()}`;
+    this.stepKey = '';
+  }
+
+  private endHelp(): void {
+    this.help = null;
+    this.hide();
   }
 
   private get steps(): Step[] {
@@ -491,6 +510,11 @@ export class Tutor {
 
   /** A click or Enter: finish the line, then go on (or, on a step that waits, step aside). */
   private next(): void {
+    if (this.help) {
+      if (this.typed < this.text.length) this.typed = this.text.length;
+      else this.endHelp();
+      return;
+    }
     const t = this.game.state.tutorial;
     if (!t || this.waiting) return;
     if (this.typed < this.text.length) {
@@ -504,6 +528,10 @@ export class Tutor {
   }
 
   private skip(): void {
+    if (this.help) {
+      this.endHelp();
+      return;
+    }
     const t = this.game.state.tutorial;
     if (!t) return;
     if (t.chapter === 'manor') t.manorSeen = true;
@@ -559,6 +587,11 @@ export class Tutor {
   /** Called every frame. */
   update(dt: number): void {
     const g = this.game;
+    // Called to explain a panel: he does that before anything else.
+    if (this.help) {
+      this.play(this.help, `help:${this.helpKey}`, dt);
+      return;
+    }
     // In any game, the first trading post or dock brings him to explain trade (unless tips are off).
     // And the first knowledge worth spending brings him to show the learning board.
     if (!g.state.tutorial && !g.demo && (tradeHouse(g) || readyCount(g.state) > 0) && tipsOn()) g.state.tutorial = { step: 0, chapter: 'done', manorSeen: true };
@@ -589,9 +622,14 @@ export class Tutor {
     }
     const step = this.steps[t.step];
     if (!step) return;
+    this.play(step, `${t.chapter}:${t.step}`, dt);
+  }
+
+  /** Shows a step: he walks to what it lights up and has his say. */
+  private play(step: Step, key: string, dt: number): void {
+    const g = this.game;
     this.active = true;
     this.root.style.display = 'block';
-    const key = `${t.chapter}:${t.step}`;
     if (key !== this.stepKey) {
       this.stepKey = key;
       step.enter?.(g);
@@ -600,7 +638,7 @@ export class Tutor {
       this.shown = 0;
       this.waiting = false;
     }
-    if (step.until?.(g)) {
+    if (step.until?.(g) && !this.help) {
       this.advance();
       return;
     }
@@ -736,11 +774,15 @@ export class Tutor {
     const right = this.side ? this.side === 'right' : this.gx < W / 2;
     const shownText = this.text.slice(0, Math.floor(this.typed));
     const done = this.typed >= this.text.length;
-    const t = this.game.state.tutorial!;
+    const t = this.game.state.tutorial;
+    // Explaining a panel, he only asks to be thanked.
+    const skip = this.help ? 'Thank you' : t?.chapter === 'start' ? 'Skip tutorial' : 'Skip';
+    const next = this.help ? 'Click when you have heard enough ▸' : step.until ? 'Over to you, my liege ▸' : 'Click or press Enter to go on ▸';
     const html = `<div class="t-name">Fingamoboblius</div><p>${esc(shownText)}<span class="t-caret">${done ? '' : '▌'}</span></p>
-      <div class="t-foot"><span class="t-next">${done ? (step.until ? 'Over to you, my liege ▸' : 'Click or press Enter to go on ▸') : 'Click to hurry him'}</span><button data-t="skip">${t.chapter === 'start' ? 'Skip tutorial' : 'Skip'}</button></div>`;
-    if (this.balloon.dataset.html !== `${t.chapter}${t.step}:${Math.floor(this.typed)}`) {
-      this.balloon.dataset.html = `${t.chapter}${t.step}:${Math.floor(this.typed)}`;
+      <div class="t-foot"><span class="t-next">${done ? next : 'Click to hurry him'}</span><button data-t="skip">${skip}</button></div>`;
+    const stamp = `${this.stepKey}:${Math.floor(this.typed)}`;
+    if (this.balloon.dataset.html !== stamp) {
+      this.balloon.dataset.html = stamp;
       this.balloon.innerHTML = html;
     }
     // Beside the trade window there is only so much room.

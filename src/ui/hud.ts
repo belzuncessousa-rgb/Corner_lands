@@ -1,5 +1,6 @@
 import { knows, learn, unlockForBuilding, UNLOCK_BY_ID, type LearnTab } from '../game/unlocks';
 import { boardHtml, readyCount, tabOf } from './learning';
+import { fingaButton, helpText } from './fingahelp';
 import { IMPROVEMENT_BY_ID, improvementsFor } from '../game/improve';
 import { OPTIONS, optionError, optionOn, optionOnce, setOption } from '../game/options';
 import { NEWS } from './news';
@@ -531,7 +532,7 @@ export class Hud {
     else if (id === 'pop') html = this.labourPanel();
     else if (id === 'treasury') html = this.treasuryPanel();
     else html = this.goodsPanel(id as GoodsGroup);
-    setHTML(panel, `${this.pinnedChip ? '<button class="close" data-action="chip-close">✕</button>' : ''}${html}`);
+    setHTML(panel, `${this.pinnedChip ? '<button class="close" data-action="chip-close">✕</button>' : ''}${helpText(id) ? fingaButton(id) : ''}${html}`);
     panel.style.display = 'block';
     const anchor = this.el.topbar.querySelector(`[data-chip="${id}"]`) as HTMLElement | null;
     if (anchor) {
@@ -866,7 +867,7 @@ export class Hud {
       this.el.objectives,
       this.objectivesMin
         ? `<button class="pill" data-action="toggle-obj"><b>${tier.name}</b>${s.relaxed ? `<span class="sep-dot">·</span>Objectives${active.length ? ` <span class="count">${active.length - ready}</span>` : ' ✓'}` : ''} <span class="chev">▾</span></button>`
-        : `<button class="pill" data-action="toggle-obj"><b>${tier.name}</b><span class="chev">▴</span></button>
+        : `<button class="pill" data-action="toggle-obj"><b>${tier.name}</b><span class="chev">▴</span></button>${fingaButton('objectives')}
       <div class="body">
         ${next ? `<div class="tier-next">Next: <b>${next.name}</b> — ${req.join(', ')}</div>` : `<div class="tier-next">${tier.desc}</div>`}
         ${s.relaxed ? `<h3>Objectives</h3>
@@ -1094,7 +1095,7 @@ export class Hud {
     }
     if (b.type !== 'townhall') actions.push(`<button data-action="demolish-b">✖ ${b.build < 1 ? 'Cancel' : 'Demolish'}</button>`);
     const head = `
-      <button class="close" data-action="deselect">✕</button>
+      <button class="close" data-action="deselect">✕</button>${fingaButton(`building:${b.type}`)}
       <h2>${esc(buildingName(b))}${b.trade ? ` <small>· ${esc(BUILDINGS[b.trade].name)}</small>` : ''}</h2>`;
     const body = `
       <div class="desc">${own.desc}</div>
@@ -1220,6 +1221,7 @@ export class Hud {
         <div class="pick-grid">${goods}</div>
         <div class="row" style="justify-content:center;margin-top:10px"><button data-m="cancel">Cancel</button></div>`;
     };
+    this.modalHelp = 'orders';
     const m = this.openModal(draw());
     const box = m.querySelector('.modal') as HTMLElement;
     box.classList.add('picker-modal');
@@ -1542,6 +1544,7 @@ export class Hud {
           <b>${esc(c.label)}</b><small>${esc(c.detail)}${why ? ` <span class="neg">— ${esc(why)}</span>` : ''}</small></button>`;
       })
       .join('');
+    this.modalHelp = 'event';
     const m = this.openModal(
       `<div class="event">
         <div class="art-slot" data-art="events/${e.id}"></div>
@@ -1575,6 +1578,7 @@ export class Hud {
     const miles = dated
       .map((m) => `<div class="mile"><small>${MONTH_NAMES[monthOf(m.day)]}, Year ${yearOf(m.day)}</small><span>${esc(m.text)}</span></div>`)
       .join('');
+    this.modalHelp = 'chronicle';
     this.openModal(`<h2>Chronicle of ${esc(townName(s))}</h2>${miles ? `<div class="sub">Milestones</div><div class="milestones">${miles}</div><div class="sub">Lately</div>` : ''}<div class="chronicle">${rows || '<i>Nothing has happened yet.</i>'}</div>
       <div class="row" style="justify-content:flex-end;margin-top:10px"><button class="primary" data-action="close-modal">Close</button></div>`);
   }
@@ -2020,6 +2024,15 @@ export class Hud {
       case 'learning':
         this.showLearning();
         break;
+      case 'finga': {
+        // He explains the panel the button sits on.
+        const key = t.dataset.key ?? '';
+        const text = helpText(key);
+        const host = t.closest('.modal, #chip-panel, #inspector, #objectives') as HTMLElement | null;
+        const sel = host ? (host.id ? `#${host.id}` : '.modal') : undefined;
+        if (text) this.game.tutor.explain(key, text, sel);
+        break;
+      }
       case 'learn-open':
         this.showLearning(t.dataset.id);
         break;
@@ -2121,6 +2134,7 @@ export class Hud {
         return `<tr><td><b>${esc(c.name)}</b></td><td><div class="chain">${links}</div>${rep.why ? `<div class="small neg">${esc(rep.why)}</div>` : ''}</td></tr>`;
       })
       .join('');
+    this.modalHelp = 'production';
     this.openModal(`<h2>Production Book</h2>
       <p class="note">Every trade in your lands, what it takes and what it makes. Greyed trades unlock with rank or charters.</p>
       <div class="prodbook">${chains ? `<h3>Chains <small class="muted">in store, +made −used last month</small></h3><table class="prod chains">${chains}</table>` : ''}${sections}</div>
@@ -2149,6 +2163,7 @@ export class Hud {
       root = this.modal.querySelector('.modal')!;
       root.innerHTML = html;
     } else {
+      this.modalHelp = 'learning';
       root = this.openModal(html).querySelector('.modal')!;
       root.classList.add('wide', 'learning-modal');
     }
@@ -2222,17 +2237,22 @@ export class Hud {
       root = this.modal.querySelector('.modal')!;
       root.innerHTML = html;
     } else {
+      this.modalHelp = 'charters';
       root = this.openModal(html).querySelector('.modal')!;
       root.classList.add('wide', 'charter-modal', 'plaque');
     }
     root.querySelectorAll<HTMLCanvasElement>('canvas.t-scene').forEach((cv) => drawTapestry(cv, cv.dataset.path!, cv.dataset.color!, 126, 92));
   }
 
-  private openModal(html: string, closable = true): HTMLElement {
+  /** The panel help the next window opened carries (see fingahelp.ts). */
+  private modalHelp: string | undefined;
+
+  private openModal(html: string, closable = true, help = this.modalHelp): HTMLElement {
+    this.modalHelp = undefined;
     this.closeModal(true);
     const back = document.createElement('div');
     back.className = 'modal-back';
-    back.innerHTML = `<div class="modal panel">${html}</div>`;
+    back.innerHTML = `<div class="modal panel">${help && helpText(help) ? fingaButton(help) : ''}${html}</div>`;
     if (closable) {
       back.addEventListener('click', (e) => {
         if (e.target === back) this.closeModal();
@@ -2329,6 +2349,7 @@ export class Hud {
   showNewGame(fromMain: boolean, presetSeed?: number, presetLand?: Land, preset?: { name: string; named: boolean; mode: string }, tutorial = false): void {
     const seed = presetSeed ?? Math.floor(Math.random() * 999999);
     const mode0 = preset?.mode ?? 'normal';
+    this.modalHelp = 'newgame';
     const m = this.openModal(
       `<h2>${tutorial ? 'Tutorial' : 'New Settlement'}</h2>
       ${tutorial ? '<p>Fingamoboblius, your steward, will show you the ropes on a land chosen for learning. Pick how hard it should be; the land is always the same.</p>' : ''}
@@ -2420,7 +2441,7 @@ export class Hud {
     if (key === this.lastInspectorKey) return;
     this.lastInspectorKey = key;
     box.style.display = 'block';
-    box.innerHTML = `<button class="close" data-action="deselect">✕</button>
+    box.innerHTML = `<button class="close" data-action="deselect">✕</button>${fingaButton('folk')}
       <h2>${esc(folkName(s, a))}</h2>
       <div class="desc">${esc(folkDoing(s, a))}</div>
       ${home ? `<div class="kv link" data-action="goto-b" data-id="${home.id}"><span>Lives in</span><span>${esc(buildingName(home))}</span></div>` : ''}
@@ -2550,6 +2571,7 @@ export class Hud {
     const look: LordLook = { ...DEFAULT_LORD, ...(after ? this.draftLord : (s.lord ?? this.draftLord)) };
     const arms: Heraldry = { ...DEFAULT_HERALDRY, ...(after ? this.draftArms : (s.heraldry ?? this.draftArms)) };
     let tab: 'lord' | 'arms' = 'lord';
+    this.modalHelp = 'lord';
     const m = this.openModal(
       `<h2>Your Lord</h2>
       <div class="lord-stage"><div class="lord-portrait"></div><div class="lord-flag"></div></div>
@@ -2654,6 +2676,7 @@ export class Hud {
   }
 
   showGameMenu(): void {
+    this.modalHelp = 'menu';
     const m = this.openModal(
       `<h1 class="logo-h">${LOGO}</h1>
       <div class="sub">${esc(this.game.summary())}</div>
@@ -2775,6 +2798,7 @@ export class Hud {
   }
 
   private showSave(): void {
+    this.modalHelp = 'save';
     const m = this.openModal(
       `<h2>Save Game</h2>
       <div class="row"><input id="slot" value="${esc(townName(this.game.state).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'my-village')}" maxlength="40"><button class="primary" data-m="save">Save</button></div>
@@ -2849,6 +2873,7 @@ export class Hud {
   }
 
   private showHelp(fromMain: boolean): void {
+    this.modalHelp = 'help';
     const m = this.openModal(
       `<h2>How to Play</h2>
       <div class="help">
@@ -2887,6 +2912,7 @@ export class Hud {
     const s = this.game.state;
     const h = s.history;
     if (h.length < 2) {
+      this.modalHelp = 'ledger';
       this.openModal(`<h2>Town Ledger</h2><p>The clerk needs a couple of months of records before drawing any charts. Check back soon.</p>
         <div class="row" style="justify-content:flex-end"><button class="primary" data-action="close-modal">Close</button></div>`);
       return;
@@ -2898,6 +2924,7 @@ export class Hud {
       ['Gold', 'gold', ''],
     ];
     const html = charts.map(([title, key, unit]) => lineChart(title, h.map((p) => [p.d, p[key]]), unit, key === 'happy' ? 100 : undefined)).join('');
+    this.modalHelp = 'ledger';
     const m = this.openModal(`<h2>Town Ledger</h2>
       <div class="ledger">${html}</div>
       <div class="row" style="justify-content:flex-end"><button class="primary" data-action="close-modal">Close</button></div>`);

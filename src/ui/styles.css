@@ -2842,3 +2842,55 @@ button.plaque-btn.small {
   filter: grayscale(0.3);
   opacity: 1;
 }
+
+/* Fingamoboblius's portrait on a panel: click to have him explain it. */
+button.finga-help {
+  position: absolute;
+  top: 6px;
+  right: 38px;
+  width: 26px;
+  height: 26px;
+  min-height: 0;
+  padding: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 40% 35%, #f8ecd0, #e2cc9c);
+  border: 2px solid #6a4a2a;
+  box-shadow: 0 2px 0 rgba(58, 36, 18, 0.6);
+  z-index: 3;
+}
+button.finga-help:hover:not(:disabled) {
+  background: radial-gradient(circle at 40% 35%, #fff6e0, #f0dcaa);
+  transform: scale(1.1);
+}
+button.finga-help svg {
+  width: 20px;
+  height: 20px;
+  filter: none;
+}
+/* Where no close button sits beside it, it takes the corner. */
+.modal > button.finga-help {
+  top: 10px;
+  right: 10px;
+}
+.modal.learning-modal > button.finga-help {
+  right: 96px;
+  top: 16px;
+}
+#chip-panel > button.finga-help {
+  right: 6px;
+}
+#chip-panel > button.close ~ button.finga-help {
+  right: 38px;
+}
+#objectives button.finga-help {
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+}
+#objectives {
+  position: relative;
+}
