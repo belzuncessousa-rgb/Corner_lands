@@ -532,7 +532,7 @@ describe('levels', () => {
     s.res.dressedstone = 10;
     expect(buildRoad(s, x, y, 2)).toBe(true);
     expect(buildRoad(s, x, y, 3)).toBe(true);
-    expect(s.res.dressedstone).toBe(9);
+    expect(s.res.dressedstone).toBe(8);
     const i = y * s.width + x;
     expect(s.road[i]).toBe(3);
     s.road[i + 1] = 2;
@@ -1722,6 +1722,8 @@ describe('trade audit', () => {
     const { buyPrice, exportUnitPrice, sellPrice } = await import('../src/game/sim');
     const s = tradeTown();
     s.charters = ['trade1', 'trade2', 'trade3a'];
+    // Toll navigation and trade deals are the merchants' concession on top of this rule.
+    s.learned = (s.learned ?? []).filter((id) => id !== 'x:tollnav' && id !== 'x:tradedeals');
     const guild = placeNearRoad(s, 'guildhall');
     guild.build = 1;
     guild.need = undefined;
@@ -2053,10 +2055,19 @@ describe('draught animals', () => {
     const post = placeNearRoad(s, 'tradingpost');
     post.build = 1;
     post.need = undefined;
+    // The pack horse pulls the goods cart.
+    post.improved = ['goodscart'];
     recompute(s);
     post.workers = 2;
     return { s, post };
   };
+
+  it('a trading post keeps no pack horse until it has a goods cart', async () => {
+    const { buyDraughtError } = await import('../src/game/sim');
+    const { s, post } = town();
+    post.improved = [];
+    expect(buyDraughtError(s, post)).toMatch(/Nothing here/);
+  });
 
   it('a trading post buys a pack horse only into a free stall, and carries half as much again', async () => {
     const { buyDraught, buyDraughtError, tradeCapacity, stalls, STABLE_STALLS } = await import('../src/game/sim');
@@ -2274,5 +2285,145 @@ describe('knowledge and the monastery', () => {
     h.level = 4;
     h.residents = 5;
     expect(knowledgeIncome(s)).toBe(base + 1.25);
+  });
+});
+
+describe('improvements, choices and town options', () => {
+  const built = (s: GameState, type: BuildingType) => {
+    const b = placeNearRoad(s, type);
+    b.build = 1;
+    b.need = undefined;
+    recompute(s);
+    return b;
+  };
+  const finish = async (s: GameState, b: Building) => {
+    const { finishUpgrade } = await import('../src/game/levels');
+    finishUpgrade(s, b);
+  };
+
+  it('an improvement must be learned, is built by builders, and then counts', async () => {
+    const { improveError, startImprove } = await import('../src/game/sim');
+    const { workersOf } = await import('../src/game/levels');
+    const s = freshWorld(41);
+    s.res.gold = 500;
+    const wc = built(s, 'woodcutter');
+    expect(improveError(s, wc, 'biglodge')).toMatch(/learned/);
+    learnEverything(s);
+    const places = workersOf(wc);
+    expect(startImprove(s, wc, 'biglodge')).toBeNull();
+    expect(wc.need).toEqual({ wood: 6 });
+    expect(improveError(s, wc, 'oxshed')).toMatch(/already at work/);
+    await finish(s, wc);
+    expect(wc.improved).toEqual(['biglodge']);
+    expect(workersOf(wc)).toBe(places + 2);
+    expect(improveError(s, wc, 'biglodge')).toMatch(/Already/);
+  });
+
+  it('the improved store needs its loft first, and holds twice as much', async () => {
+    const { improveError, storageCap } = await import('../src/game/sim');
+    const s = generateWorld(42);
+    const before = storageCap(s, 'materials');
+    const st = built(s, 'storehouse');
+    const one = storageCap(s, 'materials') - before;
+    expect(improveError(s, st, 'bigstore')).toMatch(/loft/);
+    st.improved = ['loft'];
+    expect(storageCap(s, 'materials') - before).toBe(one * 1.5);
+    st.improved = ['loft', 'bigstore'];
+    expect(storageCap(s, 'materials') - before).toBe(one * 2);
+  });
+
+  it('a lathe makes wood parts from two planks, and a firing chamber halves the fuel', async () => {
+    const { produceOnce } = await import('../src/game/sim');
+    const s = generateWorld(43);
+    const c = built(s, 'carpenter');
+    c.improved = ['lathe'];
+    s.res.planks = 10;
+    expect(produceOnce(s, c)).toBeNull();
+    expect(s.res.planks).toBe(8);
+    const k = built(s, 'kiln');
+    k.improved = ['firingchamber'];
+    s.res.clay = 40;
+    s.res.firewood = 40;
+    produceOnce(s, k);
+    produceOnce(s, k);
+    expect(s.res.firewood).toBe(39);
+  });
+
+  it('coppice and high forest are a choice: taking one closes the other', async () => {
+    const { learn, learnError } = await import('../src/game/unlocks');
+    const s = generateWorld(44);
+    s.res.knowledge = 100;
+    s.madeEver = { wood: 500 };
+    expect(learn(s, 'c:coppice')).toBeNull();
+    expect(learnError(s, 'c:highforest')).toMatch(/chosen/);
+  });
+
+  it('goats need little pasture; Frisians milk twice and Highlanders give twice the meat', async () => {
+    const { buyAnimalError, breedMilk, breedMeat } = await import('../src/game/sim');
+    const s = generateWorld(33);
+    built(s, 'tradingpost');
+    const byre = built(s, 'byre');
+    s.res.gold = 500;
+    s.learned = (s.learned ?? []).filter((id) => id !== 'a:goats');
+    expect(buyAnimalError(s, byre, 'goats')).toMatch(/goats/);
+    expect(breedMilk(s)).toBe(1);
+    s.learned = ['c:frisian'];
+    expect(breedMilk(s)).toBe(2);
+    expect(breedMeat(s)).toBeLessThan(1);
+    s.learned = ['c:highland'];
+    expect(breedMeat(s)).toBe(2);
+  });
+
+  it('town options cost something to switch on and run, and give happiness or prestige', async () => {
+    const { setOption, monthlyOptions, optionHappiness, optionPrestige } = await import('../src/game/options');
+    const s = generateWorld(46);
+    expect(setOption(s, 'banners', true)).toMatch(/cloth/);
+    s.res.cloth = 10;
+    s.res.dyes = 10;
+    const p = optionPrestige(s);
+    expect(setOption(s, 'banners', true)).toBeNull();
+    expect(s.res.cloth).toBe(6);
+    expect(optionPrestige(s)).toBe(p + 1);
+    // Taken down and put back up again: the banners are already made.
+    setOption(s, 'banners', false);
+    setOption(s, 'banners', true);
+    expect(s.res.cloth).toBe(6);
+    s.population = 120;
+    expect(setOption(s, 'tunics', true)).toBeNull();
+    expect(optionHappiness(s).some((f) => f.label === 'Dyed tunics')).toBe(true);
+    s.res.dyes = 0;
+    for (let m = 0; m < 12; m++) monthlyOptions(s);
+    expect(optionHappiness(s).some((f) => f.label === 'Dyed tunics')).toBe(false);
+  });
+
+  it('toll navigation and trade deals each make imports cheaper and exports dearer', async () => {
+    const { buyPrice, exportUnitPrice } = await import('../src/game/sim');
+    const s = freshWorld(47);
+    const buy = buyPrice(s, 'tools', 100);
+    const sell = exportUnitPrice(s, 'tools');
+    s.learned = ['x:tollnav', 'x:tradedeals'];
+    expect(buyPrice(s, 'tools', 100)).toBeLessThan(buy);
+    expect(exportUnitPrice(s, 'tools')).toBeGreaterThan(sell);
+  });
+
+  it('feats are noticed once: a draught animal at work', async () => {
+    const { checkFeats } = await import('../src/game/sim');
+    const s = generateWorld(48);
+    const y = built(s, 'builderyard');
+    checkFeats(s);
+    expect(s.feats).not.toContain('animalwork');
+    y.beast = true;
+    checkFeats(s);
+    expect(s.feats).toContain('animalwork');
+  });
+
+  it('stone roads and cobbles must be learned', async () => {
+    const { roadError } = await import('../src/game/sim');
+    const s = freshWorld(49);
+    const h = hall(s);
+    s.res.stone = 50;
+    expect(roadError(s, h.x - 3, h.y + 6, 2)).toMatch(/Learn/);
+    s.learned = ['x:stoneroad'];
+    expect(roadError(s, h.x - 3, h.y + 6, 2)).toBeNull();
   });
 });

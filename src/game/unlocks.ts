@@ -1,3 +1,4 @@
+import { GOODS } from './data';
 import type { BuildingType, GameState, ResourceId } from './types';
 
 /**
@@ -21,9 +22,14 @@ export const LEARN_TABS: { id: LearnTab; name: string }[] = [
   { id: 'civic', name: 'Town, learning & trade' },
 ];
 
+/** Conditions that are not about goods made (see conditionMet). */
+export type ConditionTest = 'herd15' | 'herd30' | 'greatwork' | 'storefull' | 'tavern10' | 'church10' | 'well8' | 'market4' | 'courtfull' | 'stablefull' | 'animalwork' | 'trade200' | 'trade250' | 'trade500' | 'trade600' | 'trade1000';
+
 export interface Condition {
   /** Goods the town must have made in total. */
   made?: Partial<Record<ResourceId, number>>;
+  /** Something else the town must have done. */
+  test?: ConditionTest;
   /** A building the town must own (any of these). */
   built?: BuildingType[];
   /** How the condition reads on the patch. */
@@ -53,6 +59,10 @@ export interface Unlock {
   /** What it opens. */
   building?: BuildingType;
   recipe?: { building: BuildingType; id: string };
+  /** An improvement (upgrade or extension) workplaces may then be given. */
+  improvement?: string;
+  /** A town option that can then be switched on (see options.ts). */
+  option?: string;
   /** The icon on its patch (a good or building icon key). */
   icon: string;
 }
@@ -128,6 +138,63 @@ export const UNLOCKS: Unlock[] = [
   { id: b('tavern'), name: 'Alehouse', kind: 'building', tab: 'civic', group: 'Services', desc: 'Pours drink for the homes around it.', rank: 2, building: 'tavern', icon: 'tavern' },
   { id: b('builderyard'), name: "Builder's Yard", kind: 'building', tab: 'civic', group: 'Services', desc: 'With an ox, building sites nearby rise faster.', knowledge: 4, condition: { built: ['draughtstable'], label: 'a draught stable' }, building: 'builderyard', icon: 'builderyard' },
   { id: b('dock'), name: 'Dock', kind: 'building', tab: 'civic', group: 'Trade', desc: 'Boats trade more, and cheaper.', knowledge: 4, building: 'dock', icon: 'dock' },
+
+  // ------------------------------------------------ step 4: upgrades, extensions, variants, choices, options
+  { id: 'c:coppice', name: 'Coppicing', kind: 'choice', tab: 'land', group: 'Timber', choice: 'woods', desc: 'Woods regrow twice as fast; woodcutters fell poles: firewood half again, timber a third less.', knowledge: 6, condition: { made: { wood: 200 }, label: '200 timber felled' }, icon: 'firewood' },
+  { id: 'c:highforest', name: 'High forest', kind: 'choice', tab: 'land', group: 'Timber', choice: 'woods', desc: 'Tall timber: woodcutters fell a fifth more timber.', knowledge: 6, condition: { made: { wood: 200 }, label: '200 timber felled' }, icon: 'wood' },
+  { id: 'i:biglodge', name: "Large woodcutter's lodge", kind: 'upgrade', tab: 'land', group: 'Timber', desc: 'Two more places for woodcutters.', knowledge: 4, condition: { made: { wood: 100 }, label: '100 timber felled' }, improvement: 'biglodge', icon: 'woodcutter' },
+  { id: 'i:oxshed', name: 'Ox tool-shed', kind: 'extension', tab: 'land', group: 'Timber', desc: 'No slowing in the woods, less carrying.', knowledge: 4, condition: { made: { wood: 150 }, label: '150 timber felled' }, improvement: 'oxshed', icon: 'woodcutter' },
+  { id: 'i:lathe', name: 'Lathe', kind: 'extension', tab: 'land', group: 'Timber', desc: 'Wood parts from two planks instead of three.', knowledge: 6, needs: [b('carpenter')], condition: { made: { woodparts: 100 }, label: '100 wood parts made' }, improvement: 'lathe', icon: 'woodparts' },
+  { id: 'i:nursery', name: 'Tree nursery', kind: 'extension', tab: 'land', group: 'Timber', desc: 'Orchards near a forester bear a season sooner.', knowledge: 4, needs: [b('forester')], condition: { made: { wood: 300 }, label: '300 timber felled' }, improvement: 'nursery', icon: 'forester' },
+  { id: 'i:crane', name: 'Quarry crane', kind: 'extension', tab: 'land', group: 'Stone', desc: 'One more place; one stone in five comes out dressed.', knowledge: 8, condition: { made: { stone: 50 }, label: '50 stone quarried' }, improvement: 'crane', icon: 'quarry' },
+  { id: 'i:masonslodge', name: "Mason's lodge", kind: 'upgrade', tab: 'land', group: 'Stone', desc: 'Masons help raise Great Works in reach: a fifth faster.', knowledge: 8, needs: [b('stonemason')], condition: { test: 'greatwork', label: 'a Great Work begun' }, improvement: 'masonslodge', icon: 'stonemason' },
+  { id: 'o:limewash', name: 'Limewash', kind: 'option', tab: 'land', group: 'Stone', desc: 'Homes limewashed white: +1 beauty each, half a mortar a year.', knowledge: 4, needs: [b('limekiln')], option: 'limewash', icon: 'mortar' },
+  { id: 'i:firingchamber', name: 'Second firing chamber', kind: 'extension', tab: 'land', group: 'Earth', desc: 'Tiles on half the fuel.', knowledge: 5, needs: [b('kiln')], condition: { made: { tiles: 100 }, label: '100 tiles fired' }, improvement: 'firingchamber', icon: 'tiles' },
+  { id: 'x:stoneroad', name: 'Stone roads', kind: 'variant', tab: 'land', group: 'Stone', desc: 'Roads paved with stone: quicker underfoot.', knowledge: 2, icon: 'paved' },
+  { id: 'x:cobbles', name: 'Cobbled streets', kind: 'variant', tab: 'land', group: 'Stone', desc: 'Streets cobbled in dressed stone: quickest of all.', knowledge: 4, needs: ['x:stoneroad'], icon: 'cobbles' },
+  { id: r('field', 'rye'), name: 'Rye', kind: 'variant', tab: 'farm', group: 'Grain', desc: 'Grows as well on poor soil as on rich, but yields half as much as wheat.', knowledge: 3, needs: [b('windmill')], recipe: { building: 'field', id: 'rye' }, icon: 'grain' },
+  { id: r('field', 'beans'), name: 'Beans', kind: 'variant', tab: 'farm', group: 'Grain', desc: 'Vegetables that feed the soil: the next crop on that field a fifth more.', knowledge: 4, recipe: { building: 'field', id: 'beans' }, icon: 'vegetables' },
+  { id: 'i:ironplough', name: 'Iron plough', kind: 'extension', tab: 'farm', group: 'Grain', desc: 'Farmers tend half as many fields again.', knowledge: 6, condition: { made: { grain: 100 }, label: '100 grain harvested' }, improvement: 'ironplough', icon: 'farm' },
+  { id: 'i:towermill', name: 'Tower mill', kind: 'upgrade', tab: 'farm', group: 'Grain', desc: 'Four grain make five flour.', knowledge: 8, needs: [b('windmill')], condition: { made: { flour: 200 }, label: '200 flour milled' }, improvement: 'towermill', icon: 'windmill' },
+  { id: 'i:secondcopper', name: "Brewer's second copper", kind: 'upgrade', tab: 'farm', group: 'Drink', desc: 'Brews two drinks at once.', knowledge: 6, needs: [r('brewhouse', 'ale'), r('brewhouse', 'cider')], improvement: 'secondcopper', icon: 'brewhouse' },
+  { id: 'i:herbgarden', name: 'Herb garden', kind: 'extension', tab: 'farm', group: 'Wild', desc: 'Herbs from a plot all year.', knowledge: 3, needs: [r('forager', 'herbs')], condition: { made: { herbs: 50 }, label: '50 herbs gathered' }, improvement: 'herbgarden', icon: 'herbs' },
+  { id: 'i:fishingboat', name: 'Fishing boat', kind: 'upgrade', tab: 'farm', group: 'Wild', desc: 'One more place on deeper water.', knowledge: 6, condition: { made: { fish: 50 }, label: '50 fish caught' }, improvement: 'fishingboat', icon: 'fisher' },
+  { id: 'i:fishpond', name: 'Pisciculture', kind: 'extension', tab: 'farm', group: 'Wild', desc: 'A fish pond by the hut that never runs dry.', knowledge: 6, condition: { made: { fish: 100 }, label: '100 fish caught' }, improvement: 'fishpond', icon: 'fish' },
+  { id: 'i:kennels', name: 'Kennels', kind: 'extension', tab: 'farm', group: 'Wild', desc: 'Hunters walk twice as fast; the dogs eat a meat a month.', knowledge: 4, condition: { made: { meat: 100 }, label: '100 meat hunted' }, improvement: 'kennels', icon: 'hunter' },
+  { id: 'a:goats', name: 'Goats', kind: 'animal', tab: 'herd', group: 'Herds', desc: 'Milk on scrub: a goat needs one tile but gives little milk.', knowledge: 3, needs: [b('byre')], icon: 'milk' },
+  { id: 'x:longwool', name: 'Long-wool sheep', kind: 'variant', tab: 'herd', group: 'Herds', desc: 'Sheep give half as much wool again.', knowledge: 8, needs: [b('byre')], condition: { made: { wool: 200 }, label: '200 wool shorn' }, icon: 'wool' },
+  { id: 'c:frisian', name: 'Frisian cattle', kind: 'choice', tab: 'herd', group: 'Herds', choice: 'cattle', desc: 'Twice the milk, a third less meat.', knowledge: 12, needs: ['a:cattle'], condition: { test: 'herd30', label: '30 animals kept' }, icon: 'milk' },
+  { id: 'c:highland', name: 'Highland cattle', kind: 'choice', tab: 'herd', group: 'Herds', choice: 'cattle', desc: 'Twice the meat, less milk.', knowledge: 12, needs: ['a:cattle'], condition: { test: 'herd30', label: '30 animals kept' }, icon: 'meat' },
+  { id: 'i:animalsheds', name: 'Animal sheds', kind: 'upgrade', tab: 'herd', group: 'Herds', desc: 'Pastures carry 15% more animals.', knowledge: 6, needs: [b('byre')], condition: { test: 'herd15', label: '15 animals kept' }, improvement: 'animalsheds', icon: 'byre' },
+  { id: 'i:cheesecellar', name: 'Cheese cellar', kind: 'upgrade', tab: 'herd', group: 'Herds', desc: 'Two milk make two cheese.', knowledge: 6, needs: [b('dairy')], condition: { made: { cheese: 30 }, label: '30 cheese made' }, improvement: 'cheesecellar', icon: 'cheese' },
+  { id: 'i:bigstable', name: 'Expanded draught stable', kind: 'upgrade', tab: 'herd', group: 'Herds', desc: 'Six stalls instead of three.', knowledge: 8, needs: [b('draughtstable')], condition: { test: 'stablefull', label: 'a full draught stable' }, improvement: 'bigstable', icon: 'draughtstable' },
+  { id: 'x:espalier', name: 'Espalier', kind: 'variant', tab: 'herd', group: 'Orchards', desc: 'Orchard tiles touching walls or buildings bear a third more.', knowledge: 8, needs: [b('orchardist')], icon: 'apples' },
+  { id: r('orchard', 'strawberries'), name: 'Strawberries', kind: 'variant', tab: 'herd', group: 'Orchards', desc: 'Strawberry beds bear in their first year, and a fifth more.', knowledge: 12, needs: [b('orchardist')], recipe: { building: 'orchard', id: 'strawberries' }, icon: 'strawberries' },
+  { id: 'c:skeps', name: 'Skeps', kind: 'choice', tab: 'herd', group: 'Orchards', choice: 'hives', desc: 'More honey, but now and then the bees swarm away.', knowledge: 5, needs: [b('beekeeper')], icon: 'honey' },
+  { id: 'c:loghives', name: 'Log hives', kind: 'choice', tab: 'herd', group: 'Orchards', choice: 'hives', desc: 'Steady honey, a little more than before.', knowledge: 5, needs: [b('beekeeper')], icon: 'honey' },
+  { id: 'i:broadloom', name: 'Broadloom', kind: 'upgrade', tab: 'cloth', group: 'Cloth', desc: 'More cloth from the same wool or flax.', knowledge: 8, needs: [b('weaver')], condition: { made: { cloth: 100 }, label: '100 cloth woven' }, improvement: 'broadloom', icon: 'weaver' },
+  { id: 'o:tunics', name: 'Dyed tunics', kind: 'option', tab: 'cloth', group: 'Dyes', desc: 'Villagers in dyed colours: +2 happiness; a dye a year for every ten villagers.', knowledge: 4, needs: [b('dyer')], option: 'tunics', icon: 'dyes' },
+  { id: 'i:bellows', name: 'Water bellows', kind: 'extension', tab: 'metal', group: 'Iron', desc: 'Beside water: iron on half the fuel.', knowledge: 10, needs: [b('bloomery')], condition: { made: { iron: 100 }, label: '100 iron smelted' }, improvement: 'bellows', icon: 'bloomery' },
+  { id: 'i:farrier', name: 'Farrier', kind: 'extension', tab: 'metal', group: 'Iron', desc: 'Shod animals work a quarter better.', knowledge: 6, needs: [b('smithy')], condition: { test: 'animalwork', label: 'a draught animal at work' }, improvement: 'farrier', icon: 'smithy' },
+  { id: 'i:deepshaft', name: 'Deep shaft', kind: 'extension', tab: 'metal', group: 'Iron', desc: 'The ore lasts twice as long.', knowledge: 6, needs: [b('mine')], condition: { made: { ore: 200 }, label: '200 ore dug' }, improvement: 'deepshaft', icon: 'mine' },
+  { id: 'i:crownglass', name: 'Crown glass', kind: 'upgrade', tab: 'metal', group: 'Glass', desc: 'Each melt makes two glass.', knowledge: 12, needs: [b('glassworks')], condition: { made: { glass: 50 }, label: '50 glass made' }, improvement: 'crownglass', icon: 'glassworks' },
+  { id: 'o:windows', name: 'Church windows', kind: 'option', tab: 'metal', group: 'Glass', desc: 'Stained glass in the church and cathedral: more cheer and prestige; a stained glass each, once.', knowledge: 2, needs: [b('glazier')], option: 'windows', icon: 'stainedglass' },
+  { id: 'i:secondvat', name: 'Second vat', kind: 'upgrade', tab: 'civic', group: 'Faith & learning', desc: 'One flax makes two paper.', knowledge: 6, needs: [b('papermill')], condition: { made: { paper: 100 }, label: '100 paper made' }, improvement: 'secondvat', icon: 'papermill' },
+  { id: 'i:sundayschool', name: 'Sunday school', kind: 'extension', tab: 'civic', group: 'Faith & learning', desc: 'Knowledge from every home the church serves; all work 2% slower.', knowledge: 4, condition: { test: 'church10', label: 'a church serving 10 homes' }, improvement: 'sundayschool', icon: 'church' },
+  { id: 'i:infirmary', name: 'Infirmary', kind: 'extension', tab: 'civic', group: 'Faith & learning', desc: 'Sickness passes lightly over homes nearby; a medicine a month.', knowledge: 8, needs: [b('monastery')], condition: { made: { medicine: 20 }, label: '20 medicine made' }, improvement: 'infirmary', icon: 'monastery' },
+  { id: 'i:innrooms', name: 'Inn rooms', kind: 'upgrade', tab: 'civic', group: 'Services', desc: 'Travellers pay to stay; they eat a little.', knowledge: 6, needs: [b('tavern')], condition: { test: 'tavern10', label: 'a tavern serving 10 homes' }, improvement: 'innrooms', icon: 'tavern' },
+  { id: 'i:loft', name: 'Loft', kind: 'upgrade', tab: 'civic', group: 'Services', desc: 'Stores hold half as much again.', knowledge: 4, condition: { test: 'storefull', label: '300 goods in store' }, improvement: 'loft', icon: 'storage' },
+  { id: 'i:bigstore', name: 'Improved stores', kind: 'upgrade', tab: 'civic', group: 'Services', desc: 'Stores hold twice as much as at first, with two more haulers.', knowledge: 6, needs: ['i:loft'], condition: { test: 'storefull', label: '300 goods in store' }, improvement: 'bigstore', icon: 'storage' },
+  { id: 'i:oxcarts', name: 'Ox-carts', kind: 'extension', tab: 'civic', group: 'Services', desc: 'Haulers with an ox carry twice as much.', knowledge: 4, needs: ['i:bigstore', b('draughtstable')], improvement: 'oxcarts', icon: 'storage' },
+  { id: 'i:pump', name: 'Pump', kind: 'upgrade', tab: 'civic', group: 'Services', desc: 'A well reaches half as far again.', knowledge: 3, condition: { test: 'well8', label: 'a well serving 8 homes' }, improvement: 'pump', icon: 'well' },
+  { id: 'i:marketcross', name: 'Market cross', kind: 'extension', tab: 'civic', group: 'Services', desc: 'Beauty around it; each stall serves two more homes.', knowledge: 5, condition: { test: 'market4', label: 'a market of four stalls' }, improvement: 'marketcross', icon: 'market' },
+  { id: 'i:mountedguard', name: 'Mounted guard', kind: 'extension', tab: 'civic', group: 'Services', desc: 'The watch on horseback keeps order in half as many homes again.', knowledge: 8, needs: [b('courthouse')], condition: { test: 'courtfull', label: 'a courthouse with its hands full' }, improvement: 'mountedguard', icon: 'courthouse' },
+  { id: 'i:goodscart', name: 'Goods cart', kind: 'extension', tab: 'civic', group: 'Trade', desc: 'A trading post may keep a pack horse.', knowledge: 4, condition: { test: 'trade200', label: '200 goods traded' }, improvement: 'goodscart', icon: 'tradingpost' },
+  { id: 'i:tradecentre', name: 'Trade centre', kind: 'upgrade', tab: 'civic', group: 'Trade', desc: 'Two more places; carts carry twice as much.', knowledge: 8, condition: { test: 'trade600', label: '600 goods traded' }, improvement: 'tradecentre', icon: 'tradingpost' },
+  { id: 'i:hugeships', name: 'Great ships', kind: 'upgrade', tab: 'civic', group: 'Trade', desc: 'Docks send away twice as much.', knowledge: 13, needs: [b('dock')], condition: { test: 'trade1000', label: '1000 goods traded' }, improvement: 'hugeships', icon: 'dock' },
+  { id: 'x:tollnav', name: 'Toll navigation', kind: 'variant', tab: 'civic', group: 'Trade', desc: 'Merchants sell a tenth cheaper and buy a tenth dearer.', knowledge: 12, condition: { test: 'trade250', label: '250 goods traded' }, icon: 'gold' },
+  { id: 'x:tradedeals', name: 'Trade deals', kind: 'variant', tab: 'civic', group: 'Trade', desc: 'Another tenth on every bargain.', knowledge: 12, needs: ['x:tollnav'], condition: { test: 'trade500', label: '500 goods traded' }, icon: 'gold' },
+  { id: 'o:banners', name: 'Heraldic banners', kind: 'option', tab: 'civic', group: 'Looks', desc: "The lord's arms on the manor, towers and market: +prestige; cloth and dyes once.", knowledge: 2, option: 'banners', icon: 'prestige' },
 ];
 
 export const UNLOCK_BY_ID = new Map(UNLOCKS.map((u) => [u.id, u]));
@@ -159,8 +226,43 @@ export function madeOf(s: GameState, id: ResourceId): number {
   return s.madeEver?.[id] ?? 0;
 }
 
+/** Lifetime goods traded through trading posts and docks. */
+export function tradedOf(s: GameState): number {
+  return s.tradedEver ?? 0;
+}
+
+function testMet(s: GameState, t: ConditionTest): boolean {
+  const animals = () => s.buildings.reduce((n, o) => n + (o.type === 'byre' ? Object.values(o.animals ?? {}).reduce((a, v) => a + (v ?? 0), 0) : 0), 0);
+  switch (t) {
+    case 'herd15':
+      return animals() >= 15;
+    case 'herd30':
+      return animals() >= 30;
+    case 'greatwork':
+      return s.buildings.some((o) => ['markethall', 'belltower', 'cathedral', 'university', 'guildhall'].includes(o.type));
+    case 'storefull': {
+      let n = 0;
+      for (const k in s.res) if (GOODS[k as ResourceId]?.storage === 'materials') n += s.res[k as ResourceId];
+      return n >= 300;
+    }
+    case 'trade200':
+      return tradedOf(s) >= 200;
+    case 'trade250':
+      return tradedOf(s) >= 250;
+    case 'trade500':
+      return tradedOf(s) >= 500;
+    case 'trade600':
+      return tradedOf(s) >= 600;
+    case 'trade1000':
+      return tradedOf(s) >= 1000;
+    default:
+      return (s.feats ?? []).includes(t);
+  }
+}
+
 export function conditionMet(s: GameState, c: Condition | undefined): boolean {
   if (!c) return true;
+  if (c.test && !testMet(s, c.test)) return false;
   for (const k in c.made ?? {}) if (madeOf(s, k as ResourceId) < (c.made![k as ResourceId] ?? 0)) return false;
   if (c.built && !s.buildings.some((o) => c.built!.includes(o.type) && o.build >= 1)) return false;
   return true;
@@ -172,6 +274,7 @@ export function conditionProgress(s: GameState, c: Condition | undefined): numbe
   let p = 1;
   for (const k in c.made ?? {}) p = Math.min(p, madeOf(s, k as ResourceId) / Math.max(1, c.made![k as ResourceId] ?? 1));
   if (c.built && !s.buildings.some((o) => c.built!.includes(o.type) && o.build >= 1)) p = Math.min(p, 0);
+  if (c.test && !testMet(s, c.test)) p = Math.min(p, c.test.startsWith('trade') ? tradedOf(s) / Number(c.test.slice(5)) : 0);
   return Math.max(0, Math.min(1, p));
 }
 
@@ -223,5 +326,6 @@ export function grantWhatExists(s: GameState): void {
 
 /** Knows every unlock (for tests of other systems, and the sandbox). */
 export function learnEverything(s: GameState): void {
-  for (const u of UNLOCKS) grant(s, u.id);
+  // Choices are the player's to make: none is taken here.
+  for (const u of UNLOCKS) if (!u.choice) grant(s, u.id);
 }

@@ -39,9 +39,7 @@ import {
   setYard,
   footprintClear,
   PAVING_COST,
-  PAVING_TIER,
   COBBLE_COST,
-  COBBLE_TIER,
   stepDay,
   updateHappiness,
   yearOf,
@@ -58,7 +56,7 @@ import { LANDS, generateWorld, idx, inBounds } from './game/world';
 import { demolishWithUndo } from './game/undo';
 import type { Agent } from './render/agents';
 import { AgentSystem } from './render/agents';
-import { learnEverything } from './game/unlocks';
+import { knows, learnEverything } from './game/unlocks';
 import { grantCharter } from './game/charters';
 import { buildingDoor } from './render/sprites';
 import { reachOf } from './game/levels';
@@ -574,22 +572,22 @@ export class Game {
       if (grade === 3) {
         const ds = n * (COBBLE_COST.dressedstone ?? 0);
         this.hud.setHint(
-          s.tier < COBBLE_TIER
-            ? 'Cobbled streets wait until you are a Town'
+          !knows(s, 'x:cobbles')
+            ? 'Learn cobbled streets first (the learning board)'
             : this.roadAnchor
               ? `Cobbled street: ${n} tiles · ${ds} dressed stone · click to lay it, keep clicking to continue · right-click to finish`
-              : 'Click where the cobbled street starts · cobbling a road upgrades it · 1 dressed stone per tile',
-          s.tier < COBBLE_TIER || fresh.length * (COBBLE_COST.dressedstone ?? 0) > s.res.dressedstone,
+              : 'Click where the cobbled street starts · cobbling a road upgrades it · 2 dressed stone per tile',
+          !knows(s, 'x:cobbles') || fresh.length * (COBBLE_COST.dressedstone ?? 0) > s.res.dressedstone,
         );
       } else if (paved) {
         const stone = n * (PAVING_COST.stone ?? 0);
         this.hud.setHint(
-          s.tier < PAVING_TIER
-            ? 'Paved roads unlock when you become a Village'
+          !knows(s, 'x:stoneroad')
+            ? 'Learn stone roads first (the learning board)'
             : this.roadAnchor
               ? `Paved road: ${n} tiles · ${stone} stone · click to lay it, keep clicking to continue · right-click to finish`
               : 'Click where the paved road starts · paving an existing road upgrades it · 2 stone per tile',
-          s.tier < PAVING_TIER || fresh.length * (PAVING_COST.stone ?? 0) > s.res.stone,
+          !knows(s, 'x:stoneroad') || fresh.length * (PAVING_COST.stone ?? 0) > s.res.stone,
         );
       } else {
         const bridges = fresh.filter((t) => isBridge(s, t.x, t.y)).length;

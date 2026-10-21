@@ -1,3 +1,4 @@
+import { IMPROVEMENT_BY_ID, has, improvedPlaces } from './improve';
 import { BUILDINGS, TIERS } from './data';
 import {
   coveredBy,
@@ -63,7 +64,7 @@ export const TAVERN_LEVELS: { name: string; cost?: Cost; days?: number; tier?: n
 
 /** How far a service reaches, in tiles: an enlarged tavern twice as far as an alehouse. */
 export function reachOf(b: Building): number {
-  const r = BUILDINGS[b.type].radius;
+  const r = BUILDINGS[b.type].radius * (has(b, 'pump') ? 1.5 : 1);
   return b.type === 'tavern' && b.level >= 2 ? r * 2 : r;
 }
 
@@ -103,7 +104,8 @@ export function workersOf(b: Building): number {
   if (b.trade) return Math.min(BUILDINGS[b.trade].workers, b.residents);
   // A tavern keeps a second tapster.
   if (b.type === 'tavern' && b.level >= 2) return 3;
-  return BUILDINGS[b.type].workers;
+  const base = BUILDINGS[b.type].workers;
+  return base > 0 ? base + improvedPlaces(b) : base;
 }
 
 export function buildingName(b: Building): string {
@@ -244,6 +246,7 @@ export function startUpgrade(s: GameState, b: Building): boolean {
 /** Days of labour a renovation takes once materials are on site. */
 export function upgradeDays(b: Building): number {
   if (b.craftTo) return HOME_TRADE_DAYS;
+  if (b.improveTo) return IMPROVEMENT_BY_ID.get(b.improveTo)?.days ?? 6;
   if (b.type === 'townhall') return MANOR_LEVELS[b.upgrading ?? 2]?.days ?? 20;
   if (b.type === 'church') return CHURCH_LEVELS[b.upgrading ?? 2]?.days ?? 20;
   if (b.type === 'tavern') return TAVERN_LEVELS[b.upgrading ?? 2]?.days ?? 14;
@@ -253,6 +256,7 @@ export function upgradeDays(b: Building): number {
 /** Cost of the renovation in progress (for showing delivered materials). */
 export function upgradeCost(b: Building): Cost {
   if (b.craftTo) return HOME_TRADE_COST;
+  if (b.improveTo) return IMPROVEMENT_BY_ID.get(b.improveTo)?.cost ?? {};
   if (b.type === 'townhall') return MANOR_LEVELS[b.upgrading ?? 2]?.cost ?? {};
   if (b.type === 'church') return CHURCH_LEVELS[b.upgrading ?? 2]?.cost ?? {};
   if (b.type === 'tavern') return TAVERN_LEVELS[b.upgrading ?? 2]?.cost ?? {};
@@ -273,6 +277,18 @@ export function finishUpgrade(s: GameState, b: Building): void {
     b.work = 0;
     b.blocked = 0;
     log(s, `A family opened its ${BUILDINGS[b.trade].name.toLowerCase()} at home.`, 'good', b);
+    s.dirty = true;
+    return;
+  }
+  if (b.improveTo) {
+    const imp = IMPROVEMENT_BY_ID.get(b.improveTo);
+    (b.improved ??= []).push(b.improveTo);
+    b.improveTo = undefined;
+    b.upgrading = undefined;
+    b.upProgress = undefined;
+    b.upNote = undefined;
+    b.need = undefined;
+    if (imp) log(s, `${imp.name} finished at the ${buildingName(b).toLowerCase()}.`, 'good', b);
     s.dirty = true;
     return;
   }

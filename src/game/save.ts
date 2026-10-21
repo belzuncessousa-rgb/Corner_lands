@@ -107,9 +107,9 @@ export function deserialize(json: string): GameState {
   const hall = s.buildings.find((b) => b.type === 'townhall');
   if (hall && legacy) hall.level = Math.max(hall.level, s.tier + 1);
   for (const b of s.buildings) {
-    if (b.type === 'house' && b.level >= 2) b.level = Math.min(b.level, 4);
-    // The manor now stops at the Stone Manor (4x4): keeps and castles step down.
-    if (b.type === 'townhall' && (b.level > 3 || (b.upgrading ?? 0) > 3)) {
+    if (b.type === 'house' && b.level >= 2) b.level = Math.min(b.level, 5);
+    // Before the rework the manor stopped at the Stone Manor (4x4): keeps and castles step down.
+    if (beforeRework && b.type === 'townhall' && (b.level > 3 || (b.upgrading ?? 0) > 3)) {
       if (b.upgrading) {
         b.upgrading = undefined;
         b.upProgress = undefined;
@@ -126,7 +126,7 @@ export function deserialize(json: string): GameState {
     // Workplaces are no longer expanded.
     if (b.type !== 'house' && b.type !== 'townhall' && b.type !== 'market' && b.type !== 'church' && b.type !== 'tavern') {
       if (b.level > 1) b.level = 1;
-      if (b.upgrading && !b.craftTo) {
+      if (b.upgrading && !b.craftTo && !b.improveTo) {
         b.upgrading = undefined;
         b.upProgress = undefined;
         b.need = undefined;

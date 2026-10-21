@@ -1,6 +1,6 @@
 import { BUILDINGS, DAYS_PER_MONTH, DAYS_PER_YEAR, RESOURCE_STORAGE, STORAGE_CAPACITY, type StorageKind } from '../game/data';
 import { MANOR_SIZE, marketStalls, upgradeBlocker } from '../game/levels';
-import { hasCharter } from '../game/charters';
+import { knows } from '../game/unlocks';
 import { ANIMAL_KINDS, LOW_EFFICIENCY, animalsOf, deliveredTo, hasProblem, herdTotal, lordRides, monthOf, nearestShoal, orchardMaturity, seasonOf, seatOf, storageCap, stored } from '../game/sim';
 import type { Building, BuildingType, GameState, ResourceId, Season } from '../game/types';
 import { idx, inBounds } from '../game/world';
@@ -778,6 +778,7 @@ export class Renderer {
       herds.set(owner.id, used + n);
       // The farm's animals, kind by kind, shared out over its pastures.
       const a = animalsOf(owner);
+      const breed = knows(s, 'c:frisian') ? 'frisian' : knows(s, 'c:highland') ? 'highland' : 'cattle';
       const flock: string[] = [];
       for (const k of ANIMAL_KINDS) for (let i = 0; i < (a[k] ?? 0); i++) flock.push(k);
       const mine = flock.slice(used, used + Math.min(n, 40));
@@ -798,7 +799,8 @@ export class Renderer {
       for (const { kind, ax, ay, f, j } of beasts) {
         const [sx, sy] = iso(ax, ay);
         if (kind === 'sheep') drawSheep(p.ctx, sx, sy, f, season === 3 ? '#e2ddd2' : '#f2ece0');
-        else drawBeast(p.ctx, sx, sy, f, kind, j);
+        else if (kind === 'goats') drawGoat(p.ctx, sx, sy, f, j);
+        else drawBeast(p.ctx, sx, sy, f, kind === 'cattle' ? breed : kind, j);
       }
     }
     p.fence([x1 - 0.05, y0 + 0.05], [x1 - 0.05, y1 - 0.05], post);
@@ -1009,7 +1011,7 @@ export class Renderer {
     const orchard = this.orchardTiles.get(i);
     if (orchard) {
       const fruit = orchard.recipe ?? 'apples';
-      const stage = Math.round(orchardMaturity(orchard, hasCharter(s, 'orchard2')) * 4) / 4;
+      const stage = Math.round(orchardMaturity(s, orchard) * 4) / 4;
       const month = monthOf(s.day);
       const fruiting = stage >= 1 && month >= 3 && month <= 6 && (month < 5 || orchard.growth > 0);
       const blossom = month <= 1 && stage >= 0.5;
@@ -4339,7 +4341,10 @@ const fract = (v: number) => v - Math.floor(v);
 /** A cow or a pig at a screen point. */
 function drawBeast(c: CanvasRenderingContext2D, x: number, y: number, f: number, kind: string, j: number): void {
   const pig = kind === 'pigs';
-  const coat = pig ? '#e8a8a0' : ['#8a5a3a', '#f2ece0', '#3a3028', '#b0703a'][j % 4];
+  // Frisians black and white; Highlanders shaggy and russet, with long horns.
+  const highland = kind === 'highland';
+  const frisian = kind === 'frisian';
+  const coat = pig ? '#e8a8a0' : highland ? ['#b0602a', '#c8783a', '#9a5024'][j % 3] : frisian ? '#f4f0e6' : ['#8a5a3a', '#f2ece0', '#3a3028', '#b0703a'][j % 4];
   const len = pig ? 4.5 : 6.5;
   const tall = pig ? 2.5 : 5;
   c.fillStyle = 'rgba(20,20,10,0.22)';
@@ -4358,11 +4363,27 @@ function drawBeast(c: CanvasRenderingContext2D, x: number, y: number, f: number,
   c.beginPath();
   c.ellipse(x, y - tall - 2.2, len, pig ? 2.8 : 3.4, 0, 0, Math.PI * 2);
   c.fill();
-  if (!pig && j % 4 === 1) {
-    c.fillStyle = '#3a3028';
+  if (frisian || (!pig && !highland && j % 4 === 1)) {
+    c.fillStyle = '#2a2420';
     c.beginPath();
     c.ellipse(x - 1.5 * f, y - tall - 2.6, 1.8, 1.3, 0, 0, Math.PI * 2);
     c.fill();
+    if (frisian) {
+      c.beginPath();
+      c.ellipse(x + 2.4 * f, y - tall - 1.6, 1.5, 1.2, 0, 0, Math.PI * 2);
+      c.fill();
+    }
+  }
+  if (highland) {
+    // A shaggy fringe of coat along the belly.
+    c.strokeStyle = '#8a4420';
+    c.lineWidth = 0.8;
+    c.beginPath();
+    for (let i = -4; i <= 4; i += 2) {
+      c.moveTo(x + i, y - tall - 0.4);
+      c.lineTo(x + i + 0.4, y - tall + 0.9);
+    }
+    c.stroke();
   }
   // Head, lowered to graze.
   c.fillStyle = coat;
@@ -4372,6 +4393,15 @@ function drawBeast(c: CanvasRenderingContext2D, x: number, y: number, f: number,
   if (pig) {
     c.fillStyle = '#d88a84';
     c.fillRect(x + (len + 2.4) * f - 0.8, y - tall - 1.8, 1.6, 1.4);
+  } else if (highland) {
+    c.strokeStyle = '#efe4c8';
+    c.lineWidth = 0.9;
+    c.beginPath();
+    c.moveTo(x + (len + 1) * f, y - tall - 1.8);
+    c.quadraticCurveTo(x + (len - 1.5) * f, y - tall - 2.6, x + (len - 2.2) * f, y - tall - 4.6);
+    c.moveTo(x + (len + 1) * f, y - tall - 1.8);
+    c.quadraticCurveTo(x + (len + 3.5) * f, y - tall - 2.6, x + (len + 4) * f, y - tall - 4.4);
+    c.stroke();
   } else {
     c.strokeStyle = '#e8dcc4';
     c.lineWidth = 0.7;
@@ -4380,6 +4410,54 @@ function drawBeast(c: CanvasRenderingContext2D, x: number, y: number, f: number,
     c.lineTo(x + (len - 0.6) * f, y - tall - 3.8);
     c.stroke();
   }
+}
+
+/** A goat: small and wiry, with swept-back horns and a beard, head up and browsing. */
+function drawGoat(c: CanvasRenderingContext2D, x: number, y: number, f: number, j: number): void {
+  const coat = ['#e8e2d6', '#9a8a78', '#5a4a3c', '#c8b49a'][j % 4];
+  const len = 3.6;
+  const tall = 3.2;
+  c.fillStyle = 'rgba(20,20,10,0.22)';
+  c.beginPath();
+  c.ellipse(x, y, len + 0.8, 1.4, 0, 0, Math.PI * 2);
+  c.fill();
+  c.strokeStyle = '#3a3028';
+  c.lineWidth = 1;
+  c.beginPath();
+  for (const lx of [-len * 0.6, len * 0.55]) {
+    c.moveTo(x + lx, y - tall);
+    c.lineTo(x + lx, y);
+  }
+  c.stroke();
+  c.fillStyle = coat;
+  c.beginPath();
+  c.ellipse(x, y - tall - 1.6, len, 2.2, 0, 0, Math.PI * 2);
+  c.fill();
+  // Neck and head held high.
+  const hx = x + (len + 0.6) * f;
+  const hy = y - tall - 4.2;
+  c.beginPath();
+  c.moveTo(x + (len - 1.2) * f, y - tall - 2.6);
+  c.lineTo(hx, hy + 0.6);
+  c.lineTo(hx - 0.4 * f, hy + 2);
+  c.closePath();
+  c.fill();
+  c.beginPath();
+  c.ellipse(hx + 0.6 * f, hy + 0.4, 1.6, 1.1, 0.3 * f, 0, Math.PI * 2);
+  c.fill();
+  // Beard and horns.
+  c.strokeStyle = '#5a4a3c';
+  c.lineWidth = 0.7;
+  c.beginPath();
+  c.moveTo(hx + 1.4 * f, hy + 1.2);
+  c.lineTo(hx + 1.2 * f, hy + 2.6);
+  c.stroke();
+  c.strokeStyle = '#d8ccb0';
+  c.lineWidth = 0.8;
+  c.beginPath();
+  c.moveTo(hx, hy - 0.4);
+  c.quadraticCurveTo(hx - 0.6 * f, hy - 2.4, hx - 2 * f, hy - 2);
+  c.stroke();
 }
 
 /** How visible a villager is while stepping through a door: fading out as they cross the sill, in as they leave it. */

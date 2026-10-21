@@ -1,3 +1,6 @@
+import { knows } from '../game/unlocks';
+import { IMPROVEMENT_BY_ID, improvementsFor } from '../game/improve';
+import { OPTIONS, optionError, optionOn, optionOnce, setOption } from '../game/options';
 import { NEWS } from './news';
 import { drawTapestry } from './tapestry';
 import { TUTORIAL_SEED } from './tutorial';
@@ -55,6 +58,8 @@ import {
   knowledgeSources,
   MONASTERY_KNOWLEDGE,
   setTrade,
+  startImprove,
+  improveError,
   workDef,
   HOME_TRADES,
   HOME_TRADE_COST,
@@ -82,10 +87,8 @@ import {
   labourSummary,
   bCenter,
   coveredBy,
-  PAVING_TIER,
   PAVING_COST,
   COBBLE_COST,
-  COBBLE_TIER,
   setWorkers,
   setPriority,
   setRecipe,
@@ -387,8 +390,8 @@ export class Hud {
     const tool = this.game.tool;
     const kinds = [
       { paved: false, cobbled: false, key: 'R', name: 'Dirt road', icon: ICONS.road, cost: 'Free', open: true },
-      { paved: true, cobbled: false, key: 'T', name: 'Stone road', icon: ICONS.paved, cost: `${costHtml(PAVING_COST, s.res)} a tile`, open: s.tier >= PAVING_TIER },
-      { paved: false, cobbled: true, key: 'Y', name: 'Cobbled street', icon: ICONS.cobbles, cost: `${costHtml(COBBLE_COST, s.res)} a tile`, open: s.tier >= COBBLE_TIER },
+      { paved: true, cobbled: false, key: 'T', name: 'Stone road', icon: ICONS.paved, cost: `${costHtml(PAVING_COST, s.res)} a tile`, open: knows(s, 'x:stoneroad') },
+      { paved: false, cobbled: true, key: 'Y', name: 'Cobbled street', icon: ICONS.cobbles, cost: `${costHtml(COBBLE_COST, s.res)} a tile`, open: knows(s, 'x:cobbles') },
     ];
     return `<span class="road-pop">${kinds
       .filter((k) => k.open)
@@ -1007,7 +1010,7 @@ export class Hud {
       }
       if (b.upgrading) {
         const note = b.upNote ?? 'Waiting for builders';
-        rows.push(`<div class="upgrade-box"><b>Upgrading to ${esc(upgradeName(b))}</b>${needLine()}
+        rows.push(`<div class="upgrade-box"><b>${b.improveTo ? 'Building the' : 'Upgrading to'} ${esc(upgradeName(b))}</b>${needLine()}
           <div class="kv"><span>Now</span><span class="${/^Waiting/.test(note) ? 'neg' : ''}">${esc(note)}</span></div>
           <div class="kv"><span>Work</span><span>${Math.floor((b.upProgress ?? 0) * 100)}% · ${b.builders ?? 0} builders</span></div>
           <div class="progress"><i style="width:${(b.upProgress ?? 0) * 100}%"></i></div></div>`);
@@ -1025,6 +1028,35 @@ export class Hud {
           <div class="reqs">${plan.reqs.map((r) => `<span class="${r.met ? 'met' : 'unmet'}">${r.met ? '✓' : '✗'} ${esc(r.label)}</span>`).join('')}</div>
           <div class="costline">${costHtml(plan.cost, s.res)}</div>
           <button class="primary" data-action="upgrade" ${blocker ? 'disabled' : ''}>⬆ ${b.type === 'townhall' ? 'Raise the manor' : 'Upgrade'}</button></div>`);
+      }
+      const imps = b.build >= 1 ? improvementsFor(b.type) : [];
+      if (imps.length) {
+        const list = imps.map((imp) => {
+          const done = b.improved?.includes(imp.id);
+          const err = done ? null : improveError(s, b, imp.id);
+          const learned = knows(s, `i:${imp.id}`);
+          const upkeep = imp.upkeep ? ` · upkeep ${Object.entries(imp.upkeep).map(([k, v]) => `${v} ${GOODS[k as ResourceId].name.toLowerCase()}`).join(', ')} a year` : '';
+          const tip = `<b>${esc(imp.name)}</b> <small>(${imp.kind})</small><br>${esc(imp.desc)}<br>${esc(costText(imp.cost))}${upkeep}${!learned ? '<br><i>Learn it on the learning board first.</i>' : err && !done ? `<br><i>${esc(err)}</i>` : ''}`;
+          const right = done
+            ? '<span class="pos">✓ built</span>'
+            : learned
+              ? `<span class="costline">${costHtml(imp.cost, s.res)}</span><button data-action="improve" data-i="${imp.id}" ${err ? 'disabled' : ''}>Build</button>`
+              : '<span class="muted">🔒 not learned</span>';
+          return `<div class="kv imp-row ${done ? 'done' : learned ? '' : 'locked'}" data-tip="${tip}"><span>${esc(imp.name)}</span><span>${right}</span></div>`;
+        });
+        rows.push(`<div class="upgrade-box imps"><b>Improvements</b>${list.join('')}</div>`);
+      }
+      if (b.type === 'townhall' && b.build >= 1) {
+        const opts = OPTIONS.map((o) => {
+          const on = optionOn(s, o.id);
+          const learned = knows(s, `o:${o.id}`);
+          const err = on ? null : optionError(s, o.id);
+          const once = optionOnce(s, o.id);
+          const tip = `<b>${esc(o.name)}</b><br>${esc(o.desc)}${Object.keys(once).length && !(s.optionsPaid ?? []).includes(o.id) ? `<br>To begin: ${esc(costText(once))}` : ''}${!learned ? '<br><i>Learn it on the learning board first.</i>' : err ? `<br><i>${esc(err)}</i>` : ''}`;
+          const right = learned ? `<button data-action="option" data-o="${o.id}" data-on="${on ? 0 : 1}" ${err ? 'disabled' : ''}>${on ? '✓ On' : 'Off'}</button>` : '<span class="muted">🔒 not learned</span>';
+          return `<div class="kv imp-row ${learned ? '' : 'locked'}" data-tip="${tip}"><span>${esc(o.name)}</span><span>${right}</span></div>`;
+        });
+        rows.push(`<div class="upgrade-box imps"><b>Town options</b>${opts.join('')}</div>`);
       }
     }
     const warn = hasProblem(b) || /Waiting|rotted|untended/.test(b.status);
@@ -1273,7 +1305,7 @@ export class Hud {
         rows.push(`<div class="kv" data-tip="Richer soil yields up to twice as much as poor soil. Look for dark green, lush ground."><span>Soil</span><span class="${fc.soil < 0.4 ? 'neg' : ''}">${fc.soil < 0.4 ? 'Poor' : fc.soil < 0.7 ? 'Fair' : 'Rich'} (${Math.round(fc.soil * 100)}%)</span></div>`);
         if (b.lastCrop) rows.push(`<div class="kv" data-tip="Growing the same crop two years running yields less."><span>Last year</span><span>${esc(b.lastCrop)}${b.lastCrop === (b.recipe ?? 'wheat') ? ' <span class="neg">(same crop: −15%)</span>' : ''}</span></div>`);
       } else if (b.type === 'orchard') {
-        const m = orchardMaturity(b, hasCharter(s, 'orchard2'));
+        const m = orchardMaturity(s, b);
         rows.push(`<div class="kv"><span>Trees</span><span>${m < 1 ? `${Math.round(m * 100)}% grown` : 'Bearing fruit'}</span></div>${m < 1 ? bar(m) : ''}`);
         if (b.growth > 0) rows.push(`<div class="kv"><span>Fruit on the trees</span><span>${Math.floor(b.growth)}</span></div>`);
       }
@@ -1293,10 +1325,11 @@ export class Hud {
     if (b.type === 'byre' && b.build >= 1) {
       const room = herdRoom(s, b);
       const a = animalsOf(b);
-      rows.push(`<div class="kv" data-tip="A sheep needs 2 tiles of pasture, a pig 3, a cow 4; kinds share the pastures. Animals do not breed: buy them at the trading post."><span>Pasture used</span><span class="${room.used >= room.room ? 'neg' : ''}">${room.used} of ${room.room} tiles</span></div>`);
+      rows.push(`<div class="kv" data-tip="A goat needs 1 tile of pasture, a sheep 2, a pig 3, a cow 4; kinds share the pastures. Animals do not breed: buy them at the trading post."><span>Pasture used</span><span class="${room.used >= room.room ? 'neg' : ''}">${room.used} of ${room.room} tiles</span></div>`);
       for (const k of ANIMAL_KINDS) {
         const h = HERDS[k];
         const n = a[k] ?? 0;
+        if (!n && ((k === 'cattle' && !knows(s, 'a:cattle')) || (k === 'goats' && !knows(s, 'a:goats')))) continue;
         const err = buyAnimalError(s, b, k);
         const meat = Object.entries(h.meat).map(([id, v]) => `${v} ${GOODS[id as ResourceId].name.toLowerCase()}`).join(' and ');
         rows.push(`<div class="kv herd-row"><span>${n} ${n === 1 ? h.name : h.plural}</span><span>
@@ -1792,6 +1825,25 @@ export class Hud {
           recompute(s);
           this.update();
         }
+        break;
+      }
+      case 'improve': {
+        const b = this.selectedBuilding();
+        if (b) {
+          const err = startImprove(s, b, t.dataset.i ?? '');
+          if (err) this.flash(err);
+          else this.sound('place');
+          this.lastInspectorKey = '';
+          this.update();
+        }
+        break;
+      }
+      case 'option': {
+        const err = setOption(s, t.dataset.o ?? '', t.dataset.on === '1');
+        if (err) this.flash(err);
+        else this.sound('place');
+        this.lastInspectorKey = '';
+        this.update();
         break;
       }
       case 'upgrade': {
@@ -2873,6 +2925,7 @@ export class Hud {
 
 function upgradeName(b: Building): string {
   if (b.craftTo) return `a ${BUILDINGS[b.craftTo].name}`;
+  if (b.improveTo) return (IMPROVEMENT_BY_ID.get(b.improveTo)?.name ?? '').toLowerCase();
   const to = b.upgrading ?? b.level + 1;
   if (b.type === 'house') return HOUSE_LEVELS[to]?.name ?? '';
   if (b.type === 'church') return CHURCH_LEVELS[to]?.name ?? '';

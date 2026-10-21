@@ -378,6 +378,8 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     recipes: [
       { id: 'vegetables', name: 'Vegetables', inputs: {}, outputs: { vegetables: 1 } },
       { id: 'wheat', name: 'Wheat', inputs: {}, outputs: { grain: 1 } },
+      { id: 'rye', name: 'Rye', inputs: {}, outputs: { grain: 1 } },
+      { id: 'beans', name: 'Beans', inputs: {}, outputs: { vegetables: 1 } },
       { id: 'barley', name: 'Barley', inputs: {}, outputs: { barley: 1 } },
       { id: 'flax', name: 'Flax', inputs: {}, outputs: { flax: 1 } },
       { id: 'woad', name: 'Woad', inputs: {}, outputs: { woad: 1 } },
@@ -429,6 +431,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
       { id: 'apples', name: 'Apples', inputs: {}, outputs: { apples: 1 } },
       { id: 'pears', name: 'Pears', inputs: {}, outputs: { pears: 1 } },
       { id: 'plums', name: 'Plums', inputs: {}, outputs: { plums: 1 } },
+      { id: 'strawberries', name: 'Strawberries', inputs: {}, outputs: { strawberries: 1 } },
       { id: 'grapes', name: 'Vines', inputs: {}, outputs: { grapes: 1 }, charter: 'orchard2' },
     ],
   }),

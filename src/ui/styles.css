@@ -2468,3 +2468,20 @@ button.plaque-btn.small {
   padding: 4px 12px;
   font-size: 13px;
 }
+
+/* Improvements and town options in the inspector. */
+.upgrade-box.imps .imp-row {
+  align-items: center;
+  gap: 6px;
+}
+.upgrade-box.imps .imp-row > span:last-child {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.upgrade-box.imps .imp-row.locked {
+  opacity: 0.65;
+}
+.upgrade-box.imps .imp-row button {
+  padding: 1px 8px;
+}

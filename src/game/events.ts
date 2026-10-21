@@ -362,7 +362,7 @@ export const EVENTS: DecisionEvent[] = [
         label: 'Quarantine the sick lanes',
         detail: 'About one in twenty is lost; happiness −4 for a season.',
         apply: (st) => {
-          const n = Math.max(1, Math.round(st.population * 0.05));
+          const n = Math.max(1, Math.round(st.population * 0.05 * sickShare(st)));
           st.population -= n;
           addMood(st, 'The quarantine', -4, 3);
           return { text: `The sick lanes were closed off. ${n} villagers did not live to see them opened.`, kind: 'bad' };
@@ -372,7 +372,7 @@ export const EVENTS: DecisionEvent[] = [
         label: 'Pray for deliverance',
         detail: 'About one in ten is lost; happiness −6 for a season.',
         apply: (st) => {
-          const n = Math.max(1, Math.round(st.population * 0.1));
+          const n = Math.max(1, Math.round(st.population * 0.1 * sickShare(st)));
           st.population -= n;
           addMood(st, 'The fever', -6, 3);
           return { text: `The bells rang day and night. ${n} villagers were buried before the fever broke.`, kind: 'bad' };
@@ -1404,4 +1404,9 @@ export function autoResolve(s: GameState, rng: StateRng): void {
   }
   const i = e.choices(s).findIndex((c) => !c.blocked?.(s));
   if (i < 0 || !resolveEvent(s, rng, i)) s.pendingEvent = undefined;
+}
+
+/** Share of the usual losses to sickness: an infirmary with its medicine halves them. */
+function sickShare(s: GameState): number {
+  return s.buildings.some((b) => b.type === 'monastery' && b.build >= 1 && b.supplied && b.improved?.includes('infirmary')) ? 0.5 : 1;
 }

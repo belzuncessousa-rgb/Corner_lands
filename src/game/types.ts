@@ -207,6 +207,16 @@ export interface Building {
   builders?: number;
   /** Level a renovation is raising the building to. */
   upgrading?: number;
+  /** An improvement (upgrade or extension, see improve.ts) being built onto a workplace. */
+  improveTo?: string;
+  /** Improvements a workplace has. */
+  improved?: string[];
+  /** A home painted white with limewash (a town option). */
+  limewashed?: boolean;
+  /** Fuel owed from half-fuel batches, paid once it comes to a whole unit. */
+  fuelDebt?: number;
+  /** The day until which a beekeeper's bees are gone (swarmed). */
+  swarmed?: number;
   /** Materials being carried for a renovation (fractional loads). */
   carry?: number;
   /** Renovation progress 0..1 once materials are delivered. */
@@ -425,6 +435,20 @@ export interface GameState {
   madeEver?: Partial<Record<ResourceId, number>>;
   /** Unlocks the town has learned (see unlocks.ts). */
   learned?: string[];
+  /** Goods ever traded through trading posts and docks. */
+  tradedEver?: number;
+  /** Things the town has done, for learning conditions (a church serving ten homes...). */
+  feats?: string[];
+  /** Town options switched on (limewash, dyed tunics...). */
+  options?: string[];
+  /** One-off option costs already paid (banners stay made when taken down). */
+  optionsPaid?: string[];
+  /** Running option costs owed, paid as whole units. */
+  optionUse?: Partial<Record<ResourceId, number>>;
+  /** Churches glazed with stained-glass windows. */
+  glazed?: number;
+  /** No dye this month: the tunics are plain. */
+  tunicsBare?: boolean;
   using?: Partial<Record<ResourceId, number>>;
   /** Whether the university had its books and wood parts this month. */
   universityOk?: boolean;
