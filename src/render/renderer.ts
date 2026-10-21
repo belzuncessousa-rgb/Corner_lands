@@ -1,6 +1,8 @@
 import { BUILDINGS, DAYS_PER_MONTH, DAYS_PER_YEAR, RESOURCE_STORAGE, STORAGE_CAPACITY, type StorageKind } from '../game/data';
 import { MANOR_SIZE, marketStalls, upgradeBlocker } from '../game/levels';
 import { knows } from '../game/unlocks';
+import { optionOn } from '../game/options';
+import { drawImprovements } from './props';
 import { ANIMAL_KINDS, LOW_EFFICIENCY, animalsOf, deliveredTo, hasProblem, herdTotal, lordRides, monthOf, nearestShoal, orchardMaturity, seasonOf, seatOf, storageCap, stored } from '../game/sim';
 import type { Building, BuildingType, GameState, ResourceId, Season } from '../game/types';
 import { idx, inBounds } from '../game/world';
@@ -1152,6 +1154,7 @@ export class Renderer {
     this.blit(sp, wx, wy);
     this.drawDoor(s, b);
     if (b.type === 'house' && b.flowers) this.drawDoorFlowers(b, season);
+    if (b.improved?.length) drawImprovements(c, b, season, this.time);
     if (turning) {
       const [hx, hy] = iso(b.x + 1.0, b.y + 1.42, 34);
       drawSails(c, hx, hy, this.time * 0.9 + b.id, season);
@@ -1184,7 +1187,7 @@ export class Renderer {
     const fest = s.festivalDay && s.day - s.festivalDay.day < DAYS_PER_MONTH ? s.festivalDay.id : null;
     if (fest === 'mayday' && b.type === 'maypole') this.drawMayDance(b);
     if (fest === 'midsummer' && b.type === 'townhall') this.drawBonfire(b);
-    if (b.type === 'townhall' && s.commissions?.includes('tapestry')) this.drawHeraldry(b);
+    if (b.type === 'townhall' && (s.commissions?.includes('tapestry') || optionOn(s, 'banners'))) this.drawHeraldry(b);
     // Lamplight in lived-in homes and the tavern as evening falls.
     if (this.dusk > 0.25 && b.build >= 1 && (b.residents > 0 || (b.type === 'tavern' && b.workers > 0))) this.drawLamplight(s, b);
     if (b.upgrading) this.drawScaffold(b);
@@ -4842,8 +4845,9 @@ function drawFieldPicture(p: Pen, b: Building, crop: string, stage: string, seas
   const rand = (k: number) => fract(Math.sin(b.id * 91.7 + k * 12.9898) * 43758.5453);
   const rowsPerTile = 4;
   const rows = Math.round(b.h * rowsPerTile);
-  const green = crop === 'barley' ? '#7aa83e' : crop === 'flax' ? '#5a8a4a' : '#5e9a34';
-  const gold = crop === 'barley' ? '#e0cc84' : crop === 'flax' ? '#b8a060' : '#d8b44a';
+  // Rye stands blue-green and ripens a dusky grey-gold.
+  const green = crop === 'barley' ? '#7aa83e' : crop === 'flax' ? '#5a8a4a' : crop === 'rye' ? '#6a9a78' : '#5e9a34';
+  const gold = crop === 'barley' ? '#e0cc84' : crop === 'flax' ? '#b8a060' : crop === 'rye' ? '#b8a478' : '#d8b44a';
   const tall: Record<string, number> = { sprout: 2.5, young: 5, tall: 8, full: 11, flower: 11, ripe: 12, stubble: 1.6 };
   const h = tall[stage] ?? 0;
   let k = 0;
@@ -4863,6 +4867,10 @@ function drawFieldPicture(p: Pen, b: Building, crop: string, stage: string, seas
     }
     if (crop === 'vegetables') {
       k = vegetableRow(p, a, z, y, stage, k, rand, r);
+      continue;
+    }
+    if (crop === 'beans') {
+      k = beanRow(p, a, z, y, stage, k, rand);
       continue;
     }
     for (let x = a; x < z; x += 0.055) {
@@ -5004,6 +5012,48 @@ function drawFieldPicture(p: Pen, b: Building, crop: string, stage: string, seas
  * One row of vegetables: cabbages in one row, the feathery tops of turnips
  * and leeks in the next, swelling from shoots to round heads by harvest.
  */
+/** A row of field beans: leafy bushes, white flowers in early summer, dark pods when ripe. */
+function beanRow(p: Pen, a: number, z: number, y: number, stage: string, k: number, rand: (k: number) => number): number {
+  const c = p.ctx;
+  const size: Record<string, number> = { sprout: 1.2, young: 2.2, tall: 3.2, full: 3.8, flower: 3.8, ripe: 3.8, stubble: 0.8 };
+  const r = size[stage] ?? 0;
+  for (let x = a + 0.04; x < z; x += 0.1) {
+    k++;
+    const [sx, sy] = iso(x + (rand(k) - 0.5) * 0.03, y);
+    const rr = r * (0.85 + rand(k + 7) * 0.3);
+    if (stage === 'stubble') {
+      c.fillStyle = '#5a4a30';
+      c.fillRect(sx - 0.5, sy - 1.6, 1, 1.6);
+      continue;
+    }
+    c.strokeStyle = '#4a7a30';
+    c.lineWidth = 0.7;
+    c.beginPath();
+    c.moveTo(sx, sy);
+    c.lineTo(sx, sy - rr * 1.6);
+    c.stroke();
+    c.fillStyle = stage === 'ripe' ? '#7a8a40' : '#4e8a36';
+    for (const [dx, dz] of [
+      [-1.2, 0.8],
+      [1.1, 1.1],
+      [-0.6, 1.5],
+    ]) {
+      c.beginPath();
+      c.ellipse(sx + dx * rr * 0.5, sy - rr * dz, rr * 0.45, rr * 0.3, 0, 0, Math.PI * 2);
+      c.fill();
+    }
+    if (stage === 'full' && rand(k + 3) < 0.6) {
+      c.fillStyle = '#f4f0e6';
+      c.fillRect(sx - 0.6, sy - rr * 1.2, 1.2, 1);
+    }
+    if (stage === 'ripe') {
+      c.fillStyle = '#3a3a24';
+      c.fillRect(sx + 0.6, sy - rr * 1.1, 0.8, 2);
+    }
+  }
+  return k;
+}
+
 function vegetableRow(p: Pen, a: number, z: number, y: number, stage: string, k: number, rand: (k: number) => number, row: number): number {
   const c = p.ctx;
   const size: Record<string, number> = { sprout: 1.2, young: 2, tall: 2.8, full: 3.4, flower: 3.4, ripe: 3.6, stubble: 0.8 };

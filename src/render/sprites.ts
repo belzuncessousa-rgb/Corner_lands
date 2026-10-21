@@ -1,3 +1,4 @@
+import { optionOn } from '../game/options';
 import { drawHorse } from './horse';
 import { mulberry32 } from '../game/rng';
 import { HERALDRY } from './heraldry';
@@ -1170,13 +1171,20 @@ export function variantOf(s: GameState, b: Building): number {
     }
     return fore > side ? 1 : 0;
   }
+  // Stained-glass windows once the town has them put in.
+  if (b.type === 'church') return optionOn(s, 'windows') && (s.glazed ?? 0) > 0 ? 1 : 0;
   if (b.type !== 'house') return 0;
   const trade = b.trade ? HOME_TRADES.indexOf(b.trade) + 1 : 0;
   // Colours, yard, craft and the shape of the house, which the id picks.
   const forms = HOUSE_FORMS[Math.max(1, Math.min(4, b.level))] || 5;
   const form = (((b.id * 2654435761) >>> 0) >>> 7) % forms;
-  return ((b.id * 7 + b.x) % 4) + 4 * Math.max(0, YARD_CODES.indexOf(b.yard ?? null)) + 16 * trade + 128 * form;
+  return ((b.id * 7 + b.x) % 4) + 4 * Math.max(0, YARD_CODES.indexOf(b.yard ?? null)) + 16 * trade + 128 * form + (b.limewashed ? 1024 : 0);
 }
+
+/** Panes of stained glass: ruby, sapphire, gold, emerald. */
+const GLASS = ['#b83a3a', '#3a5ab8', '#d8a83a', '#3a8a5a'];
+/** Limewashed walls. */
+const LIMEWASH = '#fbfaf5';
 
 const STONE_COLORS = new Set([STONE, '#c8c0b0', '#9d9488', '#b0a898', '#b6ae9f', '#9d978c', '#a49c8e', '#c8c2b6', '#9b9284']);
 
@@ -1184,7 +1192,7 @@ const STONE_COLORS = new Set([STONE, '#c8c0b0', '#9d9488', '#b0a898', '#b6ae9f',
 function wallMaterial(color: string): Material | undefined {
   if (STONE_COLORS.has(color)) return 'stone';
   if (color === WOOD) return 'plank';
-  if (color === PLASTER || color === '#e8d4b0' || HOUSE_VARIANTS.some((v) => v.wall === color)) return 'plaster';
+  if (color === PLASTER || color === '#e8d4b0' || color === LIMEWASH || HOUSE_VARIANTS.some((v) => v.wall === color)) return 'plaster';
   return undefined;
 }
 
@@ -2601,10 +2609,10 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
         p.box(0.75, 1.15, 2.25, 3.55, 0, 3, STONE);
         p.box(0.78, 1.18, 2.22, 3.52, 3, 19, WOOD);
         for (const y of [1.5, 2.1, 2.7, 3.25]) p.line([2.22, y, 3], [2.22, y, 22], '#5a3a22', 1.4);
-        for (const y of [1.7, 2.3, 2.9]) {
+        [1.7, 2.3, 2.9].forEach((y, k) => {
           p.wallR(2.222, y, y + 0.14, 9, 17, '#2e2a38');
-          p.wallR(2.223, y + 0.02, y + 0.12, 10, 16, season === 3 ? '#e8b850' : '#6a7a9a');
-        }
+          p.wallR(2.223, y + 0.02, y + 0.12, 10, 16, season === 3 ? '#e8b850' : variant ? GLASS[k % GLASS.length] : '#6a7a9a');
+        });
         p.roofY(0.78, 1.18, 2.22, 3.52, 22, 30, 'shingle', WOOD, 0.12);
         // A carved cross on the gable and a gabled porch at the door.
         p.line([1.5, 3.525, 34], [1.5, 3.525, 44], '#5a3a22', 1.4);
@@ -2628,11 +2636,13 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       // Nave.
       p.box(0.6, 1.2, 2.4, 3.65, 0, 32, '#b6ae9f');
       // Buttresses and tall windows.
-      for (const y of [1.6, 2.2, 2.8, 3.4]) {
+      [1.6, 2.2, 2.8, 3.4].forEach((y, k) => {
         p.box(2.4, y - 0.05, 2.5, y + 0.05, 0, 20, '#a49c8e');
         p.wallR(2.402, y + 0.12, y + 0.26, 10, 26, '#3a3a52');
-        p.wallR(2.403, y + 0.14, y + 0.24, 11, 25, season === 3 ? '#e8b850' : '#5a6a9a');
-      }
+        p.wallR(2.403, y + 0.14, y + 0.24, 11, 25, season === 3 ? '#e8b850' : variant ? GLASS[k % GLASS.length] : '#5a6a9a');
+        // Stained glass: leading across the panes.
+        if (variant && season !== 3) p.line([2.404, y + 0.14, 18], [2.404, y + 0.24, 18], '#2a2a3a', 0.6);
+      });
       // Front gable with door and rose window.
       p.roofY(0.6, 1.2, 2.4, 3.65, 32, 26, 'slate', '#b6ae9f', 0.1);
       p.wallL(3.652, 1.3, 1.7, 0, 18, '#4a2f1b');
@@ -2646,6 +2656,20 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       p.ctx.beginPath();
       p.ctx.arc(rx, ry, 3.5, 0, Math.PI * 2);
       p.ctx.fill();
+      if (variant && season !== 3) {
+        // A rose of coloured petals.
+        for (let k = 0; k < 6; k++) {
+          p.ctx.fillStyle = GLASS[k % GLASS.length];
+          p.ctx.beginPath();
+          p.ctx.moveTo(rx, ry);
+          p.ctx.arc(rx, ry, 3.5, (k * Math.PI) / 3, ((k + 1) * Math.PI) / 3);
+          p.ctx.fill();
+        }
+        p.ctx.fillStyle = '#e8c860';
+        p.ctx.beginPath();
+        p.ctx.arc(rx, ry, 1.1, 0, Math.PI * 2);
+        p.ctx.fill();
+      }
       break;
     }
     case 'monastery': {
@@ -4568,11 +4592,13 @@ export const HOUSE_FORMS = [0, 5, 5, 3, 3];
 
 /** Splits a house variant: colours, yard extension, home craft and shape. */
 function homeParts(variant: number) {
+  const hv = HOUSE_VARIANTS[variant % HOUSE_VARIANTS.length];
   return {
-    hv: HOUSE_VARIANTS[variant % HOUSE_VARIANTS.length],
+    // Limewashed homes are white whatever their colour was.
+    hv: variant >= 1024 ? { ...hv, wall: LIMEWASH } : hv,
     yard: YARD_CODES[Math.floor(variant / HOUSE_VARIANTS.length) % YARD_CODES.length] ?? null,
     trade: HOME_TRADES[(Math.floor(variant / 16) % 8) - 1] ?? null,
-    form: Math.floor(variant / 128),
+    form: Math.floor(variant / 128) % 8,
   };
 }
 
@@ -5402,8 +5428,53 @@ export function stallSprite(kind: number, season: Season, open: boolean): Sprite
   });
 }
 
+/** A strawberry bed: low leafy plants on straw, white flowers in spring and red berries in summer. */
+function strawberrySprite(season: Season, stage: number, fruiting: boolean, blossom: boolean): Sprite {
+  return makeSprite(56, 28, 28, 16, (ctx) => {
+    const winter = season === 3;
+    // Two ridges of straw down the bed.
+    for (const dy of [-3, 3]) {
+      ctx.fillStyle = winter ? '#e4e8ea' : '#d8c084';
+      ctx.beginPath();
+      ctx.ellipse(0, dy, 20, 3.2, -0.46, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (winter) return;
+    const rand = mulberry32(11);
+    const k = 0.5 + 0.5 * stage;
+    for (let i = 0; i < 9; i++) {
+      const t = i / 8 - 0.5;
+      const row = i % 2 ? 3 : -3;
+      const x = t * 34 + (rand() - 0.5) * 2;
+      const y = row - t * 15;
+      for (const [dx, dy] of [
+        [-1.6, -0.6],
+        [1.6, -0.8],
+        [0, -2],
+      ]) {
+        ctx.fillStyle = rand() < 0.5 ? '#4e8a36' : '#5e9a3e';
+        ctx.beginPath();
+        ctx.ellipse(x + dx * k, y + dy * k - 1, 2 * k, 1.4 * k, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      if (blossom || (stage >= 1 && !fruiting && season === 0)) {
+        ctx.fillStyle = '#f8f4ea';
+        ctx.fillRect(x - 0.6, y - 4 * k, 1.3, 1.3);
+      }
+      if (fruiting) {
+        ctx.fillStyle = '#d8323a';
+        ctx.beginPath();
+        ctx.arc(x + 1.4, y - 0.4, 1.1, 0, Math.PI * 2);
+        ctx.arc(x - 1.2, y + 0.2, 1, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  });
+}
+
 export function fruitTreeSprite(fruit: string, season: Season, stage: number, fruiting: boolean, blossom = false): Sprite {
   if (fruit === 'grapes') return vineSprite(season, stage, fruiting);
+  if (fruit === 'strawberries') return strawberrySprite(season, stage, fruiting, blossom);
   return makeSprite(36, 48, 18, 42, (ctx) => {
     const k = 0.45 + 0.55 * stage;
     const trunkH = 9 * k;
