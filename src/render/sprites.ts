@@ -1223,17 +1223,39 @@ function drawGothicChurch(p: Pen, season: Season, glazed: number): void {
   const ST = '#ddd4c0';
   const ST2 = '#cfc5ae';
   const pane = (k: number) => (winter ? '#e8b850' : glazed ? GLASS[k % GLASS.length] : '#5a6a9a');
+  // A tower with its spire and pinnacles, its front face at y0 + 0.62.
+  const tower = (x0: number, y0: number) => {
+    const x1 = x0 + 0.5;
+    const y1 = y0 + 0.62;
+    p.box(x0, y0, x1, y1, 0, 70, ST, undefined, 'stone');
+    p.wallL(y1 + 0.002, x0 + 0.15, x0 + 0.35, 50, 64, '#2a2522');
+    p.wallR(x1 + 0.002, y0 + 0.2, y0 + 0.42, 50, 64, '#221e1b');
+    p.wallL(y1 + 0.002, x0 + 0.18, x0 + 0.32, 20, 34, '#2e2e40');
+    p.wallL(y1 + 0.003, x0 + 0.2, x0 + 0.3, 21, 33, pane(x0 > 1 ? 2 : 3));
+    p.roofPyramid(x0, y0, x1, y1, 70, 44, 'slate', 0.03);
+    for (const [px, py] of [
+      [x0 + 0.03, y1 - 0.03],
+      [x1 - 0.03, y1 - 0.03],
+      [x1 - 0.03, y0 + 0.03],
+    ])
+      p.poly([[px - 0.04, py, 70], [px + 0.04, py, 70], [px, py, 82]], ST, '#9a927f', 0.5);
+    const cy = (y0 + y1) / 2;
+    p.line([(x0 + x1) / 2, cy, 114], [(x0 + x1) / 2, cy, 124], '#d8b84a', 1.4);
+    p.line([(x0 + x1) / 2 - 0.05, cy + 0.05, 120], [(x0 + x1) / 2 + 0.05, cy - 0.05, 120], '#d8b84a', 1.4);
+  };
   // Shadows fall away from the light, to the right of each part, never out in front of a wall.
   castShadows(p, [
     [1.05, 0.3, 1.95, 0.7, 0.3],
     [0.45, 0.75, 2.55, 3.3, 0.35],
     [0.8, 0.7, 2.2, 3.35, 0.45],
-    [0.3, 3.0, 0.8, 3.62, 0.55],
+    [0.3, 2.45, 0.8, 3.07, 0.5],
     [2.2, 3.0, 2.7, 3.62, 0.55],
   ]);
   // A small apse at the east end.
   p.box(1.05, 0.3, 1.95, 0.7, 0, 30, ST2, undefined, 'stone');
   p.roofPyramid(1.05, 0.3, 1.95, 0.7, 30, 12, 'slate', 0.04);
+  // The left tower stands back, behind the front of the church, which hides its foot.
+  tower(0.3, 2.45);
   // The aisles: low, with lean-to roofs against the nave.
   p.box(0.45, 0.75, 2.55, 3.3, 0, 20, ST2, undefined, 'stone');
   p.poly([[2.55, 0.75, 20], [2.55, 3.3, 20], [2.2, 3.3, 27], [2.2, 0.75, 27]], '#5d6670', '#3a4048', 0.6);
@@ -1285,24 +1307,7 @@ function drawGothicChurch(p: Pen, season: Season, glazed: number): void {
   p.wallL(3.356, 1.36, 1.64, 0, 18, '#4a2f1b');
   p.line([1.5, 3.358, 0], [1.5, 3.358, 18], '#2e1d10', 0.8);
   p.poly([[1.26, 3.36, 22], [1.74, 3.36, 22], [1.5, 3.36, 31]], ST2, '#9a927f', 0.6);
-  // The twin towers with their spires and pinnacles.
-  for (const x0 of [0.3, 2.2]) {
-    const x1 = x0 + 0.5;
-    p.box(x0, 3.0, x1, 3.62, 0, 70, ST, undefined, 'stone');
-    p.wallL(3.622, x0 + 0.15, x0 + 0.35, 50, 64, '#2a2522');
-    p.wallR(x1 + 0.002, 3.2, 3.42, 50, 64, '#221e1b');
-    p.wallL(3.622, x0 + 0.18, x0 + 0.32, 20, 34, '#2e2e40');
-    p.wallL(3.623, x0 + 0.2, x0 + 0.3, 21, 33, pane(x0 > 1 ? 2 : 3));
-    p.roofPyramid(x0, 3.0, x1, 3.62, 70, 44, 'slate', 0.03);
-    for (const [px, py] of [
-      [x0 + 0.03, 3.59],
-      [x1 - 0.03, 3.59],
-      [x1 - 0.03, 3.03],
-    ])
-      p.poly([[px - 0.04, py, 70], [px + 0.04, py, 70], [px, py, 82]], ST, '#9a927f', 0.5);
-    p.line([(x0 + x1) / 2, 3.31, 114], [(x0 + x1) / 2, 3.31, 124], '#d8b84a', 1.4);
-    p.line([(x0 + x1) / 2 - 0.05, 3.36, 120], [(x0 + x1) / 2 + 0.05, 3.26, 120], '#d8b84a', 1.4);
-  }
+  tower(2.2, 3.0);
 }
 
 /**
@@ -6752,7 +6757,7 @@ function drawPalace(p: Pen, season: Season, smoke: V3[]): void {
     [0.3, 0.45, 1.3, 2.95, 0.3],
     [1.3, 0.6, 2.7, 2.6, 0.4],
     [2.7, 0.45, 3.7, 2.95, 0.35],
-    [0.22, 2.45, 0.92, 3.15, 0.45],
+    [0.22, 1.75, 0.92, 2.45, 0.45],
     [3.08, 2.45, 3.78, 3.15, 0.45],
     [1.5, 2.6, 2.5, 2.95, 0.15],
   ]);
@@ -6761,6 +6766,17 @@ function drawPalace(p: Pen, season: Season, smoke: V3[]): void {
   p.ellipse(2.0, 3.45, 1, 13, 6.5, '#a8a093');
   p.ellipse(2.0, 3.45, 2, 11, 5.4, winter ? '#dde8ee' : '#5a8ab0');
   p.line([2.0, 3.45, 2], [2.0, 3.45, 9], '#bab3a6', 1.6);
+  // A corner pavilion a storey higher than the wings, under a tall roof.
+  const pavilion = (x0: number, y0: number, h: number) => {
+    const y1 = y0 + 0.7;
+    p.box(x0, y0, x0 + 0.7, y1, 0, h, ST, undefined, 'stone');
+    for (let z = 6; z < h - 8; z += 16) p.windowL(y1, x0 + 0.27, z, 0.15, 9);
+    for (let z = 22; z < h - 8; z += 16) p.windowR(x0 + 0.7, y0 + 0.27, z, 0.14, 9);
+    p.roofPyramid(x0, y0, x0 + 0.7, y1, h, 26, ROOFC, 0.05);
+    p.line([x0 + 0.35, y0 + 0.35, h + 26], [x0 + 0.35, y0 + 0.35, h + 34], '#d8b84a', 1.2);
+  };
+  // The left pavilion stands back, behind the front of the palace, which hides its foot.
+  pavilion(0.22, 1.75, 70);
   // Left wing, ridge front to back.
   p.box(0.3, 0.45, 1.3, 2.95, 0, 36, ST, undefined, 'stone');
   for (const z of [5, 19]) p.windowL(2.95, 0.55, z, 0.16, 9, winter && z === 5);
@@ -6786,14 +6802,7 @@ function drawPalace(p: Pen, season: Season, smoke: V3[]): void {
   for (const z of [5, 19]) p.windowL(2.95, 3.25, z, 0.16, 9);
   p.roofY(2.7, 0.45, 3.7, 2.95, 36, 22, ROOFC, ST, 0.08);
   smoke.push(p.chimney(3.2, 0.8, 52, 12, '#a8a093'));
-  // Corner pavilions at the front of each wing, a storey higher, under tall roofs.
-  for (const x0 of [0.22, 3.08]) {
-    p.box(x0, 2.45, x0 + 0.7, 3.15, 0, 50, ST, undefined, 'stone');
-    for (const z of [6, 22, 38]) p.windowL(3.15, x0 + 0.27, z, 0.15, 9);
-    p.windowR(x0 + 0.7, 2.72, 22, 0.14, 9);
-    p.roofPyramid(x0, 2.45, x0 + 0.7, 3.15, 50, 26, ROOFC, 0.05);
-    p.line([x0 + 0.35, 2.8, 76], [x0 + 0.35, 2.8, 84], '#d8b84a', 1.2);
-  }
+  pavilion(3.08, 2.45, 50);
   // The door and the hangings in the lord's colours, on the wall behind the portico.
   p.wallL(2.602, 1.86, 2.14, 2.5, 18, '#4a2f1b');
   p.wallL(2.604, 1.62, 1.7, 14, 26, arms.field);

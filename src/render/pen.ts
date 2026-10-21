@@ -117,13 +117,14 @@ export class Pen {
   }
 
   /** Soft ground shadow under a footprint. */
+  /** A shadow cast to the right, away from the light: never out in front of the walls, so they meet the ground. */
   shadow(x0: number, y0: number, x1: number, y1: number, grow = 0.12): void {
     this.poly(
       [
-        [x0 - grow * 0.3, y0 - grow * 0.3, 0],
-        [x1 + grow * 1.6, y0 - grow * 0.3, 0],
-        [x1 + grow * 1.6, y1 + grow * 1.6, 0],
-        [x0 - grow * 0.3, y1 + grow * 1.6, 0],
+        [x0, y0, 0],
+        [x1 + grow * 2.5, y0, 0],
+        [x1 + grow * 2.5, y1, 0],
+        [x0, y1, 0],
       ],
       'rgba(30,30,10,0.22)',
     );
