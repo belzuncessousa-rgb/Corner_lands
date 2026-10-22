@@ -5,11 +5,11 @@ import { RESOURCE_IDS } from './types';
 export const DAY_SECONDS = 22.5;
 
 /** Walking speed in tiles per game day: paved roads, dirt roads, open country. */
-export const STONE_ROAD_TILES_PER_DAY = 30;
+export const STONE_ROAD_TILES_PER_DAY = 60;
 /** Cobbled streets of dressed stone are the quickest going of all. */
-export const COBBLE_TILES_PER_DAY = 36;
-export const ROAD_TILES_PER_DAY = 22;
-export const OFFROAD_TILES_PER_DAY = 12;
+export const COBBLE_TILES_PER_DAY = 72;
+export const ROAD_TILES_PER_DAY = 44;
+export const OFFROAD_TILES_PER_DAY = 24;
 /**
  * How far gatherers go for what they gather: there is no fixed area, only
  * the walk, which costs them working time. Beyond this they will not go.

@@ -60,8 +60,8 @@ export class Heap {
   }
 }
 
-/** Woods slow walkers off the road by this much more. */
-export const WOODS_SLOWDOWN = 1.4;
+/** Woods slow walkers off the road by this much more: a little, not so much that gathering in them stops paying. */
+export const WOODS_SLOWDOWN = 1.15;
 
 /**
  * Time to cross a tile, in dirt-road tiles: what walkers take, what the

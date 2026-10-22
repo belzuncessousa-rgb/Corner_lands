@@ -9,6 +9,7 @@ import { idx, inBounds } from '../game/world';
 import { type Agent, LEISURE_ACTS } from './agents';
 import { ICONS } from '../ui/icons';
 import type { Animal } from './wildlife';
+import { LENS_COLORS, type LensData, type LensKind, lensCount } from './lens';
 import { drawHorse, drawOx } from './horse';
 import { Pen, TH, TW, iso, mix, shade, type RoofKind, type V3 } from './pen';
 import { mulberry32 } from '../game/rng';
@@ -70,6 +71,10 @@ export interface Overlay {
   coverage?: { circles: { cx: number; cy: number; r: number }[]; homes: Map<number, boolean> };
   /** A farm or field is being placed: tint the land by how fertile it is. */
   fertility?: boolean;
+  /** The resource lens: the map greyed, with what gatherers gather lit up and counted. */
+  lens?: LensData;
+  /** The selected building's people: curved lines from it to each of them, and how many are indoors. */
+  crew?: { cx: number; cy: number; h: number; to: { x: number; y: number }[]; inside: number };
 }
 
 interface Particle {
@@ -508,6 +513,7 @@ export class Renderer {
       if (season === 1) this.drawFireflies(s, visible);
     }
     if (ov.ghost) this.drawGhost(s, ov.ghost, season);
+    if (ov.crew && !ov.lens) this.drawCrew(ov.crew);
 
     this.mark('objects');
     // ---- particles (chimney smoke)
@@ -526,7 +532,207 @@ export class Renderer {
     else this.snow = [];
     this.drawAtmosphere(season, s.day);
     this.drawNightLights();
+    if (ov.lens) this.drawLens(s, ov.lens);
     this.mark('effects');
+  }
+
+  /**
+   * Curved lines from a building to each of its workers or builders, with
+   * the ants marching along them toward the people, and a ring at each.
+   */
+  private drawCrew(crew: NonNullable<Overlay['crew']>): void {
+    const c = this.ctx;
+    const z = this.cam.zoom;
+    const [bx, by] = iso(crew.cx, crew.cy, crew.h);
+    c.save();
+    c.lineCap = 'round';
+    for (const t of crew.to) {
+      const [ax, ay] = iso(t.x, t.y, 9);
+      const dist = Math.hypot(ax - bx, ay - by);
+      if (dist < 4) continue;
+      // The curve bows upward, more for longer lines, like a thrown rope.
+      const mx = (ax + bx) / 2;
+      const my = (ay + by) / 2 - Math.min(90, 14 + dist * 0.28);
+      c.setLineDash([]);
+      c.strokeStyle = 'rgba(30,20,10,0.45)';
+      c.lineWidth = 4 / z;
+      c.beginPath();
+      c.moveTo(bx, by);
+      c.quadraticCurveTo(mx, my, ax, ay);
+      c.stroke();
+      c.setLineDash([7 / z, 5 / z]);
+      c.lineDashOffset = -this.time * (24 / z);
+      c.strokeStyle = '#f2d878';
+      c.lineWidth = 2 / z;
+      c.beginPath();
+      c.moveTo(bx, by);
+      c.quadraticCurveTo(mx, my, ax, ay);
+      c.stroke();
+      // A ring round the villager's feet.
+      const [fx, fy] = iso(t.x, t.y);
+      c.setLineDash([]);
+      c.strokeStyle = '#f2d878';
+      c.lineWidth = 1.6 / z;
+      c.beginPath();
+      c.ellipse(fx, fy, 7, 3.5, 0, 0, Math.PI * 2);
+      c.stroke();
+    }
+    // Where the lines start: a knot over the building.
+    c.setLineDash([]);
+    c.fillStyle = '#f2d878';
+    c.strokeStyle = 'rgba(30,20,10,0.6)';
+    c.lineWidth = 1.2 / z;
+    c.beginPath();
+    c.arc(bx, by, 3.2 / Math.min(1, z), 0, Math.PI * 2);
+    c.fill();
+    c.stroke();
+    if (crew.inside > 0) {
+      const label = `${crew.inside} inside`;
+      c.font = `bold ${11 / z}px Georgia, serif`;
+      c.textAlign = 'center';
+      c.textBaseline = 'bottom';
+      c.lineWidth = 3 / z;
+      c.strokeStyle = 'rgba(30,20,10,0.75)';
+      c.strokeText(label, bx, by - 6 / Math.min(1, z));
+      c.fillStyle = '#f8ecc8';
+      c.fillText(label, bx, by - 6 / Math.min(1, z));
+    }
+    c.restore();
+  }
+
+  /**
+   * The resource lens: the whole picture loses its colour and darkens a
+   * little, then each tile with something to gather glows in its own colour
+   * (over the trees that hide it), and each patch gets a ball with its icon
+   * and about how much is there.
+   */
+  private drawLens(s: GameState, lens: LensData): void {
+    const c = this.ctx;
+    const z = this.cam.zoom;
+    c.save();
+    c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    c.globalCompositeOperation = 'saturation';
+    c.fillStyle = '#808080';
+    c.globalAlpha = 0.92;
+    c.fillRect(0, 0, this.width, this.height);
+    c.globalCompositeOperation = 'source-over';
+    c.globalAlpha = 1;
+    c.fillStyle = 'rgba(18,20,28,0.3)';
+    c.fillRect(0, 0, this.width, this.height);
+    // The tiles themselves, in world space.
+    c.setTransform(this.dpr * z, 0, 0, this.dpr * z, this.dpr * (this.width / 2 - this.cam.x * z), this.dpr * (this.height / 2 - this.cam.y * z));
+    const [vx0, vy0] = this.screenToWorld(-40, -40);
+    const [vx1, vy1] = this.screenToWorld(this.width + 40, this.height + 40);
+    const pulse = 0.75 + 0.25 * Math.sin(this.time * 2.5);
+    for (const kind in lens.tiles) {
+      const list = lens.tiles[kind as LensKind]!;
+      if (!list.length) continue;
+      c.fillStyle = LENS_COLORS[kind as LensKind];
+      c.globalAlpha = 0.28 * pulse;
+      c.beginPath();
+      for (const i of list) {
+        const [a, b] = iso(i % s.width, (i / s.width) | 0);
+        if (a < vx0 || a > vx1 || b < vy0 || b > vy1) continue;
+        c.moveTo(a, b);
+        c.lineTo(a + TW / 2, b + TH / 2);
+        c.lineTo(a, b + TH);
+        c.lineTo(a - TW / 2, b + TH / 2);
+        c.closePath();
+      }
+      c.fill();
+      c.globalAlpha = 0.95;
+      c.beginPath();
+      for (const i of list) {
+        const [a, b] = iso((i % s.width) + 0.5, ((i / s.width) | 0) + 0.5);
+        if (a < vx0 || a > vx1 || b < vy0 || b > vy1) continue;
+        c.moveTo(a + 3.2, b);
+        c.arc(a, b, 3.2, 0, Math.PI * 2);
+      }
+      c.fill();
+    }
+    c.globalAlpha = 1;
+    for (const r of lens.rings) {
+      const [a, b] = iso(r.x, r.y);
+      c.strokeStyle = LENS_COLORS[r.kind];
+      c.lineWidth = 2;
+      c.setLineDash([5, 4]);
+      c.beginPath();
+      c.ellipse(a, b, r.r * TW * 0.5, r.r * TH * 0.5, 0, 0, Math.PI * 2);
+      c.stroke();
+    }
+    c.setLineDash([]);
+    // The balls, in screen space so they keep their size; near ones of a kind merge when zoomed out.
+    c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    const R = 13;
+    const drawn: { x: number; y: number; kind: LensKind; n: number; varies: boolean }[] = [];
+    for (const g of lens.groups) {
+      const [x, y] = this.tileToScreen(g.x, g.y, 14);
+      if (x < -30 || y < -30 || x > this.width + 30 || y > this.height + 30) continue;
+      const same = drawn.find((d) => d.kind === g.kind && Math.hypot(d.x - x, d.y - y) < R * 2.6);
+      if (same) {
+        same.n += g.n;
+        continue;
+      }
+      drawn.push({ x, y, kind: g.kind, n: g.n, varies: g.varies });
+    }
+    // Different kinds on the same spot step aside.
+    for (let i = 0; i < drawn.length; i++)
+      for (let j = 0; j < i; j++) {
+        const dx = drawn[i].x - drawn[j].x;
+        const dy = drawn[i].y - drawn[j].y;
+        if (Math.hypot(dx, dy) < R * 2.2) drawn[i].x = drawn[j].x + R * 2.4;
+      }
+    c.font = 'bold 11px Georgia, serif';
+    c.textBaseline = 'middle';
+    c.textAlign = 'center';
+    for (const d of drawn) {
+      const color = LENS_COLORS[d.kind];
+      c.fillStyle = 'rgba(0,0,0,0.4)';
+      c.beginPath();
+      c.arc(d.x + 1.5, d.y + 2, R, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = '#fff6e0';
+      c.beginPath();
+      c.arc(d.x, d.y, R, 0, Math.PI * 2);
+      c.fill();
+      c.strokeStyle = color;
+      c.lineWidth = 2.5;
+      c.stroke();
+      this.drawLensIcon(d.kind, d.x, d.y);
+      // The count, on a tab under the ball.
+      const label = lensCount({ kind: d.kind, x: 0, y: 0, n: d.n, varies: d.varies });
+      const w = Math.max(18, c.measureText(label).width + 10);
+      c.fillStyle = d.n < 1 ? '#6a6458' : '#3a2a18';
+      c.beginPath();
+      c.roundRect(d.x - w / 2, d.y + R - 3, w, 15, 7);
+      c.fill();
+      c.fillStyle = '#fff6e0';
+      c.fillText(label, d.x, d.y + R + 4.5);
+    }
+    c.restore();
+  }
+
+  /** The picture inside a lens ball: the good's own icon, or a little mushroom. */
+  private drawLensIcon(kind: LensKind, x: number, y: number): void {
+    const c = this.ctx;
+    if (kind === 'mushrooms') {
+      c.fillStyle = '#f2ead8';
+      c.fillRect(x - 1.6, y - 1, 3.2, 6);
+      c.fillStyle = '#c8402a';
+      c.beginPath();
+      c.ellipse(x, y - 1.5, 6.5, 4.6, 0, Math.PI, 0);
+      c.closePath();
+      c.fill();
+      c.fillStyle = '#fff';
+      c.beginPath();
+      c.arc(x - 2.5, y - 3.2, 0.9, 0, Math.PI * 2);
+      c.arc(x + 1.8, y - 4, 0.9, 0, Math.PI * 2);
+      c.fill();
+      return;
+    }
+    const id: ResourceId = kind === 'game' ? 'meat' : kind;
+    const icon = goodIcon(id);
+    if (icon) c.drawImage(icon, x - 8, y - 8, 16, 16);
   }
 
   // ---------------------------------------------------------------- ground helpers

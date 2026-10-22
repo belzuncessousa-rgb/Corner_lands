@@ -361,7 +361,7 @@ export class AgentSystem {
         // Screen-space facing: +1 right, -1 left.
         if (Math.abs(dx - dy) > 0.01) a.dir = dx - dy > 0 ? 1 : -1;
       }
-      a.step += dt * 6;
+      a.step += dt * 11;
       if (!a.path.length) this.arrive(s, a);
       return;
     }

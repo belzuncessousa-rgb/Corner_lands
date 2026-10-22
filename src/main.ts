@@ -63,6 +63,7 @@ import { grantCharter } from './game/charters';
 import { penShoal, reachOf } from './game/levels';
 import { Wildlife } from './render/wildlife';
 import { type Overlay, Renderer } from './render/renderer';
+import { type LensData, lensData } from './render/lens';
 import { Tutor } from './ui/tutorial';
 import { installWood } from './ui/wood';
 import { installIconPaint } from './ui/icons';
@@ -122,6 +123,20 @@ export class Game {
   private longPress = 0;
   /** Which service's reach the map is showing (V cycles), if any. */
   coverage: BuildingType | null = null;
+  /** The lens the map is seen through: as it is, or greyed with its resources lit up (L). */
+  lens: 'normal' | 'resources' = 'normal';
+  private lensCache: { data: LensData; at: number } | null = null;
+
+  /** Switches between the lenses: the land as it is, and its resources. */
+  setLens(lens: 'normal' | 'resources'): void {
+    this.lens = lens;
+    this.lensCache = null;
+    if (lens !== 'normal' && this.coverage) {
+      this.coverage = null;
+      this.hud.showCoverage(null);
+    }
+    this.hud.update();
+  }
 
   /** Demolishes a building (from the tool or the inspector). There is no taking it back. */
   demolishBuilding(b: Building): boolean {
@@ -140,6 +155,7 @@ export class Game {
   cycleCoverage(): void {
     const order: (BuildingType | null)[] = [...COVERAGE_TYPES, null];
     this.coverage = order[(order.indexOf(this.coverage) + 1) % order.length];
+    if (this.coverage && this.lens !== 'normal') this.setLens('normal');
     this.hud.showCoverage(this.coverage);
   }
 
@@ -418,6 +434,12 @@ export class Game {
     const ov: Overlay = {};
     const s = this.state;
     if (this.selectedAgent) ov.agent = this.selectedAgent;
+    if (this.lens === 'resources') {
+      // Berries ripen and herds move: look again every second or so.
+      const now = performance.now();
+      if (!this.lensCache || now - this.lensCache.at > 1000) this.lensCache = { data: lensData(s), at: now };
+      ov.lens = this.lensCache.data;
+    }
     if (this.coverage) {
       const type = this.coverage;
       // The same buildings coveredBy counts: staffed ones, and a cathedral for the church.
@@ -440,6 +462,7 @@ export class Game {
           const c = bCenter(b);
           ov.range = { cx: c.x, cy: c.y, r: reachOf(b), highlight: rangeHighlighter(s, b.type) };
         }
+        ov.crew = this.crewOf(b);
       } else {
         this.selected = null;
       }
@@ -621,10 +644,28 @@ export class Game {
       );
     } else if (this.coverage) {
       this.hud.showCoverage(this.coverage);
+    } else if (this.lens === 'resources') {
+      this.hud.setHint('Resource lens: rock, bog ore, berries, mushrooms, game and fish, and about how much of each · L or Esc to go back', false);
     } else {
       this.hud.setHint('', false);
     }
     return ov;
+  }
+
+  /** Lines from a building to the people working there or building it, wherever they are now. */
+  private crewOf(b: Building): Overlay['crew'] {
+    const to: { x: number; y: number }[] = [];
+    let inside = 0;
+    for (const a of this.agents.agents) {
+      const r = a.role;
+      if ((r.kind !== 'work' && r.kind !== 'build' && r.kind !== 'beast') || r.id !== b.id) continue;
+      if (a.visible) to.push({ x: a.x, y: a.y });
+      else inside++;
+    }
+    if (!to.length && !inside) return undefined;
+    const c = bCenter(b);
+    const d = BUILDINGS[b.type];
+    return { cx: c.x, cy: c.y, h: d.zone ? 4 : 18 + Math.min(d.w, d.h) * 7, to, inside };
   }
 
   private buildHint(type: BuildingType, x: number, y: number, err: string | null): string {
@@ -1078,6 +1119,10 @@ export class Game {
           this.hud.showCoverage(null);
           return;
         }
+        if (this.lens !== 'normal') {
+          this.setLens('normal');
+          return;
+        }
         if (this.tool.kind === 'road' && this.roadAnchor) this.roadAnchor = null;
         else if ((this.tool.kind === 'zone' || this.tool.kind === 'grove') && this.zoneAnchor) this.zoneAnchor = null;
         else if (this.tool.kind !== 'select') this.setTool({ kind: 'select' });
@@ -1102,6 +1147,8 @@ export class Game {
         this.setTool({ kind: 'road', royal: true });
       } else if (k === 'v') {
         this.cycleCoverage();
+      } else if (k === 'l') {
+        this.setLens(this.lens === 'normal' ? 'resources' : 'normal');
       } else if (k === 'u') {
         this.setPhoto(!this.photo);
       } else if (k === 'x' || k === 'delete') {

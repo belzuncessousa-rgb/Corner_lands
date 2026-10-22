@@ -1126,6 +1126,16 @@ button.active {
   width: 22px;
   height: 22px;
 }
+/* The lens switch: the land as it is, or its resources; the one in use is pressed in. */
+#lens-switch {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+}
+#lens-switch .icon-btn {
+  width: 32px;
+  height: 32px;
+}
 #top #topbar {
   opacity: 0.94;
   flex-wrap: nowrap;
@@ -1930,6 +1940,22 @@ table.prod td.num {
   white-space: nowrap;
 }
 
+/* Too narrow for the buttons, the top bar and the clock side by side: the top bar gets its own row. */
+@media (max-width: 1260px) {
+  #top {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  #top #topbar {
+    order: 3;
+    flex: 0 0 auto;
+    margin: 0 auto;
+  }
+  #top .stack.right {
+    margin-left: auto;
+  }
+}
+
 /* ------------------------------------------------------------ phones */
 
 @media (max-width: 700px) {
@@ -1956,6 +1982,10 @@ table.prod td.num {
   #top .icon-btn svg {
     width: 18px;
     height: 18px;
+  }
+  #top #lens-switch .icon-btn {
+    width: 30px;
+    height: 30px;
   }
   #topbar .chip .delta,
   #topbar .sep {

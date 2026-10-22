@@ -2,6 +2,7 @@ import type { Game } from '../main';
 import { bCenter } from '../game/sim';
 import type { GameState } from '../game/types';
 import { readyCount } from './learning';
+import type { HelpPage } from './fingahelp';
 
 /**
  * The tutorial: Fingamoboblius, an old steward with a beard, walks about the
@@ -56,6 +57,14 @@ function landSpot(g: Game, x: number, y: number, r = 46): Spot {
   return { x: sx - r, y: sy - r * 0.8, w: r * 2, h: r * 1.6, round: true };
 }
 
+/** The selected building, lit up on the map. */
+function selectedSpot(g: Game): Spot | null {
+  const b = g.state.buildings.find((o) => o.id === g.selected);
+  if (!b) return null;
+  const c = bCenter(b);
+  return landSpot(g, c.x, c.y, 30 + Math.max(b.w, b.h) * 12);
+}
+
 /** Where the guide is panning the view to (tiles); the view glides there. */
 let camGoal: { x: number; y: number } | null = null;
 
@@ -107,6 +116,10 @@ const START: Step[] = [
   {
     say: 'In the corner: the game menu, your portrait (dress yourself and design your arms there), the chronicle of all that happens, the production book, the town charters, and the reach of your wells and markets.',
     show: '#top .btnrow',
+  },
+  {
+    say: 'And this little switch changes how you see the land. The glass greys it out and lights up what can be gathered: rock, bog ore, berries and mushrooms hiding under the trees, game and fish, with about how much of each. Handy, before you build a lodge!',
+    show: '#lens-switch',
   },
   {
     say: 'Below them, your rank and what you need to grow to the next one. A hamlet becomes a village, then a town, and so on.',
@@ -484,23 +497,49 @@ export class Tutor {
     return this.active && !this.help;
   }
 
-  /** A panel he has been asked to explain, and its key. */
+  /** A panel he has been asked to explain: its pages, the one he is on, and its key. */
   private help: Step | null = null;
+  private helpSteps: Step[] = [];
+  private helpAt = 0;
   private helpKey = '';
+  /** The speed to go back to once he has done explaining (he stops time while he talks). */
+  private helpSpeed: number | null = null;
 
   /**
-   * Asked (by the little portrait on a panel) to explain it: he pops up beside
-   * the panel, says his piece, and goes when clicked.
+   * Asked (by the little portrait on a panel) to explain it: he pops up and
+   * walks the player round the panel a page at a time, lighting up each part
+   * as he talks about it, with the rest of the screen greyed and time stopped.
+   * Pages about something not on screen just now are left out.
    */
-  explain(key: string, text: string, show?: string): void {
-    this.help = { say: text, show };
+  explain(key: string, pages: HelpPage[], host?: string): void {
+    const g = this.game;
+    const steps: Step[] = [];
+    for (const p of pages) {
+      if (p.show === 'selected') {
+        if (g.selected === null) continue;
+        steps.push({ say: p.say, show: (g) => selectedSpot(g) });
+      } else if (!p.show || document.querySelector(p.show)) steps.push({ say: p.say, show: p.show });
+    }
+    if (!steps.length) steps.push({ say: pages[0].say, show: host });
+    // A page with nothing of its own to show points at the panel itself.
+    for (const st of steps) st.show ??= host;
+    this.helpSteps = steps;
+    this.helpAt = 0;
+    this.help = steps[0];
     this.helpKey = `${key}:${Date.now()}`;
     this.stepKey = '';
+    if (this.helpSpeed === null) {
+      this.helpSpeed = g.speedIndex;
+      g.setSpeed(0);
+    }
   }
 
   private endHelp(): void {
     this.help = null;
+    this.helpSteps = [];
     this.hide();
+    if (this.helpSpeed !== null && this.game.speedIndex === 0) this.game.setSpeed(this.helpSpeed);
+    this.helpSpeed = null;
   }
 
   private get steps(): Step[] {
@@ -512,6 +551,7 @@ export class Tutor {
   private next(): void {
     if (this.help) {
       if (this.typed < this.text.length) this.typed = this.text.length;
+      else if (this.helpAt + 1 < this.helpSteps.length) this.help = this.helpSteps[++this.helpAt];
       else this.endHelp();
       return;
     }
@@ -578,8 +618,8 @@ export class Tutor {
       camGoal = null;
       return false;
     }
-    // Ease in, at a walking pace: never more than a dozen tiles a second.
-    const v = Math.min(d, Math.max(d * dt * 2.2, 1.5 * dt), 12 * dt);
+    // Ease in, at a brisk pace: never more than two dozen tiles a second.
+    const v = Math.min(d, Math.max(d * dt * 4.4, 3 * dt), 24 * dt);
     r.centerOn(cx + (dx / d) * v, cy + (dy / d) * v);
     return d > 0.4;
   }
@@ -589,7 +629,7 @@ export class Tutor {
     const g = this.game;
     // Called to explain a panel: he does that before anything else.
     if (this.help) {
-      this.play(this.help, `help:${this.helpKey}`, dt);
+      this.play(this.help, `help:${this.helpKey}:${this.helpAt}`, dt);
       return;
     }
     // In any game, the first trading post or dock brings him to explain trade (unless tips are off).
@@ -664,10 +704,12 @@ export class Tutor {
       const floor = bar && bar.height ? Math.min(spot.y, bar.top) : spot.y;
       ty = below ? Math.min(H - 220, spot.y + spot.h + 16) : Math.max(70, floor - 110);
     }
-    // Showing something in the big trade window: he stands just outside it, his balloon on the open side.
+    // Showing something in the big trade window, or in a panel he is explaining: he stands just
+    // outside it, his balloon on the open side, so neither hides what he points at.
     this.side = null;
-    const wide = document.querySelector('#inspector.trade-wide') as HTMLElement | null;
-    const pr = wide?.offsetParent ? wide.getBoundingClientRect() : null;
+    const wide = (document.querySelector('#inspector.trade-wide') ??
+      (this.help ? [...document.querySelectorAll<HTMLElement>('#inspector, #chip-panel, .modal')].find((el) => el.getClientRects().length && spot && contains(el.getBoundingClientRect(), spot)) : null)) as HTMLElement | null;
+    const pr = wide?.getClientRects().length ? wide.getBoundingClientRect() : null;
     if (spot && pr && spot.x >= pr.left - 8 && spot.x + spot.w <= pr.right + 8) {
       const midY = Math.max(70, Math.min(H - 150, spot.y + spot.h / 2 - 40));
       if (pr.left >= 290) {
@@ -692,15 +734,15 @@ export class Tutor {
     const dx = tx - this.gx;
     const dy = ty - this.gy;
     const d = Math.hypot(dx, dy);
-    // He walks (at a stroll, so it reads as walking) and only talks once there.
+    // He walks (briskly, but so it still reads as walking) and only talks once there.
     const walking = d > 2;
     if (popping) {
       // Not a word until the smoke clears.
     } else if (walking) {
-      const v = Math.min(d, 170 * dt);
+      const v = Math.min(d, 340 * dt);
       this.gx += (dx / d) * v;
       this.gy += (dy / d) * v;
-      this.walk += dt * 10;
+      this.walk += dt * 18;
     } else if (!panning && this.typed < this.text.length) {
       this.typed = Math.min(this.text.length, this.typed + dt * 48);
     } else if (!panning) {
@@ -777,9 +819,11 @@ export class Tutor {
     const t = this.game.state.tutorial;
     // Explaining a panel, he only asks to be thanked.
     const skip = this.help ? 'Thank you' : t?.chapter === 'start' ? 'Skip tutorial' : 'Skip';
-    const next = this.help ? 'Click when you have heard enough ▸' : step.until ? 'Over to you, my liege ▸' : 'Click or press Enter to go on ▸';
+    const more = this.help && this.helpAt + 1 < this.helpSteps.length;
+    const page = this.help && this.helpSteps.length > 1 ? ` <small>${this.helpAt + 1}/${this.helpSteps.length}</small>` : '';
+    const next = this.help ? (more ? 'Click or press Enter to go on ▸' : 'Click when you have heard enough ▸') : step.until ? 'Over to you, my liege ▸' : 'Click or press Enter to go on ▸';
     const html = `<div class="t-name">Fingamoboblius</div><p>${esc(shownText)}<span class="t-caret">${done ? '' : '▌'}</span></p>
-      <div class="t-foot"><span class="t-next">${done ? next : 'Click to hurry him'}</span><button data-t="skip">${skip}</button></div>`;
+      <div class="t-foot"><span class="t-next">${done ? next : 'Click to hurry him'}${page}</span><button data-t="skip">${skip}</button></div>`;
     const stamp = `${this.stepKey}:${Math.floor(this.typed)}`;
     if (this.balloon.dataset.html !== stamp) {
       this.balloon.dataset.html = stamp;
@@ -866,6 +910,11 @@ export class Tutor {
     c.fill();
     c.restore();
   }
+}
+
+/** Whether a spot lies within a panel's box (give or take its outline). */
+function contains(r: DOMRect, spot: Spot): boolean {
+  return spot.x >= r.left - 8 && spot.x + spot.w <= r.right + 8 && spot.y >= r.top - 8 && spot.y + spot.h <= r.bottom + 8;
 }
 
 /** Seconds from the puff until he can speak. */

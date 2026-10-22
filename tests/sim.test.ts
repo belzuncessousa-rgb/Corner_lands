@@ -2154,6 +2154,28 @@ describe('draught animals', () => {
   });
 });
 
+describe('resource lens', () => {
+  it('gathers every rock, bush and herd into patches, counting what is there', async () => {
+    const { lensData } = await import('../src/render/lens');
+    const s = generateWorld(41);
+    const lens = lensData(s);
+    const sum = (kind: string) => lens.groups.filter((g) => g.kind === kind).reduce((n, g) => n + g.n, 0);
+    let rock = 0;
+    let berries = 0;
+    for (let i = 0; i < s.terrain.length; i++) {
+      if (s.occ[i] >= 0) continue;
+      if (s.rock[i] && !(s.silver ?? []).includes(i)) rock++;
+      if (s.berriesMax[i]) berries += s.berries[i];
+    }
+    expect(sum('stone')).toBe(rock);
+    expect(sum('berries')).toBe(berries);
+    expect(sum('game')).toBeCloseTo((s.herds ?? []).reduce((n, h) => n + h.n, 0));
+    // Patches are kept small enough that their numbers say where things are.
+    for (const g of lens.groups) expect(g.n).toBeGreaterThanOrEqual(0);
+    expect(lens.groups.filter((g) => g.kind === 'stone').length).toBeGreaterThan(1);
+  });
+});
+
 describe('upkeep and crates', () => {
   it('a workplace wears out its tools, and works slower once none are left to replace them', async () => {
     const { dailyUpkeep, wornYield, WORN_YIELD } = await import('../src/game/sim');

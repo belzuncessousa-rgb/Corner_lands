@@ -1,6 +1,6 @@
 import { knows, learn, unlockForBuilding, UNLOCK_BY_ID, type LearnTab } from '../game/unlocks';
 import { boardHtml, readyCount, tabOf } from './learning';
-import { fingaButton, helpText } from './fingahelp';
+import { fingaButton, hasHelp, helpPages } from './fingahelp';
 import { IMPROVEMENT_BY_ID, improvementsFor } from '../game/improve';
 import { OPTIONS, optionError, optionOn, optionOnce, setOption } from '../game/options';
 import { NEWS } from './news';
@@ -27,7 +27,6 @@ import {
   YARD_STORE,
   EXPORT_PER_DOCK,
   EXPORT_PER_MARKET,
-  UPKEEP,
 } from '../game/data';
 import { WORKS_OF_ART, nextTitle, takeTitle, titleError, TITLES, fairCost, fairError, fairPrestige, FAIR_TIER, feastCost, feastError, FESTIVALS, festivalError, getEvent, holdFair, holdFeast, holdFestival, resolveEvent } from '../game/events';
 import { CHARTERS, CHARTER_TIER, PATHS, charterCost, charterError, grantCharter, hasCharter } from '../game/charters';
@@ -129,6 +128,7 @@ import {
   buyDraught,
   sellDraught,
   DRAUGHT_PRICE,
+  upkeepOf,
 } from '../game/sim';
 import type { Building, BuildingType, Category, Cost, GoodsGroup, Land, ResourceId } from '../game/types';
 import type { StorageKind } from '../game/data';
@@ -160,6 +160,14 @@ function lastNumber(msgs: { n?: number }[]): number {
 
 const REACH_ICON =
   '<svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><circle cx="10" cy="10" r="7.5" fill="none" stroke="#5a3a22" stroke-width="1.4" stroke-dasharray="2.5 1.8"/><circle cx="10" cy="10" r="2.6" fill="#3a5a8a"/></svg>';
+
+/** The lenses: the land as it is (an eye), and its resources (a magnifying glass over a gem). */
+const LENS_ICONS = {
+  normal:
+    '<svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><path d="M1.5 10c2.4-4 5.2-6 8.5-6s6.1 2 8.5 6c-2.4 4-5.2 6-8.5 6s-6.1-2-8.5-6z" fill="#f4ecd8" stroke="#5a3a22" stroke-width="1.2"/><circle cx="10" cy="10" r="3.4" fill="#4a7a3a"/><circle cx="10" cy="10" r="1.5" fill="#2a1a10"/></svg>',
+  resources:
+    '<svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="6" fill="#e8eef0" stroke="#5a3a22" stroke-width="1.5"/><path d="M8.5 5l3 2.6-3 4-3-4z" fill="#d04a5a"/><path d="M5.5 7.6h6" stroke="#8a2a3a" stroke-width=".6"/><path d="M13 13l5 5" stroke="#5a3a22" stroke-width="2.4" stroke-linecap="round"/></svg>',
+};
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
@@ -288,6 +296,10 @@ export class Hud {
             <button class="panel icon-btn" data-action="production" data-tip="<b>Production Book</b><br>Every trade, what it takes and what it makes.">${ICONS.books}</button>
             <button class="panel icon-btn" data-action="charters" data-tip="<b>Town Charters</b><br>Spend prestige to specialise your town.">${ICONS.prestige}</button>
             <button class="panel icon-btn" data-action="coverage" data-tip="<b>Reach</b> (V)<br>Show where wells, markets, taverns and churches reach, and which homes they miss.">${REACH_ICON}</button>
+            <div id="lens-switch" class="panel">
+              <button class="icon-btn active" data-action="lens" data-lens="normal" data-tip="<b>The land</b> (L)<br>See the land as it is.">${LENS_ICONS.normal}</button>
+              <button class="icon-btn" data-action="lens" data-lens="resources" data-tip="<b>Resource lens</b> (L)<br>Grey the land and light up rock, bog ore, berries, mushrooms, game and fish, even under the trees, with about how much of each.">${LENS_ICONS.resources}</button>
+            </div>
           </div>
           <div id="objectives" class="panel"></div>
         </div>
@@ -527,7 +539,7 @@ export class Hud {
       chip('treasury', '', `${ICONS.gold}${Math.floor(s.res.gold)}${s.res.prestige > 0 || s.tier >= 1 ? `<span class="prestige">${ICONS.prestige}${Math.floor(s.res.prestige)}</span>` : ''}`),
       (() => {
         const ready = readyCount(s);
-        return `<button class="res chip learn-chip" data-action="learning" data-tip="<b>The learning board</b><br>Spend knowledge on new buildings, recipes and better ways of working.${ready ? `<br>${ready} can be learned now.` : ''}">📖${ICONS.knowledge}${Math.floor(s.res.knowledge)}${ready ? `<span class="badge">${ready}</span>` : ''}</button>`;
+        return `<button class="res chip learn-chip" data-action="learning" data-tip="<b>The learning board</b><br>Spend knowledge on new buildings, recipes and better ways of working.${ready ? `<br>${ready} can be learned now.` : ''}">${ICONS.knowledge}${Math.floor(s.res.knowledge)}${ready ? `<span class="badge">${ready}</span>` : ''}</button>`;
       })(),
     ].join('');
     setHTML(this.el.topbar, html);
@@ -545,7 +557,7 @@ export class Hud {
     else if (id === 'pop') html = this.labourPanel();
     else if (id === 'treasury') html = this.treasuryPanel();
     else html = this.goodsPanel(id as GoodsGroup);
-    setHTML(panel, `${this.pinnedChip ? '<button class="close" data-action="chip-close">✕</button>' : ''}${helpText(id) ? fingaButton(id) : ''}${html}`);
+    setHTML(panel, `${this.pinnedChip ? '<button class="close" data-action="chip-close">✕</button>' : ''}${hasHelp(id) ? fingaButton(id) : ''}${html}`);
     panel.style.display = 'block';
     const anchor = this.el.topbar.querySelector(`[data-chip="${id}"]`) as HTMLElement | null;
     if (anchor) {
@@ -784,6 +796,7 @@ export class Hud {
     this.renderTopbar();
     this.renderChipPanel();
     this.renderLordButton();
+    for (const b of this.root.querySelectorAll<HTMLElement>('#lens-switch [data-lens]')) b.classList.toggle('active', b.dataset.lens === g.lens);
 
     // Clock.
     const season = seasonOf(s.day);
@@ -953,7 +966,7 @@ export class Hud {
         ).join('');
         const prio = b.priority ?? 1;
         rows.push(`<div class="kv labour" data-tip="Click the pips to choose how many villagers work here. Workers left free take other jobs or help build."><span>Workers ${b.workers}/${want}</span><span class="pips">${pips}</span></div>
-          <div class="kv"><span>Priority</span><span class="seg">${['Low', 'Normal', 'High']
+          <div class="kv prio"><span>Priority</span><span class="seg">${['Low', 'Normal', 'High']
             .map((n, i) => `<button data-action="prio" data-p="${i}" class="${prio === i ? 'active' : ''}" data-tip="${['Staffed last', 'Staffed in the usual order', 'Staffed before everything else'][i]}">${n}</button>`)
             .join('')}</span></div>`);
         if (d.months) {
@@ -1042,7 +1055,7 @@ export class Hud {
         const tip = ZONE_OWNERS.has(b.type)
           ? 'Time lost walking out to its fields, pastures or orchards. Lay them out close by, or lay roads to them.'
           : 'Time lost walking to storage and to what it gathers. Build closer to a storehouse or granary and to the woods, rocks or bushes, or lay roads.';
-        rows.push(`<div class="kv" data-tip="${tip}"><span>Walking time</span><span class="${b.efficiency < LOW_EFFICIENCY ? 'neg' : ''}">${Math.round(b.efficiency * 100)}% efficient</span></div>`);
+        rows.push(`<div class="kv walk" data-tip="${tip}"><span>Walking time</span><span class="${b.efficiency < LOW_EFFICIENCY ? 'neg' : ''}">${Math.round(b.efficiency * 100)}% efficient</span></div>`);
       }
       if (!d.recipes && Object.keys(d.inputs).length) rows.push(`<div class="kv"><span>Consumes</span><span class="costline">${costHtml(d.inputs)}</span></div>`);
       if (!d.recipes && Object.keys(d.outputs).length) rows.push(`<div class="kv"><span>Produces</span><span class="costline">${costHtml(d.outputs)}</span></div>`);
@@ -1187,12 +1200,21 @@ export class Hud {
   }
 
   private upkeepRows(b: Building): string[] {
-    const wear = UPKEEP[b.type];
+    const wear = upkeepOf(this.game.state, b);
     if (!wear || b.build < 1) return [];
-    const names = Object.entries(wear).map(([k, v]) => `${v} ${GOODS[k as ResourceId].name.toLowerCase()}`);
+    // Most trades wear out less than one a month: say it by the year then, in round numbers.
+    const one = { tools: 'tool', woodparts: 'wood part' } as const;
+    const names = (Object.entries(wear) as ['tools' | 'woodparts', number][])
+      .filter(([, v]) => v > 0)
+      .map(([k, v]) => {
+        const [n, per] = v >= 1 ? [v, 'a month'] : [v * 12, 'a year'];
+        const r = Math.round(n * 10) / 10;
+        return `${r} ${r === 1 ? one[k] : GOODS[k].name.toLowerCase()} ${per}`;
+      });
+    if (!names.length) return [];
     const what = Object.keys(wear).map((k) => GOODS[k as ResourceId].name.toLowerCase()).join(' and ');
     return [
-      `<div class="kv" data-tip="${esc(`With a full crew the work wears out ${names.join(' and ')} a month; each is taken from the stores as it goes. With none in store the crew makes do with worn gear and works a quarter slower.`)}"><span>Upkeep</span><span class="${b.worn ? 'neg' : ''}">${b.worn ? `Worn out: needs ${what}` : `${names.join(' · ')} a month`}</span></div>`,
+      `<div class="kv upkeep" data-tip="${esc(`With a full crew the work wears out ${names.join(' and ')}; each is taken from the stores as it goes, less with fewer workers. With none in store the crew makes do with worn gear and works a quarter slower.`)}"><span>Upkeep</span><span class="${b.worn ? 'neg' : ''}">${b.worn ? `Worn out: needs ${what}` : names.join(' · ')}</span></div>`,
     ];
   }
 
@@ -1786,6 +1808,9 @@ export class Hud {
       case 'coverage':
         g.cycleCoverage();
         break;
+      case 'lens':
+        g.setLens(t.dataset.lens === 'resources' ? 'resources' : 'normal');
+        break;
       case 'deselect':
         g.select(null);
         break;
@@ -2065,10 +2090,12 @@ export class Hud {
       case 'finga': {
         // He explains the panel the button sits on.
         const key = t.dataset.key ?? '';
-        const text = helpText(key);
+        const pages = helpPages(key);
         const host = t.closest('.modal, #chip-panel, #inspector, #objectives') as HTMLElement | null;
         const sel = host ? (host.id ? `#${host.id}` : '.modal') : undefined;
-        if (text) this.game.tutor.explain(key, text, sel);
+        // A chip's panel stays open while he talks about it.
+        if (host?.id === 'chip-panel' && this.openChip) this.showChip(this.openChip, true);
+        if (pages) this.game.tutor.explain(key, pages, sel);
         break;
       }
       case 'learn-open':
@@ -2293,7 +2320,7 @@ export class Hud {
     this.closeModal(true);
     const back = document.createElement('div');
     back.className = 'modal-back';
-    back.innerHTML = `<div class="modal panel">${help && helpText(help) ? fingaButton(help) : ''}${html}</div>`;
+    back.innerHTML = `<div class="modal panel">${help && hasHelp(help) ? fingaButton(help) : ''}${html}</div>`;
     if (closable) {
       back.addEventListener('click', (e) => {
         if (e.target === back) this.closeModal();
@@ -2882,7 +2909,7 @@ export class Hud {
         <p><b>Prestige</b> comes from a fine manor, a church and monuments. From Town on, spend it on <b>charters</b> (crown button) to specialise your town.</p>
         <p>Your <b>steward</b> warns you when things go wrong; the <b>Chronicle</b> (scroll button) keeps the full story.</p>
         <div class="ornament">❦</div>
-        <p><b>Keys</b>: <kbd>Left-drag</kbd> / <kbd>WASD</kbd> / arrows pan · <kbd>Wheel</kbd> / <kbd>+</kbd><kbd>-</kbd> / pinch zoom · <kbd>R</kbd> road (click, click) · <kbd>T</kbd> stone road · <kbd>Y</kbd> cobbled street · <kbd>X</kbd> / <kbd>Del</kbd> demolish · <kbd>P</kbd> protect a wood · <kbd>U</kbd> photo mode (hide the interface) · <kbd>V</kbd> reach of wells, markets, taverns, churches · ${BUILD_ORDER.filter((b) => BUILDINGS[b].hotkey)
+        <p><b>Keys</b>: <kbd>Left-drag</kbd> / <kbd>WASD</kbd> / arrows pan · <kbd>Wheel</kbd> / <kbd>+</kbd><kbd>-</kbd> / pinch zoom · <kbd>R</kbd> road (click, click) · <kbd>T</kbd> stone road · <kbd>Y</kbd> cobbled street · <kbd>X</kbd> / <kbd>Del</kbd> demolish · <kbd>P</kbd> protect a wood · <kbd>U</kbd> photo mode (hide the interface) · <kbd>V</kbd> reach of wells, markets, taverns, churches · <kbd>L</kbd> resource lens · ${BUILD_ORDER.filter((b) => BUILDINGS[b].hotkey)
           .map((b) => `<kbd>${BUILDINGS[b].hotkey!.toUpperCase()}</kbd> ${BUILDINGS[b].name.toLowerCase()}`)
           .join(' · ')} · <kbd>Space</kbd> pause · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> speed</p>
         <p><b>Playing with friends:</b> found the same land with the seed of the week, download your town from Save Game for a friend to open, and compare <b>scores</b> on the load cards: villagers and rank, the lord's title, great works, works of art, milestones and every year in which no one went hungry.</p>

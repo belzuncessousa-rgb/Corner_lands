@@ -783,20 +783,27 @@ export function wornYield(b: Building): number {
  * worn out it is replaced from the stores. With none in store the crew makes
  * do with worn gear, and works slower until one comes.
  */
+/** Tools and wood parts a workplace wears out a month with a full crew: its trade's, its improvements', less what charters spare. */
+export function upkeepOf(s: GameState, b: Building): Partial<Record<'tools' | 'woodparts', number>> | undefined {
+  const extra = b.improved?.length ? improvedUpkeep(b, hasCharter(s, 'farm2') ? ['ironplough'] : []) : undefined;
+  let wear = UPKEEP[b.type];
+  if (extra) {
+    wear = { ...wear };
+    for (const k in extra) wear[k as 'tools'] = (wear[k as 'tools'] ?? 0) + (extra[k as 'tools'] ?? 0);
+  }
+  if (wear?.tools && hasCharter(s, 'metal3b')) wear = { ...wear, tools: wear.tools * 0.8 };
+  return wear;
+}
+
 export function dailyUpkeep(s: GameState): void {
   for (const b of s.buildings) {
-    const extra = b.improved?.length ? improvedUpkeep(b, hasCharter(s, 'farm2') ? ['ironplough'] : []) : undefined;
-    let wear = UPKEEP[b.type];
-    if (extra) {
-      wear = { ...wear };
-      for (const k in extra) wear[k as 'tools'] = (wear[k as 'tools'] ?? 0) + (extra[k as 'tools'] ?? 0);
-    }
+    const wear = upkeepOf(s, b);
     if (!wear || b.build < 1 || b.workers <= 0 || b.paused || isBlocked(b)) continue;
     const crew = b.workers / Math.max(1, workersOf(b));
     for (const k in wear) {
       const id = k as 'tools' | 'woodparts';
       const acc = (b.upkeep ??= {});
-      acc[id] = (acc[id] ?? 0) + ((wear[id] ?? 0) * crew * (id === 'tools' && hasCharter(s, 'metal3b') ? 0.8 : 1)) / DAYS_PER_MONTH;
+      acc[id] = (acc[id] ?? 0) + ((wear[id] ?? 0) * crew) / DAYS_PER_MONTH;
       if ((acc[id] ?? 0) < 1) continue;
       if (s.res[id] >= 1) {
         s.res[id] -= 1;
