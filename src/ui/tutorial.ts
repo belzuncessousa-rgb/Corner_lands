@@ -118,7 +118,7 @@ const START: Step[] = [
     show: '#top .btnrow',
   },
   {
-    say: 'And this little switch changes how you see the land. The glass greys it out and lights up what can be gathered: rock, bog ore, berries and mushrooms hiding under the trees, game and fish, with about how much of each. Handy, before you build a lodge!',
+    say: 'And this little switch changes how you see the land. The glass greys it out and lights up what can be gathered: rock, bog ore, berries hiding under the trees, game and fish, with about how much of each. Handy, before you build a lodge!',
     show: '#lens-switch',
   },
   {

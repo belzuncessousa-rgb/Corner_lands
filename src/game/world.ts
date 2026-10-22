@@ -274,13 +274,12 @@ export function generateWorld(seed: number, opts: { relaxed?: boolean; hardy?: b
 
 /**
  * What can be gathered and hunted, in patches: berry bushes at forest edges,
- * mushrooms on the forest floor, herds of deer and rabbits in the woods and
- * shoals of fish in the water.
+ * herds of deer and rabbits in the woods and shoals of fish in the water;
+ * and, only to be looked at, rings of mushrooms on the forest floor.
  *
  * Near the start lies one of each kind but deer, together enough to feed
  * some thirty villagers a year (a villager eats twelve a year): a patch of
- * six berry bushes (~120), a small ring of mushrooms (~60), a warren
- * (~110) and a shoal (~110). About two and a half times as much again lies
+ * six berry bushes (~120), a warren (~110) and a shoal (~110). About two and a half times as much again lies
  * far off, toward the edges of the map: wild food carries a hamlet, not a town.
  */
 export function seedNature(s: GameState, site: { x: number; y: number }, rand: () => number, berries = true): void {
@@ -331,7 +330,7 @@ export function seedNature(s: GameState, site: { x: number; y: number }, rand: (
     s.berries.set(s.berriesMax);
   }
 
-  // Mushrooms: rings on the floor of older woods.
+  // Mushrooms: rings on the floor of older woods, for the look of them (no one gathers them).
   s.mushrooms = {};
   s.mushroomsMax = {};
   const deepWood = (x: number, y: number) => s.trees[idx(s, x, y)] >= 1 && trees(x, y, 2) >= 10;

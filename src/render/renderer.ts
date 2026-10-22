@@ -712,24 +712,9 @@ export class Renderer {
     c.restore();
   }
 
-  /** The picture inside a lens ball: the good's own icon, or a little mushroom. */
+  /** The picture inside a lens ball: the good's own icon. */
   private drawLensIcon(kind: LensKind, x: number, y: number): void {
     const c = this.ctx;
-    if (kind === 'mushrooms') {
-      c.fillStyle = '#f2ead8';
-      c.fillRect(x - 1.6, y - 1, 3.2, 6);
-      c.fillStyle = '#c8402a';
-      c.beginPath();
-      c.ellipse(x, y - 1.5, 6.5, 4.6, 0, Math.PI, 0);
-      c.closePath();
-      c.fill();
-      c.fillStyle = '#fff';
-      c.beginPath();
-      c.arc(x - 2.5, y - 3.2, 0.9, 0, Math.PI * 2);
-      c.arc(x + 1.8, y - 4, 0.9, 0, Math.PI * 2);
-      c.fill();
-      return;
-    }
     const id: ResourceId = kind === 'game' ? 'meat' : kind;
     const icon = goodIcon(id);
     if (icon) c.drawImage(icon, x - 8, y - 8, 16, 16);

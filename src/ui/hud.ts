@@ -298,7 +298,7 @@ export class Hud {
             <button class="panel icon-btn" data-action="coverage" data-tip="<b>Reach</b> (V)<br>Show where wells, markets, taverns and churches reach, and which homes they miss.">${REACH_ICON}</button>
             <div id="lens-switch" class="panel">
               <button class="icon-btn active" data-action="lens" data-lens="normal" data-tip="<b>The land</b> (L)<br>See the land as it is.">${LENS_ICONS.normal}</button>
-              <button class="icon-btn" data-action="lens" data-lens="resources" data-tip="<b>Resource lens</b> (L)<br>Grey the land and light up rock, bog ore, berries, mushrooms, game and fish, even under the trees, with about how much of each.">${LENS_ICONS.resources}</button>
+              <button class="icon-btn" data-action="lens" data-lens="resources" data-tip="<b>Resource lens</b> (L)<br>Grey the land and light up rock, bog ore, berries, game and fish, even under the trees, with about how much of each.">${LENS_ICONS.resources}</button>
             </div>
           </div>
           <div id="objectives" class="panel"></div>

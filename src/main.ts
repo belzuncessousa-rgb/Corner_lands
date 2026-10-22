@@ -645,7 +645,7 @@ export class Game {
     } else if (this.coverage) {
       this.hud.showCoverage(this.coverage);
     } else if (this.lens === 'resources') {
-      this.hud.setHint('Resource lens: rock, bog ore, berries, mushrooms, game and fish, and about how much of each · L or Esc to go back', false);
+      this.hud.setHint('Resource lens: rock, bog ore, berries, game and fish, and about how much of each · L or Esc to go back', false);
     } else {
       this.hud.setHint('', false);
     }
@@ -675,7 +675,7 @@ export class Game {
       // No area to fill: what matters is how far the workers must walk.
       const c = centerOf(x, y, d.w, d.h);
       const dist = nearestResource(this.state, type, c);
-      const what = { woodcutter: 'trees', quarry: 'rock', mine: 'ore', forager: 'berries or mushrooms', hunter: 'game', fisher: 'fish' }[type as string] ?? 'resources';
+      const what = { woodcutter: 'trees', quarry: 'rock', mine: 'ore', forager: 'berries', hunter: 'game', fisher: 'fish' }[type as string] ?? 'resources';
       if (dist === null) return `${d.name}: no ${what} within reach · the workers would have nothing to do`;
       // The walk as the villagers walk it: quicker along roads, slower through woods.
       const walk = dist < 6 ? 'a short walk' : dist < 14 ? 'a fair walk' : 'a long walk: they will lose time on the way';

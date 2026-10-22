@@ -3,18 +3,18 @@ import type { GameState } from '../game/types';
 /**
  * The resource lens: what the land holds for gatherers, gathered into
  * patches. The map greys out and each patch gets a little ball saying what
- * is there and about how much, so bushes and mushrooms under the trees, ore
+ * is there and about how much, so bushes under the trees, ore
  * in the bogs and game in the woods can be found at a glance.
  */
 
-export type LensKind = 'stone' | 'ore' | 'silver' | 'berries' | 'mushrooms' | 'game' | 'fish';
+export type LensKind = 'stone' | 'ore' | 'silver' | 'berries' | 'game' | 'fish';
 
 export interface LensGroup {
   kind: LensKind;
   /** Middle of the patch, in tiles. */
   x: number;
   y: number;
-  /** How much is there now: outcrops for rock and ore, berries, mushrooms, animals or fish. */
+  /** How much is there now: outcrops for rock and ore, berries, animals or fish. */
   n: number;
   /** Whether the amount comes and goes (bushes regrow, herds breed), so is shown as "about". */
   varies: boolean;
@@ -34,7 +34,6 @@ export const LENS_COLORS: Record<LensKind, string> = {
   ore: '#d0804a',
   silver: '#e8f0ff',
   berries: '#e0405a',
-  mushrooms: '#f0b040',
   game: '#b07a40',
   fish: '#50b0e8',
 };
@@ -47,7 +46,7 @@ const SPLIT = 12;
 /** The lens for the land as it is now. */
 export function lensData(s: GameState): LensData {
   const W = s.width;
-  const tiles: Partial<Record<LensKind, number[]>> = { stone: [], ore: [], silver: [], berries: [], mushrooms: [] };
+  const tiles: Partial<Record<LensKind, number[]>> = { stone: [], ore: [], silver: [], berries: [] };
   const amount = new Map<number, number>();
   const silver = new Set(s.silver ?? []);
   for (let i = 0; i < s.terrain.length; i++) {
@@ -57,16 +56,12 @@ export function lensData(s: GameState): LensData {
     else if (s.ore[i]) tiles.ore!.push(i);
     if (s.berriesMax[i]) tiles.berries!.push(i);
   }
-  for (const k in s.mushroomsMax ?? {}) {
-    const i = Number(k);
-    if (s.occ[i] < 0) tiles.mushrooms!.push(i);
-  }
   const groups: LensGroup[] = [];
-  for (const kind of ['stone', 'ore', 'silver', 'berries', 'mushrooms'] as const) {
+  for (const kind of ['stone', 'ore', 'silver', 'berries'] as const) {
     const list = tiles[kind]!;
-    const value = (i: number) => (kind === 'berries' ? s.berries[i] : kind === 'mushrooms' ? (s.mushrooms?.[i] ?? 0) : 1);
+    const value = (i: number) => (kind === 'berries' ? s.berries[i] : 1);
     for (const patch of patches(list, W)) {
-      // Split a wide patch by a grid, so a big forest floor reads part by part.
+      // Split a wide patch by a grid, so a big one reads part by part.
       const xs = patch.map((i) => i % W);
       const ys = patch.map((i) => (i / W) | 0);
       const wide = Math.max(...xs) - Math.min(...xs) > SPLIT + 2 || Math.max(...ys) - Math.min(...ys) > SPLIT + 2;
@@ -87,7 +82,7 @@ export function lensData(s: GameState): LensData {
           sx += (i % W) + 0.5;
           sy += ((i / W) | 0) + 0.5;
         }
-        groups.push({ kind, x: sx / part.length, y: sy / part.length, n, varies: kind === 'berries' || kind === 'mushrooms' });
+        groups.push({ kind, x: sx / part.length, y: sy / part.length, n, varies: kind === 'berries' });
       }
     }
   }
@@ -144,7 +139,6 @@ export const LENS_NAMES: Record<LensKind, string> = {
   ore: 'Bog ore',
   silver: 'Silver veins',
   berries: 'Berries',
-  mushrooms: 'Mushrooms',
   game: 'Game',
   fish: 'Fish',
 };

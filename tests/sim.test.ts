@@ -2154,6 +2154,50 @@ describe('draught animals', () => {
   });
 });
 
+describe('travel', () => {
+  it('counts every kind of road: the better the road, the shorter the walk the work loses', async () => {
+    const { walkBetween } = await import('../src/game/sim');
+    const s = generateWorld(42);
+    // Two buildings a good way apart along one long lane.
+    const h = hall(s);
+    const y = h.y + 3;
+    const spot = (from: number, step: number, type: BuildingType) => {
+      for (let x = from; Math.abs(x - from) < 12; x += step) {
+        if (placementError(s, type, x, y + 1)) continue;
+        for (let rx = Math.min(x, h.x); rx <= Math.max(x + 2, h.x + 3); rx++) buildRoad(s, rx, y);
+        const b = placeOrder(s, type, x, y + 1);
+        if (b) return b;
+      }
+      throw new Error(`no room for ${type}`);
+    };
+    const a = spot(h.x - 8, -1, 'well');
+    const b = spot(h.x + 8, 1, 'woodcutter');
+    for (const x of [a, b]) {
+      x.build = 1;
+      x.need = undefined;
+    }
+    recompute(s);
+    const lane = walkBetween(s, a, b);
+    expect(lane).toBeGreaterThan(10);
+    // Pave every road tile, then cobble them: each is quicker going than the last.
+    const roads = [...s.road.keys()].filter((i) => s.road[i] === 1);
+    let last = lane;
+    for (const kind of [2, 3]) {
+      for (const i of roads) s.road[i] = kind;
+      s.dirty = true;
+      recompute(s);
+      const now = walkBetween(s, a, b);
+      expect(now).toBeLessThan(last);
+      last = now;
+    }
+    // Off the roads altogether, the same walk is the slowest.
+    for (const i of roads) s.road[i] = 0;
+    s.dirty = true;
+    recompute(s);
+    expect(walkBetween(s, a, b)).toBeGreaterThan(lane);
+  });
+});
+
 describe('resource lens', () => {
   it('gathers every rock, bush and herd into patches, counting what is there', async () => {
     const { lensData } = await import('../src/render/lens');

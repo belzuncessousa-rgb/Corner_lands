@@ -3,6 +3,7 @@
  * something worth telling returning players goes in; the number only grows.
  */
 export const NEWS: { n: number; text: string }[] = [
+  { n: 32, text: 'A resource lens (L) shows rock, ore, berries, game and fish even under the trees; select a building to see lines to its workers; Fingamoboblius walks you round each panel; everyone walks twice as fast, and roads speed up errands and haulers' },
   { n: 31, text: 'Workplaces wear out tools and wood parts; an Alehouse that grows into a Tavern; no more ranges for workplaces: long walks slow them, and a footprints sign shows which' },
   { n: 30, text: 'Villagers walk up to the door and step inside, and the door opens for them; every trade works with its own tools: axes, scythes, saws, bows and crooks' },
   { n: 29, text: 'A Draught Stable for pack horses and oxen, and a Builder\'s Yard whose ox cart speeds up building; a bear now and then, and turtles on quiet shores' },

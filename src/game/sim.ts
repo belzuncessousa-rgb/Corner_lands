@@ -1226,8 +1226,8 @@ export function nearestResource(s: GameState, type: BuildingType, c: { x: number
       trees: (i) => s.trees[i] > 0 && !inGrove(s, i),
       rock: (i) => s.rock[i] > 0,
       ore: (i) => s.ore[i] > 0,
-      // Foragers pick berries, and mushrooms in the woods.
-      berries: (i) => s.berriesMax[i] > 0 || (s.mushroomsMax?.[i] ?? 0) > 0,
+      // Foragers pick berries (the mushrooms in the woods are only for looking at).
+      berries: (i) => s.berriesMax[i] > 0,
     };
     const pred = has[d.gathers ?? ''];
     if (!pred) return null;
@@ -1973,6 +1973,19 @@ function nearestTile(s: GameState, b: Building, test: (i: number) => boolean): n
   return -1;
 }
 
+/**
+ * The walk from one building to another, in dirt-road tiles, along the
+ * quickest way (lanes, paved roads, cobbles and the Royal Road all count, as
+ * do woods); beyond a long walk, as the crow flies over open ground.
+ */
+export function walkBetween(s: GameState, from: Building, to: Building): number {
+  const c = bCenter(to);
+  const d = walkToPoint(walkFrom(s, from), s, c.x, c.y, Math.max(to.w, to.h) / 2 + 1);
+  if (Number.isFinite(d)) return d;
+  const f = bCenter(from);
+  return Math.hypot(c.x - f.x, c.y - f.y) * (ROAD_TILES_PER_DAY / OFFROAD_TILES_PER_DAY);
+}
+
 /** Walking time to a point (a herd in the woods, a shoal off the bank): to the nearest land within a short way of it. */
 function walkToPoint(f: WalkField, s: GameState, px: number, py: number, near: number): number {
   let best = Infinity;
@@ -2087,7 +2100,6 @@ export function dailyHaul(s: GameState): void {
     if (st.build < 1 || st.workers <= 0) continue;
     const kind = (Object.keys(HAUL_STORES) as StorageKind[]).find((k) => HAUL_STORES[k] === st.type);
     if (!kind) continue;
-    const c = bCenter(st);
     let moved = 0;
     let full = false;
     for (let w = 0; w < st.workers && !full; w++) {
@@ -2101,8 +2113,7 @@ export function dailyHaul(s: GameState): void {
           let n = 0;
           for (const k in b.stock) if (RESOURCE_STORAGE[k as ResourceId] === kind) n += b.stock[k as ResourceId] ?? 0;
           if (n < 1) continue;
-          const bc = bCenter(b);
-          const dist = Math.hypot(bc.x - c.x, bc.y - c.y);
+          const dist = walkBetween(s, st, b);
           const score = Math.min(n, HAUL_LOAD) / (1 + dist);
           if (score > bestScore) {
             best = b;
@@ -2111,8 +2122,8 @@ export function dailyHaul(s: GameState): void {
           }
         }
         if (!best) break;
-        // There and back, mostly along lanes, plus loading. A long last trip
-        // is finished tomorrow.
+        // There and back along the quickest way, plus loading. A long last
+        // trip is finished tomorrow.
         const trip = (2 * bestDist) / (ROAD_TILES_PER_DAY * (beastWorks(st) ? 1.5 : 1)) + 0.05;
         if (trip > time && time < 1) break;
         time -= trip;
@@ -2203,7 +2214,7 @@ export function natureMonthly(s: GameState, rng: StateRng): void {
   }
   // A shoal comes back slowly: a catch a month, half that in winter.
   for (const sh of s.shoals ?? []) sh.n = Math.min(sh.max, sh.n + (winter ? 0.5 : 1));
-  // Mushrooms come up in late summer and autumn, a few in spring.
+  // Mushrooms come up in late summer and autumn, a few in spring: nobody picks them, they are there to be seen.
   const m = monthOf(s.day);
   if (s.mushroomsMax && (m >= 5 && m <= 8 || m === 2)) {
     s.mushrooms ??= {};
@@ -3666,13 +3677,12 @@ const MAX_ERRANDS = 0.35;
 export function errandShare(s: GameState): number {
   let days = 0;
   let people = 0;
+  // The walk as it is walked: roads (the better the quicker) shorten it, woods lengthen it.
   const near = (h: Building, t: BuildingType) => {
-    const c = bCenter(h);
     let best = Infinity;
     for (const o of s.buildings) {
       if ((o.type !== t && !(t === 'church' && o.type === 'cathedral')) || o.build < 1) continue;
-      const oc = bCenter(o);
-      best = Math.min(best, Math.hypot(oc.x - c.x, oc.y - c.y));
+      best = Math.min(best, walkBetween(s, h, o));
     }
     return best;
   };

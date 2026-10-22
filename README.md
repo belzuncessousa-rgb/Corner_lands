@@ -43,7 +43,7 @@ then fall back to the browser's localStorage.
 | Pause / speed | `Space`, `1` `2` `3` (normal, ×3, ×8) |
 | Undo | `Ctrl+Z` (or the button) within ten seconds takes back the last placement or demolition |
 | Reach overlay | `V` cycles wells, markets, taverns and churches: which homes each covers |
-| Resource lens | `L` (or the lens switch at the top) greys the map and lights up rock, bog ore, berries, mushrooms, game and fish, with about how much of each in every patch |
+| Resource lens | `L` (or the lens switch at the top) greys the map and lights up rock, bog ore, berries, game and fish, with about how much of each in every patch |
 | Who works where | Select a building: curved lines run from it to each of its workers or builders, wherever they are |
 
 ### How the settlement works
@@ -103,7 +103,7 @@ then fall back to the browser's localStorage.
 - **Food & seasons** — each villager eats one food per month (bread and cheese
   go further); meals from several food groups (grain, meat, produce, dairy)
   raise happiness. With nothing else left, families boil wheat or oats into
-  pottage, half as filling. Foragers pick berries, autumn mushrooms or herbs and rest in deep winter;
+  pottage, half as filling. Foragers pick berries or herbs (the mushrooms in the woods are only for looking at) and rest in deep winter;
   every household burns a bundle of firewood (or two logs) each winter month.
 - **Workshops** — a Windmill grinds wheat for the Bakery; the Brewhouse brews
   ale from barley or cider from apples for the taverns; a Dairy makes cheese;
