@@ -34,11 +34,11 @@ export interface HouseLevel {
 
 export const HOUSE_LEVELS: HouseLevel[] = [
   { name: '', housing: 0, tax: 0 },
-  { name: 'Cottage', housing: 5, tax: 1 },
-  { name: 'Timber House', housing: 7, tax: 1.5, cost: { wood: 2, planks: 4 }, tier: 1 },
-  { name: 'Townhouse', housing: 9, tax: 2, cost: { planks: 6, stone: 4, tiles: 10 }, tier: 2 },
-  { name: "Merchant's House", housing: 9, tax: 3, cost: { dressedstone: 6, tiles: 10, mortar: 4, glass: 4, gold: 20 }, tier: 3 },
-  { name: 'Patrician House', housing: 9, tax: 4, cost: { dressedstone: 6, mortar: 4, glass: 10, stainedglass: 6, gold: 100 }, tier: 4 },
+  { name: 'Cottage', housing: 3, tax: 1 },
+  { name: 'Timber House', housing: 5, tax: 1.5, cost: { wood: 2, planks: 4 }, tier: 1 },
+  { name: 'Townhouse', housing: 7, tax: 2, cost: { planks: 6, stone: 4, tiles: 10 }, tier: 2 },
+  { name: "Merchant's House", housing: 7, tax: 3, cost: { dressedstone: 6, tiles: 10, mortar: 4, glass: 4, gold: 20 }, tier: 3 },
+  { name: 'Patrician House', housing: 7, tax: 4, cost: { dressedstone: 6, mortar: 4, glass: 10, stainedglass: 6, gold: 100 }, tier: 4 },
 ];
 
 export const MANOR_LEVELS: { name: string; cost?: Cost; days?: number }[] = [

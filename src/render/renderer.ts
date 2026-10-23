@@ -317,7 +317,6 @@ export class Renderer {
     this.late.length = 0;
     this.drawFields(s, season, ov.selected);
     this.drawBedGround(s, season, visible);
-    this.drawFootpaths(s, agents, season, dt, visible);
     // Roads on top of ground: all edges first so joints blend.
     for (const layer of ['edge', 'fill'] as const) {
       for (let y = 0; y < H; y++) {
@@ -810,49 +809,6 @@ export class Renderer {
       c.lineTo(wx + len, wy);
     }
     c.stroke();
-  }
-
-  private wear = new Float32Array(0);
-  private wearSeed = -1;
-
-  /**
-   * Where villagers keep walking off-road the grass wears into a dirt path,
-   * and slowly grows back when they stop.
-   */
-  private drawFootpaths(s: GameState, agents: Agent[], season: Season, dt: number, visible: (x: number, y: number) => boolean): void {
-    const n = s.width * s.height;
-    if (this.wear.length !== n || this.wearSeed !== s.seed) {
-      this.wear = new Float32Array(n);
-      this.wearSeed = s.seed;
-    }
-    const w = this.wear;
-    if (dt > 0) {
-      for (const a of agents) {
-        if (!a.visible || a.phase !== 'walk') continue;
-        const tx = Math.floor(a.x);
-        const ty = Math.floor(a.y);
-        if (!inBounds(s, tx, ty)) continue;
-        const i = ty * s.width + tx;
-        if (!s.road[i] && s.occ[i] < 0) w[i] = Math.min(1, w[i] + dt * 0.05);
-      }
-    }
-    const decay = 1 - dt * 0.0015;
-    const c = this.ctx;
-    c.fillStyle = season === 3 ? '#c9c2b2' : '#a48a62';
-    for (let i = 0; i < n; i++) {
-      if (w[i] <= 0) continue;
-      w[i] *= decay;
-      if (w[i] < 0.12 || s.road[i] || s.occ[i] >= 0 || s.terrain[i]) continue;
-      const x = i % s.width;
-      const y = (i - x) / s.width;
-      const [wx, wy] = iso(x + 0.5, y + 0.5);
-      if (!visible(wx, wy)) continue;
-      c.globalAlpha = Math.min(0.55, (w[i] - 0.12) * 1.2);
-      c.beginPath();
-      c.ellipse(wx, wy, 17, 8.5, 0, 0, Math.PI * 2);
-      c.fill();
-    }
-    c.globalAlpha = 1;
   }
 
   /**

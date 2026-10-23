@@ -274,7 +274,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     category: 'housing',
     cost: { wood: 4 },
     buildDays: 8,
-    housing: 5,
+    housing: 3,
     hotkey: 'h',
   }),
   woodcutter: def({
@@ -1132,6 +1132,8 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     cost: { wood: 10, planks: 5 },
     buildDays: 20,
     workers: 1,
+    // The priest lives in.
+    housing: 1,
     radius: 16,
     tier: 2,
   }),

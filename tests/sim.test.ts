@@ -131,7 +131,7 @@ describe('simulation', () => {
     expect(s.res.wood).toBeLessThan(wood);
     run(s, 25);
     expect(house.build).toBe(1);
-    expect(totalHousing(s)).toBe(before + 5);
+    expect(totalHousing(s)).toBe(before + 3);
   });
 
   it('woodcutter fells trees and produces timber', () => {
@@ -499,7 +499,8 @@ describe('levels', () => {
     const s = generateWorld(14);
     expect(s.buildings.some((b) => b.type === 'townhall')).toBe(false);
     expect(nextTierRequirements(s).join()).toMatch(/marketplace/);
-    for (let k = 0; k < 3; k++) placeNearRoad(s, 'house').build = 1;
+    // Room for twenty: the camp's eight and four cottages of three.
+    for (let k = 0; k < 4; k++) placeNearRoad(s, 'house').build = 1;
     marketBy(s, hall(s));
     const well = placeNearRoad(s, 'well');
     well.build = 1;

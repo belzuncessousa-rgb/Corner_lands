@@ -545,9 +545,12 @@ export function act(s: GameState, rand: () => number): void {
   const sites = s.buildings.filter((b) => b.build < 1).length;
   // Sites waiting for stone must not block the quarry that would supply it.
   if (s.res.stone < 6 && count(s, 'quarry') === 0 && tryPlace(s, 'quarry')) return;
+  const foodMakers = count(s, 'forager') + count(s, 'hunter') + count(s, 'fisher') + count(s, 'bakery') * 2;
+  // Before anything else, something to eat: with the stores running down and
+  // no one gathering food, a forager or a hunter takes the first timber.
+  if (foodMakers === 0 && (tryPlace(s, 'forager') || tryPlace(s, 'hunter') || tryPlace(s, 'fisher'))) return;
   if (sites >= 3) return;
   const idle = pop - s.buildings.reduce((a, b) => a + b.workers, 0);
-  const foodMakers = count(s, 'forager') + count(s, 'hunter') + count(s, 'fisher') + count(s, 'bakery') * 2;
   const wants: BuildingType[] = [];
   // Gear wearing out with nothing to mend it: a trading post to buy tools comes first.
   if (count(s, 'tradingpost') === 0 && count(s, 'dock') === 0 && (s.res.tools < 2 || s.buildings.filter((b) => b.worn).length >= 2)) wants.push('tradingpost');
