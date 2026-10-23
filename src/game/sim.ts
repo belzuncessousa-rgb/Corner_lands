@@ -2643,8 +2643,12 @@ function farmFertility(s: GameState, b: Building): number {
 
 /** Grain (or barley, oats, flax) per tile from a fully tended field on rich soil. */
 export const FIELD_YIELD = 18;
-/** Farmer-days of sowing and tending each tile of field needs in a season. */
-export const TEND_PER_TILE = 4;
+/**
+ * Farmer-days of sowing and tending each tile of field needs in a season:
+ * a farmer works about seven and a half tiles, some 135 food a year, a third
+ * more than an orchard's picker brings in.
+ */
+export const TEND_PER_TILE = 8;
 /** Workshops leave this much firewood for the homes' hearths. */
 export const FIREWOOD_RESERVE = 20;
 
@@ -4244,10 +4248,11 @@ export function monthly(s: GameState, rng: StateRng): void {
   const tax = TAX_LEVELS[s.taxLevel];
   let taxes = 0;
   let residents = 0;
+  // Each lived-in home pays by its kind: a Cottage a coin a month at normal taxes.
   for (const b of s.buildings) {
     if (b.residents === 0) continue;
     residents += b.residents;
-    taxes += b.residents * tax.perHead * (b.type === 'house' ? (HOUSE_LEVELS[b.level]?.tax ?? 1) * (hasLuxury(s, b) ? 1.3 : 1) : 1);
+    if (b.type === 'house') taxes += tax.perHome * (HOUSE_LEVELS[b.level]?.tax ?? 1) * (hasLuxury(s, b) ? 1.3 : 1);
   }
   // Only so many can be taxed: the manor's clerk sees to the first 45, each tax office to 40 more.
   const taxable = taxReach(s, true);

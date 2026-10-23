@@ -485,7 +485,8 @@ button.active {
   color: #3d7a3a;
   text-shadow: 0 1px 0 #fff6dc;
 }
-.card.poor .cost {
+/* Only what is short shows red; the rest of the cost stays as it is. */
+.card .cost .neg {
   color: var(--bad);
 }
 .card img {

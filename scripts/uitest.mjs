@@ -303,6 +303,9 @@ await page.waitForTimeout(600);
 check('save the game', /Saved/.test(await page.textContent('#save-msg')));
 await page.evaluate(() => { window.game.state.res.gold = 1; });
 await page.click('[data-m="back"]');
+// Saved games are opened from the main menu.
+await page.click('[data-m="main"]');
+await page.waitForTimeout(500);
 await page.click('[data-m="load"]');
 await page.waitForTimeout(500);
 const loadBtn = await page.$$('.saves .save');
@@ -325,6 +328,8 @@ const townBefore = await page.evaluate(() => ({ b: window.game.state.buildings.l
 await page.click('[data-m="back"]');
 await page.evaluate(() => { window.game.newGame(9, 'normal', 'Elsewhere'); window.game.hud.showGameMenu(); });
 await page.waitForTimeout(200);
+await page.click('[data-m="main"]');
+await page.waitForTimeout(500);
 await page.click('[data-m="load"]');
 await page.waitForTimeout(400);
 await page.setInputFiles('input.file-pick', filePath);

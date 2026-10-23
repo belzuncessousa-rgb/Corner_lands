@@ -615,26 +615,6 @@ export class Hud {
     const factors = s.happinessFactors
       .map((f) => `<div class="kv"><span>${esc(f.label)}</span><span class="${f.value >= 0 ? 'pos' : 'neg'}">${f.value > 0 ? '+' : ''}${f.value}</span></div>`)
       .join('');
-    // How many finer homes have each of their needs met, worst first.
-    const tally = new Map<string, { met: number; of: number; lacking?: number }>();
-    for (const b of s.buildings) {
-      if (b.type !== 'house' || b.level < 2 || b.build < 1) continue;
-      for (const n of houseNeeds(s, b, b.level).slice(2)) {
-        const t = tally.get(n.label) ?? { met: 0, of: 0 };
-        t.of++;
-        if (n.met) t.met++;
-        else t.lacking ??= b.id;
-        tally.set(n.label, t);
-      }
-    }
-    const needs = [...tally]
-      .sort((a, b) => a[1].met / a[1].of - b[1].met / b[1].of)
-      .map(([label, t]) => {
-        const full = t.met === t.of;
-        const attrs = full ? 'class="kv"' : `class="kv link" data-action="goto-b" data-id="${t.lacking}" data-tip="Show a home that lacks this"`;
-        return `<div ${attrs}><span>${esc(label)}</span><span class="${full ? 'pos' : 'neg'}">${t.met}/${t.of} homes</span></div>`;
-      })
-      .join('');
     // Town talk: the wishes most often heard in the lanes, in the villagers' words.
     const voices = new Map<string, { homes: number; at: number }>();
     for (const b of s.buildings) {
@@ -654,7 +634,6 @@ export class Hud {
       <div class="bar"><i style="width:${s.happiness}%;background-position:${-220 + s.happiness * 2.2}px 0"></i></div>
       ${factors || '<i>No villagers yet</i>'}
       ${talk ? `<div class="sub">Town talk</div>${talk}` : ''}
-      ${needs ? `<div class="sub">Needs of the finer homes</div>${needs}` : ''}
       <div class="kv" data-tip="Happy villagers work a little harder: from -10% at 20% happiness to +10% at 80%."><span>Pace of work</span><span class="${moodYield(s) >= 1 ? 'pos' : 'neg'}">${moodYield(s) >= 1 ? '+' : ''}${Math.round((moodYield(s) - 1) * 100)}%</span></div>
       <p class="note">Above 50% settlers arrive, if there are homes and two months of food in store; below 30% families leave.${s.happinessTarget !== s.happiness ? ` Heading towards ${s.happinessTarget}%.` : ''}</p>`;
   }
@@ -732,7 +711,7 @@ export class Hud {
       <div class="sub">Taxes</div>
       <div class="tax">${TAX_LEVELS.map(
         (t, i) =>
-          `<button data-action="tax" data-level="${i}" class="${s.taxLevel === i ? 'active' : ''}" data-tip="<b>${t.name} taxes</b><br>${t.perHead} coins per villager per month, more from finer homes (up to three times from a merchant's house).<br>Happiness ${t.happiness >= 0 ? '+' : ''}${t.happiness}">${t.name}</button>`,
+          `<button data-action="tax" data-level="${i}" class="${s.taxLevel === i ? 'active' : ''}" data-tip="<b>${t.name} taxes</b><br>${t.perHome} coin${t.perHome === 1 ? '' : 's'} a month from each lived-in cottage, more from finer homes (up to four times from a patrician house).<br>Happiness ${t.happiness >= 0 ? '+' : ''}${t.happiness}">${t.name}</button>`,
       ).join('')}</div>
       ${this.prestigeRows()}
       ${this.knowledgeRows()}
@@ -2818,9 +2797,7 @@ export class Hud {
       <div class="menu">
         <button class="primary" data-m="resume">Resume</button>
         <button data-m="save">Save Game</button>
-        <button data-m="load">Load Game</button>
-        <button data-m="new">New Settlement</button>
-        <button data-m="lord">Your Lord &amp; Arms</button>
+        <button data-m="main">Main Menu</button>
         <button data-m="help">How to Play</button>
         <button data-m="settings">Settings</button>
         <button data-m="photo">Photo mode (U)</button>
@@ -2830,9 +2807,12 @@ export class Hud {
     );
     m.querySelector('[data-m="resume"]')!.addEventListener('click', () => this.closeModal());
     m.querySelector('[data-m="save"]')!.addEventListener('click', () => this.showSave());
-    m.querySelector('[data-m="load"]')!.addEventListener('click', () => this.showLoad(false));
-    m.querySelector('[data-m="new"]')!.addEventListener('click', () => this.showNewGame(false));
-    m.querySelector('[data-m="lord"]')!.addEventListener('click', () => this.showLord());
+    // New settlements and saved games are opened from the main menu (the lord has a button of his own).
+    // The town is saved first, so Continue brings it back just as it was.
+    m.querySelector('[data-m="main"]')!.addEventListener('click', async () => {
+      await this.game.autosave().catch(() => undefined);
+      this.showMainMenu();
+    });
     m.querySelector('[data-m="help"]')!.addEventListener('click', () => this.showHelp(false));
     m.querySelector('[data-m="settings"]')!.addEventListener('click', () => this.showSettings(false));
     m.querySelector('[data-m="photo"]')!.addEventListener('click', () => {

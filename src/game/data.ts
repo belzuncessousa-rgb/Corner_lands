@@ -1528,10 +1528,11 @@ export const TIERS = [
 ];
 
 export const TAX_LEVELS = [
-  { name: 'None', perHead: 0, happiness: 10 },
-  { name: 'Low', perHead: 0.25, happiness: 4 },
-  { name: 'Normal', perHead: 0.5, happiness: 0 },
-  { name: 'High', perHead: 0.8, happiness: -14 },
+  // Coins a month from each lived-in Cottage (finer homes pay more, see HOUSE_LEVELS).
+  { name: 'None', perHome: 0, happiness: 10 },
+  { name: 'Low', perHome: 0.5, happiness: 4 },
+  { name: 'Normal', perHome: 1, happiness: 0 },
+  { name: 'High', perHome: 1.6, happiness: -14 },
 ];
 
 
