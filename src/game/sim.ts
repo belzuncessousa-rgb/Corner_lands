@@ -474,7 +474,8 @@ export function zoneError(s: GameState, type: BuildingType, x0: number, y0: numb
   if (!z) return 'Not a zone';
   if (!isUnlocked(s, type)) return `Requires ${TIERS[d.tier].name}`;
   const r = zoneRect(x0, y0, x1, y1);
-  if (r.w < z.min || r.h < z.min) return `At least ${z.min}×${z.min} tiles`;
+  // A marketplace only needs room for one stall: two tiles, any shape.
+  if (type === 'market' ? r.w * r.h < 2 : r.w < z.min || r.h < z.min) return type === 'market' ? 'At least two tiles' : `At least ${z.min}×${z.min} tiles`;
   if (r.w > z.max || r.h > z.max) return `At most ${z.max}×${z.max} tiles`;
   const clear = footprintClear(s, r.x, r.y, r.w, r.h);
   if (clear) return clear;
@@ -1846,12 +1847,6 @@ export function inSeason(s: GameState, b: Building): boolean {
  */
 export function restingNow(s: GameState, b: Building): boolean {
   if (!inSeason(s, b)) return true;
-  // Batch workshops wait, without workers, until a full batch of inputs is in store.
-  const def = workDef(b);
-  if (def.batch && !b.batchOn) {
-    if (!batchReady(s, b)) return true;
-    b.batchOn = true;
-  }
   // The harvest is brought in early in its month; once it is in, the farmers are free.
   if (b.type === 'farm' && monthOf(s.day) === 7 && s.day % DAYS_PER_MONTH !== 0 && !zonesOf(s, b).some((f) => f.growth > 0)) return true;
   // Foresters whose woods are full take other work until next month.
@@ -1864,14 +1859,6 @@ export function restingNow(s: GameState, b: Building): boolean {
     b.status = 'Back to work';
   }
   return false;
-}
-
-/** Whether inputs for a whole batch of cycles are waiting in store. */
-export function batchReady(s: GameState, b: Building): boolean {
-  const d = workDef(b);
-  const n = d.batch ?? 1;
-  for (const k in d.inputs) if (s.res[k as ResourceId] < (d.inputs[k as ResourceId] ?? 0) * n) return false;
-  return true;
 }
 
 /** The first month after `from` in which the workplace works again. */
@@ -2595,11 +2582,6 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
         return 'Waiting for fuel (firewood or charcoal)';
       }
       if (!canAfford(s, inputs)) {
-        // A batch ends when the inputs run out; workers go back to other jobs.
-        if (d.batch) {
-          b.batchOn = false;
-          return 'Batch done: waiting for the next load';
-        }
         const missing = Object.keys(inputs).filter((k) => s.res[k as ResourceId] < (inputs[k as ResourceId] ?? 0));
         b.lack = missing[0] as ResourceId;
         return `Waiting for ${missing.map((k) => GOODS[k as ResourceId].name.toLowerCase()).join(', ')}`;
@@ -3653,12 +3635,6 @@ export function dailyProduction(s: GameState, rng: StateRng): void {
       else if (b.workers === 0) b.status = 'No workers available';
       continue;
     }
-    if (d.batch && !b.batchOn && inSeason(s, b) && !batchReady(s, b)) {
-      const need = Object.entries(d.inputs).map(([k, v]) => `${Math.floor(s.res[k as ResourceId])}/${(v ?? 0) * (d.batch ?? 1)} ${GOODS[k as ResourceId].name.toLowerCase()}`);
-      b.status = `Waiting for a full batch (${need.join(', ')})`;
-      b.blocked = BLOCK_SEASONAL;
-      continue;
-    }
     if (!inSeason(s, b)) {
       const next = nextSeasonMonth(s, b);
       b.status = next === null ? 'Resting' : `Resting until ${MONTH_NAMES[next].toLowerCase()}`;
@@ -3719,7 +3695,6 @@ export function dailyProduction(s: GameState, rng: StateRng): void {
         status === 'Out of season' ||
         status === 'Nothing to gather this season' ||
         status === 'The woods are full' ||
-        !!status?.startsWith('Batch done') ||
         !!status?.startsWith('Enough');
       b.blocked = status ? (idle ? BLOCK_SEASONAL : BLOCK_PROBLEM) : 0;
       // A day or two without inputs is no shortage: the workers wait for the
@@ -4385,7 +4360,7 @@ export const MONASTERY_KNOWLEDGE = 3;
  * What the settlement's own lore brings every month, by its rank: a bigger
  * place knows more (tuned so the whole board is learned a few years after City).
  */
-export const RANK_LORE = [0.2, 1, 1.5, 2, 3];
+export const RANK_LORE = [0.2, 1 / 3, 0.5, 2 / 3, 1];
 export function eldersLore(s: GameState): number {
   return RANK_LORE[s.tier] ?? RANK_LORE[RANK_LORE.length - 1];
 }

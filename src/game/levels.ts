@@ -93,10 +93,11 @@ export function roomToGrow(s: GameState, b: Building, size: number): boolean {
   return true;
 }
 
-/** Stalls a marketplace has room for: one for every six tiles, up to six. */
+/** Stalls a marketplace has room for: one for every two tiles of square. */
 export function marketStalls(b: Building): number {
   if (b.type === 'markethall') return 10;
-  return Math.max(1, Math.min(6, Math.floor((b.w * b.h) / 6)));
+  // A stall, and a vendor, for every two tiles of square.
+  return Math.max(1, Math.floor((b.w * b.h) / 2));
 }
 
 export function workersOf(b: Building): number {
@@ -121,14 +122,14 @@ export function buildingName(b: Building): string {
 /** Great Works that count for the Patrician House (all but the statue). */
 export const GREAT_WORKS: BuildingType[] = ['markethall', 'belltower', 'cathedral', 'university', 'guildhall'];
 
-/** The best church (or the cathedral, as the finest) whose reach covers a home. */
-export function churchLevelNear(s: GameState, home: Building): number {
+/**
+ * The town's church, as fine as it is (the cathedral the finest): a town has
+ * only one, so homes anywhere in it may grow on its account, near it or not.
+ */
+export function churchLevelInTown(s: GameState): number {
   let best = 0;
-  const c = { x: home.x + home.w / 2, y: home.y + home.h / 2 };
   for (const o of s.buildings) {
     if ((o.type !== 'church' && o.type !== 'cathedral') || o.build < 1) continue;
-    const r = BUILDINGS[o.type].radius;
-    if (Math.hypot(o.x + o.w / 2 - c.x, o.y + o.h / 2 - c.y) > r) continue;
     best = Math.max(best, o.type === 'cathedral' ? 3 : o.level || 1);
   }
   return best;
@@ -146,20 +147,20 @@ export function houseNeeds(s: GameState, b: Building, level: number): Need[] {
     { label: 'Firewood in winter', met: !s.report.cold },
   ];
   if (level >= 2) {
-    out.push({ label: 'A church nearby', met: churchLevelNear(s, b) >= 1 });
+    out.push({ label: 'A church in town', met: churchLevelInTown(s) >= 1 });
     out.push({ label: 'A well nearby', met: coveredBy(s, b, 'well') });
     out.push({ label: 'A market nearby', met: coveredBy(s, b, 'market') });
     out.push({ label: 'Two food groups', met: s.report.variety >= 2 });
   }
   if (level >= 3) {
-    out.push({ label: 'A stone church nearby', met: churchLevelNear(s, b) >= 2 });
+    out.push({ label: 'A stone church in town', met: churchLevelInTown(s) >= 2 });
     out.push({ label: 'An alehouse or tavern with drink', met: coveredBy(s, b, 'tavern') });
     out.push({ label: 'Three food groups', met: s.report.variety >= 3 });
     if (level === 3) out.push({ label: 'Clothes or boots', met: hasSupply(s, b, 'clothes') || hasSupply(s, b, 'boots') });
     out.push({ label: 'Medicine (or herbs)', met: hasSupply(s, b, 'medicine') || hasSupply(s, b, 'herbs') });
   }
   if (level >= 4) {
-    out.push({ label: 'A dressed stone church nearby', met: churchLevelNear(s, b) >= 3 });
+    out.push({ label: 'A dressed stone church in town', met: churchLevelInTown(s) >= 3 });
     out.push({ label: 'A bathhouse nearby', met: coveredBy(s, b, 'bathhouse') });
     out.push({ label: 'Four food groups', met: s.report.variety >= 4 });
     out.push({ label: 'Clothes', met: hasSupply(s, b, 'clothes') });

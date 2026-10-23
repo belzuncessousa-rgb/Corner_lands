@@ -124,8 +124,7 @@ then fall back to the browser's localStorage.
   Clay pits by the water feed the Tile Kiln (roof tiles for Townhouses); the
   Stonemason squares stone for the manor, church and statues; the Carpenter
   makes wood parts for windmills; the Bloomery smelts ore into iron for the
-  Blacksmith. Kilns, tanneries and bloomeries work in batches: their workers
-  only come once a full batch of inputs is waiting.
+  Blacksmith.
 - **Homes grow** — Cottage (3 villagers) → Timber House (5) (well, market, a tavern with ale or
   cider, clothes, two food groups) → Townhouse (7; church, boots, medicine, three
   food groups). Clothes, boots and medicine wear out every three months.

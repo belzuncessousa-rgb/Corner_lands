@@ -462,7 +462,8 @@ export class Renderer {
         // Stalls on every other tile, spread evenly over the square.
         const slots = marketStalls(b);
         const cands: number[] = [];
-        for (let y = b.y; y < b.y + b.h; y += 2) for (let x = b.x; x < b.x + b.w; x += 2) cands.push(y * W + x);
+        // A stall to every two tiles: on alternate tiles, chequered, so they do not stand shoulder to shoulder.
+        for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) if ((x - b.x + y - b.y) % 2 === 0 || b.w * b.h <= 2) cands.push(y * W + x);
         for (let k = 0; k < Math.min(slots, cands.length); k++) {
           const i = cands[Math.floor(((k + 0.5) * cands.length) / slots)];
           const x = i % W;

@@ -218,8 +218,6 @@ export interface BuildingDef {
   charter?: string;
   /** Fuel burned each batch: a firewood is one, a charcoal two (G18). */
   fuel?: number;
-  /** Works in batches: workers are only called once inputs for this many cycles wait. */
-  batch?: number;
   /** Drawn areas worked from a nearby workplace (fields, pastures, orchards). */
   zone?: { owner: BuildingType; min: number; max: number };
   buildable: boolean;
@@ -513,7 +511,6 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     cycle: 3,
     inputs: { hides: 2 },
     outputs: { leather: 2 },
-    batch: 3,
     tier: 1,
     recipes: [
       { id: 'leather', name: 'Leather', inputs: { hides: 2 }, outputs: { leather: 2 } },
@@ -869,7 +866,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   kiln: def({
     type: 'kiln',
     name: 'Tile Kiln',
-    desc: 'Fires clay into roof tiles over a firewood blaze. The kiln is fired in batches: workers come once clay for three firings is waiting. Townhouses are roofed with tiles.',
+    desc: 'Fires clay into roof tiles over a firewood blaze. Townhouses are roofed with tiles.',
     category: 'industry',
     fuel: 1,
     cost: { wood: 4, stone: 4 },
@@ -877,7 +874,6 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     cycle: 3,
     inputs: { clay: 4 },
     outputs: { tiles: 4 },
-    batch: 3,
     tier: 1,
   }),
   stonemason: def({
@@ -915,7 +911,6 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     cycle: 3,
     inputs: { ore: 2 },
     outputs: { iron: 2 },
-    batch: 2,
     tier: 2,
   }),
   cooper: def({

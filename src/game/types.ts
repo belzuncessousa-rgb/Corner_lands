@@ -284,8 +284,6 @@ export interface Building {
   age?: number;
   /** Fields: the crop harvested last year (for rotation). */
   lastCrop?: string;
-  /** Batch workshops: a batch is under way. */
-  batchOn?: boolean;
   /** Houses: a craft the family works from home. */
   trade?: BuildingType;
   /** Houses: goods the household has been supplied with, until which day. */

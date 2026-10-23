@@ -967,26 +967,20 @@ describe('review regressions', () => {
   });
 });
 
-describe('batch work', () => {
-  it('a kiln waits for a full batch, fires it, then frees its workers', () => {
+describe('kilns', () => {
+  it('a kiln fires tiles whenever it has clay and fuel, a firing at a time', () => {
     const s = generateWorld(81);
     s.tier = 1;
     const k = placeNearRoad(s, 'kiln');
     k.build = 1;
     k.need = undefined;
     s.population = 10;
-    s.res.clay = 8;
+    s.res.clay = 4;
     s.res.firewood = 60;
     s.dirty = true;
-    run(s, 2);
-    expect(k.workers).toBe(0);
-    expect(k.status).toMatch(/full batch/);
-    s.res.clay = 12;
-    run(s, 60);
+    run(s, 30);
+    // No waiting for a full batch: the clay there is gets fired.
     expect(s.res.tiles).toBeGreaterThan(0);
-    expect(k.batchOn).toBe(false);
-    run(s, 1);
-    expect(k.workers).toBe(0);
   });
 });
 
