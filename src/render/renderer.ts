@@ -2681,23 +2681,46 @@ export class Renderer {
   }
 
   /** Poles and planks around a building being renovated. */
+  /**
+   * Scaffolding while a building is renovated: poles and plank decks along
+   * its two front walls (not a cage round the whole of it), a brace or two,
+   * a ladder, and the materials stacked beside it.
+   */
   private drawScaffold(b: Building): void {
     const p = new Pen(this.ctx);
-    const h = b.type === 'townhall' ? 60 : 44;
-    const corners: [number, number][] = [
-      [b.x + 0.1, b.y + 0.1],
-      [b.x + b.w - 0.1, b.y + 0.1],
-      [b.x + b.w - 0.1, b.y + b.h - 0.1],
-      [b.x + 0.1, b.y + b.h - 0.1],
-    ];
-    for (const [x, y] of corners) p.line([x, y, 0], [x, y, h], '#7b5a36', 1.6);
-    for (const z of [h * 0.35, h * 0.7, h]) {
-      p.line([corners[3][0], corners[3][1], z], [corners[2][0], corners[2][1], z], '#8a6a44', 1.2);
-      p.line([corners[2][0], corners[2][1], z], [corners[1][0], corners[1][1], z], '#8a6a44', 1.2);
+    const h = b.type === 'townhall' ? 30 : 22;
+    const out = 0.12;
+    const pole = '#7b5a36';
+    const plank = '#b08a58';
+    const fy = b.y + b.h + out;
+    const fx = b.x + b.w + out;
+    const along = (from: number, to: number) => {
+      const n = Math.max(2, Math.round((to - from) / 0.75));
+      return Array.from({ length: n + 1 }, (_, k) => from + ((to - from) * k) / n);
+    };
+    const xs = along(b.x + 0.15, b.x + b.w + out);
+    const ys = along(b.y + 0.15, b.y + b.h + out);
+    // The side wall's run first (further back), then the front's.
+    for (const y of ys) p.line([fx, y, 0], [fx, y, h], pole, 1.3);
+    for (const z of [h * 0.5, h]) {
+      p.poly([[fx, ys[0], z], [fx, fy, z], [fx + 0.18, fy, z], [fx + 0.18, ys[0], z]], plank, shade(plank, 0.6));
+      p.line([fx + 0.18, ys[0], z + 3], [fx + 0.18, fy, z + 3], pole, 0.8);
     }
+    p.line([fx, ys[0], 0], [fx, ys[Math.min(2, ys.length - 1)], h * 0.5], pole, 0.9);
+    for (const x of xs) p.line([x, fy, 0], [x, fy, h], pole, 1.3);
+    for (const z of [h * 0.5, h]) {
+      p.poly([[xs[0], fy, z], [fx, fy, z], [fx, fy + 0.18, z], [xs[0], fy + 0.18, z]], plank, shade(plank, 0.6));
+      p.line([xs[0], fy + 0.18, z + 3], [fx, fy + 0.18, z + 3], pole, 0.8);
+    }
+    p.line([xs[0], fy, h * 0.5], [xs[Math.min(2, xs.length - 1)], fy, 0], pole, 0.9);
+    // A ladder up to the first deck.
+    const lx = xs[1];
+    p.line([lx - 0.08, fy + 0.3, 0], [lx - 0.08, fy + 0.18, h * 0.5 + 4], '#6a4a2a', 1);
+    p.line([lx + 0.08, fy + 0.3, 0], [lx + 0.08, fy + 0.18, h * 0.5 + 4], '#6a4a2a', 1);
+    for (let z = 3; z < h * 0.5; z += 3) p.line([lx - 0.08, fy + 0.3 - (z / (h * 0.5)) * 0.12, z], [lx + 0.08, fy + 0.3 - (z / (h * 0.5)) * 0.12, z], '#6a4a2a', 0.7);
     const got = deliveredTo(b);
-    if ((got.planks ?? 0) + (got.wood ?? 0) > 0) p.logPile(b.x + b.w + 0.05, b.y + b.h - 0.5, 2);
-    if ((got.stone ?? 0) > 0) p.stonePile(b.x + 0.2, b.y + b.h + 0.05, 3);
+    if ((got.planks ?? 0) + (got.wood ?? 0) > 0) p.logPile(b.x + b.w + 0.35, b.y + 0.3, 2);
+    if ((got.stone ?? 0) > 0) p.stonePile(b.x + 0.2, b.y + b.h + 0.45, 3);
   }
 
   /** A bobbing bubble over a building: a glyph, or the good it is waiting for. */
