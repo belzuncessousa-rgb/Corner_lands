@@ -320,6 +320,18 @@ export interface Message {
   n?: number;
 }
 
+/** A standing word from the steward, shown as a tab at the left until the trouble passes or the player waves it away. */
+export interface Alert {
+  id: string;
+  /** alert: an emergency (red); tip: tutorial help (yellow). */
+  level: 'alert' | 'tip';
+  title: string;
+  text: string;
+  /** Tile it is about; clicking the tab centres the camera there. */
+  at?: { x: number; y: number };
+  day: number;
+}
+
 export interface MonthReport {
   eaten: number;
   shortage: number;
@@ -425,8 +437,10 @@ export interface GameState {
   hardy?: boolean;
   /** Identifies this settlement among saves (its autosave slot). */
   founded?: number;
-  /** Day each piece of advisor advice was last given. */
+  /** Day each tip was last given, or each warning waved away. */
   advice?: Record<string, number>;
+  /** The steward's warnings and tips showing now. */
+  alerts?: Alert[];
   /** Old export rules (pre stock targets); migrated on load. */
   exports?: Partial<Record<ResourceId, number>>;
   /** Stock targets overriding each good's default keep amount. */

@@ -31,7 +31,7 @@ import {
   UPKEEP,
   NEAR_HINT,
 } from './data';
-import { advise } from './advisor';
+import { advise, clearAlerts } from './advisor';
 import { CHARTERS, hasCharter, onPath } from './charters';
 import { artBoons, DUKE_PRESTIGE, monthlyAtelier, rollEvent, TITLES } from './events';
 import {
@@ -2628,9 +2628,6 @@ export const FIELD_YIELD = 18;
  * more than an orchard's picker brings in.
  */
 export const TEND_PER_TILE = 8;
-/** Workshops leave this much firewood for the homes' hearths. */
-export const FIREWOOD_RESERVE = 20;
-
 /**
  * Goods other than food are made more slowly than they used to be, to match
  * the cheaper buildings (G19; tuned in the balance pass).
@@ -2654,12 +2651,12 @@ export function fuelOf(d: BuildingDef, r: Recipe | null | undefined): number {
 
 /**
  * What a batch's fuel is paid with: a firewood is one unit, a charcoal two.
- * Smelters and smiths burn charcoal first, other fires firewood first, and
- * the homes' firewood reserve is never touched. Null when there is not enough.
+ * Smelters and smiths burn charcoal first, other fires firewood first.
+ * Null when there is not enough.
  */
 export function fuelPlan(s: GameState, type: BuildingType, units: number): Cost | null {
   if (units <= 0) return {};
-  const wood = Math.max(0, Math.floor(s.res.firewood - FIREWOOD_RESERVE));
+  const wood = Math.max(0, Math.floor(s.res.firewood));
   const coal = Math.floor(s.res.charcoal);
   if (type === 'bloomery' || type === 'smithy') {
     const c = Math.min(coal, Math.ceil(units / 2));
@@ -4915,6 +4912,7 @@ export function stepDay(s: GameState): void {
   checkMilestones(s);
   s.day++;
   if (s.day % DAYS_PER_MONTH === 0) monthly(s, rng);
+  else clearAlerts(s);
   if (s.dirty) recompute(s);
 }
 
