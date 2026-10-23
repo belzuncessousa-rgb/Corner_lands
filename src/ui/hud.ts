@@ -2389,6 +2389,7 @@ export class Hud {
         <button data-m="tutorial">Tutorial</button>
         ${saves.length ? '<button data-m="load">Load Game</button>' : ''}
         <button data-m="help">How to Play</button>
+        <button data-m="settings">Settings</button>
       </div>
       ${this.newsHtml()}`,
       false,
@@ -2408,6 +2409,7 @@ export class Hud {
     });
     m.querySelector('[data-m="load"]')?.addEventListener('click', () => this.showLoad(true));
     m.querySelector('[data-m="help"]')!.addEventListener('click', () => this.showHelp(true));
+    m.querySelector('[data-m="settings"]')!.addEventListener('click', () => this.showSettings(true));
     m.querySelector('[data-m="tutorial"]')!.addEventListener('click', () => {
       this.ensureAudio();
       this.showNewGame(true, TUTORIAL_SEED, 'meadow', undefined, true);
@@ -2700,12 +2702,7 @@ export class Hud {
         <button data-m="new">New Settlement</button>
         <button data-m="lord">Your Lord &amp; Arms</button>
         <button data-m="help">How to Play</button>
-        <button data-m="sound">Sound: ${this.muted ? 'Off' : 'On'}</button>
-        <button data-m="music" ${this.muted ? 'disabled' : ''}>Music: ${this.musicOn ? 'On' : 'Off'}</button>
-        <button data-m="scale">Text size: ${Math.round(this.uiScale * 100)}%</button>
-        <button data-m="pausebad">Pause on bad news: ${this.pauseOnBad ? 'On' : 'Off'}</button>
-        <button data-m="tips">Tips: ${this.tipsOn ? 'On' : 'Off'}</button>
-        <button data-m="bicons">Build menu: ${this.buildIcons ? 'Icons' : 'Pictures'}</button>
+        <button data-m="settings">Settings</button>
         <button data-m="photo">Photo mode (U)</button>
         <button data-m="picture">📷 Save a picture</button>
       </div>
@@ -2717,15 +2714,7 @@ export class Hud {
     m.querySelector('[data-m="new"]')!.addEventListener('click', () => this.showNewGame(false));
     m.querySelector('[data-m="lord"]')!.addEventListener('click', () => this.showLord());
     m.querySelector('[data-m="help"]')!.addEventListener('click', () => this.showHelp(false));
-    m.querySelector('[data-m="pausebad"]')!.addEventListener('click', () => {
-      this.pauseOnBad = !this.pauseOnBad;
-      try {
-        localStorage.setItem('cornerlands.pauseOnBad', this.pauseOnBad ? '1' : '0');
-      } catch {
-        /* ignore */
-      }
-      this.showGameMenu();
-    });
+    m.querySelector('[data-m="settings"]')!.addEventListener('click', () => this.showSettings(false));
     m.querySelector('[data-m="photo"]')!.addEventListener('click', () => {
       this.closeModal();
       this.game.setPhoto(true);
@@ -2754,6 +2743,35 @@ export class Hud {
         btn.textContent = url;
       }
     });
+  }
+
+  /** The settings: sound, music, text size and the rest, each a button that flips it. */
+  private showSettings(fromMain: boolean): void {
+    this.modalHelp = 'settings';
+    const m = this.openModal(
+      `<h2>Settings</h2>
+      <div class="menu">
+        <button data-m="sound">Sound: ${this.muted ? 'Off' : 'On'}</button>
+        <button data-m="music" ${this.muted ? 'disabled' : ''}>Music: ${this.musicOn ? 'On' : 'Off'}</button>
+        <button data-m="scale">Text size: ${Math.round(this.uiScale * 100)}%</button>
+        <button data-m="pausebad">Pause on bad news: ${this.pauseOnBad ? 'On' : 'Off'}</button>
+        <button data-m="tips">Tips: ${this.tipsOn ? 'On' : 'Off'}</button>
+        <button data-m="bicons">Build menu: ${this.buildIcons ? 'Icons' : 'Pictures'}</button>
+        <button class="primary" data-m="back">Back</button>
+      </div>`,
+      // From the title screen there is nothing behind it to fall back to.
+      !fromMain,
+    );
+    m.querySelector('[data-m="back"]')!.addEventListener('click', () => (fromMain ? this.showMainMenu() : this.showGameMenu()));
+    m.querySelector('[data-m="pausebad"]')!.addEventListener('click', () => {
+      this.pauseOnBad = !this.pauseOnBad;
+      try {
+        localStorage.setItem('cornerlands.pauseOnBad', this.pauseOnBad ? '1' : '0');
+      } catch {
+        /* ignore */
+      }
+      this.showSettings(fromMain);
+    });
     m.querySelector('[data-m="music"]')!.addEventListener('click', () => {
       this.musicOn = !this.musicOn;
       this.music?.setOn(this.musicOn);
@@ -2762,7 +2780,7 @@ export class Hud {
       } catch {
         /* ignore */
       }
-      this.showGameMenu();
+      this.showSettings(fromMain);
     });
     m.querySelector('[data-m="bicons"]')!.addEventListener('click', () => {
       this.buildIcons = !this.buildIcons;
@@ -2772,7 +2790,7 @@ export class Hud {
         /* ignore */
       }
       this.renderBuildBar();
-      this.showGameMenu();
+      this.showSettings(fromMain);
     });
     m.querySelector('[data-m="tips"]')!.addEventListener('click', () => {
       this.tipsOn = !this.tipsOn;
@@ -2784,7 +2802,7 @@ export class Hud {
       } catch {
         /* ignore */
       }
-      this.showGameMenu();
+      this.showSettings(fromMain);
     });
     m.querySelector('[data-m="scale"]')!.addEventListener('click', () => {
       const steps = [0.85, 1, 1.15, 1.3];
@@ -2795,7 +2813,7 @@ export class Hud {
       } catch {
         /* ignore */
       }
-      this.showGameMenu();
+      this.showSettings(fromMain);
     });
     m.querySelector('[data-m="sound"]')!.addEventListener('click', () => {
       this.muted = !this.muted;
@@ -2806,7 +2824,7 @@ export class Hud {
       } catch {
         /* ignore */
       }
-      this.showGameMenu();
+      this.showSettings(fromMain);
     });
   }
 

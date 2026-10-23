@@ -95,8 +95,12 @@ const HELP: Record<string, HelpPage[]> = {
     { say: 'And your arms. They fly on the manor, on the banners and on the town\'s flags.', show: '.lord-flag' },
   ],
   menu: [
-    { say: 'The game menu: save and load, settings, and help.', show: '.modal .menu' },
+    { say: 'The game menu: save and load, your lord, help, and the settings for sound, text size and the like.', show: '.modal .menu' },
     { say: 'And the seed of your land. The same seed always grows the same land, so friends can play it too.', show: '.modal .seed-line' },
+  ],
+  settings: [
+    { say: 'Your settings, my liege: how the game sounds, looks and behaves. Each button flips its setting, and it is remembered next time.', show: '.modal .menu' },
+    { say: 'Sound and music; the size of the writing; whether bad news stops time; tips like mine; and pictures or icons on the build bar.' },
   ],
   newgame: [
     { say: 'A new settlement! How exciting. Let us choose your land.' },

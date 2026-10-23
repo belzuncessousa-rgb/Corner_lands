@@ -283,7 +283,9 @@ const late = await page.evaluate(() => {
 check('news still shows once the chronicle is full', late);
 // Pause on bad news, switched on in the menu.
 await page.keyboard.press('Escape');
+await page.click('[data-m="settings"]');
 await page.click('[data-m="pausebad"]');
+await page.click('[data-m="back"]');
 await page.click('[data-m="resume"]');
 await page.evaluate(() => { const g = window.game; g.setSpeed(1); window.cl.log(g.state, 'Food shortage! 3 villagers went hungry.', 'bad'); g.hud.update(); });
 await page.waitForTimeout(300);
@@ -330,10 +332,12 @@ const townAfter = await page.evaluate(() => ({ b: window.game.state.buildings.le
 check('a town file opens where it was saved', JSON.stringify(townBefore) === JSON.stringify(townAfter), JSON.stringify(townAfter));
 await page.evaluate(() => window.game.hud.showGameMenu());
 await page.waitForTimeout(200);
+await page.click('[data-m="settings"]');
 const musicBefore = await page.textContent('[data-m="music"]');
 await page.click('[data-m="music"]');
 check('music switch toggles', musicBefore !== (await page.textContent('[data-m="music"]')));
 await page.click('[data-m="music"]');
+await page.click('[data-m="back"]');
 check('the seed link button is there', !!(await page.$('[data-m="seed-link"]')));
 await page.click('[data-m="photo"]');
 await page.waitForTimeout(200);
