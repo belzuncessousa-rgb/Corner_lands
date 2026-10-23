@@ -2211,6 +2211,72 @@ describe('draught animals', () => {
   });
 });
 
+describe('building sites and moving', () => {
+  it('a high-priority site gets the builders and the materials first', async () => {
+    const { constructionSites, setSitePriority } = await import('../src/game/sim');
+    const s = generateWorld(61);
+    const a = placeNearRoad(s, 'house');
+    const b = placeNearRoad(s, 'house');
+    expect(constructionSites(s)[0]).toBe(a);
+    setSitePriority(s, b, 2);
+    expect(constructionSites(s)[0]).toBe(b);
+    // Few hands: the high-priority site is staffed first.
+    s.population = 2;
+    recompute(s);
+    expect(b.builders).toBeGreaterThan(0);
+    expect(a.builders ?? 0).toBe(0);
+  });
+
+  it('a building is moved without materials: the old one works until the new spot stands', async () => {
+    const { moveError, startMove, MOVE_TIME } = await import('../src/game/sim');
+    const s = generateWorld(62);
+    const w = placeNearRoad(s, 'woodcutter');
+    w.build = 1;
+    w.need = undefined;
+    w.priority = 2;
+    recompute(s);
+    const id = w.id;
+    const stock = { ...s.res };
+    // Find a free spot a little way off.
+    let at: { x: number; y: number } | null = null;
+    for (let dy = 6; dy < 20 && !at; dy++) for (let dx = -10; dx < 10 && !at; dx++) if (!moveError(s, w, w.x + dx, w.y + dy)) at = { x: w.x + dx, y: w.y + dy };
+    expect(at).not.toBeNull();
+    const site = startMove(s, w, at!.x, at!.y)!;
+    expect(site).toBeTruthy();
+    expect(moveError(s, w, at!.x + 3, at!.y)).toMatch(/Already/);
+    expect(s.buildings.includes(w)).toBe(true);
+    // It costs nothing.
+    for (const k of ['wood', 'stone', 'planks', 'gold'] as const) expect(s.res[k]).toBe(stock[k]);
+    for (let d = 0; d < BUILDINGS.woodcutter.buildDays * MOVE_TIME * 3 && s.buildings.includes(site); d++) stepDay(s);
+    expect(s.buildings.includes(site)).toBe(false);
+    const moved = s.buildings.find((o) => o.id === id)!;
+    expect([moved.x, moved.y]).toEqual([at!.x, at!.y]);
+    expect(moved.priority).toBe(2);
+    expect(s.occ[idx(s, at!.x, at!.y)]).toBe(id);
+  });
+
+  it('a gatherer with nothing within reach says so the same day and does no work', async () => {
+    const { dailyProduction, gatherLook } = await import('../src/game/sim');
+    const { StateRng } = await import('../src/game/rng');
+    const s = generateWorld(63);
+    const f = placeNearRoad(s, 'forager');
+    f.build = 1;
+    f.need = undefined;
+    f.workers = 2;
+    f.recipe = 'berries';
+    s.day = 150;
+    recompute(s);
+    s.berries.fill(0);
+    expect(gatherLook(s, f)).toEqual({ none: expect.stringMatching(/picked clean|No berry/) });
+    f.workers = 2;
+    dailyProduction(s, new StateRng(s));
+    expect(f.status).toMatch(/picked clean|No berry/);
+    expect(f.efficiency).toBe(0);
+    expect(f.work).toBe(0);
+    expect(s.messages.some((m) => /picked clean|No berry/.test(m.text))).toBe(true);
+  });
+});
+
 describe('travel', () => {
   it('counts every kind of road: the better the road, the shorter the walk the work loses', async () => {
     const { walkBetween } = await import('../src/game/sim');

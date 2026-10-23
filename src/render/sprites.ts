@@ -5368,16 +5368,19 @@ function drawCottage(p: Pen, form: number, hv: HouseLook, season: Season, smoke:
       break;
     }
     case 3: {
-      // A rubble-stone cottage under a deep thatch.
-      p.shadow(0.3, 0.3, 1.3, 1.05);
-      p.box(0.3, 0.3, 1.3, 1.05, 0, 13, '#a49c8e', undefined, 'rubble');
+      // A cob cottage: thick daubed walls with corner posts, a deep thatch,
+      // and a boarded woodshed against its end.
+      p.shadow(0.3, 0.3, 1.5, 1.05);
+      p.box(0.3, 0.3, 1.3, 1.05, 0, 13, W);
+      for (const [x, y] of [[0.3, 1.05], [1.3, 1.05], [1.3, 0.3]] as [number, number][]) p.line([x, y, 0], [x, y, 13], BEAM, 1.4);
+      p.box(1.3, 0.45, 1.5, 0.95, 0, 8, '#8a6a40');
+      p.poly([[1.3, 0.42, 11], [1.3, 0.98, 11], [1.54, 0.98, 7], [1.54, 0.42, 7]], p.snow ? '#eef2f4' : shade(ROOF_COLORS.shingle, 0.9), shade(ROOF_COLORS.shingle, 0.5));
       p.doorL(1.05, 0.75, 0.18, 10);
       p.windowL(1.05, 0.45, 6, 0.13, 5, winter);
       p.windowL(1.05, 1.05, 6, 0.12, 5);
-      p.windowR(1.3, 0.6, 6, 0.13, 5);
       drawHouseExtra(p, hv.extra, season, 1.05, [0.45, 1.05], 6, [0.75, 0.18]);
-      p.roofX(0.3, 0.3, 1.3, 1.05, 13, 17, 'thatch', '#a49c8e', 0.16);
-      smoke.push(p.chimney(1.12, 0.6, 20, 14, '#8a7d70'));
+      p.roofX(0.3, 0.3, 1.3, 1.05, 13, 17, 'thatch', W, 0.16);
+      smoke.push(p.chimney(0.5, 0.6, 20, 14, '#8a7d70'));
       break;
     }
     case 4: {
