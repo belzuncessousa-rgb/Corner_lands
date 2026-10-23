@@ -253,6 +253,10 @@ export interface Building {
   want?: number;
   /** Job priority: 0 low, 1 normal (default), 2 high. */
   priority?: number;
+  /** A site where a building is being put up anew (the id of the building being moved), see startMove. */
+  moveOf?: number;
+  /** Building-site priority (new building or renovation): which site gets builders and materials first; 0 low, 1 normal (default), 2 high. */
+  sitePriority?: number;
   /** Chosen product (recipe id), or undefined for Auto. */
   recipe?: string;
   /** Zones (fields, pastures, orchards): the workplace that tends them. */
@@ -375,6 +379,10 @@ export interface Shoal {
 /** Kinds of land a new settlement may be founded on. */
 export type Land = 'meadow' | 'valley' | 'hills';
 
+/** The land's natural resources, each of which a map has plenty of, some, little or none. */
+export type NatResource = 'stone' | 'game' | 'fish' | 'berries' | 'ore' | 'fertility';
+export type Richness = 'rich' | 'regular' | 'poor' | 'none';
+
 export interface GameState {
   version: number;
   seed: number;
@@ -411,6 +419,8 @@ export interface GameState {
   relaxed?: boolean;
   /** The kind of land: rolling meadows (the default), a river valley, or hills. */
   land?: Land;
+  /** How rich this land is in each natural resource (not shown to the player; old lands have none: all regular). */
+  richness?: Partial<Record<NatResource, Richness>>;
   /** Hardy mode: a scarcer start, colder winters, choosier settlers. */
   hardy?: boolean;
   /** Identifies this settlement among saves (its autosave slot). */

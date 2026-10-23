@@ -12,8 +12,6 @@ import {
   buildRoad,
   layRoads,
   planRoad,
-  canAfford,
-  materialsOf,
   bCenter,
   buyAnimal,
   isBridge,
@@ -29,6 +27,8 @@ import {
   recompute,
   removeRoad,
   clearTree,
+  moveError,
+  startMove,
   demolishBlocker,
   nearestResource,
   seatOf,
@@ -76,7 +76,9 @@ export type Tool =
   | { kind: 'road'; paved?: boolean; cobbled?: boolean; royal?: boolean; wall?: boolean; lay?: BuildingType }
   | { kind: 'zone'; type: BuildingType }
   | { kind: 'demolish' }
-  | { kind: 'grove' };
+  | { kind: 'grove' }
+  /** Choosing a new spot for a building (its id). */
+  | { kind: 'move'; id: number };
 
 const SPEEDS = [0, 1, 3, 8];
 
@@ -225,8 +227,8 @@ export class Game {
     this.setSpeed(this.speedIndex === 0 ? this.lastSpeed : 0);
   }
 
-  newGame(seed: number, mode: 'normal' | 'relaxed' | 'hardy' = 'normal', name?: string, land: Land = 'meadow'): void {
-    this.state = generateWorld(seed, { relaxed: mode === 'relaxed', hardy: mode === 'hardy', land });
+  newGame(seed: number, mode: 'normal' | 'relaxed' | 'hardy' = 'normal', name?: string, land: Land = 'meadow', tutorial = false): void {
+    this.state = generateWorld(seed, { relaxed: mode === 'relaxed', hardy: mode === 'hardy', land, plain: tutorial });
     this.state.founded = Date.now();
     this.state.name = name?.trim().slice(0, 40) || placeName(seed);
     recompute(this.state);
@@ -437,6 +439,11 @@ export class Game {
     return { x: Math.floor(tx - d.w / 2 + 0.5), y: Math.floor(ty - d.h / 2 + 0.5) };
   }
 
+  /** Where a building being moved would stand, centred on the pointer. */
+  private movePos(b: Building, tx: number, ty: number): { x: number; y: number } {
+    return { x: Math.floor(tx - b.w / 2 + 0.5), y: Math.floor(ty - b.h / 2 + 0.5) };
+  }
+
   private lastPointer: { x: number; y: number } | null = null;
 
   private overlay(): Overlay {
@@ -484,7 +491,16 @@ export class Game {
     if (inBounds(s, tx, ty)) ov.hover = { x: tx, y: ty };
     const tool = this.tool;
     if ((tool.kind === 'build' || tool.kind === 'zone') && (tool.type === 'farm' || tool.type === 'field')) ov.fertility = true;
-    if (tool.kind === 'build') {
+    if (tool.kind === 'move') {
+      const b = s.buildings.find((o) => o.id === tool.id);
+      if (b) {
+        const p = this.movePos(b, ftx, fty);
+        const err = moveError(s, b, p.x, p.y);
+        ov.ghost = { type: b.type, x: p.x, y: p.y, ok: !err };
+        ov.selected = b.id;
+        this.hud.setHint(err ? `Move the ${BUILDINGS[b.type].name}: ${err}` : `Move the ${BUILDINGS[b.type].name} here · no materials, builders take it down and put it up again; it keeps working until then · right-click to cancel`, !!err);
+      }
+    } else if (tool.kind === 'build') {
       const p = this.ghostPos(tool.type, ftx, fty);
       const err = placementError(s, tool.type, p.x, p.y);
       ov.ghost = { type: tool.type, x: p.x, y: p.y, ok: !err };
@@ -851,6 +867,22 @@ export class Game {
     const tx = Math.floor(ftx);
     const ty = Math.floor(fty);
     const tool = this.tool;
+    if (tool.kind === 'move') {
+      const b = s.buildings.find((o) => o.id === tool.id);
+      if (!b) return this.setTool({ kind: 'select' });
+      const p = this.movePos(b, ftx, fty);
+      const err = moveError(s, b, p.x, p.y);
+      if (err) {
+        this.hud.flash(err);
+        return;
+      }
+      if (startMove(s, b, p.x, p.y)) {
+        this.hud.sound('place');
+        this.setTool({ kind: 'select' });
+        this.select(b.id);
+      }
+      return;
+    }
     if (tool.kind === 'build') {
       const p = this.ghostPos(tool.type, ftx, fty);
       const err = placementError(s, tool.type, p.x, p.y);
@@ -861,7 +893,6 @@ export class Game {
       const b = placeOrder(s, tool.type, p.x, p.y);
       if (b) {
         this.hud.sound('place');
-        if (!canAfford(s, materialsOf(BUILDINGS[tool.type].cost))) this.hud.flash('Builders will start once the materials are in storage.');
         if (tool.type !== 'house' && tool.type !== 'well' && tool.type !== 'garden') {
           this.setTool({ kind: 'select' });
           this.hud.closeCategory();

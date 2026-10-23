@@ -331,7 +331,8 @@ describe('yards and haulers', () => {
 describe('kinds of land', () => {
   it('valleys run wetter and richer, hills stonier and poorer; saves remember which', () => {
     const stats = (land: 'meadow' | 'valley' | 'hills') => {
-      const s = generateWorld(4242, { land });
+      // The lie of each kind of land, apart from what this land happens to be rich or poor in.
+      const s = generateWorld(4242, { land, plain: true });
       return {
         s,
         rock: s.rock.filter((v) => v > 0).length,
@@ -347,6 +348,39 @@ describe('kinds of land', () => {
     expect(valley.rock).toBeLessThan(meadow.rock);
     expect(deserialize(serialize(hills.s)).land).toBe('hills');
     expect(meadow.s.land).toBeUndefined();
+  });
+
+  it('each land is rich in its own resource, lacks one other (never stone), and is regular or poor in the rest', async () => {
+    const { RICHNESS_SCALE, WATER_PER_SHOAL } = await import('../src/game/world');
+    const rich = { meadow: 'fertility', valley: 'fish', hills: 'stone' } as const;
+    for (const land of ['meadow', 'valley', 'hills'] as const)
+      for (let seed = 1; seed <= 12; seed++) {
+        const s = generateWorld(seed, { land });
+        const r = s.richness!;
+        const kinds = Object.values(r);
+        expect(r[rich[land]]).toBe('rich');
+        expect(kinds.filter((k) => k === 'rich').length).toBe(1);
+        expect(kinds.filter((k) => k === 'none').length).toBe(1);
+        expect(kinds.filter((k) => k === 'regular').length).toBe(2);
+        expect(kinds.filter((k) => k === 'poor').length).toBe(2);
+        expect(r.stone).not.toBe('none');
+        // What is missing is missing.
+        if (r.fish === 'none') expect(s.shoals!.length).toBe(0);
+        if (r.game === 'none') expect(s.herds!.length).toBe(0);
+        if (r.berries === 'none') expect(s.berriesMax.some((v) => v > 0)).toBe(false);
+        if (r.ore === 'none') expect(s.ore.some((v) => v > 0)).toBe(false);
+        if (r.fertility === 'none') expect(Math.max(...s.fertility)).toBeLessThan(0.2);
+        // Fish in proportion to the water: about one shoal per WATER_PER_SHOAL tiles, more or fewer by richness.
+        if (r.fish !== 'none') {
+          const water = s.terrain.reduce((n, t) => n + (t === 1 ? 1 : 0), 0);
+          const want = Math.max(1, Math.round((water / WATER_PER_SHOAL) * RICHNESS_SCALE[r.fish!]));
+          expect(s.shoals!.length).toBeGreaterThanOrEqual(Math.min(want, 2));
+          expect(s.shoals!.length).toBeLessThanOrEqual(want);
+        }
+        expect(deserialize(serialize(s)).richness).toEqual(r);
+      }
+    // The tutorial's land has some of everything.
+    expect(Object.values(generateWorld(209, { plain: true }).richness!).every((k) => k === 'regular')).toBe(true);
   });
 });
 

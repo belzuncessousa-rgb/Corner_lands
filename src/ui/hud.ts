@@ -130,6 +130,8 @@ import {
   sellDraught,
   DRAUGHT_PRICE,
   upkeepOf,
+  setSitePriority,
+  moveBlocker,
 } from '../game/sim';
 import type { Building, BuildingType, Category, Cost, GoodsGroup, Land, ResourceId } from '../game/types';
 import type { StorageKind } from '../game/data';
@@ -930,7 +932,7 @@ export class Hud {
     const plan = upgradePlan(s, b);
     const blocker = upgradeBlocker(s, b);
     const key = JSON.stringify([
-      b.id, b.status, b.workers, b.builders, b.residents, b.build.toFixed(2), b.paused, b.level, b.lastOutput, b.growth.toFixed(2), b.want, b.priority, b.recipe, b.yard, b.flowers, b.trade, b.herd, JSON.stringify(b.animals ?? {}), b.owner, Math.floor(b.growth),
+      b.id, b.status, b.workers, b.builders, b.residents, b.build.toFixed(2), b.paused, b.level, b.lastOutput, b.growth.toFixed(2), b.want, b.priority, b.sitePriority, b.recipe, b.yard, b.flowers, b.trade, b.herd, JSON.stringify(b.animals ?? {}), b.owner, Math.floor(b.growth),
       s.tier, blocker, b.need, (b.upProgress ?? 0).toFixed(2), b.unmet, Math.floor(yardTotal(b)), b.hauled, s.buildings.length, Math.floor(s.res.gold / 10), s.population,
       s.lastFeast, s.festivals, monthOf(s.day), b.type === 'market' ? s.day : 0, s.retinue, Math.floor(s.res.wood), Math.floor(totalFood(s)), b.barn, Math.floor(s.res.prestige),
       JSON.stringify(b.orders ?? []), b.worn, b.beast, b.hungry, stalls(s).used, stalls(s).room,
@@ -951,7 +953,15 @@ export class Hud {
       const left = Object.entries(b.need).filter(([, v]) => (v ?? 0) > 0);
       return left.length ? `<div class="kv"><span>Still to carry</span><span class="costline">${costHtml(Object.fromEntries(left))}</span></div>` : '';
     };
+    // Building sites (and renovations) have their own priority: who gets builders and materials first.
+    const sitePrio = () => {
+      const p = b.sitePriority ?? 1;
+      return `<div class="kv site-prio" data-tip="Which building site gets builders, and the materials in store, first."><span>Building priority</span><span class="seg">${['Low', 'Normal', 'High']
+        .map((n, i) => `<button data-action="site-prio" data-p="${i}" class="${p === i ? 'active' : ''}">${n}</button>`)
+        .join('')}</span></div>`;
+    };
     if (b.build < 1) {
+      rows.push(sitePrio());
       rows.push(needLine());
       rows.push(`<div class="kv"><span>Construction</span><span>${Math.floor(b.build * 100)}%</span></div><div class="progress"><i style="width:${b.build * 100}%"></i></div>`);
       rows.push(`<div class="kv"><span>Builders</span><span>${b.builders ?? 0}</span></div>`);
@@ -1066,7 +1076,7 @@ export class Hud {
         const note = b.upNote ?? 'Waiting for builders';
         rows.push(`<div class="upgrade-box"><b>${b.improveTo ? 'Building the' : 'Upgrading to'} ${esc(upgradeName(b))}</b>${needLine()}
           <div class="kv"><span>Now</span><span class="${/^Waiting/.test(note) ? 'neg' : ''}">${esc(note)}</span></div>
-          <div class="kv"><span>Work</span><span>${Math.floor((b.upProgress ?? 0) * 100)}% · ${b.builders ?? 0} builders</span></div>
+          <div class="kv"><span>Work</span><span>${Math.floor((b.upProgress ?? 0) * 100)}% · ${b.builders ?? 0} builders</span></div>${sitePrio()}
           <div class="progress"><i style="width:${(b.upProgress ?? 0) * 100}%"></i></div></div>`);
       } else if (plan) {
         const label = b.type === 'townhall' ? `Raise the manor to a ${plan.name}` : `Upgrade to ${plan.name}`;
@@ -1125,7 +1135,8 @@ export class Hud {
     if (b.build >= 1 && d.workers > 0) {
       actions.push(`<button data-action="pause-b">${b.paused ? '▶ Resume' : '❚❚ Pause'}</button>`);
     }
-    if (b.type !== 'townhall') actions.push(`<button data-action="demolish-b">✖ ${b.build < 1 ? 'Cancel' : 'Demolish'}</button>`);
+    if (!moveBlocker(s, b)) actions.push(`<button data-action="move-b" data-tip="Choose a new spot: builders take it down and put it up there, with no materials. It keeps working until then.">⇄ Move</button>`);
+    if (b.type !== 'townhall') actions.push(`<button data-action="demolish-b">✖ ${b.moveOf !== undefined ? 'Cancel the move' : b.build < 1 ? 'Cancel' : 'Demolish'}</button>`);
     const head = `
       <button class="close" data-action="deselect">✕</button>${fingaButton(`building:${b.type}`)}
       <h2>${esc(buildingName(b))}${b.trade ? ` <small>· ${esc(BUILDINGS[b.trade].name)}</small>` : ''}</h2>`;
@@ -1859,6 +1870,14 @@ export class Hud {
         }
         break;
       }
+      case 'site-prio': {
+        const b = this.selectedBuilding();
+        if (b) {
+          setSitePriority(s, b, Number(t.dataset.p));
+          this.update();
+        }
+        break;
+      }
       case 'prio': {
         const b = this.selectedBuilding();
         if (b) {
@@ -1949,6 +1968,11 @@ export class Hud {
         if (b && startUpgrade(s, b)) this.sound('place');
         this.confirmUpgrade = null;
         this.update();
+        break;
+      }
+      case 'move-b': {
+        const b = this.selectedBuilding();
+        if (b) g.setTool({ kind: 'move', id: b.id });
         break;
       }
       case 'demolish-b': {
@@ -2484,7 +2508,7 @@ export class Hud {
     });
     m.querySelector('[data-m="back"]')!.addEventListener('click', () => (fromMain ? this.showMainMenu() : this.showGameMenu()));
     m.querySelector('[data-m="go"]')!.addEventListener('click', () => {
-      this.game.newGame(tutorial ? TUTORIAL_SEED : seedOf(input.value.trim()), mode as 'normal' | 'relaxed' | 'hardy', town.value, tutorial ? 'meadow' : landOf());
+      this.game.newGame(tutorial ? TUTORIAL_SEED : seedOf(input.value.trim()), mode as 'normal' | 'relaxed' | 'hardy', town.value, tutorial ? 'meadow' : landOf(), tutorial);
       if (tutorial) this.game.state.tutorial = { step: 0, chapter: 'start', storeSeen: false };
       this.game.state.lord = { ...this.draftLord };
       this.game.state.heraldry = { ...this.draftArms };

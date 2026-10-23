@@ -1,6 +1,6 @@
 import { BUILDINGS } from './data';
 import { fbm, mulberry32 } from './rng';
-import type { Building, BuildingType, GameState, Land, Resources } from './types';
+import type { Building, BuildingType, GameState, Land, NatResource, Resources, Richness } from './types';
 import { RESOURCE_IDS } from './types';
 
 export const MAP_SIZE = 80;
@@ -50,7 +50,44 @@ export const LANDS: Record<Land, { name: string; desc: string }> = {
   hills: { name: 'Hills', desc: 'Stony upland with more rock and ore, thin soil and only a stream.' },
 };
 
-export function generateWorld(seed: number, opts: { relaxed?: boolean; hardy?: boolean; land?: Land } = {}): GameState {
+/** How much of a resource each richness brings, against a regular land. */
+export const RICHNESS_SCALE: Record<Richness, number> = { rich: 2, regular: 1, poor: 0.5, none: 0 };
+
+/** The resource each kind of land is always rich in. */
+const LAND_RICH: Record<Land, NatResource> = { meadow: 'fertility', valley: 'fish', hills: 'stone' };
+
+/**
+ * How rich a new land is in each natural resource: the one its kind of land
+ * is known for is rich, one other is missing altogether (never stone), and
+ * of the rest two are regular and two poor. The tutorial's land has some of
+ * everything.
+ */
+export function rollRichness(land: Land, rand: () => number, plain = false): Record<NatResource, Richness> {
+  const all: NatResource[] = ['stone', 'game', 'fish', 'berries', 'ore', 'fertility'];
+  const out = Object.fromEntries(all.map((k) => [k, 'regular'])) as Record<NatResource, Richness>;
+  if (plain) return out;
+  const rich = LAND_RICH[land];
+  out[rich] = 'rich';
+  const rest = all.filter((k) => k !== rich);
+  const canLack = rest.filter((k) => k !== 'stone');
+  const none = canLack[Math.floor(rand() * canLack.length)];
+  out[none] = 'none';
+  const left = rest.filter((k) => k !== none);
+  // Shuffle what is left: two regular, two poor.
+  for (let i = left.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [left[i], left[j]] = [left[j], left[i]];
+  }
+  left.forEach((k, i) => (out[k] = i < 2 ? 'regular' : 'poor'));
+  return out;
+}
+
+/** How much of a natural resource a land has, against a regular one (old lands: regular). */
+export function richness(s: GameState, k: NatResource): number {
+  return RICHNESS_SCALE[s.richness?.[k] ?? 'regular'];
+}
+
+export function generateWorld(seed: number, opts: { relaxed?: boolean; hardy?: boolean; land?: Land; plain?: boolean } = {}): GameState {
   const land: Land = opts.land ?? 'meadow';
   const W = MAP_SIZE;
   const H = MAP_SIZE;
@@ -91,6 +128,8 @@ export function generateWorld(seed: number, opts: { relaxed?: boolean; hardy?: b
     dirty: true,
   };
 
+  // What this land is rich and poor in (its own dice, so the lie of the land does not change with it).
+  s.richness = rollRichness(land, mulberry32(seed + 4242), opts.plain);
   for (let i = 0; i < n; i++) s.variant[i] = Math.floor(rand() * 256);
 
   // --- Water: a meandering river plus noise lakes.
@@ -221,12 +260,15 @@ export function generateWorld(seed: number, opts: { relaxed?: boolean; hardy?: b
       return;
     }
   };
-  // Few outcrops, but deep: stone is found in places, not everywhere.
-  depositNear(s.rock, 8, 13, 2, 40, true);
-  const outcrops = land === 'hills' ? 9 : land === 'valley' ? 2 : 4;
+  // Few outcrops, but deep: stone is found in places, not everywhere. There is always one near the start.
+  depositNear(s.rock, 8, 13, richness(s, 'stone') < 1 ? 1 : 2, 40, true);
+  const outcrops = Math.round((land === 'hills' ? 6 : land === 'valley' ? 2 : 4) * richness(s, 'stone'));
   for (let k = 0; k < outcrops; k++) depositNear(s.rock, 16, 40, 1 + Math.floor(rand() * 2), 45);
-  depositNear(s.ore, 14, 22, 1, 30, false, true);
-  for (let k = 0; k < (land === 'hills' ? 4 : 2); k++) depositNear(s.ore, 20, 40, 1, 35, false, true);
+  const ore = richness(s, 'ore');
+  if (ore > 0) {
+    depositNear(s.ore, 14, 22, 1, 30, false, true);
+    for (let k = 0; k < Math.round((land === 'hills' ? 3 : 2) * ore); k++) depositNear(s.ore, 20, 40, 1, 35, false, true);
+  }
 
   seedNature(s, site, rand);
 
@@ -250,6 +292,14 @@ export function generateWorld(seed: number, opts: { relaxed?: boolean; hardy?: b
         for (let dy = -4; dy <= 4 && !near; dy++) for (let dx = -4; dx <= 4 && !near; dx++) near = inBounds(s, x + dx, y + dy) && s.terrain[idx(s, x + dx, y + dy)] === 1;
         if (near) s.fertility[i] = Math.min(1, s.fertility[i] + 0.3);
       }
+  }
+  // Rich soil, thin soil, or none worth the plough anywhere (below a fifth).
+  const fert = s.richness.fertility;
+  if (fert !== 'regular') {
+    for (let i = 0; i < n; i++) {
+      const f = s.fertility[i];
+      s.fertility[i] = fert === 'rich' ? Math.min(1, f * 1.3 + 0.12) : fert === 'poor' ? Math.max(0.15, f * 0.6) : Math.min(0.19, Math.max(0.1, f * 0.2));
+    }
   }
   if (land !== 'meadow') s.land = land;
   // Enough timber for a home, a woodcutter and a food camp; a little coin.
@@ -320,10 +370,12 @@ export function seedNature(s: GameState, site: { x: number; y: number }, rand: (
       placed++;
     }
   };
-  if (berries) {
+  // How much of each this land has: rich doubles the patches, poor halves them, none has none.
+  const berryScale = richness(s, 'berries');
+  if (berries && berryScale > 0) {
     const near = spot(6, 12, edge) ?? spot(6, 14, (x, y) => free(idx(s, x, y)) && !s.trees[idx(s, x, y)]);
-    if (near) berryPatch(near.x, near.y, 6);
-    for (let k = 0; k < 3; k++) {
+    if (near) berryPatch(near.x, near.y, Math.max(3, Math.round(6 * Math.min(1.4, berryScale))));
+    for (let k = 0; k < Math.round(3 * berryScale); k++) {
       const p = far(edge);
       if (p) berryPatch(p.x, p.y, 7);
     }
@@ -364,25 +416,56 @@ export function seedNature(s: GameState, site: { x: number; y: number }, rand: (
   // Game: a warren of rabbits near the start, where wood meets meadow; deer
   // keep to glades deep in the woods far off, and another warren.
   s.herds = [];
+  const game = richness(s, 'game');
   const woods = (x: number, y: number) => free(idx(s, x, y)) && s.trees[idx(s, x, y)] <= 1 && trees(x, y, 4) >= 30;
-  const warrenNear = spot(7, 15, edge);
-  if (warrenNear) s.herds.push({ kind: 'rabbit', x: warrenNear.x + 0.5, y: warrenNear.y + 0.5, n: 10, max: 14 });
-  const deer = far(woods);
-  if (deer) s.herds.push({ kind: 'deer', x: deer.x + 0.5, y: deer.y + 0.5, n: 6, max: 8 });
-  const warrenFar = far(edge);
-  if (warrenFar) s.herds.push({ kind: 'rabbit', x: warrenFar.x + 0.5, y: warrenFar.y + 0.5, n: 10, max: 14 });
+  const apart = (x: number, y: number) => !s.herds!.some((o) => Math.hypot(o.x - x, o.y - y) < 10);
+  if (game > 0) {
+    // Always a warren within reach (a small one on poor land), then deer and warrens further off.
+    const warrenNear = spot(7, 15, edge);
+    const small = game < 1 ? 0.6 : 1;
+    if (warrenNear) s.herds.push({ kind: 'rabbit', x: warrenNear.x + 0.5, y: warrenNear.y + 0.5, n: Math.round(10 * small), max: Math.round(14 * small) });
+    for (let k = 0; k < Math.round(1 * game); k++) {
+      const deer = far((x, y) => woods(x, y) && apart(x, y));
+      if (deer) s.herds.push({ kind: 'deer', x: deer.x + 0.5, y: deer.y + 0.5, n: 6, max: 8 });
+    }
+    for (let k = 0; k < Math.round(1 * game) - (game < 1 ? 1 : 0); k++) {
+      const warrenFar = far((x, y) => edge(x, y) && apart(x, y));
+      if (warrenFar) s.herds.push({ kind: 'rabbit', x: warrenFar.x + 0.5, y: warrenFar.y + 0.5, n: 10, max: 14 });
+    }
+  }
 
-  // Fish shoal in open water, away from the banks: one near, one far.
+  // Fish shoal in open water, away from the banks: about one for every
+  // WATER_PER_SHOAL tiles of water (twice that on rich land, half on poor),
+  // the first near the start, the rest spread out over the water.
   s.shoals = [];
   const deep = (x: number, y: number) => {
     for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (!inBounds(s, x + dx, y + dy) || s.terrain[idx(s, x + dx, y + dy)] !== 1) return false;
     return true;
   };
-  const shoalNear = spot(4, 18, deep);
-  if (shoalNear) s.shoals.push({ x: shoalNear.x + 0.5, y: shoalNear.y + 0.5, n: SHOAL_MAX, max: SHOAL_MAX });
-  const shoalFar = far((x, y) => deep(x, y) && !s.shoals!.some((o) => Math.hypot(o.x - x, o.y - y) < 8));
-  if (shoalFar) s.shoals.push({ x: shoalFar.x + 0.5, y: shoalFar.y + 0.5, n: SHOAL_MAX, max: SHOAL_MAX });
+  let water = 0;
+  for (let i = 0; i < s.terrain.length; i++) if (s.terrain[i] === 1) water++;
+  const fish = richness(s, 'fish');
+  const shoals = fish > 0 ? Math.max(1, Math.round((water / WATER_PER_SHOAL) * fish)) : 0;
+  const clear = (x: number, y: number) => !s.shoals!.some((o) => Math.hypot(o.x - x, o.y - y) < SHOAL_SPACING);
+  const add = (p: { x: number; y: number } | null) => p && s.shoals!.push({ x: p.x + 0.5, y: p.y + 0.5, n: SHOAL_MAX, max: SHOAL_MAX });
+  // A stream has no open water: there the fish keep to its widest stretches.
+  const wide = (x: number, y: number) => {
+    let n = 0;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (inBounds(s, x + dx, y + dy) && s.terrain[idx(s, x + dx, y + dy)] === 1) n++;
+    return s.terrain[idx(s, x, y)] === 1 && n >= 5;
+  };
+  if (shoals > 0) add(spot(4, 18, deep) ?? spot(4, 24, wide));
+  for (let tries = 0; s.shoals.length < shoals && tries < 1200; tries++) {
+    const x = Math.floor(rand() * s.width);
+    const y = Math.floor(rand() * s.height);
+    if ((tries < 600 ? deep(x, y) : wide(x, y)) && clear(x, y)) add({ x, y });
+  }
 }
+
+/** Tiles of water for each shoal of fish, on a land of regular richness. */
+export const WATER_PER_SHOAL = 150;
+/** Shoals keep at least this far apart. */
+const SHOAL_SPACING = 6;
 
 /** Catches a shoal holds (each half a catch of five fish). */
 export const SHOAL_MAX = 12;

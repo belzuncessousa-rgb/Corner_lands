@@ -274,6 +274,68 @@ export function placementError(s: GameState, type: BuildingType, x: number, y: n
   return materialsShort(s, d.cost, type);
 }
 
+// ---------------------------------------------------------------- moving
+
+/** What cannot be moved: the manor and the camp, walls, hedges and beds, and drawn zones. */
+const UNMOVABLE: BuildingType[] = ['townhall', 'camp', 'wall', 'hedge', 'flowerbed'];
+/** Taking a building down and putting it up again takes this much longer than raising it. */
+export const MOVE_TIME = 1.25;
+
+/** Why a building cannot be moved at all just now, or null. */
+export function moveBlocker(s: GameState, b: Building): string | null {
+  if (BUILDINGS[b.type].zone || UNMOVABLE.includes(b.type)) return 'This cannot be moved';
+  if (b.build < 1) return 'Finish building it first';
+  if (b.upgrading || b.craftTo) return 'Builders are already at work here';
+  if (s.buildings.some((o) => o.moveOf === b.id)) return 'Already being moved';
+  return null;
+}
+
+/** Why a building cannot be moved to a spot, or null. Moving costs no materials, only builders' time. */
+export function moveError(s: GameState, b: Building, x: number, y: number): string | null {
+  const blocked = moveBlocker(s, b);
+  if (blocked) return blocked;
+  const clear = footprintClear(s, x, y, b.w, b.h, b.type === 'dock');
+  if (clear) return clear;
+  if ((b.type === 'fisher' || b.type === 'claypit' || b.type === 'sandpit' || b.type === 'watermill' || b.type === 'dock' || b.type === 'papermill' || b.type === 'watersawmill') && countInRadius(s, centerOf(x, y, b.w, b.h), 2.5, (i) => s.terrain[i] === 1) < 2) {
+    return 'Must be next to water';
+  }
+  if (b.type === 'silvermine' && !silverUnder(s, x, y, b.w, b.h)) return 'Must stand on a silver vein';
+  if (ESTATE.includes(b.type) && !touchesEstate(s, x, y, b.w, b.h)) return "Must touch the manor's grounds";
+  return null;
+}
+
+/**
+ * Starts moving a building: builders put it up anew at the new spot (no
+ * materials, a quarter longer than building it), while the old one keeps
+ * working. When the new one stands, the old one is taken down and the
+ * building, with its workers, stock and settings, carries on from there.
+ */
+export function startMove(s: GameState, b: Building, x: number, y: number): Building | null {
+  if (moveError(s, b, x, y)) return null;
+  const site = makeBuilding(s.nextId++, b.type, x, y);
+  site.w = b.w;
+  site.h = b.h;
+  site.level = b.level;
+  site.moveOf = b.id;
+  site.sitePriority = b.sitePriority;
+  placeBuilding(s, site);
+  recompute(s);
+  return site;
+}
+
+/** The new spot stands: the building moves into it, and its old place is cleared. */
+function finishMove(s: GameState, site: Building): void {
+  const old = s.buildings.find((o) => o.id === site.moveOf);
+  removeBuilding(s, site);
+  if (!old) return;
+  removeBuilding(s, old);
+  old.x = site.x;
+  old.y = site.y;
+  placeBuilding(s, old);
+  log(s, `${BUILDINGS[old.type].name} moved.`, 'info', old);
+  recompute(s);
+}
+
 /** The deer park: a reserve of at least seven by seven tiles. */
 export const DEER_PARK_MIN = 49;
 /** Venison a staffed deer park gives each month for every ten tiles. */
@@ -726,6 +788,13 @@ export function demolish(s: GameState, b: Building): boolean {
       else back[id] = (back[id] ?? 0) + Math.floor((c[id] ?? 0) * f);
     }
   };
+  // A building being moved takes its new site with it; a move cancelled costs nothing, as it cost nothing.
+  for (const m of s.buildings.filter((o) => o.moveOf === b.id)) removeBuilding(s, m);
+  if (b.moveOf !== undefined) {
+    removeBuilding(s, b);
+    recompute(s);
+    return true;
+  }
   if (b.build >= 1) {
     add(d.zone ? zoneCost(b.type, b.w, b.h) : d.cost, 0.5);
     if (b.upgrading) {
@@ -1631,7 +1700,8 @@ export function recompute(s: GameState): void {
     // A site whose materials are all missing from storage holds no builders:
     // they would only stand about, while the woodcutters who could end the
     // wait went unstaffed.
-    if (isProject(b) && !starvedSite(s, b)) jobs.push({ b, site: true, p: 100 + (b.type === 'wall' ? WALL_SITE_PRIORITY : SITE_PRIORITY) + b.id * 1e-6 });
+    // A site's own priority puts it in the same bands as the workplaces'.
+    if (isProject(b) && !starvedSite(s, b)) jobs.push({ b, site: true, p: (2 - (b.sitePriority ?? 1)) * 100 + (b.type === 'wall' ? WALL_SITE_PRIORITY : SITE_PRIORITY) + b.id * 1e-6 });
     if (b.paused) continue;
     if (b.build >= 1 && workDef(b).workers > 0 && (b.want ?? 1) > 0 && !restingNow(s, b)) {
       if (isMarket(b)) {
@@ -1863,6 +1933,14 @@ export function setWorkers(s: GameState, b: Building, want: number | undefined):
 export function setPriority(s: GameState, b: Building, p: number): void {
   b.priority = Math.max(0, Math.min(2, p));
   if (b.priority === 1) b.priority = undefined;
+  recompute(s);
+}
+
+/** Sets a building site's priority: high sites get builders and materials before the rest. */
+export function setSitePriority(s: GameState, b: Building, p: number): void {
+  b.sitePriority = Math.max(0, Math.min(2, p));
+  if (b.sitePriority === 1) b.sitePriority = undefined;
+  s.dirty = true;
   recompute(s);
 }
 
@@ -2255,6 +2333,53 @@ export function natureMonthly(s: GameState, rng: StateRng): void {
       }
       s.mushrooms[k] = Math.min(s.mushroomsMax[k], (s.mushrooms[k] ?? 0) + 1);
     }
+  }
+}
+
+/**
+ * What a gatherer would walk to today: the walk to the nearest of what it
+ * gathers that is there now, or why there is none. Looked at every day, so
+ * the walk counted in its efficiency is today's, and an empty patch is
+ * flagged at once rather than when the next load fails. Null for workplaces
+ * that gather nothing (or have nothing in season, which is a rest).
+ */
+export function gatherLook(s: GameState, b: Building): { dist: number } | { none: string } | null {
+  switch (b.type) {
+    case 'woodcutter': {
+      const t = nearestTile(s, b, (i) => s.trees[i] > 0 && !inGrove(s, i));
+      if (t >= 0) return { dist: walkFrom(s, b).cost[t] };
+      return { none: s.groves?.length && nearestTile(s, b, (i) => s.trees[i] > 0) >= 0 ? 'Only protected woods within reach' : 'No trees within reach' };
+    }
+    case 'quarry':
+    case 'mine': {
+      const arr = b.type === 'quarry' ? s.rock : s.ore;
+      const t = nearestTile(s, b, (i) => arr[i] > 0);
+      return t >= 0 ? { dist: walkFrom(s, b).cost[t] } : { none: b.type === 'quarry' ? 'No rock within reach' : 'No ore within reach' };
+    }
+    case 'forager': {
+      const r = chooseRecipe(s, b);
+      if (!r) return null;
+      if (r.id === 'berries') {
+        const t = nearestTile(s, b, (i) => s.berries[i] > 0);
+        if (t >= 0) return { dist: walkFrom(s, b).cost[t] };
+        return { none: nearestTile(s, b, (i) => s.berriesMax[i] > 0) >= 0 ? 'Bushes picked clean for now' : 'No berry bushes within reach' };
+      }
+      if (has(b, 'herbgarden')) return { dist: 1 };
+      const t = nearestTile(s, b, (i) => s.trees[i] > 0);
+      return t >= 0 ? { dist: walkFrom(s, b).cost[t] } : { none: 'No woods within reach for herbs' };
+    }
+    case 'hunter': {
+      const h = nearestHerd(s, b);
+      if (h) return { dist: walkToPoint(walkFrom(s, b), s, h.x, h.y, 2) };
+      return { none: nearestHerd(s, b, true) ? 'The game nearby has been hunted out for now' : 'No game within reach' };
+    }
+    case 'fisher': {
+      const sh = nearestShoal(s, b);
+      if (sh) return { dist: walkToPoint(walkFrom(s, b), s, sh.x, sh.y, 4) };
+      return { none: nearestShoal(s, b, true) ? 'The fish are fished out for now' : 'No fish within reach' };
+    }
+    default:
+      return null;
   }
 }
 
@@ -3506,6 +3631,17 @@ export function dailyProduction(s: GameState, rng: StateRng): void {
       continue;
     }
     b.hauled = servedByHaulers(s, b);
+    // A gatherer with nothing within reach says so at once, and gets nothing done.
+    const look = gatherLook(s, b);
+    if (look && 'none' in look) {
+      if (b.status !== look.none) log(s, `${BUILDINGS[b.type].name}: ${look.none.charAt(0).toLowerCase()}${look.none.slice(1)}. Its workers will go elsewhere.`, 'bad', b);
+      b.status = look.none;
+      b.blocked = BLOCK_PROBLEM;
+      b.efficiency = 0;
+      b.lack = undefined;
+      continue;
+    }
+    if (look) b.resDist = look.dist;
     b.efficiency = workEfficiency(b);
     // Time spent on the household's errands is time not spent at work.
     b.work += ((b.workers / d.workers) * b.efficiency * moodYield(s) * learningYield(s) * (1 - (s.report.errands ?? 0)) * wornYield(b) * paceOf(s, b) * improvedPace(b)) / d.cycle;
@@ -3576,7 +3712,8 @@ export const LABOUR_PER_BUILDER = 2;
 
 /** Construction sites in the order builders attend to them. */
 export function constructionSites(s: GameState): Building[] {
-  return s.buildings.filter(isProject).sort((a, b) => a.id - b.id);
+  // The player's priority first: a high-priority site is served its materials before the rest.
+  return s.buildings.filter(isProject).sort((a, b) => (b.sitePriority ?? 1) - (a.sitePriority ?? 1) || a.id - b.id);
 }
 
 export function needsMaterials(b: Building): boolean {
@@ -3661,8 +3798,12 @@ export function dailyConstruction(s: GameState): void {
     }
     // A mason's lodge in reach lends its masons to a Great Work: a fifth faster.
     const masons = GREAT_WORKS.includes(b.type) && s.buildings.some((m) => m.type === 'stonemason' && m.workers > 0 && has(m, 'masonslodge') && Math.hypot(bCenter(m).x - bCenter(b).x, bCenter(m).y - bCenter(b).y) <= GATHER_REACH) ? 1.2 : 1;
-    b.build = Math.min(1, b.build + (n * LABOUR_PER_BUILDER * boost * masons) / d.buildDays);
-    b.status = `Raising the walls (${n} builder${n > 1 ? 's' : ''})`;
+    b.build = Math.min(1, b.build + (n * LABOUR_PER_BUILDER * boost * masons) / (d.buildDays * (b.moveOf !== undefined ? MOVE_TIME : 1)));
+    b.status = `${b.moveOf !== undefined ? 'Taking it down and putting it up here' : 'Raising the walls'} (${n} builder${n > 1 ? 's' : ''})`;
+    if (b.build >= 1 && b.moveOf !== undefined) {
+      finishMove(s, b);
+      continue;
+    }
     if (b.build >= 1) {
       b.status = 'Completed';
       b.need = undefined;
