@@ -255,6 +255,8 @@ export interface Building {
   priority?: number;
   /** A site where a building is being put up anew (the id of the building being moved), see startMove. */
   moveOf?: number;
+  /** An orchard laid out but not planted yet: its fruit is still to be chosen (and paid for). */
+  bare?: boolean;
   /** Building-site priority (new building or renovation): which site gets builders and materials first; 0 low, 1 normal (default), 2 high. */
   sitePriority?: number;
   /** Chosen product (recipe id), or undefined for Auto. */

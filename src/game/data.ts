@@ -420,7 +420,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   orchard: def({
     type: 'orchard',
     name: 'Orchard',
-    desc: 'Rows of fruit trees: apples (also pressed into cider), pears or plums. Saplings cost 2 coins a tile.',
+    desc: 'Ground for fruit, laid out for nothing near an orchard keeper\'s lodge; then choose what to plant: apples (also pressed into cider) or plums at 2 coins a tile, pears at 3, strawberry beds at 1, vines at 4.',
     category: 'farming',
     w: 1,
     h: 1,

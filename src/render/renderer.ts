@@ -1356,6 +1356,8 @@ export class Renderer {
     }
     const v = s.variant[i];
     const orchard = this.orchardTiles.get(i);
+    // A bare orchard is only dug ground until its fruit is chosen.
+    if (orchard?.bare) return;
     if (orchard) {
       const fruit = orchard.recipe ?? 'apples';
       const stage = Math.round(orchardMaturity(s, orchard) * 4) / 4;

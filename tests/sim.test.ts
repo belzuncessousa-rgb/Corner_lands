@@ -747,7 +747,12 @@ describe('fields, herds, orchards and backyards', () => {
     ready(s, 'granary');
     const lodge = ready(s, 'orchardist');
     const o = await zoneNear(s, 'orchard', lodge, 4, 4);
-    o.recipe = 'pears';
+    // Laid out bare, then planted: pears cost three coins a tile.
+    expect(o.bare).toBe(true);
+    const { plantOrchard } = await import('../src/game/sim');
+    const gold = s.res.gold;
+    expect(plantOrchard(s, o, 'pears')).toBeNull();
+    expect(gold - s.res.gold).toBe(3 * o.w * o.h);
     o.age = 1000;
     s.population = 6;
     s.day = DAYS_PER_MONTH * 5 - 1;

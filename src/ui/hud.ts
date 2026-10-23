@@ -131,6 +131,9 @@ import {
   DRAUGHT_PRICE,
   upkeepOf,
   theOnly,
+  plantOrchard,
+  plantingCost,
+  ORCHARD_PLANTING,
   setSitePriority,
   moveBlocker,
 } from '../game/sim';
@@ -149,7 +152,7 @@ const ZONE_COST_NOTE: Partial<Record<BuildingType, string>> = {
   field: '<small>Free · draw it</small>',
   pasture: '<small>Fences: timber</small>',
   deerpark: '<small>Paling: timber</small>',
-  orchard: '<small>2 coins a tile</small>',
+  orchard: '<small>free; fruit 1–4 coins a tile</small>',
 };
 const YARD_ICON: Record<string, string> = { veg: 'vegetables', hens: 'eggs', bees: 'honey' };
 const costText = (c: Cost) =>
@@ -997,16 +1000,18 @@ export class Hud {
         const fixed = !!d.zone || b.type === 'byre';
         const avail = d.recipes.filter((r) => recipeKnown(s, b.type, r));
         const opts = fixed ? avail : [{ id: '', name: 'Auto' }, ...avail];
-        const current = b.recipe ?? (fixed ? d.recipes[0].id : '');
-        const label = b.type === 'field' ? 'Crop' : b.type === 'orchard' ? 'Fruit' : b.type === 'byre' ? 'Animals' : 'Product';
+        // A bare orchard has no fruit yet: each button plants one, at its own price.
+        const current = b.bare ? null : (b.recipe ?? (fixed ? d.recipes[0].id : ''));
+        const label = b.type === 'field' ? 'Crop' : b.type === 'orchard' ? (b.bare ? 'Plant' : 'Fruit') : b.type === 'byre' ? 'Animals' : 'Product';
         rows.push(`<div class="kv product"><span>${label}</span><span class="seg">${opts
           .map((r) => {
             const rec = d.recipes!.find((x) => x.id === r.id);
             const tip = rec
-              ? `<b>${rec.name}</b><br>${b.type === 'orchard' ? 'Replanting starts the trees over.' : rec.months ? `In ${seasonSpan(rec.months)}` : 'All year'}${rec.auto === false ? '<br>Auto never picks this; choose it to make it.' : ''}`
+              ? `<b>${rec.name}</b><br>${b.type === 'orchard' ? `${b.bare ? 'Plant' : 'Replant'} with ${rec.name.toLowerCase()}: ${plantingCost(b, rec.id)} coins (${ORCHARD_PLANTING[rec.id] ?? 2} a tile).${b.bare ? '' : ' Replanting starts the trees over.'}` : rec.months ? `In ${seasonSpan(rec.months)}` : 'All year'}${rec.auto === false ? '<br>Auto never picks this; choose it to make it.' : ''}`
               : '<b>Auto</b><br>Make whatever is in season and below its stock target.';
             const icon = rec ? (ICONS[Object.keys(rec.outputs)[0] as ResourceId] ?? '') : '';
-            return `<button data-action="recipe" data-r="${r.id}" class="${current === r.id ? 'active' : ''}" data-tip="${esc(tip)}">${icon}${r.name}</button>`;
+            const price = b.type === 'orchard' && current !== r.id ? ` <small>${plantingCost(b, r.id)}c</small>` : '';
+            return `<button data-action="recipe" data-r="${r.id}" class="${current === r.id ? 'active' : ''}" data-tip="${esc(tip)}">${icon}${r.name}${price}</button>`;
           })
           .join('')}</span></div>`);
       }
@@ -1930,7 +1935,13 @@ export class Hud {
       }
       case 'recipe': {
         const b = this.selectedBuilding();
-        if (b) {
+        if (b?.type === 'orchard') {
+          const err = plantOrchard(s, b, t.dataset.r ?? '');
+          if (err) this.flash(err);
+          else this.sound('place');
+          this.lastInspectorKey = '';
+          this.update();
+        } else if (b) {
           setRecipe(s, b, t.dataset.r || undefined);
           recompute(s);
           this.update();

@@ -457,7 +457,8 @@ export function isZone(type: BuildingType): boolean {
 /** What it costs to lay out a zone: fences for pastures, saplings for orchards. */
 export function zoneCost(type: BuildingType, w: number, h: number): Cost {
   if (type === 'pasture') return { wood: w + h };
-  if (type === 'orchard') return { gold: 2 * w * h };
+  // An orchard is laid out for nothing; its saplings are paid for when the fruit is chosen.
+  if (type === 'orchard') return {};
   // A timber for every tile of paling round the reserve.
   if (type === 'deerpark') return { wood: 2 * (w + h) };
   return {};
@@ -499,7 +500,10 @@ export function placeZone(s: GameState, type: BuildingType, x0: number, y0: numb
   b.w = r.w;
   b.h = r.h;
   b.build = 1;
-  if (type === 'orchard') b.age = 0;
+  if (type === 'orchard') {
+    b.age = 0;
+    b.bare = true;
+  }
   placeBuilding(s, b);
   recompute(s);
   return b;
@@ -1934,14 +1938,37 @@ export function chooseRecipe(s: GameState, b: Building, any = false): Recipe | n
   return null;
 }
 
+/** Coins a tile of orchard costs to plant, by fruit: vines and pears dear, strawberry beds cheap. */
+export const ORCHARD_PLANTING: Record<string, number> = { apples: 2, pears: 3, plums: 2, strawberries: 1, grapes: 4 };
+
+/** What planting (or replanting) an orchard with a fruit costs. */
+export function plantingCost(b: Building, fruit: string): number {
+  return (ORCHARD_PLANTING[fruit] ?? 2) * b.w * b.h;
+}
+
+/** Plants an orchard with a fruit (or replants it, starting the trees over), paying for the saplings. */
+export function plantOrchard(s: GameState, b: Building, fruit: string): string | null {
+  const r = BUILDINGS.orchard.recipes?.find((x) => x.id === fruit);
+  if (!r || !recipeKnown(s, 'orchard', r)) return 'Not known yet';
+  if (!b.bare && (b.recipe ?? 'apples') === fruit) return null;
+  const cost = plantingCost(b, fruit);
+  if (s.res.gold < cost) return `Planting ${r.name.toLowerCase()} costs ${cost} coins`;
+  s.res.gold -= cost;
+  b.recipe = fruit;
+  b.bare = undefined;
+  b.age = 0;
+  b.growth = 0;
+  return null;
+}
+
 export function setRecipe(s: GameState, b: Building, id: string | undefined): void {
   // Only what the town has learned.
   const r = id ? workDef(b).recipes?.find((x) => x.id === id) : undefined;
   if (r && !recipeKnown(s, b.type, r)) return;
-  // Replanting an orchard starts the trees over.
-  if (b.type === 'orchard' && (b.recipe ?? 'apples') !== (id ?? 'apples')) {
-    b.age = 0;
-    b.growth = 0;
+  // An orchard is planted, and paid for, by fruit.
+  if (b.type === 'orchard') {
+    if (id) plantOrchard(s, b, id);
+    return;
   }
   b.recipe = id;
   b.work = Math.min(b.work, 0.99);
@@ -3294,6 +3321,11 @@ function dailyOrchards(s: GameState): void {
   const first = s.day % DAYS_PER_MONTH === 0;
   for (const o of s.buildings) {
     if (o.type !== 'orchard') continue;
+    if (o.bare) {
+      o.growth = 0;
+      o.status = 'Bare ground: choose a fruit to plant';
+      continue;
+    }
     o.age = (o.age ?? 0) + 1;
     const m = orchardMaturity(s, o);
     if (month === 5 && first) {

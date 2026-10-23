@@ -60,7 +60,7 @@ describe('first hours', () => {
     const { act, tryPlace, zoneSpot } = await import('../src/game/autoplay');
     const { activeQuests, QUESTS } = await import('../src/game/quests');
     const { startUpgrade, upgradeBlocker } = await import('../src/game/levels');
-    const { placeZone, setKeep, setPriority, setYard, stepDay } = await import('../src/game/sim');
+    const { placeZone, plantOrchard, setKeep, setPriority, setYard, stepDay } = await import('../src/game/sim');
     const when: Record<string, number[]> = {};
     const seeds = [1, 2, 3, 4, 5, 6];
     for (const seed of seeds) {
@@ -94,7 +94,8 @@ describe('first hours', () => {
             if (!o) tryPlace(s, 'orchardist');
             else {
               const spot = zoneSpot(s, 'orchard', o, [[3, 3], [3, 2], [2, 3], [2, 2]]);
-              if (spot) placeZone(s, 'orchard', spot.x, spot.y, spot.x + spot.w - 1, spot.y + spot.h - 1);
+              const z = spot && placeZone(s, 'orchard', spot.x, spot.y, spot.x + spot.w - 1, spot.y + spot.h - 1);
+              if (z) plantOrchard(s, z, 'apples');
             }
           }
         }
