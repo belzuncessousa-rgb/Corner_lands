@@ -130,6 +130,8 @@ import {
   sellDraught,
   DRAUGHT_PRICE,
   upkeepOf,
+  orchardHands,
+  ORCHARD_TEND_MONTHS,
   prestigeSources,
   theOnly,
   plantOrchard,
@@ -1424,6 +1426,7 @@ export class Hud {
       } else if (b.type === 'orchard') {
         const m = orchardMaturity(s, b);
         rows.push(`<div class="kv"><span>Trees</span><span>${m < 1 ? `${Math.round(m * 100)}% grown` : 'Bearing fruit'}</span></div>${m < 1 ? bar(m) : ''}`);
+        if (monthOf(s.day) < ORCHARD_TEND_MONTHS && !b.bare) rows.push(`<div class="kv" data-tip="How much of this season's tending the keepers have done: the fruit that sets in autumn is in proportion."><span>Tended this season</span><span>${Math.round((b.tended ?? 0) * 100)}%</span></div>${bar(b.tended ?? 0)}`);
         if (b.growth > 0) rows.push(`<div class="kv"><span>Fruit on the trees</span><span>${Math.floor(b.growth)}</span></div>`);
       }
     }
@@ -1457,7 +1460,9 @@ export class Hud {
     }
     if (b.type === 'orchardist' && b.build >= 1) {
       const orchards = zonesOf(s, b);
-      rows.push(`<div class="kv"><span>Orchards</span><span>${orchards.length} · ${zoneArea(orchards)} tiles</span></div>`);
+      const area = zoneArea(orchards);
+      const hands = orchardHands(b);
+      rows.push(`<div class="kv" data-tip="${workersOf(b)} keepers can tend about ${hands} tiles of orchard through spring and summer; trees left part untended bear part of their fruit."><span>Orchards</span><span class="${area > hands ? 'neg' : ''}">${orchards.length} · ${area} of ~${hands} tiles</span></div>`);
     }
     if (b.type === 'house' && b.build >= 1 && b.level >= 2) {
       if (b.trade) {

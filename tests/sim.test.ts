@@ -747,17 +747,42 @@ describe('fields, herds, orchards and backyards', () => {
     ready(s, 'granary');
     const lodge = ready(s, 'orchardist');
     const o = await zoneNear(s, 'orchard', lodge, 4, 4);
-    // Laid out bare, then planted: pears cost three coins a tile.
+    // Laid out bare, then planted: pears cost six coins a tile.
     expect(o.bare).toBe(true);
     const { plantOrchard } = await import('../src/game/sim');
     const gold = s.res.gold;
     expect(plantOrchard(s, o, 'pears')).toBeNull();
-    expect(gold - s.res.gold).toBe(3 * o.w * o.h);
+    expect(gold - s.res.gold).toBe(6 * o.w * o.h);
     o.age = 1000;
     s.population = 6;
-    s.day = DAYS_PER_MONTH * 5 - 1;
+    // Tended from spring through summer, the fruit sets and is picked in autumn.
+    s.day = Math.ceil(s.day / DAYS_PER_YEAR) * DAYS_PER_YEAR;
+    run(s, DAYS_PER_MONTH * 7);
+    expect(o.tended).toBe(1);
+    run(s, 1);
+    expect(o.tended).toBe(0);
+    expect(o.growth).toBeGreaterThan(o.w * o.h * 8);
     run(s, DAYS_PER_MONTH * 2);
-    expect(s.res.pears).toBeGreaterThan(40);
+    expect(s.res.pears).toBeGreaterThan(80);
+  });
+
+  it('untended orchards bear only as much as they were tended', async () => {
+    const { plantOrchard } = await import('../src/game/sim');
+    const s = generateWorld(34);
+    s.tier = 1;
+    s.res.gold = 500;
+    ready(s, 'granary');
+    const lodge = ready(s, 'orchardist');
+    const o = await zoneNear(s, 'orchard', lodge, 4, 4);
+    plantOrchard(s, o, 'apples');
+    o.age = 1000;
+    s.population = 6;
+    s.day = Math.ceil(s.day / DAYS_PER_YEAR) * DAYS_PER_YEAR;
+    // No keepers at all this season.
+    lodge.want = 0;
+    recompute(s);
+    run(s, DAYS_PER_MONTH * 7 + 1);
+    expect(o.growth).toBe(0);
   });
 
   it('backyards cost materials and feed the household', async () => {
