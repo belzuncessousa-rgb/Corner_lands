@@ -1068,11 +1068,71 @@ describe('steward', () => {
     const { storageCap, stored } = await import('../src/game/sim');
     const s = generateWorld(84);
     s.res.planks += storageCap(s, 'materials') - stored(s, 'materials');
-    // One tip a month: put the others on cooldown.
+    // Tips are for the tutorial; one a month: put the others on cooldown.
+    s.tutorial = { step: 0, chapter: 'done' };
     s.advice = { housing: s.day, 'food-low': s.day, firewood: s.day };
     advise(s, 3);
-    const msg = s.messages.find((m) => m.kind === 'advice');
-    expect(msg?.text).toMatch(/storehouses are full, mostly planks \(\d+\)/);
+    const tip = s.alerts?.find((a) => a.id === 'storage');
+    expect(tip?.level).toBe('tip');
+    expect(tip?.text).toMatch(/storehouses are full, mostly planks \(\d+\)/);
+  });
+});
+
+describe('steward warnings', () => {
+  it('gives tips only in the tutorial, but warns everyone of an emergency', async () => {
+    const { advise } = await import('../src/game/advisor');
+    const { storageCap, stored } = await import('../src/game/sim');
+    const s = generateWorld(84);
+    s.res.planks += storageCap(s, 'materials') - stored(s, 'materials');
+    advise(s, 3);
+    expect(s.alerts?.some((a) => a.level === 'tip')).toBe(false);
+    const work = s.buildings.find((b) => b.type !== 'house' && b.residents === 0 && b.build >= 1)!;
+    work.worn = true;
+    advise(s, 3);
+    const worn = s.alerts?.find((a) => a.id === 'worn-gear');
+    expect(worn?.level).toBe('alert');
+    expect(worn?.at).toEqual({ x: work.x + work.w / 2, y: work.y + work.h / 2 });
+  });
+  it('takes a warning down when the trouble passes, and a dismissed one stays away a while', async () => {
+    const { advise, clearAlerts, dismissAlert } = await import('../src/game/advisor');
+    const s = generateWorld(84);
+    const work = s.buildings.find((b) => b.type !== 'house' && b.residents === 0 && b.build >= 1)!;
+    work.worn = true;
+    advise(s, 3);
+    expect(s.alerts?.some((a) => a.id === 'worn-gear')).toBe(true);
+    work.worn = undefined;
+    clearAlerts(s);
+    expect(s.alerts?.some((a) => a.id === 'worn-gear')).toBe(false);
+    work.worn = true;
+    advise(s, 3);
+    dismissAlert(s, 'worn-gear');
+    advise(s, 4);
+    expect(s.alerts?.some((a) => a.id === 'worn-gear')).toBe(false);
+    s.day += DAYS_PER_MONTH * 3;
+    advise(s, 6);
+    expect(s.alerts?.some((a) => a.id === 'worn-gear')).toBe(true);
+  });
+  it('warns of a cold winter while there is still winter left to heat', async () => {
+    const { advise } = await import('../src/game/advisor');
+    const s = generateWorld(84);
+    const home = s.buildings.find((b) => b.type === 'house') ?? s.buildings[0];
+    home.residents = Math.max(1, home.residents);
+    s.res.firewood = 0;
+    s.res.wood = 0;
+    advise(s, 10);
+    expect(s.alerts?.some((a) => a.id === 'firewood')).toBe(true);
+    advise(s, 0);
+    expect(s.alerts?.some((a) => a.id === 'firewood')).toBe(false);
+  });
+});
+
+describe('fuel', () => {
+  it('workshops may burn the last of the firewood', async () => {
+    const { fuelPlan } = await import('../src/game/sim');
+    const s = generateWorld(84);
+    s.res.firewood = 5;
+    s.res.charcoal = 0;
+    expect(fuelPlan(s, 'bakery', 5)).toEqual({ firewood: 5 });
   });
 });
 
@@ -1184,6 +1244,7 @@ describe('harvest forecast', () => {
     // Only the farm's barn is left to take it.
     expect(f.room).toBe(200);
     s.advice = { housing: s.day, 'food-low': s.day, firewood: s.day, granary: s.day };
+    s.tutorial = { step: 0, chapter: 'done' };
     advise(s, 6);
     expect(s.messages.at(-1)?.text).toMatch(/harvest is near/);
   });
@@ -1254,6 +1315,7 @@ describe('steward on mills', () => {
     s.tier = 1;
     s.res.grain = 200;
     s.advice = { housing: s.day, 'food-low': s.day, firewood: s.day, granary: s.day, storage: s.day };
+    s.tutorial = { step: 0, chapter: 'done' };
     advise(s, 3);
     expect(s.messages.at(-1)?.text).toMatch(/wheat sits unground/);
   });
@@ -1269,7 +1331,11 @@ describe('steward on mills', () => {
       for (let dy = -r; dy <= r && !mill; dy++)
         for (let dx = -r; dx <= r && !mill; dx++) if (!placementError(s, 'windmill', hall.x + dx, hall.y + dy)) mill = placeOrder(s, 'windmill', hall.x + dx, hall.y + dy);
     mill!.build = 1;
-    for (let i = 0; i < 25; i++) advise(s, 3);
+    s.tutorial = { step: 0, chapter: 'done' };
+    for (let i = 0; i < 25; i++) {
+      advise(s, 3);
+      s.alerts = [];
+    }
     expect(s.messages.some((m) => /bakers rest: the bread in store has reached its target/.test(m.text))).toBe(true);
     // The advice points at a windmill, so its toast can show the spot.
     expect(s.messages.find((m) => /bakers rest/.test(m.text))?.at).toEqual({ x: mill!.x + mill!.w / 2, y: mill!.y + mill!.h / 2 });
@@ -1507,7 +1573,11 @@ describe('steward on idle hands and unused piles', () => {
     const s = generateWorld(11);
     s.tier = 1;
     s.res.hides = 150;
-    for (let i = 0; i < 20; i++) advise(s, 3);
+    s.tutorial = { step: 0, chapter: 'done' };
+    for (let i = 0; i < 20; i++) {
+      advise(s, 3);
+      s.alerts = [];
+    }
     const said = s.messages.map((m) => m.text).join(' | ');
     expect(said).toMatch(/150 hides lie unused.*Tannery/);
   });
@@ -1623,7 +1693,11 @@ describe('pottage', () => {
     expect(r.pottage).toBe(40);
     s.report.pottage = r.pottage;
     s.report.shortage = 0;
-    for (let i = 0; i < 25; i++) advise(s, 3);
+    s.tutorial = { step: 0, chapter: 'done' };
+    for (let i = 0; i < 25; i++) {
+      advise(s, 3);
+      s.alerts = [];
+    }
     expect(s.messages.some((m) => /40 villagers lived on pottage/.test(m.text))).toBe(true);
   });
 });

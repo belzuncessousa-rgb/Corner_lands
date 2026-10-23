@@ -786,6 +786,34 @@ button.active {
 .modal ul.credits a {
   color: inherit;
 }
+.modal .volumes {
+  display: grid;
+  gap: 4px;
+  padding: 4px 8px 6px;
+  border: 1.5px solid var(--parch-3);
+  border-radius: 6px;
+}
+.modal .volume {
+  display: grid;
+  grid-template-columns: 9em 1fr 3.2em;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--title);
+  font-size: 15px;
+  color: var(--ink);
+}
+.modal .volume input[type='range'] {
+  padding: 0;
+  border: 0;
+  accent-color: var(--wood);
+  width: 100%;
+}
+.modal .volume output {
+  font-family: var(--serif);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+}
 .modal .row {
   display: flex;
   gap: 8px;
@@ -2995,4 +3023,52 @@ button.finga-help svg {
 
 @media (max-width: 560px) {
   .modes { flex-direction: column; }
+}
+
+/* The steward's tabs down the left edge: red for trouble, yellow for tutorial tips. */
+#alerts {
+  position: absolute;
+  left: 0;
+  top: 42%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  max-width: 300px;
+  z-index: 3;
+}
+#alerts:empty { display: none; }
+.alert-tab {
+  padding: 4px 10px 4px 6px;
+  border-radius: 0 8px 8px 0;
+  border-left: 5px solid var(--bad);
+  cursor: pointer;
+  font-size: 13.5px;
+  animation: msgIn 0.35s ease-out;
+  user-select: none;
+}
+.alert-tab.tip { border-left-color: #d9a520; }
+.alert-tab .head { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.alert-tab .mark {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-weight: bold;
+  font-size: 12px;
+  color: #fff;
+  background: var(--bad);
+  flex: none;
+}
+.alert-tab.tip .mark { background: #d9a520; color: #3b2a1a; }
+.alert-tab .name { font-weight: bold; }
+.alert-tab.alert .name { color: var(--bad); }
+.alert-tab .body { margin-top: 4px; font-size: 13px; line-height: 1.35; white-space: normal; max-width: 270px; }
+.alert-tab .how { margin-top: 3px; font-size: 11.5px; font-style: italic; color: var(--ink-soft); }
+.alert-tab:not(.open):hover { transform: translateX(3px); }
+@media (max-width: 700px) {
+  #alerts { top: 34%; max-width: 220px; }
+  .alert-tab .name { display: none; }
+  .alert-tab.open .name { display: inline; }
 }

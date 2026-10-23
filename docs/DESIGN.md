@@ -257,6 +257,7 @@ Note from the morning run: the 30-year soak's famine on seed 3 comes from its ra
 ### Phase 19 — Ideas for the next runs
 - [x] Unground grain in big towns: a Year-17 bot city had 626 sacks of grain waiting while the steward asked for mills. Find out why the mills lag (hands, flour storage, distance) and fix the cause in the game if it is not just the bot (Found: the bakers rest once bread reaches its stock target, so the surplus is wheat, not hunger. The steward now counts food by how many it feeds and points to the bread target instead of asking for mills.)
 - [x] The steward's advice gets a "show me" link to the building or spot it is about, like the harvest toasts
+- [x] Fewer steward signs: red tabs on the left for emergencies only (worn-out gear, food or firewood short of what the town needs, no market or stall), standing until the trouble passes or a right-click dismisses them for three months; the other advice comes as yellow tips in the tutorial only. Workshops no longer keep back a firewood reserve.
 - [x] A seasonal goal on the objectives panel for players past City: "this year: raise prestige by 200", "this year: no one goes hungry"
 
 ### Phase 20 — Ideas for the next runs
