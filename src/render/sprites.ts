@@ -3575,11 +3575,12 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       break;
     }
     case 'stewpond': {
-      // A stone-edged pond with lilies, a little sluice and a net drying.
-      p.poly([[0.25, 0.3, 0], [1.75, 0.3, 0], [1.75, 1.7, 0], [0.25, 1.7, 0]], '#9d978c');
-      p.poly([[0.35, 0.4, 0], [1.65, 0.4, 0], [1.65, 1.6, 0], [0.35, 1.6, 0]], season === 3 ? '#cfe0e8' : '#4a7ab0');
+      // A round stone-edged pond with lilies, a little sluice and a net drying.
+      const ring = (r: number) => Array.from({ length: 28 }, (_, k) => [1 + Math.cos((k / 28) * Math.PI * 2) * r, 1 + Math.sin((k / 28) * Math.PI * 2) * r, 0] as [number, number, number]);
+      p.poly(ring(0.78), '#9d978c');
+      p.poly(ring(0.66), season === 3 ? '#cfe0e8' : '#4a7ab0');
       if (season !== 3) {
-        for (const [x, y] of [[0.6, 0.7], [1.2, 1.1], [0.9, 1.4], [1.4, 0.6]]) {
+        for (const [x, y] of [[0.65, 0.8], [1.2, 1.15], [0.9, 1.35], [1.3, 0.7]]) {
           p.ellipse(x, y, 0, 3, 1.4, '#4f8a3c');
           p.circle(x + 0.03, y, 0.5, 0.8, '#f2d0e0');
         }

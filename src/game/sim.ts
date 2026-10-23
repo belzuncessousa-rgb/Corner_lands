@@ -278,7 +278,7 @@ export function placementError(s: GameState, type: BuildingType, x: number, y: n
   if (type === 'university' && s.buildings.some((b) => b.type === 'university')) return 'Your town has its university';
   if (type === 'watchtower' && s.buildings.filter((b) => b.type === 'watchtower').length >= watchTowerLimit(s)) return `${watchTowerLimit(s)} watch towers for a town this size`;
   if (type === 'silvermine' && !silverUnder(s, x, y, d.w, d.h)) return 'Must stand on a silver vein';
-  if (ESTATE.includes(type) && !touchesEstate(s, x, y, d.w, d.h)) return "Must touch the manor's grounds (the manor, its buildings, or hedges, flower beds and gardens beside them)";
+  if (ESTATE.includes(type) && !touchesEstate(s, x, y, d.w, d.h)) return `Must stand within ${ESTATE_REACH} tiles of the manor or its grounds`;
   if ((d.cost.gold ?? 0) > s.res.gold) return 'Not enough coins';
   return materialsShort(s, d.cost, type);
 }
@@ -309,7 +309,7 @@ export function moveError(s: GameState, b: Building, x: number, y: number): stri
     return 'Must be next to water';
   }
   if (b.type === 'silvermine' && !silverUnder(s, x, y, b.w, b.h)) return 'Must stand on a silver vein';
-  if (ESTATE.includes(b.type) && !touchesEstate(s, x, y, b.w, b.h)) return "Must touch the manor's grounds";
+  if (ESTATE.includes(b.type) && !touchesEstate(s, x, y, b.w, b.h)) return `Must stand within ${ESTATE_REACH} tiles of the manor or its grounds`;
   return null;
 }
 
@@ -355,50 +355,47 @@ export function watchTowerLimit(s: GameState): number {
   return Math.max(0, 2 * (s.tier - 1));
 }
 
-/** The lord's buildings: each must touch the manor or what already touches it. */
+/** The lord's buildings: each must stand within ESTATE_REACH tiles of the manor or of another of them. */
 export const ESTATE: BuildingType[] = ['stable', 'armoury', 'manorgarden', 'atelier', 'stewpond', 'tiltyard', 'barracks', 'deerpark'];
 /** Decorations that join the manor's grounds when they touch them. */
 const ESTATE_DECOR: BuildingType[] = ['hedge', 'flowerbed', 'publicgarden', 'manorgarden'];
 
+/** How far (in tiles of open ground between them) the lord's buildings may stand from the rest of the estate. */
+export const ESTATE_REACH = 4;
+
+/** Tiles of open ground between two rectangles (0 when they touch or overlap). */
+function gapBetween(a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }): number {
+  const dx = Math.max(0, b.x - (a.x + a.w), a.x - (b.x + b.w));
+  const dy = Math.max(0, b.y - (a.y + a.h), a.y - (b.y + b.h));
+  return Math.max(dx, dy);
+}
+
+/** The manor and every building of its estate within reach of it, or of one another. */
+export function estateMembers(s: GameState): Building[] {
+  const hall = s.buildings.find((b) => b.type === 'townhall');
+  if (!hall) return [];
+  const members = [hall];
+  const rest = s.buildings.filter((o) => ESTATE.includes(o.type) || ESTATE_DECOR.includes(o.type));
+  for (let k = 0; k < members.length; k++) {
+    for (let j = rest.length - 1; j >= 0; j--) {
+      if (gapBetween(members[k], rest[j]) > ESTATE_REACH) continue;
+      members.push(rest[j]);
+      rest.splice(j, 1);
+    }
+  }
+  return members;
+}
+
 /** The tiles of the manor's grounds: the manor and everything of the estate joined to it. */
 export function estateTiles(s: GameState): Set<number> {
-  const hall = s.buildings.find((b) => b.type === 'townhall');
   const tiles = new Set<number>();
-  if (!hall) return tiles;
-  const joined = new Set<number>([hall.id]);
-  const queue = [hall];
-  while (queue.length) {
-    const b = queue.pop()!;
-    for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) tiles.add(idx(s, x, y));
-    for (let y = b.y - 1; y <= b.y + b.h; y++)
-      for (let x = b.x - 1; x <= b.x + b.w; x++) {
-        if (!inBounds(s, x, y)) continue;
-        const id = s.occ[idx(s, x, y)];
-        if (id < 0 || joined.has(id)) continue;
-        const o = getBuilding(s, id);
-        if (!o || !(ESTATE.includes(o.type) || ESTATE_DECOR.includes(o.type))) continue;
-        // Corners do not join: the sides must meet.
-        const corner = (x < b.x || x >= b.x + b.w) && (y < b.y || y >= b.y + b.h);
-        if (corner) continue;
-        joined.add(id);
-        queue.push(o);
-      }
-  }
+  for (const b of estateMembers(s)) for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) tiles.add(idx(s, x, y));
   return tiles;
 }
 
+/** Whether a spot lies within reach of the manor's estate. */
 function touchesEstate(s: GameState, x: number, y: number, w: number, h: number): boolean {
-  const tiles = estateTiles(s);
-  for (let yy = y; yy < y + h; yy++)
-    for (let xx = x; xx < x + w; xx++)
-      for (const [dx, dy] of [
-        [1, 0],
-        [-1, 0],
-        [0, 1],
-        [0, -1],
-      ])
-        if (inBounds(s, xx + dx, yy + dy) && tiles.has(idx(s, xx + dx, yy + dy))) return true;
-  return false;
+  return estateMembers(s).some((b) => gapBetween(b, { x, y, w, h }) <= ESTATE_REACH);
 }
 
 function silverUnder(s: GameState, x: number, y: number, w: number, h: number): boolean {
@@ -484,7 +481,7 @@ export function zoneError(s: GameState, type: BuildingType, x0: number, y0: numb
   if (type === 'deerpark') {
     if (s.buildings.some((b) => b.type === 'deerpark')) return 'Your manor has its deer park';
     if (r.w * r.h < DEER_PARK_MIN) return `At least ${DEER_PARK_MIN} tiles`;
-    if (!touchesEstate(s, r.x, r.y, r.w, r.h)) return "Must touch the manor's grounds";
+    if (!touchesEstate(s, r.x, r.y, r.w, r.h)) return `Must lie within ${ESTATE_REACH} tiles of the manor or its grounds`;
   }
   const cost = zoneCost(type, r.w, r.h);
   if (!canAfford(s, cost)) return cost.gold ? 'Not enough coins' : 'Not enough timber for fences';

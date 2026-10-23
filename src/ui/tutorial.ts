@@ -281,7 +281,7 @@ const MANOR: Step[] = [
     show: '#top [data-action="charters"]',
   },
   {
-    say: "The manor can be renovated into a Manor House, a Stone Manor and at last a Palace. Each opens buildings for the lord's grounds: a stable, a garden, an armoury, a deer park, the atelier where masterpieces are made. They must stand beside the manor, or beside the hedges and gardens that join it.",
+    say: "The manor can be renovated into a Manor House, a Stone Manor and at last a Palace. Each opens buildings for the lord's grounds: a stable, a garden, an armoury, a deer park, the atelier where masterpieces are made. They must stand within four tiles of the manor, or of the lord's other buildings and gardens.",
   },
   {
     say: 'And here you may dress yourself and design the arms that fly over the manor. That is all, my liege. Rule well!',

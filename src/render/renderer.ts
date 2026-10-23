@@ -3,7 +3,7 @@ import { MANOR_SIZE, marketStalls } from '../game/levels';
 import { knows } from '../game/unlocks';
 import { optionOn } from '../game/options';
 import { drawImprovements, pastureShed } from './props';
-import { estateTiles, ANIMAL_KINDS, LOW_EFFICIENCY, animalsOf, deliveredTo, hasProblem, herdTotal, lordRides, monthOf, orchardMaturity, seasonOf, seatOf, storageCap, stored } from '../game/sim';
+import { estateMembers, ANIMAL_KINDS, LOW_EFFICIENCY, animalsOf, deliveredTo, hasProblem, herdTotal, lordRides, monthOf, orchardMaturity, seasonOf, seatOf, storageCap, stored } from '../game/sim';
 import type { Building, BuildingType, GameState, ResourceId, Season } from '../game/types';
 import { idx, inBounds } from '../game/world';
 import { type Agent, LEISURE_ACTS, boatHome, boatSpot } from './agents';
@@ -965,26 +965,43 @@ export class Renderer {
     c.globalAlpha = 1;
   }
 
-  private estateCache = { key: '', tiles: [] as number[] };
+  private estateCache = { key: '', members: [] as Building[] };
 
-  /** The manor's grounds: the grass under the manor and its buildings worn into one gravelled shape. */
+  /**
+   * The manor's grounds: the grass under the manor and its buildings worn to
+   * gravel in soft rounded patches, each a little wider than what stands on
+   * it, run together into one shape where they meet.
+   */
   private drawGrounds(s: GameState, season: Season): void {
     const key = `${s.buildings.length}:${s.nextId}:${s.buildings.find((b) => b.type === 'townhall')?.w ?? 0}`;
-    if (this.estateCache.key !== key) this.estateCache = { key, tiles: [...estateTiles(s)] };
+    if (this.estateCache.key !== key) this.estateCache = { key, members: estateMembers(s) };
     const c = this.ctx;
     c.fillStyle = season === 3 ? 'rgba(205,200,190,0.55)' : 'rgba(168,146,104,0.5)';
     c.beginPath();
-    for (const i of this.estateCache.tiles) {
-      const x = i % s.width;
-      const y = (i / s.width) | 0;
-      // Each tile a little overgrown so neighbours run together.
-      const g = 0.12;
-      const pts = [iso(x - g, y - g), iso(x + 1 + g, y - g), iso(x + 1 + g, y + 1 + g), iso(x - g, y + 1 + g)];
-      c.moveTo(pts[0][0], pts[0][1]);
-      for (const [px, py] of pts.slice(1)) c.lineTo(px, py);
+    for (const b of this.estateCache.members) {
+      // Hedges and flower beds stand on the grass; only buildings wear it.
+      if (b.type === 'hedge' || b.type === 'flowerbed') continue;
+      const cx = b.x + b.w / 2;
+      const cy = b.y + b.h / 2;
+      const rx = b.w / 2 + 0.9;
+      const ry = b.h / 2 + 0.9;
+      // A squircle, wobbling a little so it reads as worn ground, not a stamp.
+      const n = 36;
+      for (let k = 0; k <= n; k++) {
+        const t = (k / n) * Math.PI * 2;
+        const co = Math.cos(t);
+        const si = Math.sin(t);
+        const wob = 1 + 0.05 * Math.sin(t * 5 + b.id);
+        const px = cx + rx * wob * Math.sign(co) * Math.abs(co) ** 0.7;
+        const py = cy + ry * wob * Math.sign(si) * Math.abs(si) ** 0.7;
+        const [wx, wy] = iso(px, py);
+        if (k === 0) c.moveTo(wx, wy);
+        else c.lineTo(wx, wy);
+      }
       c.closePath();
     }
-    c.fill();
+    // Overlapping patches fill once (nonzero), so where they meet is one even shape.
+    c.fill('nonzero');
   }
 
   private drawFields(s: GameState, season: Season, selected?: number): void {
