@@ -271,7 +271,7 @@ export function placementError(s: GameState, type: BuildingType, x: number, y: n
   if (type === 'silvermine' && !silverUnder(s, x, y, d.w, d.h)) return 'Must stand on a silver vein';
   if (ESTATE.includes(type) && !touchesEstate(s, x, y, d.w, d.h)) return "Must touch the manor's grounds (the manor, its buildings, or hedges, flower beds and gardens beside them)";
   if ((d.cost.gold ?? 0) > s.res.gold) return 'Not enough coins';
-  return null;
+  return materialsShort(s, d.cost, type);
 }
 
 /** The deer park: a reserve of at least seven by seven tiles. */
@@ -346,8 +346,25 @@ export function materialsOf(cost: Cost): Cost {
 }
 
 /**
+ * What a new site, renovation or improvement still lacks before it may
+ * start: every material must be in store already, beyond what the sites
+ * already started are owed. A woodcutter's lodge may fell its own timber.
+ */
+export function materialsShort(s: GameState, cost: Cost, type?: BuildingType): string | null {
+  for (const k in materialsOf(cost)) {
+    const id = k as ResourceId;
+    if (id === 'wood' && type === 'woodcutter') continue;
+    const free = Math.floor(s.res[id] - owedTo(s, id));
+    const need = cost[id] ?? 0;
+    if (free < need) return `Needs ${need} ${GOODS[id].name.toLowerCase()} in store (${Math.max(0, free)} free)`;
+  }
+  return null;
+}
+
+/**
  * Places a construction site. Gold is paid at once; materials are carried
- * from storage by builders as they become available.
+ * from storage by builders, a load at a time, but must all be in store
+ * before the site may be laid out.
  */
 export function placeOrder(s: GameState, type: BuildingType, x: number, y: number): Building | null {
   if (placementError(s, type, x, y)) return null;
@@ -527,6 +544,17 @@ export function buildRoad(s: GameState, x: number, y: number, paved: boolean | R
   else if (isBridge(s, x, y)) pay(s, BRIDGE_COST);
   setRoad(s, x, y, true, grade);
   if (grade === 4) s.royalLinked = royalLinked(s);
+  return true;
+}
+
+/** Fells the trees on a tile to clear it (the demolish tool): the timber is left to rot, as from a demolished building. */
+export function clearTree(s: GameState, x: number, y: number): boolean {
+  if (!inBounds(s, x, y)) return false;
+  const i = idx(s, x, y);
+  if (!s.trees[i] || s.occ[i] >= 0) return false;
+  s.trees[i] = 0;
+  (s.stumps ??= {})[i] = s.day;
+  s.dirty = true;
   return true;
 }
 
@@ -1692,7 +1720,7 @@ export function improveError(s: GameState, b: Building, id: string): string | nu
   if (imp.after && !has(b, imp.after)) return `Needs the ${IMPROVEMENT_BY_ID.get(imp.after)!.name.toLowerCase()} first`;
   if (imp.water && countInRadius(s, centerOf(b.x, b.y, b.w, b.h), 2.5, (i) => s.terrain[i] === 1) < 2) return 'Must stand beside water';
   if (s.res.gold < (imp.cost.gold ?? 0)) return `Needs ${imp.cost.gold} coins`;
-  return null;
+  return materialsShort(s, imp.cost);
 }
 
 /** Starts building an improvement onto a workplace: builders carry the materials in. */
@@ -4152,7 +4180,7 @@ export const MONASTERY_KNOWLEDGE = 3;
  * What the settlement's own lore brings every month, by its rank: a bigger
  * place knows more (tuned so the whole board is learned a few years after City).
  */
-export const RANK_LORE = [0.5, 1, 1.5, 2, 3];
+export const RANK_LORE = [0.2, 1, 1.5, 2, 3];
 export function eldersLore(s: GameState): number {
   return RANK_LORE[s.tier] ?? RANK_LORE[RANK_LORE.length - 1];
 }
@@ -4654,7 +4682,6 @@ export function rankNeeds(s: GameState, tier: number): Need[] {
   }
   if (tier === 2) {
     out.push({ label: 'A church', met: has('church') });
-    out.push({ label: 'A trading post or dock', met: has('tradingpost') || has('dock') });
   }
   if (tier === 3) {
     out.push({ label: 'An alehouse or tavern', met: has('tavern') });

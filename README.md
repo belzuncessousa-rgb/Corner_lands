@@ -43,7 +43,7 @@ then fall back to the browser's localStorage.
 | Pause / speed | `Space`, `1` `2` `3` (normal, ×3, ×8) |
 | Undo | `Ctrl+Z` (or the button) within ten seconds takes back the last placement or demolition |
 | Reach overlay | `V` cycles wells, markets, taverns and churches: which homes each covers |
-| Resource lens | `L` (or the lens switch at the top) greys the map and lights up rock, bog ore, berries, game and fish, with about how much of each in every patch |
+| Resource lens | `L` (or the magnifying-glass button at the top) switches on a view that greys the map and lights up rock, bog ore, berries, game and fish, with about how much of each in every patch |
 | Who works where | Select a building: curved lines run from it to each of its workers or builders, wherever they are |
 
 ### How the settlement works
@@ -77,7 +77,8 @@ then fall back to the browser's localStorage.
   priority and, where it has several, its product (or Auto). Seasonal work and
   workplaces whose goods are at their stock target free their workers.
 - **Building** — place a plan and builders carry the materials from storage,
-  one load per trip, then raise the walls. Plans can wait for materials.
+  one load per trip, then raise the walls. A plan can only be laid out once all its
+  materials are in store (beyond what other sites are still owed).
   Construction is a job: each site takes two builders before other work, and
   idle villagers lend a hand.
 - **Roads** — optional. They speed up walking, which makes everything nearby

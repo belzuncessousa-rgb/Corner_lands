@@ -28,6 +28,7 @@ import {
   placementError,
   recompute,
   removeRoad,
+  clearTree,
   demolishBlocker,
   nearestResource,
   seatOf,
@@ -111,6 +112,10 @@ export class Game {
   demo = true;
   hoverTile: { x: number; y: number } | null = null;
   private simAcc = 0;
+  /** How far the current day has gone, 0 to 1 (the month bar fills smoothly). */
+  get dayFraction(): number {
+    return Math.min(1, this.simAcc / DAY_SECONDS);
+  }
   private lastTime = performance.now();
   private hudTimer = 0;
   private lastMonth = -1;
@@ -163,8 +168,12 @@ export class Game {
   private cancelOrDeselect(): void {
     if (this.tool.kind === 'road' && this.roadAnchor) this.roadAnchor = null;
     else if ((this.tool.kind === 'zone' || this.tool.kind === 'grove') && this.zoneAnchor) this.zoneAnchor = null;
-    else if (this.tool.kind !== 'select') this.setTool({ kind: 'select' });
-    else this.select(null);
+    else {
+      // Putting the tool down closes the build menu it came from too.
+      if (this.tool.kind !== 'select') this.setTool({ kind: 'select' });
+      else this.select(null);
+      if (this.hud.categoryOpen) this.hud.closeCategory();
+    }
   }
   private dragTile: { x: number; y: number } | null = null;
   /** Where the road being laid starts; the next click finishes a segment. */
@@ -639,7 +648,11 @@ export class Game {
       const occ = inBounds(s, tx, ty) ? s.occ[idx(s, tx, ty)] : -1;
       const b = occ >= 0 ? s.buildings.find((o) => o.id === occ) : undefined;
       this.hud.setHint(
-        b ? `Click to demolish ${BUILDINGS[b.type].name}${b.type === 'townhall' ? ' (not possible)' : ''}` : 'Click a building, or drag across roads to remove them',
+        b
+          ? `Click to demolish ${BUILDINGS[b.type].name}${b.type === 'townhall' ? ' (not possible)' : ''}`
+          : inBounds(s, tx, ty) && s.trees[idx(s, tx, ty)] && !s.road[idx(s, tx, ty)]
+            ? 'Click to fell these trees and clear the ground (the timber is left) · drag to clear a line'
+            : 'Click a building, or drag across roads or trees to remove them',
         b?.type === 'townhall',
       );
     } else if (this.coverage) {
@@ -867,6 +880,9 @@ export class Game {
       } else if (s.road[idx(s, tx, ty)]) {
         removeRoad(s, tx, ty);
         recompute(s);
+      } else if (clearTree(s, tx, ty)) {
+        recompute(s);
+        this.hud.sound('demolish');
       }
       return;
     }
@@ -968,7 +984,8 @@ export class Game {
   private finishRoadRemoval(tx: number, ty: number): void {
     const s = this.state;
     let n = 0;
-    for (const t of this.roadTiles(tx, ty)) if (removeRoad(s, t.x, t.y)) n++;
+    // Dragging clears the roads along the line, or failing a road the trees.
+    for (const t of this.roadTiles(tx, ty)) if (removeRoad(s, t.x, t.y) || clearTree(s, t.x, t.y)) n++;
     if (n) recompute(s);
   }
 

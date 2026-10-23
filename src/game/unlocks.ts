@@ -197,7 +197,7 @@ export const UNLOCKS: Unlock[] = [
   { id: 'i:hugeships', name: 'Great ships', kind: 'upgrade', tab: 'civic', group: 'Trade', desc: 'Docks send away twice as much.', knowledge: 13, needs: [b('dock')], condition: { test: 'trade1000', label: '1000 goods traded' }, improvement: 'hugeships', icon: 'dock' },
   { id: 'x:tollnav', name: 'Toll navigation', kind: 'variant', tab: 'civic', group: 'Trade', desc: 'Merchants sell a tenth cheaper and buy a tenth dearer.', knowledge: 12, condition: { test: 'trade250', label: '250 goods traded' }, icon: 'gold' },
   { id: 'x:tradedeals', name: 'Trade deals', kind: 'variant', tab: 'civic', group: 'Trade', desc: 'Another tenth on every bargain.', knowledge: 12, needs: ['x:tollnav'], condition: { test: 'trade500', label: '500 goods traded' }, icon: 'gold' },
-  { id: 'o:banners', name: 'Heraldic banners', kind: 'option', tab: 'civic', group: 'Looks', desc: "The lord's arms on the manor, towers and market: +prestige; cloth and dyes once.", knowledge: 2, option: 'banners', icon: 'prestige' },
+  { id: 'o:banners', name: 'Heraldic banners', kind: 'option', tab: 'civic', group: 'Looks', desc: "The lord's arms on the manor, towers and market: +prestige; cloth and dyes once.", knowledge: 2, condition: { made: { cloth: 4, dyes: 2 }, label: '4 cloth and 2 dyes made' }, option: 'banners', icon: 'prestige' },
 ];
 
 export const UNLOCK_BY_ID = new Map(UNLOCKS.map((u) => [u.id, u]));

@@ -174,6 +174,11 @@ button.active {
   min-width: 118px;
   line-height: 1.1;
 }
+/* The month filling up: tall enough to show inside its painted rim. */
+#clock .progress.month {
+  height: 10px;
+  margin: 3px 0 0;
+}
 #clock .date small {
   display: block;
   font-family: var(--serif);
@@ -1126,16 +1131,6 @@ button.active {
   width: 22px;
   height: 22px;
 }
-/* The lens switch: the land as it is, or its resources; the one in use is pressed in. */
-#lens-switch {
-  display: flex;
-  gap: 2px;
-  padding: 2px;
-}
-#lens-switch .icon-btn {
-  width: 32px;
-  height: 32px;
-}
 #top #topbar {
   opacity: 0.94;
   flex-wrap: nowrap;
@@ -1511,6 +1506,29 @@ button.active {
 #topbar .chip .prestige svg {
   width: 16px;
   height: 16px;
+}
+/* Fixed boxes for the numbers (wide screens; phones share the row out instead). */
+#topbar .n {
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+}
+#topbar .badge.none,
+#topbar .prestige.none {
+  visibility: hidden;
+}
+@media (min-width: 701px) {
+  #topbar .n4 {
+    min-width: 4ch;
+  }
+  #topbar .n5 {
+    min-width: 5ch;
+  }
+}
+@media (max-width: 700px) {
+  #topbar .badge.none,
+  #topbar .prestige.none {
+    display: none;
+  }
 }
 #topbar .chip .badge {
   font-size: 10px;
@@ -1982,10 +2000,6 @@ table.prod td.num {
   #top .icon-btn svg {
     width: 18px;
     height: 18px;
-  }
-  #top #lens-switch .icon-btn {
-    width: 30px;
-    height: 30px;
   }
   #topbar .chip .delta,
   #topbar .sep {
@@ -2869,10 +2883,8 @@ button.finga-help svg {
   position: static;
   flex: none;
 }
+/* It keeps the place the close button takes when the panel is pinned, so pinning never moves it. */
 #chip-panel > button.finga-help {
-  right: 6px;
-}
-#chip-panel > button.close ~ button.finga-help {
   right: 38px;
 }
 #objectives button.finga-help {

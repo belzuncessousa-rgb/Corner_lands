@@ -170,7 +170,7 @@ export const QUESTS: Quest[] = [
   {
     id: 'town',
     title: 'Become a Town',
-    hint: 'Reach 45 villagers with a tavern and a trading post: the village then grows into a Town.',
+    hint: 'Reach 45 villagers with a church: the village then grows into a Town.',
     reward: { gold: 100 },
     done: (s) => s.tier >= 2,
   },

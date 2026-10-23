@@ -118,8 +118,8 @@ const START: Step[] = [
     show: '#top .btnrow',
   },
   {
-    say: 'And this little switch changes how you see the land. The glass greys it out and lights up what can be gathered: rock, bog ore, berries hiding under the trees, game and fish, with about how much of each. Handy, before you build a lodge!',
-    show: '#lens-switch',
+    say: 'And this little glass changes how you see the land. Click it and it greys the land out and lights up what can be gathered: rock, bog ore, berries hiding under the trees, game and fish, with about how much of each. Handy, before you build a lodge!',
+    show: '#lens-btn',
   },
   {
     say: 'Below them, your rank and what you need to grow to the next one. A hamlet becomes a village, then a town, and so on.',
@@ -285,6 +285,37 @@ const MANOR: Step[] = [
   {
     say: 'And here you may dress yourself and design the arms that fly over the manor. That is all, my liege. Rule well!',
     show: '#lord-btn',
+    enter: (g) => g.setSpeed(0),
+  },
+];
+
+/** The tutorial's first storehouse, once it stands (only a game begun as the tutorial has storeSeen false, so only it gets this lesson). */
+const firstStore = (g: Game) => g.state.buildings.find((b) => b.type === 'storehouse' && b.build >= 1);
+
+const STORE: Step[] = [
+  {
+    say: 'Our storehouse stands, my liege! Click it, and let us have a look.',
+    enter: (g) => {
+      g.setSpeed(0);
+      const b = firstStore(g);
+      if (b) lookAt(g, b.x + 1, b.y + 1);
+    },
+    show: (g) => {
+      const b = firstStore(g);
+      return b ? landSpot(g, b.x + 1, b.y + 1, 60) : null;
+    },
+    until: (g) => g.selected !== null && g.selected === firstStore(g)?.id,
+  },
+  {
+    say: 'It has room for two haulers. But with so few workplaces, one can carry all there is, and the other is better off building. Click the second pip to send one away.',
+    show: '#inspector .labour',
+    until: (g) => {
+      const b = firstStore(g);
+      return !b || (b.want ?? 2) <= 1;
+    },
+  },
+  {
+    say: 'Just so. When the yards fill up faster than one hauler can carry, give the place back. Each job should earn its keep!',
     enter: (g) => g.setSpeed(0),
   },
 ];
@@ -544,7 +575,7 @@ export class Tutor {
 
   private get steps(): Step[] {
     const c = this.game.state.tutorial?.chapter;
-    return c === 'manor' ? MANOR : c === 'trade' ? TRADE : c === 'learn' ? LEARN : START;
+    return c === 'manor' ? MANOR : c === 'trade' ? TRADE : c === 'learn' ? LEARN : c === 'store' ? STORE : START;
   }
 
   /** A click or Enter: finish the line, then go on (or, on a step that waits, step aside). */
@@ -577,6 +608,7 @@ export class Tutor {
     if (t.chapter === 'manor') t.manorSeen = true;
     if (t.chapter === 'trade') t.tradeSeen = true;
     if (t.chapter === 'learn') t.learnSeen = true;
+    if (t.chapter === 'store') t.storeSeen = true;
     t.chapter = 'done';
     this.hide();
     this.game.setSpeed(1);
@@ -589,6 +621,7 @@ export class Tutor {
       if (t.chapter === 'manor') t.manorSeen = true;
       if (t.chapter === 'trade') t.tradeSeen = true;
       if (t.chapter === 'learn') t.learnSeen = true;
+      if (t.chapter === 'store') t.storeSeen = true;
       t.chapter = 'done';
       if (this.game.speed === 0) this.game.setSpeed(1);
       t.step = 0;
@@ -643,6 +676,9 @@ export class Tutor {
     // The manor chapter begins once the manor stands.
     if (t.chapter === 'done' && !t.manorSeen && g.state.buildings.some((b) => b.type === 'townhall' && b.build >= 1)) {
       t.chapter = 'manor';
+      t.step = 0;
+    } else if (t.chapter === 'done' && t.storeSeen === false && firstStore(g) && !g.modalOpen) {
+      t.chapter = 'store';
       t.step = 0;
     } else if (t.chapter === 'done' && !t.tradeSeen && tradeHouse(g)) {
       t.chapter = 'trade';

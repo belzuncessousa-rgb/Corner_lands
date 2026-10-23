@@ -571,7 +571,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     desc: 'Saws timber into planks.',
     category: 'industry',
     cost: { wood: 4 },
-    workers: 2,
+    workers: 1,
     cycle: 2,
     inputs: { wood: 4 },
     outputs: { planks: 3 },

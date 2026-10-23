@@ -10,6 +10,7 @@ import {
   HOME_TRADE_DAYS,
   log,
   materialsOf,
+  materialsShort,
   needsMaterials,
   recompute,
 } from './sim';
@@ -232,7 +233,7 @@ export function upgradeBlocker(s: GameState, b: Building): string | null {
   if (missing) return `Needs: ${missing.label}`;
   if ((plan.cost.gold ?? 0) > s.res.gold) return 'Not enough coins';
   if ((plan.cost.prestige ?? 0) > s.res.prestige) return 'Not enough prestige';
-  return null;
+  return materialsShort(s, plan.cost);
 }
 
 /** Starts a renovation: gold now, materials carried in by builders. */

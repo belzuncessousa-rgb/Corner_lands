@@ -27,6 +27,7 @@ import {
   YARD_STORE,
   EXPORT_PER_DOCK,
   EXPORT_PER_MARKET,
+  DAYS_PER_MONTH,
 } from '../game/data';
 import { WORKS_OF_ART, nextTitle, takeTitle, titleError, TITLES, fairCost, fairError, fairPrestige, FAIR_TIER, feastCost, feastError, FESTIVALS, festivalError, getEvent, holdFair, holdFeast, holdFestival, resolveEvent } from '../game/events';
 import { CHARTERS, CHARTER_TIER, PATHS, charterCost, charterError, grantCharter, hasCharter } from '../game/charters';
@@ -161,13 +162,14 @@ function lastNumber(msgs: { n?: number }[]): number {
 const REACH_ICON =
   '<svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><circle cx="10" cy="10" r="7.5" fill="none" stroke="#5a3a22" stroke-width="1.4" stroke-dasharray="2.5 1.8"/><circle cx="10" cy="10" r="2.6" fill="#3a5a8a"/></svg>';
 
-/** The lenses: the land as it is (an eye), and its resources (a magnifying glass over a gem). */
-const LENS_ICONS = {
-  normal:
-    '<svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><path d="M1.5 10c2.4-4 5.2-6 8.5-6s6.1 2 8.5 6c-2.4 4-5.2 6-8.5 6s-6.1-2-8.5-6z" fill="#f4ecd8" stroke="#5a3a22" stroke-width="1.2"/><circle cx="10" cy="10" r="3.4" fill="#4a7a3a"/><circle cx="10" cy="10" r="1.5" fill="#2a1a10"/></svg>',
-  resources:
-    '<svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="6" fill="#e8eef0" stroke="#5a3a22" stroke-width="1.5"/><path d="M8.5 5l3 2.6-3 4-3-4z" fill="#d04a5a"/><path d="M5.5 7.6h6" stroke="#8a2a3a" stroke-width=".6"/><path d="M13 13l5 5" stroke="#5a3a22" stroke-width="2.4" stroke-linecap="round"/></svg>',
-};
+/** The resource lens: a magnifying glass over a gem. */
+const LENS_ICON =
+  '<svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="6" fill="#e8eef0" stroke="#5a3a22" stroke-width="1.5"/><path d="M8.5 5l3 2.6-3 4-3-4z" fill="#d04a5a"/><path d="M5.5 7.6h6" stroke="#8a2a3a" stroke-width=".6"/><path d="M13 13l5 5" stroke="#5a3a22" stroke-width="2.4" stroke-linecap="round"/></svg>';
+
+/** A number on the top bar, in a box `w` digits wide. */
+const n = (v: number | string, w: number) => `<span class="n n${w}">${v}</span>`;
+/** A count badge on a top-bar chip; when there is nothing to count it keeps its room, unseen. */
+const badge = (v: number, title = '') => `<span class="badge${v > 0 ? '' : ' none'}"${title ? ` title="${title}"` : ''}>${v > 0 ? v : 0}</span>`;
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
@@ -209,7 +211,7 @@ const ALWAYS_SHOWN: ResourceId[] = ['wood', 'stone', 'bread', 'berries', 'meat',
 
 /** Just-in-time help: one short line, shown the first time each thing is used. */
 const TIPS: Record<string, string> = {
-  category: 'Pick a building card, then click the map. Builders fetch the materials from storage, so you can place it before you can afford it.',
+  category: 'Pick a building card, then click the map. Its materials must be in store first; builders then fetch them from storage a load at a time.',
   build: 'Green means a good spot. Right-click or Esc puts the tool down. Choose well: what is placed stays placed.',
   zone: 'Fields, pastures and orchards are drawn: click one corner, then the opposite one. Bigger fields need more hands.',
   road: 'Click to start a road, click again to end it. Roads are optional, but villagers walk faster on them.',
@@ -296,10 +298,7 @@ export class Hud {
             <button class="panel icon-btn" data-action="production" data-tip="<b>Production Book</b><br>Every trade, what it takes and what it makes.">${ICONS.books}</button>
             <button class="panel icon-btn" data-action="charters" data-tip="<b>Town Charters</b><br>Spend prestige to specialise your town.">${ICONS.prestige}</button>
             <button class="panel icon-btn" data-action="coverage" data-tip="<b>Reach</b> (V)<br>Show where wells, markets, taverns and churches reach, and which homes they miss.">${REACH_ICON}</button>
-            <div id="lens-switch" class="panel">
-              <button class="icon-btn active" data-action="lens" data-lens="normal" data-tip="<b>The land</b> (L)<br>See the land as it is.">${LENS_ICONS.normal}</button>
-              <button class="icon-btn" data-action="lens" data-lens="resources" data-tip="<b>Resource lens</b> (L)<br>Grey the land and light up rock, bog ore, berries, game and fish, even under the trees, with about how much of each.">${LENS_ICONS.resources}</button>
-            </div>
+            <button id="lens-btn" class="panel icon-btn" data-action="lens" data-tip="<b>Resource lens</b> (L)<br>Grey the land and light up rock, bog ore, berries, game and fish, even under the trees, with about how much of each. Click again to see the land as it is.">${LENS_ICON}</button>
           </div>
           <div id="objectives" class="panel"></div>
         </div>
@@ -529,17 +528,18 @@ export class Hud {
       `<div class="res chip ${cls} ${this.openChip === id ? 'open' : ''}" data-chip="${id}" data-action="chip">${body}</div>`;
     const lab = labourSummary(s);
     const html = [
-      chip('happy', s.happiness < 35 ? 'low' : '', `${ICONS.happy}${s.happiness}%`),
-      chip('pop', '', `${ICONS.people}${s.population}<span class="delta">/${housing}</span>${lab.idle > 0 ? `<span class="badge" title="idle">${lab.idle}</span>` : ''}`),
+      // Numbers sit in boxes wide enough for thousands, and badges keep their place when empty, so the bar never changes width.
+      chip('happy', s.happiness < 35 ? 'low' : '', `${ICONS.happy}${n(`${s.happiness}%`, 4)}`),
+      chip('pop', '', `${ICONS.people}${n(s.population, 4)}<span class="delta">/${n(housing, 4)}</span>${badge(lab.idle, 'idle')}`),
       '<div class="sep"></div>',
-      chip('food', months < 1.2 ? 'low' : foodFull ? 'full' : '', `${ICONS.bread}${Math.floor(food)}`),
-      chip('materials', matFull ? 'full' : '', `${ICONS.materials}${sum('materials')}`),
-      chip('goods', '', `${ICONS.goods}${sum('goods')}`),
+      chip('food', months < 1.2 ? 'low' : foodFull ? 'full' : '', `${ICONS.bread}${n(Math.floor(food), 5)}`),
+      chip('materials', matFull ? 'full' : '', `${ICONS.materials}${n(sum('materials'), 5)}`),
+      chip('goods', '', `${ICONS.goods}${n(sum('goods'), 5)}`),
       '<div class="sep"></div>',
-      chip('treasury', '', `${ICONS.gold}${Math.floor(s.res.gold)}${s.res.prestige > 0 || s.tier >= 1 ? `<span class="prestige">${ICONS.prestige}${Math.floor(s.res.prestige)}</span>` : ''}`),
+      chip('treasury', '', `${ICONS.gold}${n(Math.floor(s.res.gold), 5)}<span class="prestige${s.res.prestige > 0 || s.tier >= 1 ? '' : ' none'}">${ICONS.prestige}${n(Math.floor(s.res.prestige), 4)}</span>`),
       (() => {
         const ready = readyCount(s);
-        return `<button class="res chip learn-chip" data-action="learning" data-tip="<b>The learning board</b><br>Spend knowledge on new buildings, recipes and better ways of working.${ready ? `<br>${ready} can be learned now.` : ''}">${ICONS.knowledge}${Math.floor(s.res.knowledge)}${ready ? `<span class="badge">${ready}</span>` : ''}</button>`;
+        return `<button class="res chip learn-chip" data-action="learning" data-tip="<b>The learning board</b><br>Spend knowledge on new buildings, recipes and better ways of working.${ready ? `<br>${ready} can be learned now.` : ''}">${ICONS.knowledge}${n(Math.floor(s.res.knowledge), 4)}${badge(ready)}</button>`;
       })(),
     ].join('');
     setHTML(this.el.topbar, html);
@@ -796,16 +796,16 @@ export class Hud {
     this.renderTopbar();
     this.renderChipPanel();
     this.renderLordButton();
-    for (const b of this.root.querySelectorAll<HTMLElement>('#lens-switch [data-lens]')) b.classList.toggle('active', b.dataset.lens === g.lens);
+    this.root.querySelector('#lens-btn')?.classList.toggle('active', g.lens === 'resources');
 
     // Clock.
     const season = seasonOf(s.day);
-    const progress = ((s.day % 10) / 10) * 100;
+    const progress = (((s.day % DAYS_PER_MONTH) + g.dayFraction) / DAYS_PER_MONTH) * 100;
     setHTML(
       this.el.clock,
       `<span data-tip="<b>${SEASON_NAMES[season]}</b>">${SEASON_ICONS[season]}</span>
       <div class="date">Year ${yearOf(s.day)}<small>${MONTH_NAMES[monthOf(s.day)]}</small>
-        <div class="progress" style="height:3px;margin:2px 0 0"><i class="month-bar"></i></div></div>
+        <div class="progress month" data-tip="How far the month has gone"><i class="month-bar"></i></div></div>
       <div class="speeds">
         <button data-action="speed" data-speed="0" class="${g.speedIndex === 0 ? 'active' : ''}" data-tip="Pause (Space)">❚❚</button>
         <button data-action="speed" data-speed="1" class="${g.speedIndex === 1 ? 'active' : ''}" data-tip="Normal speed (1)">▶</button>
@@ -939,9 +939,8 @@ export class Hud {
     if (key === this.lastInspectorKey || this.orderDrag) return;
     this.lastInspectorKey = key;
     box.style.display = 'block';
-    // A family craft works like that workshop; name and description stay the home's.
+    // A family craft works like that workshop; its name stays the home's.
     const d = workDef(b);
-    const own = BUILDINGS[b.type];
     const rows: string[] = [];
     // A trading post's order book is a big window in the middle of the screen, its orders beside the rest.
     const wide = (b.type === 'tradingpost' || b.type === 'dock') && b.build >= 1;
@@ -1131,7 +1130,6 @@ export class Hud {
       <button class="close" data-action="deselect">✕</button>${fingaButton(`building:${b.type}`)}
       <h2>${esc(buildingName(b))}${b.trade ? ` <small>· ${esc(BUILDINGS[b.trade].name)}</small>` : ''}</h2>`;
     const body = `
-      <div class="desc">${own.desc}</div>
       ${rows.join('')}
       <div class="status ${warn ? 'warn' : ''}">${esc(b.status || 'Idle')}</div>
       <div class="actions">${actions.join('')}</div>`;
@@ -1809,7 +1807,7 @@ export class Hud {
         g.cycleCoverage();
         break;
       case 'lens':
-        g.setLens(t.dataset.lens === 'resources' ? 'resources' : 'normal');
+        g.setLens(g.lens === 'resources' ? 'normal' : 'resources');
         break;
       case 'deselect':
         g.select(null);
@@ -2487,7 +2485,7 @@ export class Hud {
     m.querySelector('[data-m="back"]')!.addEventListener('click', () => (fromMain ? this.showMainMenu() : this.showGameMenu()));
     m.querySelector('[data-m="go"]')!.addEventListener('click', () => {
       this.game.newGame(tutorial ? TUTORIAL_SEED : seedOf(input.value.trim()), mode as 'normal' | 'relaxed' | 'hardy', town.value, tutorial ? 'meadow' : landOf());
-      if (tutorial) this.game.state.tutorial = { step: 0, chapter: 'start' };
+      if (tutorial) this.game.state.tutorial = { step: 0, chapter: 'start', storeSeen: false };
       this.game.state.lord = { ...this.draftLord };
       this.game.state.heraldry = { ...this.draftArms };
       this.closeModal(true);
@@ -2909,7 +2907,7 @@ export class Hud {
       `<h2>How to Play</h2>
       <div class="help">
         <p><b>Grow your settlement</b> from a settlers' camp into a City. The town climbs the ranks by itself once it is big enough and has what each rank needs (open the rank pill, top left, to see what the next one needs).</p>
-        <p><b>Building:</b> pick a category at the bottom, then a building, then click the map. Builders carry the materials over from storage, one load per trip, and then raise the walls. Plans can wait for materials. Buildings you cannot build yet stay hidden.</p>
+        <p><b>Building:</b> pick a category at the bottom, then a building, then click the map. Builders carry the materials over from storage, one load per trip, and then raise the walls. A plan can be laid out only once all its materials are in store. Buildings you cannot build yet stay hidden.</p>
         <p><b>Markets</b> (Civic) are free and drawn like fields. Each open stall serves ten households with their goods, the nearest homes first; homes left out go without their goods and grumble. Food comes from the stores either way.</p>
         <p><b>Gatherers</b> walk to the nearest trees, rocks, berries, game or fish, so place them close. Goods pile up in each workplace's yard until haulers from a Storehouse or Granary fetch them.</p>
         <p><b>Fields, pastures and orchards</b> (Farming) are drawn: click one corner, then the opposite one, near a Farmstead, Animal Farm or Orchard Keeper's Lodge. Choose each field's crop in the panel, and build a Silo to keep the grain; animals are bought at the Animal Farm once you have a Trading Post, and share its pasture room.</p>

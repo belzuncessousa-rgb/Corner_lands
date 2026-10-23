@@ -9,14 +9,16 @@ import {
   layRoads,
   planRoad,
   removeRoad,
-  placeOrder,
-  placementError,
+  materialsOf,
+  owedTo,
+  placeOrder as placeOrderNow,
+  placementError as placementErrorNow,
   placeZone,
   recompute,
   stepDay,
   totalHousing,
 } from '../src/game/sim';
-import type { Building, BuildingType, GameState } from '../src/game/types';
+import type { Building, BuildingType, GameState, ResourceId } from '../src/game/types';
 import { generateWorld as freshWorld, idx } from '../src/game/world';
 import { learnEverything } from '../src/game/unlocks';
 
@@ -26,6 +28,25 @@ function generateWorld(seed: number, opts?: Parameters<typeof freshWorld>[1]): G
   learnEverything(s);
   return s;
 }
+
+/**
+ * Plans may only be laid out with their materials in store. The tests here
+ * lay out sites to test other things, so the stores are lent a plan's
+ * materials while it is placed (they stay owed to the site, as in play).
+ */
+function lend<T>(s: GameState, type: BuildingType, fn: () => T): T {
+  const cost = materialsOf(BUILDINGS[type].cost);
+  // Enough for this plan on top of whatever earlier sites are still owed.
+  const lent = Object.fromEntries(Object.keys(cost).map((k) => [k, (cost[k as ResourceId] ?? 0) + owedTo(s, k as ResourceId)])) as Partial<Record<ResourceId, number>>;
+  for (const k in lent) s.res[k as ResourceId] += lent[k as ResourceId] ?? 0;
+  try {
+    return fn();
+  } finally {
+    for (const k in lent) s.res[k as ResourceId] -= lent[k as ResourceId] ?? 0;
+  }
+}
+const placeOrder = (s: GameState, type: BuildingType, x: number, y: number) => lend(s, type, () => placeOrderNow(s, type, x, y));
+const placementError = (s: GameState, type: BuildingType, x: number, y: number) => lend(s, type, () => placementErrorNow(s, type, x, y));
 
 function hall(s: GameState) {
   return s.buildings.find((b) => (b.type === 'townhall' || b.type === 'camp'))!;
@@ -1292,6 +1313,8 @@ describe('town walls', () => {
     const s = generateWorld(98);
     s.tier = 4;
     s.res.gold = 9999;
+    // Walls are laid only with their stone in store.
+    s.res.stone = 9999;
     const h = hall(s);
     // Town walls wait for a Stone Manor.
     expect(placeOrder(s, 'wall', h.x - 10, h.y)).toBeFalsy();
