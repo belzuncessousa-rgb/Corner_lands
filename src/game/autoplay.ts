@@ -650,7 +650,11 @@ export function act(s: GameState, rand: () => number): void {
     if (stored(s, 'materials') > storageCap(s, 'materials') * 0.85 && tryPlace(s, 'storehouse')) return;
     wants.push('storehouse');
   }
-  if (stored(s, 'food') > storageCap(s, 'food') * 0.8 && count(s, 'granary') < stores) wants.push('granary');
+  // Full granaries waste the gatherers' work and leave nothing put by for winter: likewise first.
+  if (stored(s, 'food') > storageCap(s, 'food') * 0.8 && count(s, 'granary') < stores) {
+    if (stored(s, 'food') > storageCap(s, 'food') * 0.85 && tryPlace(s, 'granary')) return;
+    wants.push('granary');
+  }
   // A harvest that will not fit: a granary before autumn.
   else if (monthOf(s.day) <= 6 && count(s, 'granary') < 2 + Math.floor(pop / 30) && harvestForecast(s).some((h) => h.kind === 'food' && h.expected > h.room)) wants.push('granary');
   if (s.tier >= 1) {

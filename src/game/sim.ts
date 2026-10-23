@@ -1599,6 +1599,8 @@ const TYPE_PRIORITY: Partial<Record<BuildingType, number>> = {
   fisher: 0.2,
   hunter: 0.3,
   forager: 0.4,
+  // Ale is no meal: the brewers come after everyone who puts food on the table.
+  brewhouse: 0.45,
   woodcutter: 0,
   quarry: 0.1,
   forester: 0.2,
@@ -2520,7 +2522,7 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
       const h = nearestHerd(s, b);
       if (!h) return nearestHerd(s, b, true) ? 'The game nearby has been hunted out for now' : 'No game within reach';
       // A deer feeds four outings' worth of meat; a rabbit, two.
-      const meat = { meat: h.kind === 'deer' ? 5 : 3 };
+      const meat = { meat: h.kind === 'deer' ? 8 : 6 };
       if (!canHold(s, b, meat)) return 'Storage full';
       b.resDist = walkToPoint(walkFrom(s, b), s, h.x, h.y, 2);
       h.n -= h.kind === 'deer' ? 0.25 : 0.5;
@@ -3049,7 +3051,7 @@ export const HERDS: Record<AnimalKind, { tiles: number; price: number; name: str
 };
 
 /** Milk a cow and a goat give each working day in season (before charters and breeds). */
-export const COW_MILK = 0.12;
+export const COW_MILK = 0.15;
 export const GOAT_MILK = 0.04;
 /** The cattle breed the town chose: Frisians milk twice and carry less meat, Highlanders the other way round. */
 export function breedMilk(s: GameState): number {
