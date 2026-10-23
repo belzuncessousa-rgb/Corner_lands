@@ -2460,7 +2460,31 @@ export class Hud {
     return `<details class="news" ${seen && NEWS[0].n > seen ? 'open' : ''}><summary>What's new</summary><ul>${rows}</ul></details>`;
   }
 
+  /**
+   * Browsers keep a page silent until the player first clicks or presses a
+   * key; on opening, a "click to begin" veil over the title takes that click,
+   * so the title music plays while the menu is still there.
+   */
+  private veiled = false;
+  private showVeil(): void {
+    // Not for automated browsers (the test scripts), which click buttons directly.
+    if (this.veiled || navigator.webdriver || this.audio?.state === 'running' || (!this.soundOn.music && !this.soundOn.ambience)) return;
+    this.veiled = true;
+    const v = document.createElement('div');
+    v.id = 'veil';
+    v.innerHTML = '<span>Click anywhere to begin</span>';
+    const lift = () => {
+      v.classList.add('lifted');
+      setTimeout(() => v.remove(), 600);
+      document.removeEventListener('keydown', lift);
+    };
+    v.addEventListener('pointerdown', lift);
+    document.addEventListener('keydown', lift);
+    document.body.appendChild(v);
+  }
+
   async showMainMenu(): Promise<void> {
+    this.showVeil();
     // Block game input while the save list loads, before the title appears.
     this.game.modalOpen = true;
     const saves = await listSaves().catch(() => [] as SaveInfo[]);
