@@ -281,6 +281,7 @@ export class Hud {
       this.muted = localStorage.getItem('cornerlands.muted') === '1';
       this.uiScale = Number(localStorage.getItem('cornerlands.uiScale')) || 1;
       this.pauseOnBad = localStorage.getItem('cornerlands.pauseOnBad') === '1';
+      game.renderer.nights = localStorage.getItem('cornerlands.nights') !== '0';
       this.tipsOn = localStorage.getItem('cornerlands.tipsOff') !== '1';
       this.buildIcons = localStorage.getItem('cornerlands.buildPictures') !== '1';
       this.musicOn = localStorage.getItem('cornerlands.music') !== '0';
@@ -2813,6 +2814,7 @@ export class Hud {
         <button data-m="music" ${this.muted ? 'disabled' : ''}>Music: ${this.musicOn ? 'On' : 'Off'}</button>
         <button data-m="scale">Text size: ${Math.round(this.uiScale * 100)}%</button>
         <button data-m="pausebad">Pause on bad news: ${this.pauseOnBad ? 'On' : 'Off'}</button>
+        <button data-m="nights" data-tip="Night falls each day at normal speed, longer in winter">Nights: ${this.game.renderer.nights ? 'On' : 'Off'}</button>
         <button data-m="tips">Tips: ${this.tipsOn ? 'On' : 'Off'}</button>
         <button data-m="bicons">Build menu: ${this.buildIcons ? 'Icons' : 'Pictures'}</button>
         <button class="primary" data-m="back">Back</button>
@@ -2821,6 +2823,16 @@ export class Hud {
       !fromMain,
     );
     m.querySelector('[data-m="back"]')!.addEventListener('click', () => (fromMain ? this.showMainMenu() : this.showGameMenu()));
+    m.querySelector('[data-m="nights"]')!.addEventListener('click', () => {
+      const r = this.game.renderer;
+      r.nights = !r.nights;
+      try {
+        localStorage.setItem('cornerlands.nights', r.nights ? '1' : '0');
+      } catch {
+        /* ignore */
+      }
+      this.showSettings(fromMain);
+    });
     m.querySelector('[data-m="pausebad"]')!.addEventListener('click', () => {
       this.pauseOnBad = !this.pauseOnBad;
       try {

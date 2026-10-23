@@ -4379,9 +4379,16 @@ export class Renderer {
   /** How deep into dusk the day is (0 by day, 1 at its deepest), eased so it never jumps. */
   private dusk = 0;
 
-  setDayTime(frac: number, allowed: boolean, dt: number): void {
-    // Evening falls over the last quarter of the day and lifts at the turn.
-    const target = !allowed || this.light ? 0 : frac < 0.72 ? 0 : frac < 0.92 ? (frac - 0.72) / 0.2 : Math.max(0, (1 - frac) / 0.08);
+  /** Whether night falls at all (a setting). */
+  nights = true;
+
+  setDayTime(frac: number, allowed: boolean, dt: number, winter = false): void {
+    // Evening falls in the last third of the day, and the night lasts into the
+    // next morning: longer in winter.
+    const fall = winter ? 0.6 : 0.68;
+    const dark = fall + 0.1;
+    const morning = winter ? 0.14 : 0.08;
+    const target = !allowed || this.light || !this.nights ? 0 : frac < fall ? (frac < morning ? 1 - frac / morning : 0) : frac < dark ? (frac - fall) / 0.1 : 1;
     const step = Math.min(1, dt * 2.5);
     this.dusk += (target - this.dusk) * step;
     // Early morning, when mist lies on the water.
@@ -4750,10 +4757,10 @@ export class Renderer {
     c.fillStyle = g;
     c.fillRect(0, 0, this.width, this.height);
     if (this.dusk > 0.01) {
-      // A warm low sun, then a little blue as the light goes.
-      c.fillStyle = `rgba(255,140,60,${0.13 * this.dusk})`;
+      // A warm low sun as the light goes, then a deep blue night.
+      c.fillStyle = `rgba(255,140,60,${0.13 * Math.sin(Math.min(1, this.dusk) * Math.PI)})`;
       c.fillRect(0, 0, this.width, this.height);
-      c.fillStyle = `rgba(30,35,80,${0.22 * this.dusk})`;
+      c.fillStyle = `rgba(18,22,60,${0.42 * this.dusk})`;
       c.fillRect(0, 0, this.width, this.height);
     }
     void day;

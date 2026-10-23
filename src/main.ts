@@ -8,6 +8,7 @@ import { placeName, townName } from './game/names';
 import { StateRng } from './game/rng';
 import { deserialize, serialize } from './game/save';
 import {
+  seasonOf,
   BRIDGE_COST,
   buildRoad,
   layRoads,
@@ -419,7 +420,7 @@ export class Game {
     this.agents.update(this.state, gameDt, this.clock());
     this.wildlife.update(this.state, gameDt);
     // Dusk only at normal speed: faster, the days would flicker.
-    this.renderer.setDayTime(this.clock(), !this.demo && this.speed <= 1, dt);
+    this.renderer.setDayTime(this.clock(), !this.demo && this.speed <= 1, dt, seasonOf(this.state.day) === 3);
     this.renderer.render(this.state, this.agents.agents, this.overlay(), running ? dt : 0, this.wildlife.animals);
     this.hud.minimap.update(dt);
     this.tutor.update(dt);
