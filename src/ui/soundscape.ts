@@ -21,6 +21,16 @@ export type Channel = 'music' | 'ambience' | 'noise' | 'effects';
 /** How loud each channel sits in the mix. */
 const MIX: Record<Channel, number> = { music: 0.6, ambience: 0.45, noise: 0.55, effects: 0.7 };
 
+/** Each channel's volume from the settings, 0 to 1 (1 is the mix as made). */
+export type Volumes = Record<Channel, number>;
+export const FULL_VOLUME: Volumes = { music: 1, ambience: 1, noise: 1, effects: 1 };
+export const CHANNEL_NAMES: { id: Channel; name: string }[] = [
+  { id: 'music', name: 'Music' },
+  { id: 'ambience', name: 'Ambience' },
+  { id: 'noise', name: 'Town & animals' },
+  { id: 'effects', name: 'Sound effects' },
+];
+
 /** What the player has switched on. */
 export interface SoundSwitches {
   music: boolean;
@@ -33,11 +43,16 @@ interface SoundEntry {
   duration: number;
   busy?: [number, number][];
 }
-interface Track {
+export interface Track {
   file: string;
   title: string;
   mood: Mood;
   duration: number;
+  by: string;
+  source: string;
+  licence: string;
+  /** Licensed for the game but not to be shared as a file: absent from the public repository. */
+  private?: boolean;
 }
 type Mood = 'menu' | 'day' | 'autumn' | 'winter' | 'festival';
 interface Manifest {
@@ -77,6 +92,11 @@ const BED_LEVEL: Record<string, number> = {
   smithy: 0.5,
   stone: 0.5,
   building: 0.3,
+  forest: 0.5,
+  autumnwind: 0.5,
+  crickets: 0.4,
+  footsteps: 0.3,
+  watermill: 0.5,
 };
 const BED_CHANNEL: Record<string, Channel> = {
   birds: 'ambience',
@@ -86,6 +106,9 @@ const BED_CHANNEL: Record<string, Channel> = {
   rain: 'ambience',
   wind: 'ambience',
   snowstorm: 'ambience',
+  forest: 'ambience',
+  autumnwind: 'ambience',
+  crickets: 'ambience',
 };
 
 /** A looping recording played through two players that cross over, so the seam is never heard. */
@@ -166,7 +189,9 @@ class Bed {
       this.gains[this.cur].gain.setValueAtTime(1, now);
       this.gains[this.cur].gain.linearRampToValueAtTime(0, now + this.fade);
       const old = this.cur;
-      setTimeout(() => this.els[old].pause(), this.fade * 1000 + 200);
+      setTimeout(() => {
+        if (this.cur !== old) this.els[old].pause();
+      }, this.fade * 1000 + 200);
       this.cur = next;
     }
   }
@@ -203,6 +228,16 @@ class MusicPlayer {
       const g = ac.createGain();
       g.gain.value = 0;
       ac.createMediaElementSource(el).connect(g).connect(dest);
+      // A track that is not there (kept out of the public build) is dropped, and another plays.
+      el.addEventListener('error', () => {
+        const bad = this.tracks.find((t) => el.src.endsWith(t.file));
+        if (!bad) return;
+        this.tracks = this.tracks.filter((t) => t !== bad);
+        if (this.track === bad) {
+          this.track = null;
+          if (this.mood) this.update(this.mood);
+        }
+      });
       this.els.push(el);
       this.gains.push(g);
     }
@@ -236,7 +271,9 @@ class MusicPlayer {
       this.gains[old].gain.cancelScheduledValues(now);
       this.gains[old].gain.setValueAtTime(this.gains[old].gain.value, now);
       this.gains[old].gain.linearRampToValueAtTime(0, now + fade);
-      setTimeout(() => this.els[old].pause(), fade * 1000 + 200);
+      setTimeout(() => {
+        if (this.cur !== old) this.els[old].pause();
+      }, fade * 1000 + 200);
     }
     this.cur = next;
     this.track = t;
@@ -278,26 +315,10 @@ class MusicPlayer {
   }
 
   get title(): string | null {
-    return this.track ? (TRACK_NAMES[this.track.title] ?? this.track.title.replace(/[-_]+/g, ' ')) : null;
+    return this.track?.title ?? null;
   }
 }
 
-/** Names to show for the music files. */
-const TRACK_NAMES: Record<string, string> = {
-  Menu: 'Teller of the Tales',
-  Angevin: 'Angevin',
-  'Woodland Fantasy': 'Woodland Fantasy',
-  'alexander-nakarada-village-ambiance': 'Village Ambiance',
-  'alexander-nakarada-winter-night': 'Winter Night',
-  'alexander-nakarada-wintersong': 'Wintersong',
-  'the-medieval-banquet': 'The Medieval Banquet',
-  harvestseason: 'Harvest Season',
-  celebrations_1min: 'Celebrations',
-  music_peaceful_town_loop: 'Peaceful Town',
-  summer: 'Summer',
-  '022815townbgm': 'Town',
-  'Marin_Marais_(1656-1728)_-_Excerpts_from_Suite_No.3_from_Pieces_en_trio_pour_les_flutes,_violon,_et_dessus_de_viole_(1692)': 'Marais, Pièces en trio',
-};
 
 /** Buildings whose work is heard nearby, by bed. */
 const WORK_BEDS: Partial<Record<string, BuildingType[]>> = {
@@ -306,7 +327,26 @@ const WORK_BEDS: Partial<Record<string, BuildingType[]>> = {
   market: ['market', 'markethall'],
   tavern: ['tavern'],
   bees: ['beekeeper'],
+  watermill: ['watermill', 'watersawmill', 'papermill'],
 };
+
+/** The clip for looking into each kind of building (see OPENS in scripts/audio.mjs). */
+const OPEN_BY_TYPE: Partial<Record<BuildingType, string>> = {};
+for (const [id, types] of Object.entries({
+  'open-smithy': ['smithy', 'armoury', 'bloomery', 'jeweller', 'glazier'],
+  'open-stone': ['quarry', 'stonemason', 'mine', 'silvermine', 'claypit', 'sandpit', 'limekiln', 'kiln', 'potter'],
+  'open-saw': ['sawmill', 'carpenter', 'cooper', 'builderyard', 'watersawmill'],
+  'open-watermill': ['watermill', 'papermill'],
+  'open-woodcutter': ['woodcutter', 'forester', 'collier'],
+  'open-tavern': ['tavern', 'brewhouse', 'winery'],
+  'open-market': ['market', 'markethall', 'tradingpost', 'dock', 'taxoffice', 'guildhall'],
+  'open-home': ['house'],
+  'open-bees': ['beekeeper'],
+  'open-church': ['church', 'monastery', 'cathedral', 'belltower'],
+  'open-farm': ['farm', 'field', 'orchard', 'orchardist', 'windmill', 'granary', 'silo'],
+  'open-cattle': ['byre', 'dairy', 'tanner'],
+} as Record<string, BuildingType[]>))
+  for (const t of types) OPEN_BY_TYPE[t] = id;
 
 /** Houses that make a church; bells ring only once one stands. */
 const BELL_TOWERS: BuildingType[] = ['church', 'monastery', 'cathedral', 'belltower'];
@@ -319,22 +359,29 @@ export class Soundscape {
   private beds = new Map<string, Bed>();
   private music: MusicPlayer | null = null;
   private on: SoundSwitches;
+  private volume: Volumes;
   private timers: Record<string, number> = {};
   private lastSeason: Season | null = null;
   private lastSelected: number | null = null;
   private chopTimer = 0;
+  private lastDusk = 0;
+  /** Workplaces heard from further off now and then: time to the next, and time left. */
+  private popTimer: Record<string, number> = {};
+  private popUntil: Record<string, number> = {};
 
   constructor(
     private ac: AudioContext,
     on: SoundSwitches,
+    volume: Volumes,
   ) {
     this.on = { ...on };
+    this.volume = { ...volume };
     this.master = ac.createGain();
     this.master.connect(ac.destination);
     this.bus = {} as Record<Channel, GainNode>;
     for (const id of Object.keys(MIX) as Channel[]) {
       const g = ac.createGain();
-      g.gain.value = MIX[id] * (this.isOn(id) ? 1 : 0);
+      g.gain.value = this.level(id);
       g.connect(this.master);
       this.bus[id] = g;
     }
@@ -349,8 +396,23 @@ export class Soundscape {
       .catch(() => undefined);
   }
 
+  /** A channel's gain: its place in the mix, the player's volume, and whether it is on. */
+  private level(ch: Channel): number {
+    return MIX[ch] * this.volume[ch] * (this.isOn(ch) ? 1 : 0);
+  }
+
+  setVolume(ch: Channel, v: number): void {
+    this.volume[ch] = v;
+    this.bus[ch].gain.setTargetAtTime(this.level(ch), this.ac.currentTime, 0.05);
+  }
+
   private isOn(ch: Channel): boolean {
     return ch === 'music' ? this.on.music : this.on.ambience;
+  }
+
+  /** All the music, for the credits. */
+  get tracks(): Track[] {
+    return this.manifest?.music ?? [];
   }
 
   /** The track playing now, by name. */
@@ -365,7 +427,7 @@ export class Soundscape {
   /** Switches the music, or everything else, on or off. */
   setOn(kind: keyof SoundSwitches, on: boolean): void {
     this.on[kind] = on;
-    for (const ch of Object.keys(MIX) as Channel[]) this.bus[ch].gain.setTargetAtTime(MIX[ch] * (this.isOn(ch) ? 1 : 0), this.ac.currentTime, 0.2);
+    for (const ch of Object.keys(MIX) as Channel[]) this.bus[ch].gain.setTargetAtTime(this.level(ch), this.ac.currentTime, 0.2);
     if (kind === 'music') {
       if (on) this.music?.resume();
       else this.music?.pause();
@@ -426,13 +488,12 @@ export class Soundscape {
   }
 
   /**
-   * The sound of looking into a building: its own recording if there is
-   * one (open-smithy), else one for its kind (open-farming), else a door.
+   * The sound of looking into a building: a few seconds of its trade (the
+   * anvil, the saw, the mill wheel), a site's hammering, else a door.
    */
-  openSound(type: BuildingType): void {
-    const ids = [`open-${type}`, `open-${BUILDINGS[type]?.category}`];
-    const id = ids.find((k) => this.manifest?.sounds[k]) ?? 'open';
-    this.play(id, 0.45);
+  openSound(b: Building): void {
+    const id = b.build < 1 ? 'open-building' : b.type === 'house' && b.yard === 'hens' ? 'open-hens' : (OPEN_BY_TYPE[b.type] ?? `open-${BUILDINGS[b.type]?.category}`);
+    this.play(this.manifest?.sounds[id] ? id : 'open', 0.45);
   }
 
   /** An interface click; a close or back button gets its own. */
@@ -487,10 +548,9 @@ export class Soundscape {
     // ---- ambience: the land, the hour and the weather
     const rain = r.rainLevel;
     const warm = season === 0 || season === 1 ? 1 : season === 2 ? 0.45 : 0;
-    want.birds = warm * day * (1 - rain * 0.8);
-    // The evening chorus at dusk and dawn, and softly through the day.
-    want.meadow = warm * (r.dusk > 0.1 && r.dusk < 0.7 ? 1 : 0.35 * day) * (1 - rain * 0.8);
+    const dry = 1 - rain * 0.8;
     let water = 0;
+    let woods = 0;
     let land = 0;
     const step = Math.max(1, Math.round(reach / 4));
     for (let dy = -reach; dy <= reach; dy += step) {
@@ -498,15 +558,24 @@ export class Soundscape {
         const x = Math.round(cx + dx);
         const y = Math.round(cy + dy);
         if (x < 0 || y < 0 || x >= s.width || y >= s.height) continue;
+        const i = y * s.width + x;
         const w = near(x, y);
-        if (s.terrain[y * s.width + x] === 1) water += w;
+        if (s.terrain[i] === 1) water += w;
         else land += w;
+        if (s.trees[i] > 0) woods += w;
       }
     }
-    want.river = season === 3 ? 0 : Math.min(1, (water / Math.max(1, water + land)) * 4);
+    const all = Math.max(1, water + land);
+    want.birds = warm * day * dry;
+    // The evening chorus at dusk and dawn, and softly through the day.
+    want.meadow = warm * (r.dusk > 0.1 && r.dusk < 0.7 ? 1 : 0.35 * day) * dry;
+    want.forest = (season === 3 ? 0.15 : warm) * day * dry * Math.min(1, (woods / all) * 2.5);
+    want.river = season === 3 ? 0 : Math.min(1, (water / all) * 4);
     want[season === 2 ? 'rain' : 'lightrain'] = rain;
-    want.wind = season === 3 ? 0.55 + 0.35 * (1 - close) : season === 2 ? 0.2 + 0.25 * (1 - close) : 0.08 * (1 - close);
+    want.wind = season === 3 ? 0.55 + 0.35 * (1 - close) : 0.08 * (1 - close);
+    want.autumnwind = season === 2 ? 0.45 + 0.35 * (1 - close) : 0;
     want.snowstorm = season === 3 ? (month === 1 ? 0.45 : 0.15) * (0.5 + 0.5 * (1 - close)) : 0;
+    want.crickets = night * (season === 1 ? 1 : season === 0 ? 0.35 : season === 2 && month === 0 ? 0.4 : 0) * (1 - rain);
 
     // ---- the town: heard where the camera looks, more as it comes close
     const built = (b: Building) => b.build >= 1;
@@ -519,8 +588,32 @@ export class Soundscape {
     want.tavern = nearest(working(WORK_BEDS.tavern!), 0.5) * (0.3 + 0.7 * night) * close;
     want.smithy = nearest(working(WORK_BEDS.smithy!), 0.5) * day * close;
     want.stone = nearest(working(WORK_BEDS.stone!), 0.5) * day * close;
+    want.watermill = nearest(working(WORK_BEDS.watermill!), 0.5) * close;
     want.bees = (season === 0 || season === 1 ? 1 : 0) * day * nearest((b) => built(b) && (b.type === 'beekeeper' || (b.type === 'house' && b.yard === 'bees')), 0.4) * close;
     want.building = nearest((b) => b.build < 1 && b.build > 0 && !b.need, 0.5) * day * close;
+    // Feet on the lanes: the villagers walking close to the middle of the view.
+    let walkers = 0;
+    let chopping = 0;
+    for (const a of sc.agents) {
+      if (a.phase === 'act') {
+        if (a.act === 'chop') chopping = Math.max(chopping, near(a.x, a.y, 0.4));
+      } else walkers += near(a.x, a.y, 0.25);
+    }
+    want.footsteps = close * close * day * Math.min(1, walkers / 4);
+
+    // ---- now and then a workplace further off is heard for a few seconds
+    for (const [id, types] of Object.entries(WORK_BEDS)) {
+      const far = nearest(working(types!), 1.2) * (id === 'tavern' ? 0.4 + 0.6 * night : day);
+      this.popTimer[id] = (this.popTimer[id] ?? 10 + Math.random() * 20) - (sc.running ? dt : 0);
+      if (this.popTimer[id] <= 0) {
+        this.popTimer[id] = 20 + Math.random() * 35;
+        if (far > 0.05) this.popUntil[id] = 4 + Math.random() * 3;
+      }
+      if ((this.popUntil[id] ?? 0) > 0) {
+        this.popUntil[id] -= dt;
+        want[id] = Math.max(want[id] ?? 0, far * 0.6);
+      }
+    }
 
     if (!this.on.ambience) return;
     for (const [id, bed] of this.beds) bed.update(sc.running || BED_CHANNEL[id] ? (want[id] ?? 0) * (BED_LEVEL[id] ?? 0.5) : 0, dt);
@@ -530,33 +623,46 @@ export class Soundscape {
     // ---- animals: a call now and then from what is in view; the chosen one at once
     const sel = sc.selected !== null ? s.buildings.find((b) => b.id === sc.selected) : undefined;
     if (sel && sel.id !== this.lastSelected) {
-      this.openSound(sel.type);
+      this.openSound(sel);
       const kinds = Object.entries(sel.animals ?? {})
         .filter(([, n]) => (n ?? 0) > 0)
         .map(([k]) => k);
-      const id = kinds.length ? kinds[Math.floor(Math.random() * kinds.length)] : sel.type === 'house' && sel.yard === 'hens' ? 'hens' : null;
-      if (id && this.manifest.sounds[id === 'pigs' ? 'goats' : id]) this.play(id === 'pigs' ? 'goats' : id, 0.9, 'noise', [2, 4]);
+      const id = kinds.length ? kinds[Math.floor(Math.random() * kinds.length)] : null;
+      const call = id === 'cattle' && Math.random() < 0.5 ? 'cattle2' : id;
+      if (call && this.manifest.sounds[call]) this.play(call, 0.9, 'noise', [2, 4]);
     }
     this.lastSelected = sel?.id ?? null;
     const flock = (kind: string) => nearest((b) => built(b) && ((b.animals as Record<string, number> | undefined)?.[kind] ?? 0) > 0, 0.7);
+    const hens = nearest((b) => built(b) && b.type === 'house' && b.yard === 'hens', 0.5);
     if (day > 0.3) {
       this.calls('sheep', flock('sheep') * (0.4 + 0.6 * close), [8, 22], dt);
-      this.calls('cattle', flock('cattle') * (0.4 + 0.6 * close), [10, 28], dt);
-      this.calls('goats', Math.max(flock('goats'), flock('pigs')) * (0.4 + 0.6 * close), [12, 30], dt);
-      this.calls('hens', nearest((b) => built(b) && b.type === 'house' && b.yard === 'hens', 0.5) * close, [9, 25], dt);
+      this.calls(Math.random() < 0.5 ? 'cattle' : 'cattle2', flock('cattle') * (0.4 + 0.6 * close), [10, 28], dt);
+      this.calls('goats', flock('goats') * (0.4 + 0.6 * close), [12, 30], dt);
+      this.calls('pigs', flock('pigs') * (0.4 + 0.6 * close), [9, 24], dt, [1, 2]);
+      this.calls(Math.random() < 0.5 ? 'hens' : 'hens2', hens * close, [9, 25], dt);
       this.calls('ducks', season !== 3 ? want.river * close : 0, [14, 40], dt, [1.5, 3]);
       this.calls(Math.random() < 0.5 ? 'dogs' : 'dogs2', homes * close * Math.min(1, s.population / 30) * 0.7, [25, 70], dt, [1, 2.5]);
+      // Saws at the sawpits and carpenters' and on the building sites; the woodcutters' saws.
+      this.calls('sawing', Math.max(nearest(working(['sawmill', 'carpenter', 'cooper', 'builderyard', 'watersawmill']), 0.8), want.building) * (0.3 + 0.7 * close), [12, 32], dt, [2, 4]);
+      this.calls('woodmill', nearest(working(['woodcutter', 'forester']), 0.8) * (0.3 + 0.7 * close), [16, 40], dt, [2, 4]);
     }
     if (night > 0.6 && season !== 3) this.calls('owl', 0.7, [25, 60], dt, [1.5, 3]);
+    // Frogs by the water on warm evenings and nights.
+    if (warm >= 1 && r.dusk > 0.3) this.calls('frogs', want.river * (0.4 + 0.6 * close), [12, 35], dt, [1.5, 3.5]);
+    // The cock crows as the night ends, where there are farms or hens.
+    if (this.lastDusk > 0.3 && r.dusk <= 0.3 && r.dusk < this.lastDusk && season !== 3) {
+      const farms = Math.max(hens, nearest((b) => built(b) && (b.type === 'farm' || b.type === 'byre'), 1));
+      if (farms > 0.05) this.play('rooster', farms * 0.8, 'noise');
+    }
+    this.lastDusk = r.dusk;
 
-    // ---- axes in the woods: the nearest woodcutter at work
+    // ---- axes in the woods: the nearest woodcutter at work, and now and then a tree comes down
     this.chopTimer -= dt;
     if (this.chopTimer <= 0) {
-      let best = 0;
-      for (const a of sc.agents) if (a.phase === 'act' && a.act === 'chop') best = Math.max(best, near(a.x, a.y, 0.4));
-      this.chopTimer = best > 0 ? 0.9 + Math.random() * 0.6 : 1;
-      if (best > 0) this.play('chop', best * (0.3 + 0.7 * close) * 0.7, 'noise');
+      this.chopTimer = chopping > 0 ? 0.9 + Math.random() * 0.6 : 1;
+      if (chopping > 0) this.play('chop', chopping * (0.3 + 0.7 * close) * 0.7, 'noise');
     }
+    this.calls('treefall', chopping * (0.4 + 0.6 * close), [45, 100], dt, [5, 8]);
 
     // ---- church bells when the season turns, once a church stands
     if (this.lastSeason !== null && season !== this.lastSeason && s.buildings.some((b) => built(b) && BELL_TOWERS.includes(b.type))) this.play('bells', 0.8, 'noise');

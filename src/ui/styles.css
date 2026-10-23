@@ -786,6 +786,34 @@ button.active {
 .modal ul.credits a {
   color: inherit;
 }
+.modal .volumes {
+  display: grid;
+  gap: 4px;
+  padding: 4px 8px 6px;
+  border: 1.5px solid var(--parch-3);
+  border-radius: 6px;
+}
+.modal .volume {
+  display: grid;
+  grid-template-columns: 9em 1fr 3.2em;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--title);
+  font-size: 15px;
+  color: var(--ink);
+}
+.modal .volume input[type='range'] {
+  padding: 0;
+  border: 0;
+  accent-color: var(--wood);
+  width: 100%;
+}
+.modal .volume output {
+  font-family: var(--serif);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+}
 .modal .row {
   display: flex;
   gap: 8px;

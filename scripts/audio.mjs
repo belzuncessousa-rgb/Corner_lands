@@ -1,77 +1,151 @@
-// node scripts/audio.mjs
+// node scripts/audio.mjs [--fetch]
 //
-// Turns the recordings in audio-src/ into the small files the game plays,
-// in public/audio/, and writes public/audio/manifest.json.
+// Turns the recordings into the small files the game plays, in
+// public/audio/, and writes public/audio/manifest.json.
 //
 // - Every file is brought to the same loudness for its kind (music, beds,
 //   calls, interface), so nothing jumps out and the mix is set in code.
 // - Long recordings get a list of the stretches where something is heard,
 //   so a call played from them never lands on silence.
-// - Music is every file in audio-src/music/, in name order.
+// - Short clips for looking into a building are cut from the busiest part
+//   of its recording.
 //
-// The recordings themselves are kept on the repository's `master` branch
-// (sound effects in its Abience/, animals/, town/ and UI/ folders, music at
-// its top level); run with --fetch to copy them into audio-src/ first.
+// The recordings themselves are kept on the repository's `master` branch;
+// --fetch copies them into audio-src/ (same folders) first.
+//
+// Tracks marked `private` may not be shared as files (their licence allows
+// them in the game, not in a public repository): they are encoded like the
+// rest but .gitignore keeps them out of the repository, and the game skips
+// them where they are missing.
 //
 // Needs ffmpeg and ffprobe on the PATH.
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { basename, extname, join } from 'node:path';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 
 const SRC = 'audio-src';
 const OUT = 'public/audio';
 
 /**
- * The sounds: id -> source file and kind.
+ * The sounds: id -> recording (its path on the master branch) and kind.
  * - bed: a continuous loop, faded in and out with what the camera sees.
  * - call: short pieces played now and then from the busy stretches.
- * - ui: interface sounds, played whole.
+ * - ui: interface and one-off sounds, played whole.
  */
 const SOUNDS = {
-  birds: { src: 'birds.wav', kind: 'bed' },
-  meadow: { src: '269559__vonora__sussex-woodland-meadow-bird-sounds-evening.mp3', kind: 'bed' },
-  river: { src: 'mostly_river.wav', kind: 'bed' },
-  lightrain: { src: 'light_rain.wav', kind: 'bed' },
-  rain: { src: 'rain.wav', kind: 'bed' },
-  wind: { src: 'winter_wind.mp3', kind: 'bed' },
-  snowstorm: { src: 'snow_storm.wav', kind: 'bed' },
-  village: { src: 'zoon_in_village_2.wav', kind: 'bed' },
-  residential: { src: 'zoon_in_residential.wav', kind: 'bed' },
-  tavern: { src: 'tavern_zoo_in.wav', kind: 'bed' },
-  market: { src: 'market.wav', kind: 'bed' },
-  street: { src: 'mix_hooves_noise.wav', kind: 'bed' },
-  bees: { src: 'bees_cut_short_for_buildings.wav', kind: 'bed' },
-  smithy: { src: 'blacksmith.wav', kind: 'bed' },
-  stone: { src: 'stoneworks.wav', kind: 'bed' },
-  building: { src: 'construction.wav', kind: 'bed' },
-  owl: { src: 'ocasional_owl.wav', kind: 'call' },
-  sheep: { src: 'sheep.wav', kind: 'call' },
-  cattle: { src: 'cows.flac', kind: 'call' },
-  goats: { src: 'goats.m4a', kind: 'call' },
-  hens: { src: 'chicken.wav', kind: 'call' },
-  ducks: { src: 'ducks.wav', kind: 'call' },
-  dogs: { src: 'dogs.wav', kind: 'call' },
-  dogs2: { src: 'dogs2.wav', kind: 'call' },
-  chop: { src: 'woodcutters.wav', kind: 'ui' },
-  bells: { src: 'change_season_bells.wav', kind: 'call' },
-  click: { src: 'click.wav', kind: 'ui' },
-  back: { src: 'click_close_or_back.wav', kind: 'ui' },
-  open: { src: 'stone_building_open.wav', kind: 'ui' },
-  charters: { src: 'science_screen.wav', kind: 'ui' },
+  // Nature
+  birds: { src: 'Abience/birds.wav', kind: 'bed' },
+  meadow: { src: 'Abience/269559__vonora__sussex-woodland-meadow-bird-sounds-evening.mp3', kind: 'bed' },
+  forest: { src: 'Abience/723913__magnesus__forest-birds-ambient-seamless-loop.wav', kind: 'bed' },
+  river: { src: 'Abience/mostly_river.wav', kind: 'bed' },
+  lightrain: { src: 'Abience/light_rain.wav', kind: 'bed' },
+  rain: { src: 'Abience/rain.wav', kind: 'bed' },
+  wind: { src: 'Abience/winter_wind.mp3', kind: 'bed' },
+  autumnwind: { src: 'Abience/457318__stek59__autumn-wind-and-dry-leaves.wav', kind: 'bed' },
+  snowstorm: { src: 'Abience/snow_storm.wav', kind: 'bed' },
+  crickets: { src: 'Abience/320145__owlstorm__night-crickets-ambience-on-rural-property.wav', kind: 'bed' },
+  owl: { src: 'Abience/ocasional_owl.wav', kind: 'call' },
+  frogs: { src: 'animals/532235__shaunhillyard__frog-croaking-uk-common-frog.wav', kind: 'call' },
+  // The town
+  village: { src: 'town/zoon_in_village_2.wav', kind: 'bed' },
+  residential: { src: 'town/zoon_in_residential.wav', kind: 'bed' },
+  footsteps: { src: 'footstpes.wav', kind: 'bed' },
+  tavern: { src: 'town/tavern.wav', kind: 'bed' },
+  market: { src: 'town/market.wav', kind: 'bed' },
+  street: { src: 'town/mix_hooves_noise.wav', kind: 'bed' },
+  bees: { src: 'animals/bees_cut_short_for_buildings.wav', kind: 'bed' },
+  smithy: { src: 'town/blacksmith.wav', kind: 'bed' },
+  stone: { src: 'town/stoneworks.wav', kind: 'bed' },
+  building: { src: 'town/construction.wav', kind: 'bed' },
+  watermill: { src: 'town/water_mill_building_and_ocasional_city.wav', kind: 'bed' },
+  sawing: { src: 'town/sawing_building_and_ocasional_city.wav', kind: 'call' },
+  woodmill: { src: 'town/woodcutter_mill_building_and_ocasional_city.wav', kind: 'call' },
+  treefall: { src: 'town/tree_falling_ocasional_city.wav', kind: 'call' },
+  bells: { src: 'town/change_season_bells.wav', kind: 'call' },
+  // Animals
+  sheep: { src: 'animals/sheep.wav', kind: 'call' },
+  cattle: { src: 'animals/cows.flac', kind: 'call' },
+  cattle2: { src: 'animals/cow_mooing.wav', kind: 'call' },
+  goats: { src: 'animals/goats.m4a', kind: 'call' },
+  pigs: { src: 'animals/pig_snort.wav', kind: 'call' },
+  hens: { src: 'animals/chicken.wav', kind: 'call' },
+  hens2: { src: 'animals/more_chicken.wav', kind: 'call' },
+  rooster: { src: 'animals/rooster_dawn.mp3', kind: 'call' },
+  ducks: { src: 'animals/ducks.wav', kind: 'call' },
+  dogs: { src: 'animals/dogs.wav', kind: 'call' },
+  dogs2: { src: 'animals/dogs2.wav', kind: 'call' },
+  // Effects
+  chop: { src: 'town/woodcutters.wav', kind: 'ui' },
+  coins: { src: 'town/coins_trade_taxes.wav', kind: 'ui' },
+  demolish: { src: 'town/demolishing.wav', kind: 'ui' },
+  click: { src: 'UI/click.wav', kind: 'ui' },
+  back: { src: 'UI/click_close_or_back.wav', kind: 'ui' },
+  open: { src: 'town/stone_building_open.wav', kind: 'ui' },
+  charters: { src: 'UI/science_screen.wav', kind: 'ui' },
 };
 
 /**
- * When each track plays: menu, day (spring and summer), autumn, winter or
- * festival. Matched by the start of the file name; unknown files play by day.
+ * Clips for looking into a building, cut from its trade's recording: id ->
+ * recording and length in seconds. The game picks one by building type.
  */
-const MOODS = [
-  ['Menu', 'menu'],
-  ['harvestseason', 'autumn'],
-  ['Angevin', 'autumn'],
-  ['alexander-nakarada-winter-night', 'winter'],
-  ['alexander-nakarada-wintersong', 'winter'],
-  ['celebrations', 'festival'],
-  ['the-medieval-banquet', 'festival'],
+const OPENS = {
+  'open-smithy': ['town/blacksmith.wav', 2.5],
+  'open-stone': ['town/stoneworks.wav', 2.5],
+  'open-saw': ['town/sawing_building_and_ocasional_city.wav', 2.5],
+  'open-watermill': ['town/water_mill_building_and_ocasional_city.wav', 3],
+  'open-woodcutter': ['town/woodcutter_mill_building_and_ocasional_city.wav', 2.5],
+  'open-tavern': ['town/tavern.wav', 3],
+  'open-market': ['town/market.wav', 3],
+  'open-home': ['town/zoon_in_residential.wav', 2.5],
+  'open-bees': ['animals/bees.aiff', 2.5],
+  'open-church': ['town/change_season_bells.wav', 3.5],
+  'open-farm': ['animals/rooster_dawn.mp3', 2.5],
+  'open-hens': ['animals/more_chicken.wav', 2.5],
+  'open-cattle': ['animals/cow_mooing.wav', 2.5],
+  'open-building': ['town/construction.wav', 2.5],
+};
+
+/**
+ * The music, with what its licence asks to be credited. Mood: when it
+ * plays (menu, day in spring and summer, autumn, winter, festival).
+ */
+const ALKAKRAB = { by: 'alkakrab', source: 'https://alkakrab04.wixsite.com/alkakrab-game-music', licence: 'alkakrab licence', private: true };
+const MUSIC = [
+  { src: 'Menu.mp3', id: 'teller-of-the-tales', title: 'Teller of the Tales', by: 'Kevin MacLeod', source: 'https://incompetech.com', licence: 'CC BY 4.0', mood: 'menu' },
+  { src: 'Angevin.mp3', id: 'angevin', title: 'Angevin', by: 'Kevin MacLeod', source: 'https://incompetech.com', licence: 'CC BY 4.0', mood: 'autumn' },
+  { src: 'Woodland Fantasy.mp3', id: 'woodland-fantasy', title: 'Woodland Fantasy', by: 'Matthew Pablo', source: 'https://opengameart.org/content/woodland-fantasy', licence: 'CC BY 3.0', mood: 'day' },
+  { src: 'alexander-nakarada-village-ambiance.mp3', id: 'village-ambiance', title: 'Village Ambiance', by: 'Alexander Nakarada (CreatorChords)', source: 'https://creatorchords.com', licence: 'CC BY 4.0', mood: 'day' },
+  { src: 'alexander-nakarada-wintersong.mp3', id: 'wintersong', title: 'Wintersong', by: 'Alexander Nakarada (CreatorChords)', source: 'https://creatorchords.com', licence: 'CC BY 4.0', mood: 'winter' },
+  { src: 'alexander-nakarada-winter-night.mp3', id: 'winter-night', title: 'Winter Night', by: 'Alexander Nakarada (CreatorChords)', source: 'https://creatorchords.com', licence: 'CC BY-SA 4.0', mood: 'winter' },
+  { src: 'the-medieval-banquet.mp3', id: 'the-medieval-banquet', title: 'The Medieval Banquet', by: 'Shane Ivers', source: 'https://www.silvermansound.com', licence: 'CC BY 4.0', mood: 'festival' },
+  {
+    src: 'Marin_Marais_(1656-1728)_-_Excerpts_from_Suite_No.3_from_Pieces_en_trio_pour_les_flutes,_violon,_et_dessus_de_viole_(1692).ogg',
+    id: 'marais-pieces-en-trio',
+    title: 'Marais, Suite No. 3 from Pièces en trio (1692)',
+    by: 'New Comma Baroque (Matthew C. Cataldi, Leighann Daihl, Phillip W. Serna, Emily J. Morlan)',
+    source: 'https://commons.wikimedia.org/wiki/File:Marin_Marais_(1656-1728)_-_Excerpts_from_Suite_No.3_from_Pieces_en_trio_pour_les_flutes,_violon,_et_dessus_de_viole_(1692).ogg',
+    licence: 'CC BY-SA 3.0',
+    mood: 'day',
+  },
+  {
+    src: 'summer.ogg',
+    id: 'dowland-whitehead-almand',
+    title: 'Dowland, M. George Whitehead his Almand',
+    by: 'Phillip W. Serna, viols',
+    source: 'https://commons.wikimedia.org/wiki/File:John_Dowland_(1563-1626)_-_M._George_Whitehead_His_Almand,_Lachrimae,_No.21_for_Treble,_Tenor_%26_Bass_Viols_with_Great_Bass_Violone_in_G_1604.ogg',
+    licence: 'CC BY-SA 4.0',
+    mood: 'day',
+  },
+  { src: 'Chopin,_Nocturne_op_32_no_1.ogg', id: 'chopin-nocturne-op32-1', title: 'Chopin, Nocturne Op. 32 No. 1', by: 'Constantin Stephan', source: 'https://commons.wikimedia.org/wiki/File:Chopin,_Nocturne_op_32_no_1.ogg', licence: 'CC BY-SA 4.0', mood: 'winter' },
+  { src: 'O_frondens.ogg', id: 'o-frondens', title: 'Hildegard von Bingen, O frondens', by: 'Magdalen Kadel', source: 'https://commons.wikimedia.org/wiki/File:O_frondens.ogg', licence: 'CC BY-SA 3.0', mood: 'winter' },
+  { src: 'Medieval Vol. 2 1.ogg', id: 'alkakrab-knight-in-a-tavern', title: 'Knight In A Tavern', ...ALKAKRAB, mood: 'festival' },
+  { src: 'Medieval Vol. 2 2.ogg', id: 'alkakrab-drunken-king', title: 'Drunken King', ...ALKAKRAB, mood: 'festival' },
+  { src: 'Medieval Vol. 2 3.ogg', id: 'alkakrab-morning-in-a-castle', title: 'Morning In A Castle', ...ALKAKRAB, mood: 'day' },
+  { src: 'Medieval Vol. 2 4.ogg', id: 'alkakrab-hunters-in-the-forest', title: 'Hunters In The Forest', ...ALKAKRAB, mood: 'autumn' },
+  { src: 'Medieval Vol. 2 5.ogg', id: 'alkakrab-sacred-rivers', title: 'Sacred Rivers', ...ALKAKRAB, mood: 'day' },
+  { src: 'Medieval Vol. 2 6.ogg', id: 'alkakrab-tournier-of-the-knights', title: 'Tournier Of The Knights', ...ALKAKRAB, mood: 'festival' },
+  { src: 'Medieval Vol. 2 7.ogg', id: 'alkakrab-midnight-walk', title: 'Midnight Walk', ...ALKAKRAB, mood: 'winter' },
+  { src: 'Medieval Vol. 2 8.ogg', id: 'alkakrab-stranger-in-town', title: 'Stranger In Town', ...ALKAKRAB, mood: 'autumn' },
 ];
 
 /** Loudness each kind is brought to (LUFS), and how it is encoded. */
@@ -157,13 +231,22 @@ function encode(src, dest, kind) {
   return gain;
 }
 
+/** A short clip from the busiest stretch of a recording, faded at both ends. */
+function cutClip(src, dest, len) {
+  const busy = busyStretches(src);
+  const longest = busy.sort((a, b) => b[1] - b[0] - (a[1] - a[0]))[0] ?? [0, len];
+  const start = longest[0] + Math.max(0, (longest[1] - longest[0] - len) / 2);
+  const tmp = `${dest}.wav`;
+  execFileSync('ffmpeg', ['-hide_banner', '-v', 'error', '-y', '-ss', String(start), '-t', String(len), '-i', src, '-af', `afade=t=in:d=0.08,afade=t=out:st=${len - 0.7}:d=0.7`, tmp]);
+  encode(tmp, dest, 'ui');
+  rmSync(tmp);
+}
+
 if (process.argv.includes('--fetch')) {
-  const files = run('git', ['ls-tree', '-r', '--name-only', 'origin/master']).split('\n').filter((f) => /\.(mp3|wav|ogg|flac|m4a)$/i.test(f));
+  const files = run('git', ['ls-tree', '-r', '--name-only', 'origin/master']).split('\n').filter((f) => /\.(mp3|wav|ogg|flac|m4a|aiff)$/i.test(f));
   for (const f of files) {
-    // Sounds for opening a building keep their own folder; other folders are sound effects.
-    const dir = /^open\//i.test(f) ? 'open' : f.includes('/') ? 'sfx' : 'music';
-    mkdirSync(join(SRC, dir), { recursive: true });
-    writeFileSync(join(SRC, dir, basename(f)), execFileSync('git', ['show', `origin/master:${f}`], { maxBuffer: 1 << 30 }));
+    mkdirSync(dirname(join(SRC, f)), { recursive: true });
+    writeFileSync(join(SRC, f), execFileSync('git', ['show', `origin/master:${f}`], { maxBuffer: 1 << 30 }));
   }
   console.log(`fetched ${files.length} recordings from origin/master`);
 }
@@ -171,11 +254,12 @@ if (process.argv.includes('--fetch')) {
 rmSync(OUT, { recursive: true, force: true });
 mkdirSync(join(OUT, 'music'), { recursive: true });
 const manifest = { sounds: {}, music: [] };
+const missing = [];
 
 for (const [id, def] of Object.entries(SOUNDS)) {
-  const src = join(SRC, 'sfx', def.src);
+  const src = join(SRC, def.src);
   if (!existsSync(src)) {
-    console.warn(`missing ${src}`);
+    missing.push(def.src);
     continue;
   }
   const dest = join(OUT, `${id}.mp3`);
@@ -186,26 +270,31 @@ for (const [id, def] of Object.entries(SOUNDS)) {
   console.log(`${id.padEnd(12)} ${def.kind.padEnd(5)} ${gain >= 0 ? '+' : ''}${gain.toFixed(1)} dB  ${entry.duration}s${entry.busy ? `  ${entry.busy.length} busy stretches` : ''}`);
 }
 
-// Opening a building: open/<building type or category>.<ext>, e.g. open/smithy.wav or open/farming.wav.
-const opens = existsSync(join(SRC, 'open')) ? readdirSync(join(SRC, 'open')).filter((f) => /\.(mp3|wav|ogg|flac|m4a|aac|opus)$/i.test(f)).sort() : [];
-for (const f of opens) {
-  const id = `open-${basename(f, extname(f)).toLowerCase()}`;
+for (const [id, [file, len]] of Object.entries(OPENS)) {
+  const src = join(SRC, file);
+  if (!existsSync(src)) {
+    missing.push(file);
+    continue;
+  }
   const dest = join(OUT, `${id}.mp3`);
-  encode(join(SRC, 'open', f), dest, 'ui');
+  cutClip(src, dest, len);
   manifest.sounds[id] = { file: `audio/${id}.mp3`, kind: 'ui', duration: Math.round(duration(dest) * 100) / 100 };
   console.log(`${id}`);
 }
 
-const tracks = existsSync(join(SRC, 'music')) ? readdirSync(join(SRC, 'music')).filter((f) => /\.(mp3|wav|ogg|flac|m4a|aac|opus)$/i.test(f)).sort() : [];
-for (const f of tracks) {
-  const name = basename(f, extname(f));
-  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  const dest = join(OUT, 'music', `${slug}.mp3`);
-  const gain = encode(join(SRC, 'music', f), dest, 'music');
-  const mood = MOODS.find(([start]) => name.startsWith(start))?.[1] ?? 'day';
-  manifest.music.push({ file: `audio/music/${slug}.mp3`, title: name, mood, duration: Math.round(duration(dest)) });
-  console.log(`music ${mood.padEnd(8)} ${name}  ${gain >= 0 ? '+' : ''}${gain.toFixed(1)} dB`);
+for (const m of MUSIC) {
+  const src = join(SRC, m.src);
+  if (!existsSync(src)) {
+    missing.push(m.src);
+    continue;
+  }
+  const dest = join(OUT, 'music', `${m.id}.mp3`);
+  const gain = encode(src, dest, 'music');
+  const { src: _src, id, ...about } = m;
+  manifest.music.push({ file: `audio/music/${id}.mp3`, ...about, duration: Math.round(duration(dest)) });
+  console.log(`music ${m.mood.padEnd(8)} ${m.title}  ${gain >= 0 ? '+' : ''}${gain.toFixed(1)} dB`);
 }
 
 writeFileSync(join(OUT, 'manifest.json'), JSON.stringify(manifest, null, 1) + '\n');
 console.log(`${Object.keys(manifest.sounds).length} sounds, ${manifest.music.length} tracks`);
+if (missing.length) console.warn(`missing: ${missing.join(', ')}`);

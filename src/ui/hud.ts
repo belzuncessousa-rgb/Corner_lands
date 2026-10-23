@@ -145,8 +145,8 @@ import { LANDS, idx, inBounds } from '../game/world';
 import type { Game } from '../main';
 import { BUILDING_ICONS, CATEGORY_ICONS, ICONS, LOGO, SEASON_ICONS } from './icons';
 import { Minimap } from './minimap';
-import { Soundscape, type SoundSwitches } from './soundscape';
-import { LICENCE_LINKS, MUSIC_CREDITS, SOUND_CREDITS } from './credits';
+import { CHANNEL_NAMES, FULL_VOLUME, Soundscape, type Channel, type SoundSwitches, type Track, type Volumes } from './soundscape';
+import { LICENCE_LINKS, SOUND_CREDITS } from './credits';
 import { folkDoing, folkName, folkThought, WISHES, workplaceOf } from './folk';
 
 const ZONE_COST_NOTE: Partial<Record<BuildingType, string>> = {
@@ -270,6 +270,8 @@ export class Hud {
   private sounds: Soundscape | null = null;
   /** Music, and everything else ("ambience"), each on or off. */
   soundOn: SoundSwitches = { music: true, ambience: true };
+  /** Each kind of sound's volume from the settings, 0 to 1. */
+  volume: Volumes = { ...FULL_VOLUME };
   /** The seasonal tune, separately from the other sounds. */
   private objectivesMin = true;
   private lastInspectorKey = '';
@@ -286,6 +288,8 @@ export class Hud {
     private root: HTMLElement,
   ) {
     try {
+      const vol = JSON.parse(localStorage.getItem('cornerlands.volumes') ?? 'null') as Partial<Volumes> | null;
+      if (vol) this.volume = { ...this.volume, ...vol };
       this.soundOn = {
         music: localStorage.getItem('cornerlands.music') !== '0',
         ambience: localStorage.getItem('cornerlands.ambience') !== '0' && localStorage.getItem('cornerlands.muted') !== '1',
@@ -337,6 +341,13 @@ export class Hud {
     }
     this.minimap = new Minimap(root, game.renderer, () => game.state);
     root.addEventListener('click', (e) => this.onClick(e));
+    // Browsers let sound start only after the player does something: the first click or key starts it (and the title music).
+    const wake = () => {
+      this.ensureAudio();
+      if (this.audio?.state === 'suspended') this.audio.resume().catch(() => undefined);
+    };
+    document.addEventListener('pointerdown', wake, { capture: true });
+    document.addEventListener('keydown', wake, { capture: true });
     // The sound switches close when clicking anywhere else.
     document.addEventListener('pointerdown', (e) => {
       const el = e.target as HTMLElement;
@@ -2495,11 +2506,15 @@ export class Hud {
   }
 
   /** Who made the music and sounds, as their licences ask. */
-  private showCredits(): void {
-    const rows = MUSIC_CREDITS.map(
-      (c) =>
-        `<li><b>${esc(c.title)}</b> by ${esc(c.by)} <small>(${esc(c.source)}) · <a href="${LICENCE_LINKS[c.licence] ?? '#'}" target="_blank" rel="noopener">${esc(c.licence)}</a></small></li>`,
-    ).join('');
+  private async showCredits(): Promise<void> {
+    const tracks = await fetch('audio/manifest.json')
+      .then((r) => r.json())
+      .then((m: { music: Track[] }) => m.music)
+      .catch(() => [] as Track[]);
+    const link = (url: string, text: string) => `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(text)}</a>`;
+    const rows = tracks
+      .map((c) => `<li><b>${esc(c.title)}</b> by ${esc(c.by)} <small>(${link(c.source, c.source.replace(/^https?:\/\/(www\.)?/, '').split('/')[0])}) · ${LICENCE_LINKS[c.licence] ? link(LICENCE_LINKS[c.licence], c.licence) : esc(c.licence)}</small></li>`)
+      .join('');
     const m = this.openModal(
       `<h2>Credits</h2>
       <p>Corner Lands: game, code and art made with Claude (Anthropic).</p>
@@ -2851,6 +2866,10 @@ export class Hud {
     const m = this.openModal(
       `<h2>Settings</h2>
       <div class="menu">
+        <div class="volumes">${CHANNEL_NAMES.map(
+          (c) =>
+            `<label class="volume"><span>${c.name}</span><input type="range" min="0" max="100" step="5" data-vol="${c.id}" value="${Math.round(this.volume[c.id] * 100)}"><output>${Math.round(this.volume[c.id] * 100)}%</output></label>`,
+        ).join('')}</div>
         <button data-m="scale">Text size: ${Math.round(this.uiScale * 100)}%</button>
         <button data-m="pausebad">Pause on bad news: ${this.pauseOnBad ? 'On' : 'Off'}</button>
         <button data-m="nights" data-tip="Night falls each day at normal speed, longer in winter">Nights: ${this.game.renderer.nights ? 'On' : 'Off'}</button>
@@ -2880,6 +2899,24 @@ export class Hud {
         /* ignore */
       }
       this.showSettings(fromMain);
+    });
+    m.querySelectorAll<HTMLInputElement>('input[data-vol]').forEach((inp) => {
+      const ch = inp.dataset.vol as Channel;
+      inp.addEventListener('input', () => {
+        this.volume[ch] = Number(inp.value) / 100;
+        inp.nextElementSibling!.textContent = `${inp.value}%`;
+        this.ensureAudio();
+        this.sounds?.setVolume(ch, this.volume[ch]);
+      });
+      // Remembered, with a sample of an effect when that slider is let go.
+      inp.addEventListener('change', () => {
+        try {
+          localStorage.setItem('cornerlands.volumes', JSON.stringify(this.volume));
+        } catch {
+          /* ignore */
+        }
+        if (ch === 'effects') this.sound('place');
+      });
     });
     m.querySelector('[data-m="bicons"]')!.addEventListener('click', () => {
       this.buildIcons = !this.buildIcons;
@@ -3060,7 +3097,7 @@ export class Hud {
     if (this.audio || (!this.soundOn.music && !this.soundOn.ambience)) return;
     try {
       this.audio = new AudioContext();
-      this.sounds = new Soundscape(this.audio, this.soundOn);
+      this.sounds = new Soundscape(this.audio, this.soundOn, this.volume);
     } catch {
       /* no audio */
     }
@@ -3161,11 +3198,15 @@ export class Hud {
       case 'jig':
         sc.bells(this.game.state);
         break;
-      // No recording yet for these: see docs/AUDIO-OPTIONS.md.
+      case 'coin':
+        sc.play('coins', 0.6);
+        break;
       case 'demolish':
+        sc.play('demolish', 0.7);
+        break;
+      // No recording yet for news: see docs/AUDIO-OPTIONS.md.
       case 'good':
       case 'bad':
-      case 'coin':
         break;
     }
   }
