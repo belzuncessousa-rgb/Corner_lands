@@ -80,7 +80,17 @@ then fall back to the browser's localStorage.
   one load per trip, then raise the walls. A plan can only be laid out once all its
   materials are in store (beyond what other sites are still owed).
   Construction is a job: each site takes two builders before other work, and
-  idle villagers lend a hand.
+  idle villagers lend a hand. Each site has a priority (Low, Normal, High)
+  that decides which gets builders and materials first.
+- **Moving** — a building's panel can move it: builders put it up at the new
+  spot with no materials, taking a quarter longer than building it, while the
+  old one keeps working; then it moves over with its workers and stock.
+- **The land** — every map is rich in one natural resource (meadows in
+  fertile soil, valleys in fish, hills in stone), lacks one other altogether
+  (never stone), and has a regular or a poor share of the rest: game, fish,
+  berries, bog ore, stone and fertile soil. Fish shoal about one to every 150
+  tiles of water. Founding does not tell you which: look about, or use the
+  resource lens. Woods felled bare grow back slowly from their edges.
 - **Roads** — optional. They speed up walking, which makes everything nearby
   work faster. Roads over water become bridges (4 timber per tile).
 - **Storage** — goods live in the Manor Hall, Storehouses (materials) and
@@ -98,8 +108,9 @@ then fall back to the browser's localStorage.
   soil and the expected harvest. What the stores cannot take waits in the
   farmstead's barn. Animal Farms keep
   sheep (wool), cattle (milk, beef, hides) or pigs (pork) on fenced pastures;
-  oats let a herd outgrow its pasture over winter. Orchards of apples, pears
-  or plums bear after a year and a half. Households can keep a vegetable
+  oats let a herd outgrow its pasture over winter. Orchards are laid out
+  for nothing and then planted: strawberries (1 coin a tile), apples or plums
+  (2), pears (3) or vines (4); fruit trees bear after a year and a half. Households can keep a vegetable
   patch, hens or beehives in the backyard.
 - **Food & seasons** — each villager eats one food per month (bread and cheese
   go further); meals from several food groups (grain, meat, produce, dairy)
@@ -115,8 +126,8 @@ then fall back to the browser's localStorage.
   makes wood parts for windmills; the Bloomery smelts ore into iron for the
   Blacksmith. Kilns, tanneries and bloomeries work in batches: their workers
   only come once a full batch of inputs is waiting.
-- **Homes grow** — Cottage → Timber House (well, market, a tavern with ale or
-  cider, clothes, two food groups) → Townhouse (church, boots, medicine, three
+- **Homes grow** — Cottage (3 villagers) → Timber House (5) (well, market, a tavern with ale or
+  cider, clothes, two food groups) → Townhouse (7; church, boots, medicine, three
   food groups). Clothes, boots and medicine wear out every three months.
   Unmet needs sour the mood.
 - **Home crafts** — a Timber House or Townhouse can take up a craft (baker,
@@ -128,7 +139,8 @@ then fall back to the browser's localStorage.
 - **Festivals** — May Day round the maypole in spring and a Midsummer bonfire
   by the manor: small spends from the manor's panel for a season's cheer.
 - **Fairs and the Cathedral** — from Town on the treasury can endow a fair once
-  a year (each dearer than the last) for prestige and cheer. A Borough may raise
+  a year (each dearer than the last) for prestige and cheer; its pavilions
+  stand on a green before the manor for half a month. A Borough may raise
   one Cathedral: a fortune and most of a year to build, it serves as a church
   far and wide, cheers everyone and brings prestige every month.
 - **Titles** — prestige makes the lord a Baron (a Town; taxes +10%), an Earl

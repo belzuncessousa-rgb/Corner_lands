@@ -15,7 +15,8 @@ await page.click('text=New Settlement');
 await page.fill('#seed', '4242');
 await page.click('text=Found the Settlement');
 await page.waitForTimeout(600);
-await page.evaluate(() => { const g = window.game; g.setSpeed(0); window.cl.learnEverything(g.state); g.state.tier = 1; g.state.res.wood = 300; g.state.res.planks = 60; g.state.res.stone = 60; g.state.res.gold = 500; g.hud.update(); });
+// (The charter lesson, which the prestige given below would bring on, is taken as heard: it would take the clicks.)
+await page.evaluate(() => { const g = window.game; g.setSpeed(0); g.state.tutorial = { step: 0, chapter: 'done', manorSeen: true, charterSeen: true }; window.cl.learnEverything(g.state); g.state.tier = 1; g.state.res.wood = 300; g.state.res.planks = 60; g.state.res.stone = 60; g.state.res.gold = 500; g.hud.update(); });
 // The test raises the town's size by hand: carry on past the banner it shows (it pauses the game and takes clicks).
 const closeBanners = async () => {
   while (await page.$('.banner .carry-on')) await page.click('.banner .carry-on');
