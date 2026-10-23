@@ -1,5 +1,5 @@
 import { BUILDINGS, DAYS_PER_MONTH, DAYS_PER_YEAR, RESOURCE_STORAGE, STORAGE_CAPACITY, type StorageKind } from '../game/data';
-import { MANOR_SIZE, marketStalls, upgradeBlocker } from '../game/levels';
+import { MANOR_SIZE, marketStalls } from '../game/levels';
 import { knows } from '../game/unlocks';
 import { optionOn } from '../game/options';
 import { drawImprovements, pastureShed } from './props';
@@ -1560,30 +1560,10 @@ export class Renderer {
     } else if (b.workers > 0 && !b.paused && (b.efficiency ?? 1) < LOW_EFFICIENCY) {
       // Losing much of the day to walking: select it to see how much.
       this.drawMarker(b, '#b8683a', 'walk');
-    } else if ((b.type === 'house' || b.type === 'townhall') && this.canUpgrade(s, b)) {
-      this.drawMarker(b, b.type === 'townhall' ? '#c89a38' : '#4f8a3a', '↑');
     }
+    // (Homes and the manor that could be upgraded carry no marker: their panel says so.)
     void s;
   }
-
-  /**
-   * Whether a home or the manor could be upgraded now. Checking means
-   * scanning the town for wells, markets and taverns in reach, so it is
-   * worked out once per game day (or when buildings change), not every frame.
-   */
-  private canUpgrade(s: GameState, b: Building): boolean {
-    const key = `${s.day}:${s.buildings.length}:${Math.floor(s.res.gold)}`;
-    if (key !== this.upgradeKey) {
-      this.upgradeKey = key;
-      this.upgradable.clear();
-      for (const o of s.buildings) {
-        if ((o.type === 'house' || o.type === 'townhall' || o.type === 'church') && o.build >= 1 && !o.upgrading && !upgradeBlocker(s, o)) this.upgradable.add(o.id);
-      }
-    }
-    return this.upgradable.has(b.id);
-  }
-  private upgradeKey = '';
-  private upgradable = new Set<number>();
 
   /**
    * A section of town wall, joined to its neighbours. Beside a road it rises
