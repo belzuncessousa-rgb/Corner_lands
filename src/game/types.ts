@@ -535,6 +535,8 @@ export interface GameState {
   /** Fairs held so far (each costs more) and the year of the last. */
   fairs?: number;
   lastFair?: number;
+  /** The day the latest fair opened (it stands for half a month, in front of the manor). */
+  fairDay?: number;
   /** Messages logged so far (numbers each one). */
   messageCount?: number;
   /** Day the last feast was held (the manor stays decorated for a month). */

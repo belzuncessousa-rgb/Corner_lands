@@ -448,7 +448,8 @@ export class Renderer {
         put(i * 8, tileKey(d, i));
       }
     }
-    this.festTile = this.light ? -1 : this.festivalTile(s);
+    // (The lord's fair shows even when the picture is kept light: it was paid for.)
+    this.festTile = this.light && !this.fairOn(s) ? -1 : this.festivalTile(s);
     if (this.festTile >= 0) {
       const [wx, wy] = iso((this.festTile % W) + 0.5, ((this.festTile / W) | 0) + 0.5);
       if (visible(wx, wy)) put(this.festTile * 8, tileKey((this.festTile % W) + ((this.festTile / W) | 0), this.festTile));
@@ -4437,10 +4438,11 @@ export class Renderer {
   private festivalTile(s: GameState): number {
     const month = monthOf(s.day);
     const d = s.day % DAYS_PER_MONTH;
-    if ((month !== 2 && month !== 8) || d < 2 || d > 7) return -1;
+    const fair = this.fairOn(s);
+    if (!fair && ((month !== 2 && month !== 8) || d < 2 || d > 7)) return -1;
     const hall = seatOf(s);
     if (!hall) return -1;
-    const key = `${hall.id}:${Math.floor(s.day / DAYS_PER_MONTH)}`;
+    const key = `${hall.id}:${fair ? `fair${s.fairDay}` : Math.floor(s.day / DAYS_PER_MONTH)}`;
     if (this.festCache.key === key) return this.festCache.tile;
     const W = s.width;
     const free = (x: number, y: number) => {
@@ -4448,29 +4450,146 @@ export class Renderer {
       const i = y * W + x;
       return s.occ[i] < 0 && !s.terrain[i] && !s.trees[i] && !s.rock[i] && !s.ore[i];
     };
-    let best = -1;
-    let bd = 1e9;
     const cx = hall.x + hall.w / 2;
     const cy = hall.y + hall.h / 2;
-    for (let y = hall.y - 7; y < hall.y + hall.h + 7; y++) {
-      for (let x = hall.x - 7; x < hall.x + hall.w + 7; x++) {
-        let ok = true;
-        for (let dy = -1; dy <= 1 && ok; dy++) for (let dx = -1; dx <= 1; dx++) ok &&= free(x + dx, y + dy);
-        if (!ok) continue;
-        // Nearer is better, and in front of the hall (where it can be seen) better still.
-        const dist = Math.hypot(x + 0.5 - cx, y + 0.5 - cy) + (x < hall.x || y < hall.y ? 3 : 0);
-        if (dist < bd) {
-          bd = dist;
-          best = y * W + x;
+    // The fair's green wants more room than a maypole, and looks further for it; failing that it squeezes in.
+    const look = (r: number, reach: number) => {
+      let best = -1;
+      let bd = 1e9;
+      for (let y = hall.y - reach; y < hall.y + hall.h + reach; y++) {
+        for (let x = hall.x - reach; x < hall.x + hall.w + reach; x++) {
+          let ok = true;
+          for (let dy = -r; dy <= r && ok; dy++) for (let dx = -r; dx <= r; dx++) ok &&= free(x + dx, y + dy);
+          if (!ok) continue;
+          // Nearer is better, and in front of the hall (where it can be seen) better still.
+          const dist = Math.hypot(x + 0.5 - cx, y + 0.5 - cy) + (x < hall.x || y < hall.y ? 3 : 0);
+          if (dist < bd) {
+            bd = dist;
+            best = y * W + x;
+          }
         }
       }
-    }
+      return best;
+    };
+    let best = fair ? look(2, 14) : look(1, 7);
+    if (best < 0 && fair) best = look(1, 14);
     this.festCache = { key, tile: best };
     return best;
   }
 
   /** Dancers round a ribboned maypole, or villagers about a harvest bonfire. */
+  /** Whether a fair the lord endowed is on (for half a month after it opens). */
+  private fairOn(s: GameState): boolean {
+    return s.fairDay !== undefined && s.day - s.fairDay >= 0 && s.day - s.fairDay < DAYS_PER_MONTH * 1.5;
+  }
+
+  /**
+   * The lord's fair: striped pavilions round a little green, pennants
+   * flying, bunting strung between poles, and folk milling about.
+   */
+  private drawFair(x: number, y: number): void {
+    const c = this.ctx;
+    const t = this.time;
+    const stripes = [
+      ['#c84a3a', '#f2e8d0'],
+      ['#3a6aa8', '#f2e8d0'],
+      ['#d8a838', '#7a3a2a'],
+      ['#4a8a4a', '#f2e8d0'],
+    ];
+    // Bunting round the green, on four poles.
+    const poles: [number, number][] = [[-1.7, -1.7], [1.7, -1.7], [1.7, 1.7], [-1.7, 1.7]];
+    const pts = poles.map(([dx, dy]) => iso(x + dx, y + dy, 22));
+    for (const [dx, dy] of poles) {
+      const [a, b] = iso(x + dx, y + dy);
+      c.strokeStyle = '#6a4a2a';
+      c.lineWidth = 1.2;
+      c.beginPath();
+      c.moveTo(a, b);
+      c.lineTo(a, b - 22);
+      c.stroke();
+    }
+    for (let k = 0; k < 4; k++) {
+      const [ax, ay] = pts[k];
+      const [bx, by] = pts[(k + 1) % 4];
+      c.strokeStyle = 'rgba(60,40,20,0.7)';
+      c.lineWidth = 0.6;
+      c.beginPath();
+      c.moveTo(ax, ay);
+      c.quadraticCurveTo((ax + bx) / 2, (ay + by) / 2 + 6, bx, by);
+      c.stroke();
+      for (let j = 1; j < 8; j++) {
+        const u = j / 8;
+        const fx = ax + (bx - ax) * u;
+        const fy = ay + (by - ay) * u + Math.sin(u * Math.PI) * 6;
+        c.fillStyle = ['#d84a40', '#f2e8d0', '#4a7ac8', '#e8c040'][(j + k) % 4];
+        c.beginPath();
+        c.moveTo(fx - 1.6, fy);
+        c.lineTo(fx + 1.6, fy);
+        c.lineTo(fx, fy + 3.2 + Math.sin(t * 4 + j) * 0.4);
+        c.closePath();
+        c.fill();
+      }
+    }
+    // Three pavilions: a striped cone over a round wall, a pennant on top.
+    const tents: [number, number, number][] = [[-1, -0.8, 0], [1, -0.6, 1], [0, 1, 2]];
+    for (const [dx, dy, k] of tents.sort((a, b) => a[0] + a[1] - (b[0] + b[1]))) {
+      const [ox, oy] = iso(x + dx, y + dy);
+      // Drawn at twice the size of the little figures below: a pavilion is tall.
+      c.save();
+      c.translate(ox, oy);
+      c.scale(2, 2);
+      const tx = 0;
+      const ty = 0;
+      const [col, alt] = stripes[k % stripes.length];
+      const r = 7;
+      c.fillStyle = 'rgba(30,20,10,0.25)';
+      c.beginPath();
+      c.ellipse(tx + 2, ty + 1, r + 1, (r + 1) / 2, 0, 0, Math.PI * 2);
+      c.fill();
+      for (let i = 0; i < 6; i++) {
+        c.fillStyle = i % 2 ? alt : col;
+        c.fillRect(tx - r + (i * 2 * r) / 6, ty - 9, (2 * r) / 6 + 0.3, 9);
+      }
+      c.fillStyle = '#3a2418';
+      c.fillRect(tx - 1.6, ty - 6, 3.2, 6);
+      for (let i = 0; i < 6; i++) {
+        c.fillStyle = i % 2 ? alt : col;
+        c.beginPath();
+        c.moveTo(tx, ty - 21);
+        c.lineTo(tx - r + (i * 2 * r) / 6, ty - 9);
+        c.lineTo(tx - r + ((i + 1) * 2 * r) / 6, ty - 9);
+        c.closePath();
+        c.fill();
+      }
+      c.strokeStyle = '#5a3a20';
+      c.lineWidth = 0.8;
+      c.beginPath();
+      c.moveTo(tx, ty - 21);
+      c.lineTo(tx, ty - 27);
+      c.stroke();
+      c.fillStyle = col;
+      c.beginPath();
+      c.moveTo(tx, ty - 27);
+      c.lineTo(tx + 5 + Math.sin(t * 5 + k) * 1.2, ty - 25.5);
+      c.lineTo(tx, ty - 24);
+      c.closePath();
+      c.fill();
+      c.restore();
+    }
+    // Folk milling about the green.
+    const tunics = ['#b85a48', '#5a7a9a', '#d8b048', '#6a9a5a', '#9a6aa0'];
+    for (let k = 0; k < 6; k++) {
+      const a = t * 0.15 + k * 1.7;
+      const [fx, fy] = iso(x + Math.cos(a) * 0.7, y + Math.sin(a * 1.3) * 0.6);
+      this.drawFolk(fx, fy, 0.95 * FOLK_SCALE, tunics[k % tunics.length], '#6a4428', t * 6 + k, Math.cos(a) > 0 ? -1 : 1, false);
+    }
+  }
+
   private drawFestival(s: GameState, x: number, y: number): void {
+    if (this.fairOn(s)) {
+      this.drawFair(x, y);
+      return;
+    }
     const c = this.ctx;
     const t = this.time;
     const may = monthOf(s.day) === 2;

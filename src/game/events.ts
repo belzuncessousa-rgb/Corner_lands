@@ -166,6 +166,8 @@ export function holdFair(s: GameState): string | null {
   addMood(s, 'The great fair', 8, 3);
   s.fairs = (s.fairs ?? 0) + 1;
   s.lastFair = Math.floor(s.day / DAYS_PER_YEAR);
+  s.fairDay = s.day;
+  log(s, 'The fair opens before the manor: pavilions, pedlars, jugglers and a tournament, for half a month.', 'good');
   return null;
 }
 
