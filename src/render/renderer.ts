@@ -3,10 +3,10 @@ import { MANOR_SIZE, marketStalls } from '../game/levels';
 import { knows } from '../game/unlocks';
 import { optionOn } from '../game/options';
 import { drawImprovements, pastureShed } from './props';
-import { estateTiles, ANIMAL_KINDS, LOW_EFFICIENCY, animalsOf, deliveredTo, hasProblem, herdTotal, lordRides, monthOf, nearestShoal, orchardMaturity, seasonOf, seatOf, storageCap, stored } from '../game/sim';
+import { estateTiles, ANIMAL_KINDS, LOW_EFFICIENCY, animalsOf, deliveredTo, hasProblem, herdTotal, lordRides, monthOf, orchardMaturity, seasonOf, seatOf, storageCap, stored } from '../game/sim';
 import type { Building, BuildingType, GameState, ResourceId, Season } from '../game/types';
 import { idx, inBounds } from '../game/world';
-import { type Agent, LEISURE_ACTS } from './agents';
+import { type Agent, LEISURE_ACTS, boatHome, boatSpot } from './agents';
 import { ICONS } from '../ui/icons';
 import type { Animal } from './wildlife';
 import { LENS_COLORS, type LensData, type LensKind, lensCount } from './lens';
@@ -478,9 +478,10 @@ export class Renderer {
     if (!this.light && season !== 3) {
       this.drawDucks(s, visible);
       this.drawShoals(s, visible);
-      this.drawBoats(s, visible);
       this.drawMist(s, season, visible);
     }
+    // The boats always: a fisher sits in one.
+    if (season !== 3) this.drawBoats(s, agents, visible);
     for (let bi = 0; bi < nb; bi++) {
       const bucket = this.buckets[bi];
       const keys = this.bucketKeys[bi];
@@ -2410,47 +2411,18 @@ export class Renderer {
     for (let k = 0; k < n; k++) if (!back(k)) stake(k);
   }
 
-  /** For each fishery, the open water tile its boat rows out to (or -1). */
-  private boatSpots = new Map<number, number>();
-
-  /** A rowing boat with a fisher casting a line, out from each working fishery. */
-  private drawBoats(s: GameState, visible: (x: number, y: number) => boolean): void {
-    if (this.duckMap !== s.terrain) this.boatSpots.clear();
+  /** Each fishery's rowing boat: out on its shoal with one of its own fishers casting a line, or moored empty by the hut. */
+  private drawBoats(s: GameState, agents: Agent[], visible: (x: number, y: number) => boolean): void {
     const W = s.width;
-    const water = (x: number, y: number) => inBounds(s, x, y) && s.terrain[idx(s, x, y)] === 1;
     const c = this.ctx;
+    // Which fishers have a hand out in their boat (one of their own workers).
+    const aboard = new Set<number>();
+    for (const a of agents) if (a.role.kind === 'work' && a.act === 'boat' && a.phase === 'act' && !a.visible) aboard.add(a.role.id);
     for (const b of s.buildings) {
-      if (b.type !== 'fisher' || b.build < 1 || b.workers <= 0 || b.paused) continue;
-      // Out on the shoal the fisher works, once it is at sea; otherwise near home.
-      const sh = nearestShoal(s, b);
-      let spot = -1;
-      if (sh) {
-        const ox = ((b.id * 7) % 5) * 0.4 - 0.8;
-        const oy = ((b.id * 3) % 5) * 0.3 - 0.6;
-        const tx = Math.floor(sh.x + ox);
-        const ty = Math.floor(sh.y + oy);
-        spot = water(tx, ty) ? ty * W + tx : Math.floor(sh.y) * W + Math.floor(sh.x);
-      } else {
-        spot = this.boatSpots.get(b.id) ?? -1;
-        if (!this.boatSpots.has(b.id)) {
-          let bd = 1e9;
-          const cx = b.x + b.w / 2;
-          const cy = b.y + b.h / 2;
-          for (let y = b.y - 6; y < b.y + b.h + 6; y++) {
-            for (let x = b.x - 6; x < b.x + b.w + 6; x++) {
-              let open = true;
-              for (let dy = -1; dy <= 1 && open; dy++) for (let dx = -1; dx <= 1; dx++) open &&= water(x + dx, y + dy);
-              if (!open) continue;
-              const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
-              if (d < bd) {
-                bd = d;
-                spot = y * W + x;
-              }
-            }
-          }
-          this.boatSpots.set(b.id, spot);
-        }
-      }
+      if (b.type !== 'fisher' || b.build < 1) continue;
+      // Out on the shoal while someone fishes from it; otherwise moored by the hut, empty.
+      const out = aboard.has(b.id);
+      const spot = out ? boatSpot(s, b) : boatHome(s, b);
       if (spot < 0) continue;
       const t = this.time;
       const x = (spot % W) + 0.5 + Math.sin(t * 0.07 + b.id) * 0.25;
@@ -2476,6 +2448,7 @@ export class Renderer {
       c.fill();
       c.fillStyle = '#7a5636';
       c.fillRect(Math.min(sx - 10 * f, sx + 11 * f), sy - 5, 21, 1.4);
+      if (!out) continue;
       // The fisher, seated, rod out over the water.
       this.drawFolk(sx - 3 * f, sy - 1.5, 0.85 * FOLK_SCALE, '#6a7a5a', '#4a3020', 0, f, false, true);
       const rx = sx + 1 * f;

@@ -1,6 +1,6 @@
 import { BUILDINGS, DAY_SECONDS, GATHER_REACH, GATHERERS, OFFROAD_TILES_PER_DAY, RESOURCE_STORAGE, ROAD_TILES_PER_DAY, STONE_ROAD_TILES_PER_DAY, COBBLE_TILES_PER_DAY, STORAGE_CAPACITY } from '../game/data';
 import { findPath, ROYAL_ROAD_PACE, WOODS_SLOWDOWN } from '../game/path';
-import { chooseRecipe, lordRides, doorTile, forTilesInRadius, bCenter, isWinter, nearestHerd, needsMaterials, seatOf, beastWorks, constructionSites, yardFor } from '../game/sim';
+import { chooseRecipe, lordRides, nearestShoal, doorTile, forTilesInRadius, bCenter, isWinter, nearestHerd, needsMaterials, seatOf, beastWorks, constructionSites, yardFor } from '../game/sim';
 
 /** The day of each month a merchant cart sets out from the trading post. */
 const CART_DAY = 4;
@@ -108,6 +108,78 @@ const YARD_WORK: Partial<Record<string, string[]>> = {
   limekiln: ['mix'],
   collier: ['shovel'],
 };
+
+/** Where each fisher's boat lies when no shoal is near: the open water nearest the hut. */
+const homeWater = new Map<number, number>();
+let homeWaterMap: Uint8Array | null = null;
+
+/**
+ * The tile of open water a fisher's boat lies on: out on the shoal it works,
+ * or, with none, in the open water nearest the hut (-1 if there is none).
+ */
+export function boatSpot(s: GameState, b: Building): number {
+  const W = s.width;
+  const water = (x: number, y: number) => inBounds(s, x, y) && s.terrain[idx(s, x, y)] === 1;
+  const sh = nearestShoal(s, b);
+  if (sh) {
+    const ox = ((b.id * 7) % 5) * 0.4 - 0.8;
+    const oy = ((b.id * 3) % 5) * 0.3 - 0.6;
+    const tx = Math.floor(sh.x + ox);
+    const ty = Math.floor(sh.y + oy);
+    return water(tx, ty) ? ty * W + tx : Math.floor(sh.y) * W + Math.floor(sh.x);
+  }
+  return boatHome(s, b);
+}
+
+/** The open water nearest a fisher's hut, where its boat lies moored while no one is out in it (-1 if none). */
+export function boatHome(s: GameState, b: Building): number {
+  const water = (x: number, y: number) => inBounds(s, x, y) && s.terrain[idx(s, x, y)] === 1;
+  const W = s.width;
+  if (homeWaterMap !== s.terrain) {
+    homeWater.clear();
+    homeWaterMap = s.terrain;
+  }
+  let spot = homeWater.get(b.id);
+  if (spot === undefined) {
+    spot = -1;
+    let bd = 1e9;
+    const cx = b.x + b.w / 2;
+    const cy = b.y + b.h / 2;
+    for (let y = b.y - 6; y < b.y + b.h + 6; y++) {
+      for (let x = b.x - 6; x < b.x + b.w + 6; x++) {
+        let open = true;
+        for (let dy = -1; dy <= 1 && open; dy++) for (let dx = -1; dx <= 1; dx++) open &&= water(x + dx, y + dy);
+        if (!open) continue;
+        const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
+        if (d < bd) {
+          bd = d;
+          spot = y * W + x;
+        }
+      }
+    }
+    homeWater.set(b.id, spot);
+  }
+  return spot;
+}
+
+/** The dry tile on the bank nearest a spot on the water, where the boat is boarded. */
+function landingFor(s: GameState, spot: number): { x: number; y: number } | null {
+  const sx = spot % s.width;
+  const sy = Math.floor(spot / s.width);
+  let best: { x: number; y: number } | null = null;
+  let bd = Infinity;
+  for (let r = 1; r <= 10 && !best; r++)
+    for (let y = sy - r; y <= sy + r; y++)
+      for (let x = sx - r; x <= sx + r; x++) {
+        if (!inBounds(s, x, y) || s.terrain[idx(s, x, y)] || s.occ[idx(s, x, y)] >= 0) continue;
+        const d = Math.hypot(x - sx, y - sy);
+        if (d < bd) {
+          bd = d;
+          best = { x, y };
+        }
+      }
+  return best;
+}
 
 /** Leisure acts (no tools in hand). */
 export const LEISURE_ACTS = new Set(['dance', 'pray', 'toast', 'sit', 'chat']);
@@ -409,6 +481,11 @@ export class AgentSystem {
       case 'act':
         a.phase = 'act';
         a.timer = LEISURE_ACTS.has(a.act) ? 6 + Math.random() * 8 : 4 + Math.random() * 4;
+        // Into the boat, and out on the water a good while (the boat is drawn with them in it).
+        if (a.act === 'boat') {
+          a.visible = false;
+          a.timer = 20 + Math.random() * 20;
+        }
         // A hunter turns to the herd.
         if (a.act === 'hunt' && a.cast) {
           const sx = a.cast.x - a.cast.y - (a.x - a.y);
@@ -464,8 +541,12 @@ export class AgentSystem {
     const r = a.role;
     if (r.kind === 'settler') return;
     if (this.evening && (r.kind === 'work' || r.kind === 'build' || r.kind === 'idle' || r.kind === 'lord')) {
-      // Evening: home to supper and bed. Those already in stay in.
+      // Evening: home to supper and bed. Those already in stay in; the fisher rows back first.
       const home = getBuilding(s, a.home);
+      if (a.act === 'boat' && a.phase === 'act' && !a.visible) {
+        a.visible = true;
+        a.act = '';
+      }
       if (!a.visible || !home) {
         a.phase = 'inside';
         a.visible = false;
@@ -835,8 +916,9 @@ export class AgentSystem {
     }
     const d = BUILDINGS[b.type];
     const door = doorTile(s, b);
-    // After working outside, carry goods back.
+    // After working outside, carry goods back (a fisher steps ashore from the boat).
     if (a.phase === 'act') {
+      if (a.act === 'boat') a.visible = true;
       a.carry = LEISURE_ACTS.has(a.act) ? null : goodCarried(s, b);
       this.walkTo(s, a, door.x, door.y, [b.id], 'enter-work');
       return;
@@ -856,6 +938,17 @@ export class AgentSystem {
         a.want = errand.carry;
         const ed = doorTile(s, errand.at);
         this.walkTo(s, a, ed.x, ed.y, [b.id, errand.at.id], 'fetch');
+        return;
+      }
+    }
+    // A fisher's first hand takes the boat out: rows from the bank and fishes from it.
+    if (b.type === 'fisher' && a.key.endsWith('#0') && !isWinter(s.day) && boatSpot(s, b) >= 0) {
+      const land = landingFor(s, boatSpot(s, b));
+      if (land) {
+        this.exitAt(s, a, b);
+        a.act = 'boat';
+        a.carry = null;
+        this.walkTo(s, a, land.x, land.y, [b.id], 'act');
         return;
       }
     }
