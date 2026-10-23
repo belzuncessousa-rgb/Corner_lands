@@ -192,7 +192,7 @@ then fall back to the browser's localStorage.
   the weakest link.
 - **Villagers** — click anyone walking the map to meet them: their name, trade,
   home and what is on their mind (often what their home is missing).
-- **Steward, chronicle & ledger** — timely advice, the full story of your lands
+- **Steward, chronicle & ledger** — red warning tabs for emergencies (and yellow tips in the tutorial), the full story of your lands
   with its milestones (first harvest, a hundred villagers, the cathedral...)
   and monthly charts.
 - **Protected woods** — the Protect tool (P) marks a wood the woodcutters

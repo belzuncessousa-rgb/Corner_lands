@@ -1456,7 +1456,8 @@ export class Renderer {
       const fruit = orchard.recipe ?? 'apples';
       const stage = Math.round(orchardMaturity(s, orchard) * 4) / 4;
       const month = monthOf(s.day);
-      const fruiting = stage >= 1 && month >= 3 && month <= 6 && (month < 5 || orchard.growth > 0);
+      // Green fruit through summer, ripe in autumn until picked.
+      const fruiting = stage >= 1 && month >= 4 && month <= 8 && (month < 7 || orchard.growth > 0);
       const blossom = month <= 1 && stage >= 0.5;
       const sp = this.sprite(`ft:${fruit}:${season}:${stage}:${fruiting}:${blossom}`, () => fruitTreeSprite(fruit, season, stage, fruiting, blossom));
       const [wx, wy] = iso(x + 0.5, y + 0.5);

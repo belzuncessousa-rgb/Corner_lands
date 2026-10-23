@@ -31,7 +31,7 @@ import {
   UPKEEP,
   NEAR_HINT,
 } from './data';
-import { advise } from './advisor';
+import { advise, clearAlerts } from './advisor';
 import { CHARTERS, hasCharter, onPath } from './charters';
 import { artBoons, DUKE_PRESTIGE, monthlyAtelier, rollEvent, TITLES } from './events';
 import {
@@ -501,6 +501,7 @@ export function placeZone(s: GameState, type: BuildingType, x0: number, y0: numb
   if (type === 'orchard') {
     b.age = 0;
     b.bare = true;
+    b.tended = 0;
   }
   placeBuilding(s, b);
   recompute(s);
@@ -1923,7 +1924,7 @@ export function chooseRecipe(s: GameState, b: Building, any = false): Recipe | n
 }
 
 /** Coins a tile of orchard costs to plant, by fruit: vines and pears dear, strawberry beds cheap. */
-export const ORCHARD_PLANTING: Record<string, number> = { apples: 2, pears: 3, plums: 2, strawberries: 1, grapes: 4 };
+export const ORCHARD_PLANTING: Record<string, number> = { apples: 4, pears: 6, plums: 4, strawberries: 2, grapes: 8 };
 
 /** What planting (or replanting) an orchard with a fruit costs. */
 export function plantingCost(b: Building, fruit: string): number {
@@ -1942,6 +1943,7 @@ export function plantOrchard(s: GameState, b: Building, fruit: string): string |
   b.bare = undefined;
   b.age = 0;
   b.growth = 0;
+  b.tended = 0;
   return null;
 }
 
@@ -2628,9 +2630,6 @@ export const FIELD_YIELD = 18;
  * more than an orchard's picker brings in.
  */
 export const TEND_PER_TILE = 8;
-/** Workshops leave this much firewood for the homes' hearths. */
-export const FIREWOOD_RESERVE = 20;
-
 /**
  * Goods other than food are made more slowly than they used to be, to match
  * the cheaper buildings (G19; tuned in the balance pass).
@@ -2654,12 +2653,12 @@ export function fuelOf(d: BuildingDef, r: Recipe | null | undefined): number {
 
 /**
  * What a batch's fuel is paid with: a firewood is one unit, a charcoal two.
- * Smelters and smiths burn charcoal first, other fires firewood first, and
- * the homes' firewood reserve is never touched. Null when there is not enough.
+ * Smelters and smiths burn charcoal first, other fires firewood first.
+ * Null when there is not enough.
  */
 export function fuelPlan(s: GameState, type: BuildingType, units: number): Cost | null {
   if (units <= 0) return {};
-  const wood = Math.max(0, Math.floor(s.res.firewood - FIREWOOD_RESERVE));
+  const wood = Math.max(0, Math.floor(s.res.firewood));
   const coal = Math.floor(s.res.charcoal);
   if (type === 'bloomery' || type === 'smithy') {
     const c = Math.min(coal, Math.ceil(units / 2));
@@ -3210,7 +3209,7 @@ function monthlyHerds(s: GameState, month: number): void {
 /** Days before young fruit trees bear (a year and a half). */
 export const ORCHARD_MATURE_DAYS = Math.round(DAYS_PER_MONTH * MONTHS_PER_YEAR * 1.5);
 /** Fruit per tile of a mature orchard in a season. */
-export const ORCHARD_YIELD = 7;
+export const ORCHARD_YIELD = 8;
 /** Fruit one picker gathers in a day. */
 const PICK_PER_DAY = 5;
 
@@ -3259,12 +3258,44 @@ export function espalierShare(s: GameState, o: Building): number {
   return n / Math.max(1, o.w * o.h);
 }
 
+/** Months the keepers tend the trees (spring and summer); the fruit sets and is picked in autumn. */
+export const ORCHARD_TEND_MONTHS = 7;
+/**
+ * Keeper-days of tending each tile of orchard needs over the season,
+ * whatever grows on it: a keeper tends about seventeen tiles.
+ */
+export const ORCHARD_TEND_PER_TILE = 4;
+
+/** Tiles of orchard a lodge's keepers can tend in a season. */
+export function orchardHands(b: Building): number {
+  return Math.round((workersOf(b) * ORCHARD_TEND_MONTHS * DAYS_PER_MONTH) / ORCHARD_TEND_PER_TILE);
+}
+
 function stepOrchardist(s: GameState, b: Building): void {
   const orchards = zonesOf(s, b);
+  const month = monthOf(s.day);
   b.blocked = 0;
   if (!orchards.length) {
     b.status = noZonesNote(s, b, 'Plant orchards nearby', 'orchards');
     b.blocked = BLOCK_PROBLEM;
+    return;
+  }
+  // Spring and summer: tending. Every tile needs the same care, shared out
+  // over the season; how much of it was done decides how much fruit sets.
+  if (month < ORCHARD_TEND_MONTHS) {
+    const live = orchards.filter((o) => !o.bare);
+    if (!live.length) {
+      b.status = 'Choose a fruit to plant in its orchards';
+      b.blocked = BLOCK_SEASONAL;
+      return;
+    }
+    const area = zoneArea(live);
+    const days = b.workers * (b.efficiency ?? 1) * wornYield(b);
+    const grow = days / (area * ORCHARD_TEND_PER_TILE);
+    for (const o of live) o.tended = Math.min(1, (o.tended ?? 0) + grow);
+    const done = Math.round((live.reduce((a, o) => a + (o.tended ?? 0) * o.w * o.h, 0) / area) * 100);
+    b.status = b.workers > 0 ? `Tending the trees (${done}% of the season's work done)` : 'Trees untended';
+    if (b.workers > 0 && area > orchardHands(b) * 1.05) b.status += ' (more trees than hands)';
     return;
   }
   const hanging = orchards.reduce((a, o) => a + o.growth, 0);
@@ -3298,7 +3329,7 @@ function stepOrchardist(s: GameState, b: Building): void {
   b.status = `Picking fruit (${Math.floor(hanging)} on the trees)`;
 }
 
-/** Orchards age daily; fruit sets in late summer and rots if not picked. */
+/** Orchards age daily; fruit sets in autumn, as much as the season's tending allows, and rots if not picked. */
 function dailyOrchards(s: GameState): void {
   const month = monthOf(s.day);
   const first = s.day % DAYS_PER_MONTH === 0;
@@ -3311,21 +3342,25 @@ function dailyOrchards(s: GameState): void {
     }
     o.age = (o.age ?? 0) + 1;
     const m = orchardMaturity(s, o);
-    if (month === 5 && first) {
-      o.growth = Math.round(o.w * o.h * ORCHARD_YIELD * (m >= 1 ? 1 : m * m) * (hasCharter(s, 'orchard1') ? 1.3 : 1) * orchardFactor(s, o));
+    if (month === ORCHARD_TEND_MONTHS && first) {
+      // (Orchards from before tending came in count as fully tended this once.)
+      const tended = Math.min(1, o.tended ?? 1);
+      o.growth = Math.round(o.w * o.h * ORCHARD_YIELD * (m >= 1 ? 1 : m * m) * tended * (hasCharter(s, 'orchard1') ? 1.3 : 1) * orchardFactor(s, o));
       o.lastOutput = 0;
+      o.tended = 0;
     }
-    if (month === 7 && first) o.growth = 0;
+    if (month === ORCHARD_TEND_MONTHS + 2 && first) o.growth = 0;
     const fruit = GOODS[(o.recipe ?? 'apples') as ResourceId].name.toLowerCase();
+    const care = month < ORCHARD_TEND_MONTHS ? ` · ${Math.round((o.tended ?? 0) * 100)}% tended` : '';
     o.status =
       m < 1
-        ? `Young trees: ${Math.round(m * 100)}% grown`
-        : month >= 5 && month <= 6 && o.growth > 0
+        ? `Young trees: ${Math.round(m * 100)}% grown${care}`
+        : month >= ORCHARD_TEND_MONTHS && month <= ORCHARD_TEND_MONTHS + 1 && o.growth > 0
           ? `${Math.floor(o.growth)} ${fruit} ripe`
           : month <= 1
-            ? 'In blossom'
-            : month <= 4
-              ? `${cap(fruit)} setting`
+            ? `In blossom${care}`
+            : month < ORCHARD_TEND_MONTHS
+              ? `${cap(fruit)} setting${care}`
               : 'Resting';
   }
 }
@@ -4915,6 +4950,7 @@ export function stepDay(s: GameState): void {
   checkMilestones(s);
   s.day++;
   if (s.day % DAYS_PER_MONTH === 0) monthly(s, rng);
+  else clearAlerts(s);
   if (s.dirty) recompute(s);
 }
 

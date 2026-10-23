@@ -33,6 +33,7 @@ import { WORKS_OF_ART, nextTitle, takeTitle, titleError, TITLES, fairCost, fairE
 import { CHARTERS, CHARTER_TIER, PATHS, charterCost, charterError, grantCharter, hasCharter } from '../game/charters';
 import { CHURCH_LEVELS, TAVERN_LEVELS, HOUSE_LEVELS, MANOR_LEVELS, buildingName, houseNeeds, marketStalls, startUpgrade, upgradeBlocker, upgradePlan, workersOf } from '../game/levels';
 import { activeQuests } from '../game/quests';
+import { dismissAlert } from '../game/advisor';
 import { StateRng } from '../game/rng';
 import {
   canAfford,
@@ -130,6 +131,8 @@ import {
   sellDraught,
   DRAUGHT_PRICE,
   upkeepOf,
+  orchardHands,
+  ORCHARD_TEND_MONTHS,
   prestigeSources,
   theOnly,
   plantOrchard,
@@ -265,6 +268,10 @@ export class Hud {
   private hintText = '';
   private flashUntil = 0;
   private shownMessages = 0;
+  /** The steward's tab opened to its full text, if any. */
+  private openAlert: string | null = null;
+  /** Warnings already announced with a sound, so each sounds once. */
+  private heardAlerts = new Set<string>();
   private modal: HTMLElement | null = null;
   private audio: AudioContext | null = null;
   private sounds: Soundscape | null = null;
@@ -331,14 +338,36 @@ export class Hud {
       </div>
       <div id="season-banner"></div>
       <div id="log"></div>
+      <div id="alerts"></div>
       <div id="inspector" class="panel" style="display:none"></div>
       <div id="hint" class="panel" style="display:none"></div>
       <div id="buildbar" class="panel"></div>
       <div id="tooltip" class="panel"></div>
       <div id="chip-panel" class="panel" style="display:none"></div>`;
-    for (const id of ['chip-panel', 'topbar', 'clock', 'objectives', 'log', 'inspector', 'hint', 'buildbar', 'tooltip', 'season-banner']) {
+    for (const id of ['chip-panel', 'topbar', 'clock', 'objectives', 'log', 'alerts', 'inspector', 'hint', 'buildbar', 'tooltip', 'season-banner']) {
       this.el[id] = root.querySelector(`#${id}`)!;
     }
+    // The steward's tabs: a click opens one and shows the place, a right-click waves it away.
+    this.el.alerts.addEventListener('click', (e) => {
+      const tab = (e.target as HTMLElement).closest('.alert-tab') as HTMLElement | null;
+      if (!tab) return;
+      const id = tab.dataset.id!;
+      this.openAlert = this.openAlert === id ? null : id;
+      const at = this.game.state.alerts?.find((a) => a.id === id)?.at;
+      if (at && this.openAlert) {
+        this.game.renderer.centerOn(at.x, at.y);
+        this.game.renderer.clampCamera(this.game.state);
+      }
+      this.updateAlerts();
+    });
+    this.el.alerts.addEventListener('contextmenu', (e) => {
+      const tab = (e.target as HTMLElement).closest('.alert-tab') as HTMLElement | null;
+      if (!tab) return;
+      e.preventDefault();
+      dismissAlert(this.game.state, tab.dataset.id!);
+      if (this.openAlert === tab.dataset.id) this.openAlert = null;
+      this.updateAlerts();
+    });
     this.minimap = new Minimap(root, game.renderer, () => game.state);
     root.addEventListener('click', (e) => this.onClick(e));
     // Browsers let sound start only after the player does something: the first click or key starts it (and the title music).
@@ -403,6 +432,9 @@ export class Hud {
     this.category = null;
     this.shownMessages = lastNumber(this.game.state.messages);
     this.el.log.innerHTML = '';
+    // A loaded game's standing warnings are not news.
+    this.openAlert = null;
+    this.heardAlerts = new Set((this.game.state.alerts ?? []).filter((a) => a.level === 'alert').map((a) => a.id));
     this.lastInspectorKey = '';
     this.renderBuildBar();
     this.update();
@@ -857,6 +889,7 @@ export class Hud {
     if (this.buildBarState() !== this.buildBarKey) this.renderBuildBar();
     this.updateInspector();
     this.updateLog();
+    this.updateAlerts();
     this.updateSeason();
     this.updateHint();
     this.updateTips();
@@ -1435,6 +1468,7 @@ export class Hud {
       } else if (b.type === 'orchard') {
         const m = orchardMaturity(s, b);
         rows.push(`<div class="kv"><span>Trees</span><span>${m < 1 ? `${Math.round(m * 100)}% grown` : 'Bearing fruit'}</span></div>${m < 1 ? bar(m) : ''}`);
+        if (monthOf(s.day) < ORCHARD_TEND_MONTHS && !b.bare) rows.push(`<div class="kv" data-tip="How much of this season's tending the keepers have done: the fruit that sets in autumn is in proportion."><span>Tended this season</span><span>${Math.round((b.tended ?? 0) * 100)}%</span></div>${bar(b.tended ?? 0)}`);
         if (b.growth > 0) rows.push(`<div class="kv"><span>Fruit on the trees</span><span>${Math.floor(b.growth)}</span></div>`);
       }
     }
@@ -1468,7 +1502,9 @@ export class Hud {
     }
     if (b.type === 'orchardist' && b.build >= 1) {
       const orchards = zonesOf(s, b);
-      rows.push(`<div class="kv"><span>Orchards</span><span>${orchards.length} · ${zoneArea(orchards)} tiles</span></div>`);
+      const area = zoneArea(orchards);
+      const hands = orchardHands(b);
+      rows.push(`<div class="kv" data-tip="${workersOf(b)} keepers can tend about ${hands} tiles of orchard through spring and summer; trees left part untended bear part of their fruit."><span>Orchards</span><span class="${area > hands ? 'neg' : ''}">${orchards.length} · ${area} of ~${hands} tiles</span></div>`);
     }
     if (b.type === 'house' && b.build >= 1 && b.level >= 2) {
       if (b.trade) {
@@ -1551,6 +1587,35 @@ export class Hud {
       const drop = all.reduce((a, c) => ((rank[c.dataset.kind ?? ''] ?? 1) < (rank[a.dataset.kind ?? ''] ?? 1) ? c : a));
       drop.remove();
     }
+  }
+
+  /** The steward's warnings (red) and tutorial tips (yellow), as small tabs down the left edge. */
+  private updateAlerts(): void {
+    const g = this.game;
+    const all = g.demo ? [] : (g.state.alerts ?? []);
+    // Warnings first, then tips.
+    const alerts = [...all.filter((a) => a.level === 'alert'), ...all.filter((a) => a.level === 'tip')];
+    if (this.openAlert && !alerts.some((a) => a.id === this.openAlert)) this.openAlert = null;
+    let fresh = false;
+    for (const a of alerts) if (a.level === 'alert' && !this.heardAlerts.has(a.id)) fresh = true;
+    this.heardAlerts = new Set(alerts.filter((a) => a.level === 'alert').map((a) => a.id));
+    if (fresh) {
+      this.sound('bad');
+      if (this.pauseOnBad && g.speed > 0) g.setSpeed(0);
+    }
+    setHTML(
+      this.el.alerts,
+      alerts
+        .map((a) => {
+          const open = a.id === this.openAlert;
+          const hint = `${a.at ? 'Click to show the place' : 'Click to read'} · right-click to dismiss`;
+          return `<div class="alert-tab panel ${a.level}${open ? ' open' : ''}" data-id="${esc(a.id)}" title="${hint}">
+            <div class="head"><span class="mark">${a.level === 'alert' ? '!' : '?'}</span><span class="name">${esc(a.title)}</span></div>
+            ${open ? `<div class="body">${esc(a.text.replace(/^Steward: /, ''))}<div class="how">${hint}</div></div>` : ''}
+          </div>`;
+        })
+        .join(''),
+    );
   }
 
   /** Fades a toast after a while; warnings stay up longer. */
