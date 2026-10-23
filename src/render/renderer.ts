@@ -90,6 +90,8 @@ interface Particle {
 }
 
 const GRASS_VARIANTS = 8;
+/** Seconds the old season's picture takes to fade when a new season begins. */
+const SEASON_FADE = 3;
 const CHUNK = 16;
 const TREE_VARIANTS = 6;
 
@@ -273,6 +275,21 @@ export class Renderer {
     const z = this.cam.zoom;
     HERALDRY.current = s.heraldry ?? DEFAULT_HERALDRY;
     this.lordLook = s.lord ?? DEFAULT_LORD;
+    // A new season: the trees turn and snow falls on the roofs all at once
+    // in the pictures, so the last frame of the old one is kept and faded out
+    // over a few seconds on top of the new.
+    if (season !== this.seasonShown || s.seed !== this.seasonSeed) {
+      // (Not when another game is loaded: that is no change of season.)
+      if (this.seasonShown >= 0 && s.seed === this.seasonSeed && !this.light && c.canvas.width) {
+        const fc = (this.fadeCanvas ??= document.createElement('canvas'));
+        fc.width = c.canvas.width;
+        fc.height = c.canvas.height;
+        fc.getContext('2d')!.drawImage(c.canvas, 0, 0);
+        this.fade = { left: SEASON_FADE, x: this.cam.x, y: this.cam.y, zoom: this.cam.zoom };
+      }
+      this.seasonShown = season;
+      this.seasonSeed = s.seed;
+    }
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     c.fillStyle = season === 3 ? '#9fb0b8' : '#5f7d4a';
     c.fillRect(0, 0, this.width, this.height);
@@ -311,6 +328,41 @@ export class Renderer {
         const chunk = this.groundChunk(s, cx, cy, monthOf(s.day), gs);
         c.drawImage(chunk, left - 4, top - 4, right - left + 8, bottom - top + 8);
       }
+    }
+    // The land turns slowly towards next month's colours (grass browning,
+    // snow settling) through the month, rather than all at once when it ends.
+    // Drawn whole on a second canvas and laid over once, so the chunks' seams
+    // do not show through.
+    const into = ((s.day % DAYS_PER_MONTH) + this.dayFrac) / DAYS_PER_MONTH;
+    if (!this.light && into > 0.02) {
+      const bc = (this.blendCanvas ??= document.createElement('canvas'));
+      if (bc.width !== c.canvas.width || bc.height !== c.canvas.height) {
+        bc.width = c.canvas.width;
+        bc.height = c.canvas.height;
+      }
+      const g = bc.getContext('2d')!;
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.clearRect(0, 0, bc.width, bc.height);
+      g.setTransform(c.getTransform());
+      const next = (monthOf(s.day) + 1) % 12;
+      for (let cy = 0; cy < ch; cy++) {
+        for (let cx = 0; cx < cw; cx++) {
+          const x0 = cx * CHUNK;
+          const y0 = cy * CHUNK;
+          const left = (x0 - y0 - CHUNK) * (TW / 2);
+          const right = (x0 + CHUNK - y0) * (TW / 2);
+          const top = (x0 + y0) * (TH / 2);
+          const bottom = (x0 + y0 + CHUNK * 2) * (TH / 2);
+          if (right < vx0 || left > vx1 || bottom < vy0 || top > vy1) continue;
+          g.drawImage(this.groundChunk(s, cx, cy, next, gs), left - 4, top - 4, right - left + 8, bottom - top + 8);
+        }
+      }
+      c.save();
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      // Eased, so most of the change comes in the second half of the month.
+      c.globalAlpha = into * into * (3 - 2 * into);
+      c.drawImage(bc, 0, 0);
+      c.restore();
     }
     this.mark('ground');
     this.drawWaterShimmer(s, visible);
@@ -534,6 +586,19 @@ export class Renderer {
     else this.snow = [];
     this.drawAtmosphere(season, s.day);
     this.drawNightLights();
+    // The old season fading away (only while the view stays put; a moved view would ghost).
+    if (this.fade && this.fadeCanvas) {
+      const f = this.fade;
+      f.left -= Math.max(dt, 1 / 60);
+      if (f.left <= 0 || f.x !== this.cam.x || f.y !== this.cam.y || f.zoom !== this.cam.zoom) this.fade = null;
+      else {
+        c.save();
+        c.setTransform(1, 0, 0, 1, 0, 0);
+        c.globalAlpha = f.left / SEASON_FADE;
+        c.drawImage(this.fadeCanvas, 0, 0);
+        c.restore();
+      }
+    }
     if (ov.lens) this.drawLens(s, ov.lens);
     this.mark('effects');
   }
@@ -725,6 +790,13 @@ export class Renderer {
   // ---------------------------------------------------------------- ground helpers
 
   private chunks = new Map<string, HTMLCanvasElement>();
+  /** The season last drawn, and the old season's last picture fading out after it changes. */
+  private seasonShown = -1;
+  private seasonSeed = -1;
+  private fadeCanvas: HTMLCanvasElement | null = null;
+  private fade: { left: number; x: number; y: number; zoom: number } | null = null;
+  /** Where next month's ground is drawn before it is laid over this month's. */
+  private blendCanvas: HTMLCanvasElement | null = null;
   private chunkSeed = -1;
 
   private groundChunk(s: GameState, cx: number, cy: number, month: number, scale: number): HTMLCanvasElement {
@@ -773,7 +845,8 @@ export class Renderer {
       }
     }
     this.chunks.set(key, cv);
-    while (this.chunks.size > 48) this.chunks.delete(this.chunks.keys().next().value!);
+    // Two months' worth are drawn at once (this one and the next, blending).
+    while (this.chunks.size > 120) this.chunks.delete(this.chunks.keys().next().value!);
     return cv;
   }
 
