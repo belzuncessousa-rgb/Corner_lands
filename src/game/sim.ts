@@ -527,6 +527,21 @@ function assignOwners(s: GameState): void {
   }
 }
 
+/**
+ * Why a farm, animal farm or orchard lodge has none of its own zones: none
+ * drawn within reach, or those there are worked from a nearer one of its kind.
+ */
+function noZonesNote(s: GameState, b: Building, none: string, kind: string): string {
+  const c = bCenter(b);
+  const near = s.buildings.some((z) => {
+    const zd = BUILDINGS[z.type].zone;
+    if (!zd || zd.owner !== b.type || z.owner === undefined) return false;
+    const zc = bCenter(z);
+    return Math.hypot(zc.x - c.x, zc.y - c.y) <= GATHER_REACH + Math.max(z.w, z.h) / 2;
+  });
+  return near ? `The ${kind} nearby are worked from another, nearer one` : none;
+}
+
 /** Fields, pastures or orchards tended from a workplace. */
 export function zonesOf(s: GameState, b: Building): Building[] {
   return s.buildings.filter((z) => z.owner === b.id && BUILDINGS[z.type].zone);
@@ -2916,7 +2931,7 @@ function stepFarm(s: GameState, b: Building): void {
   const crew = Math.min(1, b.workers / Math.max(1, workersOf(b)));
   b.blocked = 0;
   if (!fields.length) {
-    b.status = 'Draw fields nearby to farm';
+    b.status = noZonesNote(s, b, 'Draw fields nearby to farm', 'fields');
     b.blocked = BLOCK_PROBLEM;
     return;
   }
@@ -3140,7 +3155,7 @@ function stepByre(s: GameState, b: Building): void {
   for (const z of pastures) z.status = !b.herd ? 'Empty: buy animals at the trading post' : winter ? `${list} sheltering in the byre` : `${list} grazing`;
   b.blocked = 0;
   if (!pastures.length) {
-    b.status = 'Fence pastures nearby for the animals';
+    b.status = noZonesNote(s, b, 'Fence pastures nearby for the animals', 'pastures');
     b.blocked = BLOCK_PROBLEM;
     return;
   }
@@ -3238,7 +3253,7 @@ function stepOrchardist(s: GameState, b: Building): void {
   const orchards = zonesOf(s, b);
   b.blocked = 0;
   if (!orchards.length) {
-    b.status = 'Plant orchards nearby';
+    b.status = noZonesNote(s, b, 'Plant orchards nearby', 'orchards');
     b.blocked = BLOCK_PROBLEM;
     return;
   }
