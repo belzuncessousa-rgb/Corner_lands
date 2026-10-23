@@ -1844,7 +1844,6 @@ table.goods button.sell.active svg {
 }
 .t-node.open {
   border-color: #f2d878;
-  animation: charterPulse 1.6s ease-in-out infinite;
 }
 .t-node.locked {
   opacity: 0.55;
@@ -1852,11 +1851,6 @@ table.goods button.sell.active svg {
 .t-node.sel {
   outline: 3px solid #fff8e0;
   outline-offset: 1px;
-}
-@keyframes charterPulse {
-  50% {
-    box-shadow: 0 0 0 3px rgba(242, 216, 120, 0.6);
-  }
 }
 .charter-detail {
   flex: 1;

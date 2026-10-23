@@ -3,6 +3,7 @@ import { bCenter } from '../game/sim';
 import type { GameState } from '../game/types';
 import { readyCount } from './learning';
 import type { HelpPage } from './fingahelp';
+import { CHARTER_TIER, charterCost } from '../game/charters';
 
 /**
  * The tutorial: Fingamoboblius, an old steward with a beard, walks about the
@@ -356,6 +357,24 @@ const LEARN: Step[] = [
   },
 ];
 
+/** Whether a town charter could be granted now: a Town with the prestige for one. */
+const charterReady = (g: Game) => g.state.tier >= CHARTER_TIER && g.state.res.prestige >= charterCost(g.state);
+
+const CHARTER: Step[] = [
+  {
+    say: 'My liege! Your house has the standing now to ask the crown for a town charter. Allow me a moment.',
+    enter: (g) => g.setSpeed(0),
+    show: '#top [data-action="charters"]',
+  },
+  {
+    say: 'Each charter makes your town better at one thing, at a small cost somewhere else. They come in paths, one after another, and each costs more prestige than the last. Two full paths make a fine reign.',
+    show: '#top [data-action="charters"]',
+  },
+  {
+    say: 'There is no hurry: prestige keeps. Open the charters whenever you like, and I am there if you click my face.',
+  },
+];
+
 /** The first trading post or dock to stand. */
 const tradeHouse = (g: Game) => g.state.buildings.find((b) => (b.type === 'tradingpost' || b.type === 'dock') && b.build >= 1);
 
@@ -575,7 +594,7 @@ export class Tutor {
 
   private get steps(): Step[] {
     const c = this.game.state.tutorial?.chapter;
-    return c === 'manor' ? MANOR : c === 'trade' ? TRADE : c === 'learn' ? LEARN : c === 'store' ? STORE : START;
+    return c === 'manor' ? MANOR : c === 'trade' ? TRADE : c === 'learn' ? LEARN : c === 'store' ? STORE : c === 'charter' ? CHARTER : START;
   }
 
   /** A click or Enter: finish the line, then go on (or, on a step that waits, step aside). */
@@ -609,6 +628,7 @@ export class Tutor {
     if (t.chapter === 'trade') t.tradeSeen = true;
     if (t.chapter === 'learn') t.learnSeen = true;
     if (t.chapter === 'store') t.storeSeen = true;
+    if (t.chapter === 'charter') t.charterSeen = true;
     t.chapter = 'done';
     this.hide();
     this.game.setSpeed(1);
@@ -622,6 +642,7 @@ export class Tutor {
       if (t.chapter === 'trade') t.tradeSeen = true;
       if (t.chapter === 'learn') t.learnSeen = true;
       if (t.chapter === 'store') t.storeSeen = true;
+      if (t.chapter === 'charter') t.charterSeen = true;
       t.chapter = 'done';
       if (this.game.speed === 0) this.game.setSpeed(1);
       t.step = 0;
@@ -667,7 +688,8 @@ export class Tutor {
     }
     // In any game, the first trading post or dock brings him to explain trade (unless tips are off).
     // And the first knowledge worth spending brings him to show the learning board.
-    if (!g.state.tutorial && !g.demo && (tradeHouse(g) || readyCount(g.state) > 0) && tipsOn()) g.state.tutorial = { step: 0, chapter: 'done', manorSeen: true };
+    // Only on a first settlement: an old hand is left in peace (the face on each panel still calls him).
+    if (!g.state.tutorial && !g.demo && g.state.firstGame && (tradeHouse(g) || readyCount(g.state) > 0 || charterReady(g)) && tipsOn()) g.state.tutorial = { step: 0, chapter: 'done', manorSeen: true };
     const t = g.state.tutorial;
     if (!t || g.demo) {
       if (this.active) this.hide();
@@ -679,6 +701,9 @@ export class Tutor {
       t.step = 0;
     } else if (t.chapter === 'done' && t.storeSeen === false && firstStore(g) && !g.modalOpen) {
       t.chapter = 'store';
+      t.step = 0;
+    } else if (t.chapter === 'done' && !t.charterSeen && charterReady(g) && !g.modalOpen) {
+      t.chapter = 'charter';
       t.step = 0;
     } else if (t.chapter === 'done' && !t.tradeSeen && tradeHouse(g)) {
       t.chapter = 'trade';

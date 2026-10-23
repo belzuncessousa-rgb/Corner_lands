@@ -231,6 +231,15 @@ export class Game {
     this.state = generateWorld(seed, { relaxed: mode === 'relaxed', hardy: mode === 'hardy', land, plain: tutorial });
     this.state.founded = Date.now();
     this.state.name = name?.trim().slice(0, 40) || placeName(seed);
+    // Fingamoboblius drops in uninvited only on a first settlement (or the tutorial).
+    let founded = 0;
+    try {
+      founded = Number(localStorage.getItem('cornerlands.founded') ?? '0') || 0;
+      localStorage.setItem('cornerlands.founded', String(founded + 1));
+    } catch {
+      /* ignore */
+    }
+    if (tutorial || founded === 0) this.state.firstGame = true;
     recompute(this.state);
     // Show a meaningful happiness breakdown from the very first day.
     this.state.report.variety = FOOD_IDS.filter((f) => this.state.res[f] > 0).length;
