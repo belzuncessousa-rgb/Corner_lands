@@ -2513,8 +2513,8 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
       return null;
     }
     default: {
-      // Generic converter: inputs -> outputs. Timber is never used below a
-      // small reserve so homes keep their firewood.
+      // Generic converter: inputs -> outputs (homes burn firewood, a good of
+      // its own, so timber is used down to the last log).
       let inputs = d.inputs;
       let outputs = d.outputs;
       if (d.recipes) {
@@ -2538,10 +2538,6 @@ function produce(s: GameState, b: Building, rng: StateRng): string | null {
         // Skeps give more honey, log hives a little more and never swarm.
         const f = knows(s, 'c:skeps') ? 1.5 : knows(s, 'c:loghives') ? 1.2 : 1;
         if (f !== 1) outputs = { honey: Math.round((outputs.honey ?? 0) * f) };
-      }
-      if ((inputs.wood ?? 0) > 0 && s.res.wood - (inputs.wood ?? 0) < WOOD_RESERVE) {
-        b.lack = 'wood';
-        return 'Waiting for wood (keeping firewood reserve)';
       }
       const fuelWant = fuelOf(d, d.recipes ? chooseRecipe(s, b) : null) * improvedFuel(b) + (b.fuelDebt ?? 0);
       const fuelUnits = Math.floor(fuelWant + 1e-9);
@@ -2598,8 +2594,6 @@ function farmFertility(s: GameState, b: Building): number {
 export const FIELD_YIELD = 18;
 /** Farmer-days of sowing and tending each tile of field needs in a season. */
 export const TEND_PER_TILE = 4;
-/** Converters leave this much timber in stock for firewood. */
-export const WOOD_RESERVE = 20;
 /** Workshops leave this much firewood for the homes' hearths. */
 export const FIREWOOD_RESERVE = 20;
 
@@ -3686,13 +3680,12 @@ export function dailyProduction(s: GameState, rng: StateRng): void {
 /** Days a workshop waits for its inputs before it counts as short of them. */
 const SHORT_DAYS = 3;
 
-/** Whether a workshop's inputs (for its current product) are in store, above the firewood reserve. */
+/** Whether a workshop's inputs (for its current product) are in store, and its fuel. */
 export function inputsReady(s: GameState, b: Building): boolean {
   const d = workDef(b);
   const r = d.recipes ? chooseRecipe(s, b) : null;
   const inputs = d.recipes ? r?.inputs : d.inputs;
   if (!inputs) return false;
-  if ((inputs.wood ?? 0) > 0 && s.res.wood - (inputs.wood ?? 0) < WOOD_RESERVE) return false;
   return canAfford(s, inputs) && !!fuelPlan(s, b.type, fuelOf(d, r));
 }
 

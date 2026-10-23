@@ -848,6 +848,21 @@ export class AgentSystem {
       this.walkTo(s, a, target.x, target.y, [b.id], 'act');
       return;
     }
+    // Workshops send someone to the stores for what they work: timber for
+    // the sawpit, flour for the bakery. (Haulers bring nothing in.)
+    const inputs = Object.keys(chooseRecipe(s, b)?.inputs ?? d.inputs ?? {}) as ResourceId[];
+    const want = inputs.find((k) => s.res[k] >= 1);
+    if (want && b.status !== 'Paused' && Math.random() < 0.35) {
+      const store = nearestStore(s, b);
+      if (store) {
+        this.exitAt(s, a, b);
+        a.carry = null;
+        a.want = want;
+        const sd = doorTile(s, store);
+        this.walkTo(s, a, sd.x, sd.y, [b.id, store.id], 'fetch');
+        return;
+      }
+    }
     // Some trades are seen at work in the yard before the door.
     const yardAct = YARD_WORK[b.trade ?? b.type];
     if (yardAct && Math.random() < 0.4) {
