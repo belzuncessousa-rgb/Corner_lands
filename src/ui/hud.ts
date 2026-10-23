@@ -2513,7 +2513,11 @@ export class Hud {
       .catch(() => [] as Track[]);
     const link = (url: string, text: string) => `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(text)}</a>`;
     const rows = tracks
-      .map((c) => `<li><b>${esc(c.title)}</b> by ${esc(c.by)} <small>(${link(c.source, c.source.replace(/^https?:\/\/(www\.)?/, '').split('/')[0])}) · ${LICENCE_LINKS[c.licence] ? link(LICENCE_LINKS[c.licence], c.licence) : esc(c.licence)}</small></li>`)
+      .map((c) =>
+        c.by
+          ? `<li><b>${esc(c.title)}</b> by ${esc(c.by)} <small>(${link(c.source, c.source.replace(/^https?:\/\/(www\.)?/, '').split('/')[0])}) · ${LICENCE_LINKS[c.licence] ? link(LICENCE_LINKS[c.licence], c.licence) : esc(c.licence)}</small></li>`
+          : `<li><b>${esc(c.title)}</b> <small>(credit to come)</small></li>`,
+      )
       .join('');
     const m = this.openModal(
       `<h2>Credits</h2>

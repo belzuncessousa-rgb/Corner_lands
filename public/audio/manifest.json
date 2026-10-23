@@ -803,6 +803,42 @@
    "duration": 118
   },
   {
+   "file": "audio/music/harvest-season.mp3",
+   "title": "Harvest Season",
+   "by": "",
+   "source": "",
+   "licence": "",
+   "mood": "autumn",
+   "duration": 214
+  },
+  {
+   "file": "audio/music/peaceful-town.mp3",
+   "title": "Peaceful Town",
+   "by": "",
+   "source": "",
+   "licence": "",
+   "mood": "day",
+   "duration": 119
+  },
+  {
+   "file": "audio/music/town-theme.mp3",
+   "title": "Town",
+   "by": "",
+   "source": "",
+   "licence": "",
+   "mood": "day",
+   "duration": 97
+  },
+  {
+   "file": "audio/music/celebrations.mp3",
+   "title": "Celebrations",
+   "by": "",
+   "source": "",
+   "licence": "",
+   "mood": "festival",
+   "duration": 140
+  },
+  {
    "file": "audio/music/alkakrab-knight-in-a-tavern.mp3",
    "title": "Knight In A Tavern",
    "by": "alkakrab",

@@ -138,6 +138,11 @@ const MUSIC = [
   },
   { src: 'Chopin,_Nocturne_op_32_no_1.ogg', id: 'chopin-nocturne-op32-1', title: 'Chopin, Nocturne Op. 32 No. 1', by: 'Constantin Stephan', source: 'https://commons.wikimedia.org/wiki/File:Chopin,_Nocturne_op_32_no_1.ogg', licence: 'CC BY-SA 4.0', mood: 'winter' },
   { src: 'O_frondens.ogg', id: 'o-frondens', title: 'Hildegard von Bingen, O frondens', by: 'Magdalen Kadel', source: 'https://commons.wikimedia.org/wiki/File:O_frondens.ogg', licence: 'CC BY-SA 3.0', mood: 'winter' },
+  // Credits to come: the sources of these four are still to be noted.
+  { src: 'harvestseason.mp3', id: 'harvest-season', title: 'Harvest Season', by: '', source: '', licence: '', mood: 'autumn' },
+  { src: 'music_peaceful_town_loop.mp3', id: 'peaceful-town', title: 'Peaceful Town', by: '', source: '', licence: '', mood: 'day' },
+  { src: '022815townbgm.ogg', id: 'town-theme', title: 'Town', by: '', source: '', licence: '', mood: 'day' },
+  { src: 'celebrations_1min.mp3', id: 'celebrations', title: 'Celebrations', by: '', source: '', licence: '', mood: 'festival' },
   { src: 'Medieval Vol. 2 1.ogg', id: 'alkakrab-knight-in-a-tavern', title: 'Knight In A Tavern', ...ALKAKRAB, mood: 'festival' },
   { src: 'Medieval Vol. 2 2.ogg', id: 'alkakrab-drunken-king', title: 'Drunken King', ...ALKAKRAB, mood: 'festival' },
   { src: 'Medieval Vol. 2 3.ogg', id: 'alkakrab-morning-in-a-castle', title: 'Morning In A Castle', ...ALKAKRAB, mood: 'day' },
