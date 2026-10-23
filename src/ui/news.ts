@@ -3,6 +3,7 @@
  * something worth telling returning players goes in; the number only grows.
  */
 export const NEWS: { n: number; text: string }[] = [
+  { n: 34, text: 'Taxes by home, harder-working fields, marketplaces of any shape with a stall for every two tiles, no more batches, the lord\'s buildings within four tiles of the manor, and a manor that grows towards any free side' },
   { n: 33, text: 'Every land is rich in one resource and lacks another; move buildings; building priorities; orchards planted by fruit; a fair you can see, ships at the docks, darker nights and gentler seasons' },
   { n: 32, text: 'A resource lens (L) shows rock, ore, berries, game and fish even under the trees; select a building to see lines to its workers; Fingamoboblius walks you round each panel; everyone walks twice as fast, and roads speed up errands and haulers' },
   { n: 31, text: 'Workplaces wear out tools and wood parts; an Alehouse that grows into a Tavern; no more ranges for workplaces: long walks slow them, and a footprints sign shows which' },

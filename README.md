@@ -129,9 +129,16 @@ then fall back to the browser's localStorage.
   cider, clothes, two food groups) → Townhouse (7; church, boots, medicine, three
   food groups). Clothes, boots and medicine wear out every three months.
   Unmet needs sour the mood.
+- **Taxes** — once the manor stands, every lived-in home pays each month:
+  a Cottage one coin at normal taxes (half at low, 1.6 at high), finer homes
+  more, up to four times as much from a Patrician House. Homes need a church
+  in town to grow (not near them: a town has only one).
 - **Home crafts** — a Timber House or Townhouse can take up a craft (baker,
   brewer, weaver, tailor...). The family works it from home and makes
   half as much again as a common workshop.
+- **The lord's grounds** — the stable, gardens, armoury, stew pond and the
+  rest stand within four tiles of the manor or of one another; the grass
+  under them wears into one gravelled ground.
 - **The manor** — raise the Manor Hall to a Manor House, Stone Manor,
   Lord's Keep and finally a Castle to become a Village, Town, Borough and
   City. Each rank unlocks buildings and adds storage.
