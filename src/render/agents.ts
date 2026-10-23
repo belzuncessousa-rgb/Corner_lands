@@ -603,6 +603,22 @@ export class AgentSystem {
       }
       return;
     }
+    // A woodcutters' ox drags logs from the trees being felled back to the lodge.
+    if (owner.type === 'woodcutter') {
+      const od = doorTile(s, owner);
+      if (a.carry) {
+        this.walkTo(s, a, od.x, od.y, [owner.id], 'drop');
+        return;
+      }
+      const t = this.workTarget(s, owner);
+      if (!t) {
+        rest();
+        return;
+      }
+      a.want = 'wood';
+      this.walkTo(s, a, t.x, t.y, [owner.id], 'fetch');
+      return;
+    }
     // The ox: materials from the stores to the nearest site the yard serves.
     const site = constructionSites(s).find((o) => yardFor(s, o) === owner);
     if (!site) {

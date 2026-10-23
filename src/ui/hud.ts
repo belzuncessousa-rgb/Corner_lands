@@ -1254,7 +1254,14 @@ export class Hud {
     }
     const kind = draughtOf(b);
     if (!kind || b.build < 1) return [];
-    const what = kind === 'horse' ? `A pack horse pulls the post's own cart: merchants carry half as much again.` : `The ox pulls the cart that brings materials to building sites within reach.`;
+    const what =
+      kind === 'horse'
+        ? `A pack horse pulls the post's own cart: merchants carry half as much again.`
+        : b.type === 'woodcutter'
+          ? 'The ox drags the felled logs out of the woods: the woodcutters walk half as much.'
+          : b.type === 'storehouse' || b.type === 'granary'
+            ? 'The ox pulls the haulers\' cart: twice the load each trip.'
+            : `The ox pulls the cart that brings materials to building sites within reach.`;
     const label = kind === 'horse' ? 'Pack horse' : 'Ox';
     if (b.beast) {
       return [`<div class="kv feast" data-tip="${esc(`${what} It eats a measure of grain a month.`)}"><span>${label}</span><span>${b.hungry ? '<span class="neg">Hungry: no grain</span>' : 'At work'} <button data-action="draught-sell" data-tip="Sell it back to the drovers for ${Math.floor(DRAUGHT_PRICE[kind] / 2)} coins">Sell</button></span></div>`];

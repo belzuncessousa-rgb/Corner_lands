@@ -3382,6 +3382,8 @@ export function draughtOf(b: Building): Draught | null {
   // The pack horse needs a goods cart to pull; the stores' ox an ox-cart.
   if (b.type === 'tradingpost') return has(b, 'goodscart') ? 'horse' : null;
   if (b.type === 'storehouse' || b.type === 'granary') return has(b, 'oxcarts') ? 'ox' : null;
+  // The woodcutters' tool-shed is for an ox that drags the logs out.
+  if (b.type === 'woodcutter') return has(b, 'oxshed') ? 'ox' : null;
   return b.type === 'builderyard' ? 'ox' : null;
 }
 
@@ -3613,7 +3615,9 @@ export function workEfficiency(b: Building): number {
   // resDist is the walking time to the resource, in dirt-road tiles.
   const toResource = (d.gathers || b.type === 'forester') && b.type !== 'claypit' && b.type !== 'sandpit' ? (2 * (b.resDist ?? (NEAR_HINT / 2) * (ROAD_TILES_PER_DAY / OFFROAD_TILES_PER_DAY))) / ROAD_TILES_PER_DAY : 0;
   // Served by haulers, the workers no longer carry their goods to storage.
-  const walking = ((b.hauled ? 0 : (b.trip ?? 0)) + toResource * improvedWalk(b)) / Math.max(1, d.workers);
+  // The ox tool-shed helps only with its ox at work.
+  const walkFactor = has(b, 'oxshed') && !beastWorks(b) ? 1 : improvedWalk(b);
+  const walking = ((b.hauled ? 0 : (b.trip ?? 0)) + toResource * walkFactor) / Math.max(1, d.workers);
   return d.cycle / (d.cycle + TRAVEL_WEIGHT * walking);
 }
 

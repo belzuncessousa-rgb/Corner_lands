@@ -44,7 +44,7 @@ export const IMPROVEMENTS: Improvement[] = [
   { id: 'hugeships', name: 'Great ships', kind: 'upgrade', of: ['dock'], desc: 'Each docker sends away twice as much.', cost: { wood: 12, planks: 20, woodparts: 6 }, days: 16, upkeep: { woodparts: 6 } },
   { id: 'bigstable', name: 'Expanded draught stable', kind: 'upgrade', of: ['draughtstable'], desc: 'Six stalls instead of three.', cost: { wood: 4, planks: 6 }, days: 8 },
   // ------------------------------------------------ extensions
-  { id: 'oxshed', name: 'Ox tool-shed', kind: 'extension', of: ['woodcutter'], desc: 'An ox drags the logs: no slowing in the woods, less carrying.', cost: { wood: 2, planks: 2, tiles: 1 }, days: 4, upkeep: { tools: 0.5 } },
+  { id: 'oxshed', name: 'Ox tool-shed', kind: 'extension', of: ['woodcutter'], desc: 'An ox (bought for it, kept in a Draught Stable) drags the logs: half the walking.', cost: { wood: 2, planks: 2, tiles: 1 }, days: 4, upkeep: { tools: 0.5 } },
   { id: 'lathe', name: 'Lathe', kind: 'extension', of: ['carpenter'], desc: 'Wood parts from two planks instead of three.', cost: { planks: 4, tools: 2, tiles: 1 }, days: 6, upkeep: { tools: 1 } },
   { id: 'nursery', name: 'Tree nursery', kind: 'extension', of: ['forester'], desc: 'Saplings for the orchards: those in reach bear a season sooner.', cost: { wood: 4, planks: 2 }, days: 4 },
   { id: 'crane', name: 'Quarry crane', kind: 'extension', of: ['quarry'], desc: 'One more place, and one stone in five comes out ready-dressed.', cost: { planks: 4, woodparts: 2 }, days: 6, upkeep: { woodparts: 1 }, places: 1 },
