@@ -967,6 +967,29 @@ describe('review regressions', () => {
   });
 });
 
+describe('the manor grows', () => {
+  it('towards whichever side has room', async () => {
+    const { growSpot } = await import('../src/game/levels');
+    const s = generateWorld(91);
+    // A 3×3 manor on open ground, its right and lower sides blocked.
+    const m = { id: 999, type: 'townhall', x: 30, y: 30, w: 3, h: 3 } as unknown as Building;
+    for (let y = 26; y < 38; y++)
+      for (let x = 26; x < 38; x++) {
+        const i = idx(s, x, y);
+        s.terrain[i] = 0;
+        s.road[i] = 0;
+        s.rock[i] = 0;
+        s.ore[i] = 0;
+        s.occ[i] = -1;
+      }
+    for (let k = 29; k <= 34; k++) {
+      s.occ[idx(s, 33, k)] = 1;
+      s.occ[idx(s, k, 33)] = 1;
+    }
+    expect(growSpot(s, m, 4)).toEqual({ x: 29, y: 29 });
+  });
+});
+
 describe('kilns', () => {
   it('a kiln fires tiles whenever it has clay and fuel, a firing at a time', () => {
     const s = generateWorld(81);

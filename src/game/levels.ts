@@ -82,15 +82,30 @@ export const MANOR_TIER = [0, 0, 1, 2, 3];
 
 /** Whether the ground the manor would grow onto is clear. */
 export function roomToGrow(s: GameState, b: Building, size: number): boolean {
-  for (let y = b.y; y < b.y + size; y++) {
-    for (let x = b.x; x < b.x + size; x++) {
-      if (x < b.x + b.w && y < b.y + b.h) continue;
-      if (!inBounds(s, x, y)) return false;
-      const i = idx(s, x, y);
-      if (s.occ[i] >= 0 || s.terrain[i] || s.road[i] || s.rock[i] || s.ore[i]) return false;
+  return growSpot(s, b, size) !== null;
+}
+
+/**
+ * Where a building would stand grown to `size` square, keeping its old
+ * ground: towards whichever side has clear ground (trees are felled for it),
+ * or null if no side has.
+ */
+export function growSpot(s: GameState, b: Building, size: number): { x: number; y: number } | null {
+  for (const x0 of [b.x, b.x + b.w - size])
+    for (const y0 of [b.y, b.y + b.h - size]) {
+      let ok = true;
+      for (let y = y0; y < y0 + size && ok; y++)
+        for (let x = x0; x < x0 + size && ok; x++) {
+          if (x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h) continue;
+          if (!inBounds(s, x, y)) ok = false;
+          else {
+            const i = idx(s, x, y);
+            if (s.occ[i] >= 0 || s.terrain[i] || s.road[i] || s.rock[i] || s.ore[i]) ok = false;
+          }
+        }
+      if (ok) return { x: x0, y: y0 };
     }
-  }
-  return true;
+  return null;
 }
 
 /** Stalls a marketplace has room for: one for every two tiles of square. */
@@ -311,8 +326,15 @@ export function finishUpgrade(s: GameState, b: Building): void {
   if (b.type === 'townhall') {
     // The grounds spread onto the ground kept clear for them.
     const size = MANOR_SIZE[b.level] ?? b.w;
-    if (size > b.w && roomToGrow(s, b, size)) {
-      for (let y = b.y; y < b.y + size; y++) for (let x = b.x; x < b.x + size; x++) s.occ[idx(s, x, y)] = b.id;
+    const at = size > b.w ? growSpot(s, b, size) : null;
+    if (at) {
+      b.x = at.x;
+      b.y = at.y;
+      for (let y = b.y; y < b.y + size; y++)
+        for (let x = b.x; x < b.x + size; x++) {
+          s.occ[idx(s, x, y)] = b.id;
+          s.trees[idx(s, x, y)] = 0;
+        }
       b.w = size;
       b.h = size;
     }
