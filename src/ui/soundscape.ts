@@ -12,17 +12,19 @@ import type { Renderer } from '../render/renderer';
  * - noise: the town and its animals, heard near where the camera looks;
  * - effects: clicks and the sounds of building.
  *
- * Each has its own volume in the settings.
+ * Music and the rest ("ambience": nature, town, animals and clicks) can
+ * each be switched off from the button beside the date.
  */
 
 export type Channel = 'music' | 'ambience' | 'noise' | 'effects';
-export const CHANNELS: { id: Channel; name: string }[] = [
-  { id: 'music', name: 'Music' },
-  { id: 'ambience', name: 'Ambience' },
-  { id: 'noise', name: 'Town & animals' },
-  { id: 'effects', name: 'Sound effects' },
-];
-export const DEFAULT_VOLUME: Record<Channel, number> = { music: 0.6, ambience: 0.7, noise: 0.7, effects: 0.8 };
+/** How loud each channel sits in the mix. */
+const MIX: Record<Channel, number> = { music: 0.6, ambience: 0.7, noise: 0.7, effects: 0.8 };
+
+/** What the player has switched on. */
+export interface SoundSwitches {
+  music: boolean;
+  ambience: boolean;
+}
 
 interface SoundEntry {
   file: string;
@@ -264,7 +266,7 @@ export class Soundscape {
   private buffers = new Map<string, AudioBuffer | 'loading'>();
   private beds = new Map<string, Bed>();
   private music: MusicPlayer | null = null;
-  private volume: Record<Channel, number>;
+  private on: SoundSwitches;
   private timers: Record<string, number> = {};
   private lastSeason: Season | null = null;
   private lastSelected: number | null = null;
@@ -272,15 +274,15 @@ export class Soundscape {
 
   constructor(
     private ac: AudioContext,
-    volume: Record<Channel, number>,
+    on: SoundSwitches,
   ) {
-    this.volume = { ...volume };
+    this.on = { ...on };
     this.master = ac.createGain();
     this.master.connect(ac.destination);
     this.bus = {} as Record<Channel, GainNode>;
-    for (const { id } of CHANNELS) {
+    for (const id of Object.keys(MIX) as Channel[]) {
       const g = ac.createGain();
-      g.gain.value = this.volume[id];
+      g.gain.value = MIX[id] * (this.isOn(id) ? 1 : 0);
       g.connect(this.master);
       this.bus[id] = g;
     }
@@ -295,17 +297,18 @@ export class Soundscape {
       .catch(() => undefined);
   }
 
-  setVolume(ch: Channel, v: number): void {
-    this.volume[ch] = v;
-    this.bus[ch].gain.setTargetAtTime(v, this.ac.currentTime, 0.05);
+  private isOn(ch: Channel): boolean {
+    return ch === 'music' ? this.on.music : this.on.ambience;
   }
 
-  setMuted(muted: boolean): void {
-    this.master.gain.setTargetAtTime(muted ? 0 : 1, this.ac.currentTime, 0.2);
-    if (muted) {
-      this.music?.pause();
-      for (const b of this.beds.values()) b.stop();
-    } else this.music?.resume();
+  /** Switches the music, or everything else, on or off. */
+  setOn(kind: keyof SoundSwitches, on: boolean): void {
+    this.on[kind] = on;
+    for (const ch of Object.keys(MIX) as Channel[]) this.bus[ch].gain.setTargetAtTime(MIX[ch] * (this.isOn(ch) ? 1 : 0), this.ac.currentTime, 0.2);
+    if (kind === 'music') {
+      if (on) this.music?.resume();
+      else this.music?.pause();
+    } else if (!on) for (const b of this.beds.values()) b.stop();
   }
 
   private load(id: string): AudioBuffer | null {
@@ -328,6 +331,7 @@ export class Soundscape {
    * one of the stretches where something is heard, faded in and out.
    */
   play(id: string, gain = 1, channel: Channel = 'effects', piece?: [number, number]): void {
+    if (!this.isOn(channel)) return;
     const buf = this.load(id);
     const e = this.manifest?.sounds[id];
     if (!buf || !e || gain <= 0.01) return;
@@ -379,10 +383,10 @@ export class Soundscape {
     const want: Record<string, number> = {};
 
     if (sc.menu) {
-      this.music?.update('menu');
+      if (this.on.music) this.music?.update('menu');
       // Behind the title: a quiet meadow.
       want.birds = 0.5;
-      for (const [id, bed] of this.beds) bed.update((want[id] ?? 0) * (BED_LEVEL[id] ?? 0.5));
+      if (this.on.ambience) for (const [id, bed] of this.beds) bed.update((want[id] ?? 0) * (BED_LEVEL[id] ?? 0.5));
       return;
     }
 
@@ -402,7 +406,7 @@ export class Soundscape {
     // ---- music
     const festive =
       (s.feastDay !== undefined && s.day - s.feastDay < 4) || (s.fairDay !== undefined && s.day - s.fairDay < 15) || (s.festivalDay !== undefined && s.day - s.festivalDay.day < 4);
-    this.music?.update(festive ? 'festival' : season === 3 ? 'winter' : season === 2 ? 'autumn' : 'day');
+    if (this.on.music) this.music?.update(festive ? 'festival' : season === 3 ? 'winter' : season === 2 ? 'autumn' : 'day');
 
     // ---- ambience: the land, the hour and the weather
     const rain = r.rainLevel;
@@ -442,6 +446,7 @@ export class Soundscape {
     want.bees = (season === 0 || season === 1 ? 1 : 0) * day * nearest((b) => built(b) && (b.type === 'beekeeper' || (b.type === 'house' && b.yard === 'bees')), 0.4) * close;
     want.building = nearest((b) => b.build < 1 && b.build > 0 && !b.need, 0.5) * day * close;
 
+    if (!this.on.ambience) return;
     for (const [id, bed] of this.beds) bed.update(sc.running || BED_CHANNEL[id] ? (want[id] ?? 0) * (BED_LEVEL[id] ?? 0.5) : 0);
 
     if (!sc.running) return;

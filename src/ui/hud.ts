@@ -145,7 +145,7 @@ import { LANDS, idx, inBounds } from '../game/world';
 import type { Game } from '../main';
 import { BUILDING_ICONS, CATEGORY_ICONS, ICONS, LOGO, SEASON_ICONS } from './icons';
 import { Minimap } from './minimap';
-import { CHANNELS, DEFAULT_VOLUME, Soundscape, type Channel } from './soundscape';
+import { Soundscape, type SoundSwitches } from './soundscape';
 import { LICENCE_LINKS, MUSIC_CREDITS, SOUND_CREDITS } from './credits';
 import { folkDoing, folkName, folkThought, WISHES, workplaceOf } from './folk';
 
@@ -190,6 +190,14 @@ function costHtml(cost: Cost, have?: Record<string, number>): string {
 }
 
 const lastHtml = new WeakMap<HTMLElement, string>();
+/** The sound button's note, and the two switches it opens. */
+const SOUND_ICONS = {
+  note: '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 17.5V5.5l10-2v11.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><ellipse cx="6.5" cy="17.5" rx="3" ry="2.4" fill="currentColor"/><ellipse cx="16.5" cy="15" rx="3" ry="2.4" fill="currentColor"/></svg>',
+  music: '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M9 17.5V5.5l10-2v11.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><ellipse cx="6.5" cy="17.5" rx="3" ry="2.4" fill="currentColor"/><ellipse cx="16.5" cy="15" rx="3" ry="2.4" fill="currentColor"/></svg>',
+  ambience:
+    '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M4 20c0-8 5-14 15-15-1 9-6 14-15 15z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M4 20l9-9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M2 8h6M3 11h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+};
+
 /** Assigns innerHTML only when it changed, so buttons are not recreated mid-click. */
 /** "Early Spring – Harvest" style description of a set of months. */
 function seasonSpan(months: number[]): string {
@@ -259,10 +267,9 @@ export class Hud {
   private modal: HTMLElement | null = null;
   private audio: AudioContext | null = null;
   private sounds: Soundscape | null = null;
-  /** Volume of each kind of sound, 0 to 1. */
-  volume: Record<Channel, number> = { ...DEFAULT_VOLUME };
+  /** Music, and everything else ("ambience"), each on or off. */
+  soundOn: SoundSwitches = { music: true, ambience: true };
   /** The seasonal tune, separately from the other sounds. */
-  muted = false;
   private objectivesMin = true;
   private lastInspectorKey = '';
   private cardImgs = new Map<string, string>();
@@ -278,16 +285,15 @@ export class Hud {
     private root: HTMLElement,
   ) {
     try {
-      this.muted = localStorage.getItem('cornerlands.muted') === '1';
+      this.soundOn = {
+        music: localStorage.getItem('cornerlands.music') !== '0',
+        ambience: localStorage.getItem('cornerlands.ambience') !== '0' && localStorage.getItem('cornerlands.muted') !== '1',
+      };
       this.uiScale = Number(localStorage.getItem('cornerlands.uiScale')) || 1;
       this.pauseOnBad = localStorage.getItem('cornerlands.pauseOnBad') === '1';
       game.renderer.nights = localStorage.getItem('cornerlands.nights') !== '0';
       this.tipsOn = localStorage.getItem('cornerlands.tipsOff') !== '1';
       this.buildIcons = localStorage.getItem('cornerlands.buildPictures') !== '1';
-      const vol = JSON.parse(localStorage.getItem('cornerlands.volume') ?? 'null') as Partial<Record<Channel, number>> | null;
-      if (vol) this.volume = { ...this.volume, ...vol };
-      // Players who had switched the old music off keep it off.
-      if (!vol && localStorage.getItem('cornerlands.music') === '0') this.volume.music = 0;
       this.tipsSeen = new Set(JSON.parse(localStorage.getItem('cornerlands.tips') ?? '[]') as string[]);
       const lord = JSON.parse(localStorage.getItem('cornerlands.lord') ?? 'null') as { look: LordLook; arms: Heraldry } | null;
       if (lord) {
@@ -330,6 +336,11 @@ export class Hud {
     }
     this.minimap = new Minimap(root, game.renderer, () => game.state);
     root.addEventListener('click', (e) => this.onClick(e));
+    // The sound switches close when clicking anywhere else.
+    document.addEventListener('pointerdown', (e) => {
+      const el = e.target as HTMLElement;
+      if (!el.closest('#sound-pop, .sound-btn')) this.root.querySelector('#sound-pop')?.remove();
+    });
     // Every button clicks; closing and going back has its own sound.
     document.addEventListener(
       'click',
@@ -834,6 +845,7 @@ export class Hud {
       `<span data-tip="<b>${SEASON_NAMES[season]}</b>">${SEASON_ICONS[season]}</span>
       <div class="date">Year ${yearOf(s.day)}<small>${MONTH_NAMES[monthOf(s.day)]}</small>
         <div class="progress month" data-tip="How far the month has gone"><i class="month-bar"></i></div></div>
+      <button data-action="sound-menu" class="sound-btn ${this.soundOn.music || this.soundOn.ambience ? '' : 'off'}" data-tip="<b>Sound</b><br>Ambience and music on or off">${SOUND_ICONS.note}</button>
       <div class="speeds">
         <button data-action="speed" data-speed="0" class="${g.speedIndex === 0 ? 'active' : ''}" data-tip="Pause (Space)">❚❚</button>
         <button data-action="speed" data-speed="1" class="${g.speedIndex === 1 ? 'active' : ''}" data-tip="Normal speed (1)">▶</button>
@@ -1844,6 +1856,12 @@ export class Hud {
         this.category = null;
         g.setTool(g.tool.kind === 'demolish' ? { kind: 'select' } : { kind: 'demolish' });
         break;
+      case 'sound-menu':
+        this.toggleSoundPop(t);
+        return;
+      case 'sound-toggle':
+        this.toggleSound(t.dataset.kind as keyof SoundSwitches);
+        return;
       case 'speed':
         g.setSpeed(Number(t.dataset.speed));
         break;
@@ -2847,11 +2865,6 @@ export class Hud {
     const m = this.openModal(
       `<h2>Settings</h2>
       <div class="menu">
-        <button data-m="sound">Sound: ${this.muted ? 'Off' : 'On'}</button>
-        <div class="volumes">${CHANNELS.map(
-          (c) =>
-            `<label class="volume"><span>${c.name}</span><input type="range" min="0" max="100" step="5" data-vol="${c.id}" value="${Math.round(this.volume[c.id] * 100)}" ${this.muted ? 'disabled' : ''}><output>${Math.round(this.volume[c.id] * 100)}%</output></label>`,
-        ).join('')}</div>
         <button data-m="scale">Text size: ${Math.round(this.uiScale * 100)}%</button>
         <button data-m="pausebad">Pause on bad news: ${this.pauseOnBad ? 'On' : 'Off'}</button>
         <button data-m="nights" data-tip="Night falls each day at normal speed, longer in winter">Nights: ${this.game.renderer.nights ? 'On' : 'Off'}</button>
@@ -2882,24 +2895,6 @@ export class Hud {
       }
       this.showSettings(fromMain);
     });
-    m.querySelectorAll<HTMLInputElement>('input[data-vol]').forEach((inp) => {
-      const ch = inp.dataset.vol as Channel;
-      inp.addEventListener('input', () => {
-        this.volume[ch] = Number(inp.value) / 100;
-        inp.nextElementSibling!.textContent = `${inp.value}%`;
-        this.ensureAudio();
-        this.sounds?.setVolume(ch, this.volume[ch]);
-      });
-      // A sample of the sound being set, when the slider is let go.
-      inp.addEventListener('change', () => {
-        try {
-          localStorage.setItem('cornerlands.volume', JSON.stringify(this.volume));
-        } catch {
-          /* ignore */
-        }
-        if (ch === 'effects') this.sound('open');
-      });
-    });
     m.querySelector('[data-m="bicons"]')!.addEventListener('click', () => {
       this.buildIcons = !this.buildIcons;
       try {
@@ -2928,17 +2923,6 @@ export class Hud {
       this.applyScale();
       try {
         localStorage.setItem('cornerlands.uiScale', String(this.uiScale));
-      } catch {
-        /* ignore */
-      }
-      this.showSettings(fromMain);
-    });
-    m.querySelector('[data-m="sound"]')!.addEventListener('click', () => {
-      this.muted = !this.muted;
-      this.sounds?.setMuted(this.muted);
-      if (!this.muted) this.ensureAudio();
-      try {
-        localStorage.setItem('cornerlands.muted', this.muted ? '1' : '0');
       } catch {
         /* ignore */
       }
@@ -3087,10 +3071,10 @@ export class Hud {
   // ---------------------------------------------------------------- sound
 
   private ensureAudio(): void {
-    if (this.audio || this.muted) return;
+    if (this.audio || (!this.soundOn.music && !this.soundOn.ambience)) return;
     try {
       this.audio = new AudioContext();
-      this.sounds = new Soundscape(this.audio, this.volume);
+      this.sounds = new Soundscape(this.audio, this.soundOn);
     } catch {
       /* no audio */
     }
@@ -3098,21 +3082,62 @@ export class Hud {
 
   /** Drives the music, ambience and town sounds; called every frame. */
   tickAudio(dt: number, running: boolean): void {
-    if (!this.sounds || this.muted || this.audio?.state !== 'running') return;
+    if (!this.sounds || this.audio?.state !== 'running') return;
     const g = this.game;
     this.sounds.update(dt, { s: g.state, renderer: g.renderer, agents: g.agents.agents, selected: g.selected, menu: g.demo, running });
   }
 
+  /** Switches the music, or all the other sounds, on or off, and remembers it. */
+  private toggleSound(kind: keyof SoundSwitches): void {
+    this.soundOn[kind] = !this.soundOn[kind];
+    try {
+      localStorage.setItem(`cornerlands.${kind}`, this.soundOn[kind] ? '1' : '0');
+    } catch {
+      /* ignore */
+    }
+    this.ensureAudio();
+    if (this.audio?.state === 'suspended') this.audio.resume().catch(() => undefined);
+    this.sounds?.setOn(kind, this.soundOn[kind]);
+    this.renderSoundPop();
+  }
+
+  /** The two switches under the note beside the date. */
+  private renderSoundPop(): void {
+    const pop = this.root.querySelector('#sound-pop') as HTMLElement | null;
+    if (!pop) return;
+    const sq = (kind: keyof SoundSwitches, icon: string, name: string) =>
+      `<button data-action="sound-toggle" data-kind="${kind}" class="sound-sq ${this.soundOn[kind] ? 'on' : 'off'}" aria-pressed="${this.soundOn[kind]}">${icon}<span>${name}</span><small>${this.soundOn[kind] ? 'On' : 'Off'}</small></button>`;
+    pop.innerHTML = sq('ambience', SOUND_ICONS.ambience, 'Ambience') + sq('music', SOUND_ICONS.music, 'Music');
+  }
+
+  /** Opens or closes the sound switches below the note button. */
+  private toggleSoundPop(btn: HTMLElement): void {
+    let pop = this.root.querySelector('#sound-pop') as HTMLElement | null;
+    if (pop) {
+      pop.remove();
+      return;
+    }
+    pop = document.createElement('div');
+    pop.id = 'sound-pop';
+    pop.className = 'panel';
+    const r = btn.getBoundingClientRect();
+    const host = this.root.getBoundingClientRect();
+    pop.style.top = `${r.bottom - host.top + 6}px`;
+    pop.style.right = `${host.right - r.right}px`;
+    this.root.appendChild(pop);
+    this.renderSoundPop();
+  }
+
   /** A click on any button: its own sound for closing and going back. */
   uiClick(back: boolean): void {
-    if (this.muted) return;
+    if (!this.soundOn.ambience) return;
     this.ensureAudio();
     if (this.audio?.state === 'suspended') this.audio.resume().catch(() => undefined);
     this.sounds?.click(back);
   }
 
   sound(kind: 'place' | 'road' | 'demolish' | 'good' | 'bad' | 'coin' | 'jig' | 'fanfare' | 'march' | 'stone' | 'open' | 'charters'): void {
-    if (this.muted) return;
+    if (!this.soundOn.ambience) return;
     this.ensureAudio();
     const ac = this.audio;
     if (!ac || !this.sounds) return;

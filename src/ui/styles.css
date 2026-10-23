@@ -185,6 +185,47 @@ button.active {
   font-size: 13px;
   color: var(--ink-soft);
 }
+#clock .sound-btn {
+  padding: 2px 6px;
+  min-width: 30px;
+  display: grid;
+  place-items: center;
+}
+#clock .sound-btn.off {
+  opacity: 0.55;
+}
+#sound-pop {
+  position: absolute;
+  z-index: 30;
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+}
+#sound-pop .sound-sq {
+  width: 84px;
+  height: 84px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font-family: var(--title);
+  font-size: 14px;
+  padding: 6px;
+}
+#sound-pop .sound-sq small {
+  font-family: var(--serif);
+  font-size: 12px;
+  opacity: 0.8;
+}
+#sound-pop .sound-sq.off {
+  opacity: 0.6;
+  filter: grayscale(0.6);
+}
+#sound-pop .sound-sq.off svg {
+  /* Struck through when off. */
+  background: linear-gradient(to top right, transparent calc(50% - 1.5px), currentColor calc(50% - 1.5px), currentColor calc(50% + 1.5px), transparent calc(50% + 1.5px));
+}
 #clock .speeds {
   display: flex;
   gap: 3px;
@@ -711,34 +752,6 @@ button.active {
 }
 .modal ul.credits a {
   color: inherit;
-}
-.modal .volumes {
-  display: grid;
-  gap: 4px;
-  padding: 4px 8px 6px;
-  border: 1.5px solid var(--parch-3);
-  border-radius: 6px;
-}
-.modal .volume {
-  display: grid;
-  grid-template-columns: 9em 1fr 3.2em;
-  align-items: center;
-  gap: 10px;
-  font-family: var(--title);
-  font-size: 15px;
-  color: var(--ink);
-}
-.modal .volume input[type='range'] {
-  padding: 0;
-  border: 0;
-  accent-color: var(--wood);
-  width: 100%;
-}
-.modal .volume output {
-  font-family: var(--serif);
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-  color: var(--ink-soft);
 }
 .modal .row {
   display: flex;
