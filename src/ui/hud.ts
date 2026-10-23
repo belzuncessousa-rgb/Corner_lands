@@ -130,6 +130,7 @@ import {
   sellDraught,
   DRAUGHT_PRICE,
   upkeepOf,
+  theOnly,
   setSitePriority,
   moveBlocker,
 } from '../game/sim';
@@ -397,6 +398,14 @@ export class Hud {
       cards = BUILD_ORDER.filter((t) => BUILDINGS[t].category === this.category && isUnlocked(s, t))
         .map((t) => {
           const d = BUILDINGS[t];
+          // One to a town, and the town has it: ticked off, and a click shows it.
+          const only = theOnly(s, t);
+          if (only)
+            return `<div class="card done ${this.buildIcons ? 'icon-card' : ''}" data-action="goto-b" data-id="${only.id}" data-tip="${esc(`<b>${d.name}</b><br>One to a town, and yours ${only.build >= 1 ? 'stands' : 'is being built'}. Click to look at it.`)}">
+            <span class="tick">✓</span>
+            ${this.buildIcons ? `<span class="bicon">${BUILDING_ICONS[t] ?? CATEGORY_ICONS[d.category]}</span>` : `<img src="${this.cardImage(t)}" alt="" draggable="false">`}
+            <div class="name">${d.name}</div>
+          </div>`;
           const poor = !canAfford(s, d.cost);
           const sel = (tool.kind === 'build' || tool.kind === 'zone') && tool.type === t;
           return `<div class="card ${this.buildIcons ? 'icon-card' : ''} ${sel ? 'sel' : ''} ${poor ? 'poor' : ''}" data-action="build" data-type="${t}" data-tip="${esc(this.buildingTip(t))}">

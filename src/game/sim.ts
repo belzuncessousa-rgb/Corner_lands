@@ -173,7 +173,7 @@ export function larder(s: GameState): number {
 
 // ---------------------------------------------------------------- placement
 
-export function footprintClear(s: GameState, x: number, y: number, w: number, h: number, wetOk = false): string | null {
+export function footprintClear(s: GameState, x: number, y: number, w: number, h: number, wetOk = false, oreOk = false): string | null {
   for (let ty = y; ty < y + h; ty++) {
     for (let tx = x; tx < x + w; tx++) {
       if (!inBounds(s, tx, ty)) return 'Outside the map';
@@ -183,7 +183,8 @@ export function footprintClear(s: GameState, x: number, y: number, w: number, h:
       if (s.occ[i] >= 0) return 'Space is occupied';
       if (s.road[i]) return 'A road is in the way';
       if (s.rock[i]) return 'Rocky ground';
-      if (s.ore[i]) return 'Boggy ground';
+      // A bog iron pit is dug right into the ore it works, and the ore around it.
+      if (s.ore[i] && !oreOk) return 'Boggy ground';
     }
   }
   return null;
@@ -216,6 +217,14 @@ export function isUnlocked(s: GameState, type: BuildingType): boolean {
 
 /** Buildings a town has only one of. */
 export const ONE_PER_TOWN: BuildingType[] = ['atelier', 'barracks', 'tiltyard', 'stewpond', 'armoury', 'stable'];
+
+/** Buildings a town has only one of. */
+const SINGLE: BuildingType[] = ['townhall', 'church', 'cathedral', 'guildhall', 'belltower', 'manorgarden', 'stable', 'university', ...ONE_PER_TOWN];
+
+/** The town's one building of a kind it may have only one of, once placed (else null). */
+export function theOnly(s: GameState, type: BuildingType): Building | null {
+  return SINGLE.includes(type) ? (s.buildings.find((b) => b.type === type) ?? null) : null;
+}
 
 /** Great works that, like decorations, wait for the settlement's rank. */
 export const MONUMENTS: BuildingType[] = ['statue', 'belltower'];
@@ -253,7 +262,7 @@ export function placementError(s: GameState, type: BuildingType, x: number, y: n
   const d = BUILDINGS[type];
   if (!d.buildable) return 'Cannot be built';
   if (!isUnlocked(s, type)) return lockReason(s, type);
-  const clear = footprintClear(s, x, y, d.w, d.h, type === 'dock');
+  const clear = footprintClear(s, x, y, d.w, d.h, type === 'dock', type === 'mine');
   if (clear) return clear;
   if ((type === 'fisher' || type === 'claypit' || type === 'sandpit' || type === 'watermill' || type === 'dock' || type === 'papermill' || type === 'watersawmill') && countInRadius(s, centerOf(x, y, d.w, d.h), 2.5, (i) => s.terrain[i] === 1) < 2) {
     return 'Must be next to water';
@@ -294,7 +303,7 @@ export function moveBlocker(s: GameState, b: Building): string | null {
 export function moveError(s: GameState, b: Building, x: number, y: number): string | null {
   const blocked = moveBlocker(s, b);
   if (blocked) return blocked;
-  const clear = footprintClear(s, x, y, b.w, b.h, b.type === 'dock');
+  const clear = footprintClear(s, x, y, b.w, b.h, b.type === 'dock', b.type === 'mine');
   if (clear) return clear;
   if ((b.type === 'fisher' || b.type === 'claypit' || b.type === 'sandpit' || b.type === 'watermill' || b.type === 'dock' || b.type === 'papermill' || b.type === 'watersawmill') && countInRadius(s, centerOf(x, y, b.w, b.h), 2.5, (i) => s.terrain[i] === 1) < 2) {
     return 'Must be next to water';

@@ -1367,6 +1367,8 @@ export class Renderer {
       this.blit(sp, wx, wy, 1, TREE_SCALE * 0.92);
       return;
     }
+    // Ore under a bog iron pit is the pit's own: the building is drawn there instead.
+    if (s.ore[i] && s.occ[i] >= 0) return;
     if (s.rock[i] || s.ore[i]) {
       const ore = s.ore[i] > 0;
       const rv = v % 4;
