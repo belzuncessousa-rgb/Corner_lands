@@ -194,6 +194,7 @@ const lastHtml = new WeakMap<HTMLElement, string>();
 const SOUND_ICONS = {
   note: '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 17.5V5.5l10-2v11.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><ellipse cx="6.5" cy="17.5" rx="3" ry="2.4" fill="currentColor"/><ellipse cx="16.5" cy="15" rx="3" ry="2.4" fill="currentColor"/></svg>',
   music: '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M9 17.5V5.5l10-2v11.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><ellipse cx="6.5" cy="17.5" rx="3" ry="2.4" fill="currentColor"/><ellipse cx="16.5" cy="15" rx="3" ry="2.4" fill="currentColor"/></svg>',
+  skip: '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 6l8 6-8 6zM13 6l8 6-8 6z" fill="currentColor"/></svg>',
   ambience:
     '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M4 20c0-8 5-14 15-15-1 9-6 14-15 15z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M4 20l9-9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M2 8h6M3 11h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
 };
@@ -1859,6 +1860,11 @@ export class Hud {
       case 'sound-menu':
         this.toggleSoundPop(t);
         return;
+      case 'sound-skip':
+        this.sounds?.skipTrack();
+        // The new name shows once the track has begun.
+        setTimeout(() => this.renderSoundPop(), 150);
+        return;
       case 'sound-toggle':
         this.toggleSound(t.dataset.kind as keyof SoundSwitches);
         return;
@@ -3085,7 +3091,16 @@ export class Hud {
     if (!this.sounds || this.audio?.state !== 'running') return;
     const g = this.game;
     this.sounds.update(dt, { s: g.state, renderer: g.renderer, agents: g.agents.agents, selected: g.selected, menu: g.demo, running });
+    // Keep the open switches' "now playing" up to date as tracks change.
+    const title = this.sounds.nowPlaying;
+    if (title !== this.shownTitle) {
+      this.shownTitle = title;
+      if (this.root.querySelector('#sound-pop')) this.renderSoundPop();
+    }
   }
+
+  /** The track name last shown in the sound switches. */
+  private shownTitle: string | null = null;
 
   /** Switches the music, or all the other sounds, on or off, and remembers it. */
   private toggleSound(kind: keyof SoundSwitches): void {
@@ -3107,7 +3122,13 @@ export class Hud {
     if (!pop) return;
     const sq = (kind: keyof SoundSwitches, icon: string, name: string) =>
       `<button data-action="sound-toggle" data-kind="${kind}" class="sound-sq ${this.soundOn[kind] ? 'on' : 'off'}" aria-pressed="${this.soundOn[kind]}">${icon}<span>${name}</span><small>${this.soundOn[kind] ? 'On' : 'Off'}</small></button>`;
-    pop.innerHTML = sq('ambience', SOUND_ICONS.ambience, 'Ambience') + sq('music', SOUND_ICONS.music, 'Music');
+    const playing = this.soundOn.music ? this.sounds?.nowPlaying : null;
+    pop.innerHTML = `<div class="sound-sqs">${sq('ambience', SOUND_ICONS.ambience, 'Ambience') + sq('music', SOUND_ICONS.music, 'Music')}</div>
+      ${
+        this.soundOn.music
+          ? `<div class="now-playing"><span><small>Now playing</small>${esc(playing ?? '…')}</span><button data-action="sound-skip" data-tip="Next track">${SOUND_ICONS.skip}</button></div>`
+          : ''
+      }`;
   }
 
   /** Opens or closes the sound switches below the note button. */
@@ -3147,7 +3168,7 @@ export class Hud {
       case 'place':
       case 'stone':
       case 'open':
-        sc.play('open', kind === 'open' ? 0.7 : 0.9);
+        sc.play('open', 0.5);
         break;
       case 'road':
         sc.play('click', 0.7);

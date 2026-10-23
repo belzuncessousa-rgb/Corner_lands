@@ -160,7 +160,8 @@ function encode(src, dest, kind) {
 if (process.argv.includes('--fetch')) {
   const files = run('git', ['ls-tree', '-r', '--name-only', 'origin/master']).split('\n').filter((f) => /\.(mp3|wav|ogg|flac|m4a)$/i.test(f));
   for (const f of files) {
-    const dir = f.includes('/') ? 'sfx' : 'music';
+    // Sounds for opening a building keep their own folder; other folders are sound effects.
+    const dir = /^open\//i.test(f) ? 'open' : f.includes('/') ? 'sfx' : 'music';
     mkdirSync(join(SRC, dir), { recursive: true });
     writeFileSync(join(SRC, dir, basename(f)), execFileSync('git', ['show', `origin/master:${f}`], { maxBuffer: 1 << 30 }));
   }
@@ -183,6 +184,16 @@ for (const [id, def] of Object.entries(SOUNDS)) {
   if (def.kind === 'call') entry.busy = busyStretches(dest);
   manifest.sounds[id] = entry;
   console.log(`${id.padEnd(12)} ${def.kind.padEnd(5)} ${gain >= 0 ? '+' : ''}${gain.toFixed(1)} dB  ${entry.duration}s${entry.busy ? `  ${entry.busy.length} busy stretches` : ''}`);
+}
+
+// Opening a building: open/<building type or category>.<ext>, e.g. open/smithy.wav or open/farming.wav.
+const opens = existsSync(join(SRC, 'open')) ? readdirSync(join(SRC, 'open')).filter((f) => /\.(mp3|wav|ogg|flac|m4a|aac|opus)$/i.test(f)).sort() : [];
+for (const f of opens) {
+  const id = `open-${basename(f, extname(f)).toLowerCase()}`;
+  const dest = join(OUT, `${id}.mp3`);
+  encode(join(SRC, 'open', f), dest, 'ui');
+  manifest.sounds[id] = { file: `audio/${id}.mp3`, kind: 'ui', duration: Math.round(duration(dest) * 100) / 100 };
+  console.log(`${id}`);
 }
 
 const tracks = existsSync(join(SRC, 'music')) ? readdirSync(join(SRC, 'music')).filter((f) => /\.(mp3|wav|ogg|flac|m4a|aac|opus)$/i.test(f)).sort() : [];

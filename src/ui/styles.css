@@ -198,8 +198,40 @@ button.active {
   position: absolute;
   z-index: 30;
   display: flex;
+  flex-direction: column;
   gap: 8px;
   padding: 8px;
+  width: 196px;
+}
+#sound-pop .sound-sqs {
+  display: flex;
+  gap: 8px;
+}
+#sound-pop .now-playing {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--serif);
+  font-size: 14px;
+  line-height: 1.2;
+  color: var(--ink);
+}
+#sound-pop .now-playing span {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+#sound-pop .now-playing small {
+  display: block;
+  font-size: 11px;
+  color: var(--ink-soft);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+#sound-pop .now-playing button {
+  padding: 6px 8px;
+  display: grid;
+  place-items: center;
 }
 #sound-pop .sound-sq {
   width: 84px;

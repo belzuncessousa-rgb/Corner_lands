@@ -1,3 +1,4 @@
+import { BUILDINGS } from '../game/data';
 import { monthOf, seasonOf } from '../game/sim';
 import type { Building, BuildingType, GameState, Season } from '../game/types';
 import type { Agent } from '../render/agents';
@@ -18,7 +19,7 @@ import type { Renderer } from '../render/renderer';
 
 export type Channel = 'music' | 'ambience' | 'noise' | 'effects';
 /** How loud each channel sits in the mix. */
-const MIX: Record<Channel, number> = { music: 0.6, ambience: 0.7, noise: 0.7, effects: 0.8 };
+const MIX: Record<Channel, number> = { music: 0.6, ambience: 0.45, noise: 0.55, effects: 0.7 };
 
 /** What the player has switched on. */
 export interface SoundSwitches {
@@ -75,7 +76,7 @@ const BED_LEVEL: Record<string, number> = {
   bees: 0.35,
   smithy: 0.5,
   stone: 0.5,
-  building: 0.5,
+  building: 0.3,
 };
 const BED_CHANNEL: Record<string, Channel> = {
   birds: 'ambience',
@@ -117,24 +118,40 @@ class Bed {
     }
   }
 
-  /** Eases towards the target level; starts or pauses the players as needed. */
-  update(target: number): void {
+  /** Waiting for the first sound to arrive after starting; the fade-in begins then. */
+  private waiting = false;
+
+  /**
+   * Eases towards the target level: in over two seconds, out over four, so
+   * a river or a market drifts away instead of stopping. Starts or pauses
+   * the players as needed.
+   */
+  update(target: number, dt: number): void {
     const now = this.ac.currentTime;
-    this.level += (target - this.level) * 0.04;
-    if (Math.abs(this.level - target) < 0.002) this.level = target;
-    this.out.gain.setTargetAtTime(this.level, now, 0.1);
-    if (this.level > 0.003 && !this.playing) {
+    if (target > 0.003 && !this.playing) {
       this.playing = true;
+      this.waiting = true;
+      this.level = 0;
       const el = this.els[this.cur];
       // Begin somewhere in the middle, so two visits never sound alike.
       if (el.duration > 10) el.currentTime = Math.random() * (el.duration - 10);
+      this.gains[this.cur].gain.cancelScheduledValues(now);
       this.gains[this.cur].gain.setValueAtTime(1, now);
-      el.play().catch(() => (this.playing = false));
-    } else if (this.level <= 0.003 && this.playing && target === 0) {
-      this.playing = false;
-      for (const e of this.els) e.pause();
+      el.addEventListener('playing', () => (this.waiting = false), { once: true });
+      el.play().catch(() => {
+        this.playing = false;
+        this.waiting = false;
+      });
     }
     if (!this.playing) return;
+    if (!this.waiting) this.level += (target - this.level) * Math.min(1, dt / (target > this.level ? 2 : 4));
+    if (Math.abs(this.level - target) < 0.001) this.level = target;
+    this.out.gain.setTargetAtTime(this.level, now, 0.15);
+    if (this.level <= 0.002 && target === 0 && !this.waiting) {
+      this.playing = false;
+      for (const e of this.els) e.pause();
+      return;
+    }
     // Cross over to the other player before this one runs out.
     const el = this.els[this.cur];
     if (el.duration && el.currentTime > el.duration - this.fade) {
@@ -142,8 +159,10 @@ class Bed {
       const n = this.els[next];
       n.currentTime = 0;
       n.play().catch(() => undefined);
+      this.gains[next].gain.cancelScheduledValues(now);
       this.gains[next].gain.setValueAtTime(0, now);
       this.gains[next].gain.linearRampToValueAtTime(1, now + this.fade);
+      this.gains[this.cur].gain.cancelScheduledValues(now);
       this.gains[this.cur].gain.setValueAtTime(1, now);
       this.gains[this.cur].gain.linearRampToValueAtTime(0, now + this.fade);
       const old = this.cur;
@@ -152,9 +171,15 @@ class Bed {
     }
   }
 
+  /** Fades out over a second and a half, then stops. */
   stop(): void {
+    if (!this.playing) return;
     this.playing = false;
-    for (const e of this.els) e.pause();
+    this.level = 0;
+    this.out.gain.setTargetAtTime(0, this.ac.currentTime, 0.4);
+    setTimeout(() => {
+      if (!this.playing) for (const e of this.els) e.pause();
+    }, 1800);
   }
 }
 
@@ -245,7 +270,34 @@ class MusicPlayer {
   resume(): void {
     if (this.track) this.els[this.cur].play().catch(() => undefined);
   }
+
+  /** On to another track of the same mood, crossing over in two seconds. */
+  skip(): void {
+    const t = this.pick(this.mood ?? 'day');
+    if (t) this.start(t, 2);
+  }
+
+  get title(): string | null {
+    return this.track ? (TRACK_NAMES[this.track.title] ?? this.track.title.replace(/[-_]+/g, ' ')) : null;
+  }
 }
+
+/** Names to show for the music files. */
+const TRACK_NAMES: Record<string, string> = {
+  Menu: 'Teller of the Tales',
+  Angevin: 'Angevin',
+  'Woodland Fantasy': 'Woodland Fantasy',
+  'alexander-nakarada-village-ambiance': 'Village Ambiance',
+  'alexander-nakarada-winter-night': 'Winter Night',
+  'alexander-nakarada-wintersong': 'Wintersong',
+  'the-medieval-banquet': 'The Medieval Banquet',
+  harvestseason: 'Harvest Season',
+  celebrations_1min: 'Celebrations',
+  music_peaceful_town_loop: 'Peaceful Town',
+  summer: 'Summer',
+  '022815townbgm': 'Town',
+  'Marin_Marais_(1656-1728)_-_Excerpts_from_Suite_No.3_from_Pieces_en_trio_pour_les_flutes,_violon,_et_dessus_de_viole_(1692)': 'Marais, Pièces en trio',
+};
 
 /** Buildings whose work is heard nearby, by bed. */
 const WORK_BEDS: Partial<Record<string, BuildingType[]>> = {
@@ -301,6 +353,15 @@ export class Soundscape {
     return ch === 'music' ? this.on.music : this.on.ambience;
   }
 
+  /** The track playing now, by name. */
+  get nowPlaying(): string | null {
+    return this.music?.title ?? null;
+  }
+
+  skipTrack(): void {
+    if (this.on.music) this.music?.skip();
+  }
+
   /** Switches the music, or everything else, on or off. */
   setOn(kind: keyof SoundSwitches, on: boolean): void {
     this.on[kind] = on;
@@ -342,7 +403,12 @@ export class Soundscape {
     const g = this.ac.createGain();
     src.connect(g).connect(this.bus[channel]);
     if (!piece) {
-      g.gain.value = gain;
+      // Whole recordings still end on a short fade, never a cut.
+      const end = buf.duration / src.playbackRate.value;
+      const fade = Math.min(1.5, end / 5);
+      g.gain.setValueAtTime(gain, now);
+      g.gain.setValueAtTime(gain, now + end - fade);
+      g.gain.linearRampToValueAtTime(0, now + end);
       src.start(now);
       return;
     }
@@ -359,9 +425,19 @@ export class Soundscape {
     src.start(now, at, len + 0.05);
   }
 
+  /**
+   * The sound of looking into a building: its own recording if there is
+   * one (open-smithy), else one for its kind (open-farming), else a door.
+   */
+  openSound(type: BuildingType): void {
+    const ids = [`open-${type}`, `open-${BUILDINGS[type]?.category}`];
+    const id = ids.find((k) => this.manifest?.sounds[k]) ?? 'open';
+    this.play(id, 0.45);
+  }
+
   /** An interface click; a close or back button gets its own. */
   click(back: boolean): void {
-    this.play(back ? 'back' : 'click', 0.6);
+    this.play(back ? 'back' : 'click', back ? 0.12 : 0.4);
   }
 
   /** A pastures's or a home's animals, a call now and then. */
@@ -386,7 +462,7 @@ export class Soundscape {
       if (this.on.music) this.music?.update('menu');
       // Behind the title: a quiet meadow.
       want.birds = 0.5;
-      if (this.on.ambience) for (const [id, bed] of this.beds) bed.update((want[id] ?? 0) * (BED_LEVEL[id] ?? 0.5));
+      if (this.on.ambience) for (const [id, bed] of this.beds) bed.update((want[id] ?? 0) * (BED_LEVEL[id] ?? 0.5), dt);
       return;
     }
 
@@ -447,14 +523,14 @@ export class Soundscape {
     want.building = nearest((b) => b.build < 1 && b.build > 0 && !b.need, 0.5) * day * close;
 
     if (!this.on.ambience) return;
-    for (const [id, bed] of this.beds) bed.update(sc.running || BED_CHANNEL[id] ? (want[id] ?? 0) * (BED_LEVEL[id] ?? 0.5) : 0);
+    for (const [id, bed] of this.beds) bed.update(sc.running || BED_CHANNEL[id] ? (want[id] ?? 0) * (BED_LEVEL[id] ?? 0.5) : 0, dt);
 
     if (!sc.running) return;
 
     // ---- animals: a call now and then from what is in view; the chosen one at once
     const sel = sc.selected !== null ? s.buildings.find((b) => b.id === sc.selected) : undefined;
     if (sel && sel.id !== this.lastSelected) {
-      this.play('open', 0.45);
+      this.openSound(sel.type);
       const kinds = Object.entries(sel.animals ?? {})
         .filter(([, n]) => (n ?? 0) > 0)
         .map(([k]) => k);
