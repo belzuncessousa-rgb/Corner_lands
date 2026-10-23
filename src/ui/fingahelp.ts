@@ -58,8 +58,8 @@ const HELP: Record<string, HelpPage[]> = {
   treasury: [
     { say: 'The treasury! My favourite chip, if I may say so.', show: '#topbar [data-chip="treasury"]' },
     { say: 'Taxes. Higher fills the chest, but your people grumble. And only a manor hall collects them, mind.', show: '#chip-panel .tax' },
-    { say: 'Prestige: the standing of your house. It buys titles and charters.', show: '#chip-panel .note' },
-    { say: 'Knowledge, gathered month by month, to spend on the learning board.', show: '#chip-panel [data-tip*="Knowledge a month"]' },
+    { say: 'Prestige: the standing of your house. It buys titles and town charters, and pays for fairs\' renown. Below it, where each month\'s prestige comes from: the manor as it grows, the church, fine homes, gardens, great works, banners and more.', show: '#chip-panel .prestige-row' },
+    { say: 'Knowledge, gathered month by month, to spend on the learning board. Hover it to see who teaches.', show: '#chip-panel [data-tip*="Knowledge a month"]' },
     { say: 'With enough prestige you may even become something grander. A fine ring to it!', show: '#chip-panel [data-action="title"]' },
     { say: 'And here: the ledger, with the town\'s numbers over the years, and the charters.', show: '#chip-panel .row' },
   ],

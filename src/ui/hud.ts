@@ -130,6 +130,7 @@ import {
   sellDraught,
   DRAUGHT_PRICE,
   upkeepOf,
+  prestigeSources,
   theOnly,
   plantOrchard,
   plantingCost,
@@ -707,8 +708,7 @@ export class Hud {
         (t, i) =>
           `<button data-action="tax" data-level="${i}" class="${s.taxLevel === i ? 'active' : ''}" data-tip="<b>${t.name} taxes</b><br>${t.perHead} coins per villager per month, more from finer homes (up to three times from a merchant's house).<br>Happiness ${t.happiness >= 0 ? '+' : ''}${t.happiness}">${t.name}</button>`,
       ).join('')}</div>
-      <div class="kv" style="margin-top:8px"><span>${ICONS.prestige} Prestige</span><b>${Math.floor(s.res.prestige)}</b></div>
-      <p class="note">${esc(GOODS.prestige.desc)}</p>
+      ${this.prestigeRows()}
       ${this.knowledgeRows()}
       ${
         s.tier >= FAIR_TIER
@@ -1203,8 +1203,17 @@ export class Hud {
     const src = knowledgeSources(s);
     if (!src.length && s.res.knowledge <= 0) return '';
     const tip = src.length ? src.map((x) => `${x.label}: +${x.value.toFixed(1)}`).join('<br>') : 'Nothing teaches yet';
-    return `<div class="kv" style="margin-top:8px" data-tip="${esc(`<b>Knowledge a month</b><br>${tip}`)}"><span>${ICONS.knowledge} Knowledge</span><b>${Math.floor(s.res.knowledge)} <small class="pos">+${knowledgeIncome(s).toFixed(1)}/month</small></b></div>
-      <p class="note">${esc(GOODS.knowledge.desc)}</p>`;
+    return `<div class="kv" style="margin-top:8px" data-tip="${esc(`<b>Knowledge a month</b><br>${tip}`)}"><span>${ICONS.knowledge} Knowledge</span><b>${Math.floor(s.res.knowledge)} <small class="pos">+${knowledgeIncome(s).toFixed(1)}/month</small></b></div>`;
+  }
+
+  /** The prestige in hand, what comes in each month, and from where (largest first). */
+  private prestigeRows(): string {
+    const s = this.game.state;
+    const src = prestigeSources(s).sort((a, b) => b.value - a.value);
+    const total = src.reduce((a, x) => a + x.value, 0);
+    const lines = src.map((x) => `<div class="kv sub-kv"><span>${esc(x.label)}</span><span class="pos">+${x.value.toFixed(1)}</span></div>`).join('');
+    return `<div class="kv prestige-row" style="margin-top:8px"><span>${ICONS.prestige} Prestige</span><b>${Math.floor(s.res.prestige)} <small class="pos">+${total.toFixed(1)}/month</small></b></div>
+      ${lines || '<div class="kv sub-kv"><span class="muted">Nothing brings prestige yet</span><span></span></div>'}`;
   }
 
   /** A monastery's book for the month, and what learning a building brings. */

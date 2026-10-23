@@ -4327,45 +4327,54 @@ export function monthly(s: GameState, rng: StateRng): void {
  * Prestige: the renown of the lord's house, from a fine manor, a church,
  * monuments, townhouses and the charters that bring it.
  */
-export function prestigeIncome(s: GameState): number {
-  let n = 0;
+/** Where the town's prestige comes from each month, source by source (with a Duke's fifth more). */
+export function prestigeSources(s: GameState): { label: string; value: number }[] {
+  const out = new Map<string, number>();
+  const add = (label: string, v: number) => v && out.set(label, (out.get(label) ?? 0) + v);
   let walls = 0;
   for (const b of s.buildings) {
     if (b.build < 1) continue;
-    if (b.type === 'townhall') n += (b.level - 1) * 1.5;
-    else if (b.type === 'church') n += b.level >= 2 ? 1 : 0.5;
-    else if (b.type === 'cathedral') n += 3;
+    const name = BUILDINGS[b.type].name;
+    if (b.type === 'townhall') add('The manor', (b.level - 1) * 1.5);
+    else if (b.type === 'church') add('The church', b.level >= 2 ? 1 : 0.5);
+    else if (b.type === 'cathedral') add(name, 3);
     else if (b.type === 'wall') walls++;
-    else if (b.type === 'statue') n += 1;
-    else if (b.type === 'belltower') n += 2;
-    else if (b.type === 'manorgarden') n += 4;
-    else if (b.type === 'watchtower') n += 0.5;
-    else if (b.type === 'stable') n += 0.5;
-    else if (b.type === 'university') n += s.universityOk ? 4 : 0;
-    else if (b.type === 'publicgarden') n += 0.5;
-    else if (b.type === 'guildhall') n += 4;
-    else if (b.type === 'maypole') n += 0.5;
-    else if (b.type === 'monastery') n += b.reading ? 0.5 : 0;
-    else if (b.type === 'house' && b.level >= 3) n += b.level >= 4 ? 0.5 : 0.2;
+    else if (b.type === 'statue') add('Statues', 1);
+    else if (b.type === 'belltower') add(name, 2);
+    else if (b.type === 'manorgarden') add(name, 4);
+    else if (b.type === 'watchtower') add('Watch towers', 0.5);
+    else if (b.type === 'stable') add(name, 0.5);
+    else if (b.type === 'university') add(name, s.universityOk ? 4 : 0);
+    else if (b.type === 'publicgarden') add('Public gardens', 0.5);
+    else if (b.type === 'guildhall') add(name, 4);
+    else if (b.type === 'maypole') add('Maypoles', 0.5);
+    else if (b.type === 'monastery') add('Monasteries', b.reading ? 0.5 : 0);
+    else if (b.type === 'house' && b.level >= 3) add('Fine homes', b.level >= 4 ? 0.5 : 0.2);
+    else if (b.type === 'armoury' || b.type === 'tiltyard' || b.type === 'barracks') add("The lord's grounds", 1);
+    else if (b.type === 'stewpond' && b.workers > 0) add("The lord's grounds", 0.5);
+    else if (b.type === 'deerpark' && b.workers > 0) add("The lord's grounds", 1 + (hasCharter(s, 'nature3b') ? 2 : 0));
   }
-  if (hasCharter(s, 'learning1')) n += 1;
-  if (hasCharter(s, 'learning3b')) n += 2;
-  if (hasCharter(s, 'nature3a')) n += 1;
-  if (hasCharter(s, 'metal3a')) n += 1 + s.buildings.filter((b) => b.type === 'jeweller' && b.build >= 1).length * 2;
+  let charters = 0;
+  if (hasCharter(s, 'learning1')) charters += 1;
+  if (hasCharter(s, 'learning3b')) charters += 2;
+  if (hasCharter(s, 'nature3a')) charters += 1;
+  if (hasCharter(s, 'metal3a')) charters += 1 + s.buildings.filter((b) => b.type === 'jeweller' && b.build >= 1).length * 2;
+  add('Charters', charters);
   // Town walls: renown grows with every twenty sections, up to six a month.
-  n += Math.min(6, walls / 20);
-  n += optionPrestige(s);
-  n += artBoons(s).prestige;
-  // The lord's grounds.
-  for (const b of s.buildings) {
-    if (b.build < 1) continue;
-    if (b.type === 'armoury' || b.type === 'tiltyard' || b.type === 'barracks') n += 1;
-    else if (b.type === 'stewpond' && b.workers > 0) n += 0.5;
-    else if (b.type === 'deerpark' && b.workers > 0) n += 1 + (hasCharter(s, 'nature3b') ? 2 : 0);
-  }
+  add('Town walls', Math.min(6, walls / 20));
+  add('Town options (banners, windows)', optionPrestige(s));
+  add('Works of art', artBoons(s).prestige);
+  const list = [...out].map(([label, value]) => ({ label, value }));
   // A Duke's house: a fifth more.
-  if ((s.title ?? 0) >= 4) n *= DUKE_PRESTIGE;
-  return n;
+  if ((s.title ?? 0) >= 4) {
+    const sum = list.reduce((a, x) => a + x.value, 0);
+    if (sum) list.push({ label: "A Duke's house", value: sum * (DUKE_PRESTIGE - 1) });
+  }
+  return list;
+}
+
+export function prestigeIncome(s: GameState): number {
+  return prestigeSources(s).reduce((a, x) => a + x.value, 0);
 }
 
 /** Knowledge the monks give each month for every monastery that had its book. */

@@ -393,6 +393,11 @@ button.active {
   opacity: 0.55;
   filter: grayscale(0.7);
 }
+#chip-panel .kv.sub-kv {
+  font-size: 13px;
+  padding-left: 14px;
+  opacity: 0.85;
+}
 .card.done {
   position: relative;
   opacity: 0.6;
