@@ -480,8 +480,9 @@ export class Renderer {
       this.drawShoals(s, visible);
       this.drawMist(s, season, visible);
     }
-    // The boats always: a fisher sits in one.
+    // The boats always: a fisher sits in one; and the merchants' ships at the docks.
     if (season !== 3) this.drawBoats(s, agents, visible);
+    this.drawShips(s, visible);
     for (let bi = 0; bi < nb; bi++) {
       const bucket = this.buckets[bi];
       const keys = this.bucketKeys[bi];
@@ -2409,6 +2410,138 @@ export class Renderer {
     c.closePath();
     c.stroke();
     for (let k = 0; k < n; k++) if (!back(k)) stake(k);
+  }
+
+  /** How far the current game day has gone (0 to 1), for things that move through a day. */
+  dayFrac = 0;
+  /** Each dock's sea lane: water tiles from its quay out to the edge of the map (or the far shore). */
+  private lanes = new Map<number, number[]>();
+  private lanesMap: Uint8Array | null = null;
+
+  /** The water route from a dock out to the map's edge, or to the furthest water it can reach. */
+  private laneFor(s: GameState, b: Building): number[] {
+    if (this.lanesMap !== s.terrain) {
+      this.lanes.clear();
+      this.lanesMap = s.terrain;
+    }
+    const had = this.lanes.get(b.id);
+    if (had) return had;
+    const W = s.width;
+    const from = new Map<number, number>();
+    const queue: number[] = [];
+    for (let y = b.y - 1; y <= b.y + b.h; y++)
+      for (let x = b.x - 1; x <= b.x + b.w; x++) {
+        if (!inBounds(s, x, y) || s.terrain[y * W + x] !== 1) continue;
+        from.set(y * W + x, -1);
+        queue.push(y * W + x);
+      }
+    let end = queue[0] ?? -1;
+    for (let k = 0; k < queue.length; k++) {
+      const i = queue[k];
+      end = i;
+      const x = i % W;
+      const y = (i / W) | 0;
+      if (x === 0 || y === 0 || x === W - 1 || y === s.height - 1) break;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (!inBounds(s, nx, ny)) continue;
+        const j = ny * W + nx;
+        if (s.terrain[j] !== 1 || from.has(j)) continue;
+        from.set(j, i);
+        queue.push(j);
+      }
+    }
+    const lane: number[] = [];
+    for (let i = end; i >= 0; i = from.get(i) ?? -1) lane.push(i);
+    // From the quay outward.
+    lane.reverse();
+    this.lanes.set(b.id, lane);
+    return lane;
+  }
+
+  /**
+   * The merchants' ships: on each dock's trading days a ship sails in along
+   * its lane, lies at the quay a while, and sails off again with the goods.
+   */
+  private drawShips(s: GameState, visible: (x: number, y: number) => boolean): void {
+    const t = (s.day % 10) + this.dayFrac;
+    // In over the third day, at the quay the fourth and into the fifth, out by the sixth.
+    if (t < 3 || t >= 6.5) return;
+    for (const b of s.buildings) {
+      if (b.type !== 'dock' || b.build < 1 || b.workers <= 0 || !b.orders?.length) continue;
+      const lane = this.laneFor(s, b);
+      if (lane.length < 2) continue;
+      const along = t < 4 ? 1 - (t - 3) : t < 5.5 ? 0 : t - 5.5;
+      const pos = Math.min(lane.length - 1, along * (lane.length - 1));
+      const k = Math.floor(pos);
+      const f = pos - k;
+      const a = lane[k];
+      const c2 = lane[Math.min(lane.length - 1, k + 1)];
+      const W = s.width;
+      const x = (a % W) + 0.5 + ((c2 % W) - (a % W)) * f;
+      const y = ((a / W) | 0) + 0.5 + (((c2 / W) | 0) - ((a / W) | 0)) * f;
+      const [sx, sy] = iso(x, y);
+      if (!visible(sx, sy)) continue;
+      // Facing the way it sails (outward after the quay, inward before).
+      const dx = (c2 % W) - (a % W) - (((c2 / W) | 0) - ((a / W) | 0));
+      const out = t >= 5.5;
+      this.drawShip(sx, sy + Math.sin(this.time * 1.4 + b.id) * 0.8, (dx >= 0) === out ? 1 : -1, t >= 4 && t < 5.5);
+    }
+  }
+
+  /** A merchant cog: a round hull, a castle aft, one mast with a striped square sail (furled at the quay). */
+  private drawShip(sx: number, sy: number, f: number, moored: boolean): void {
+    const c = this.ctx;
+    c.strokeStyle = 'rgba(230,242,248,0.5)';
+    c.lineWidth = 0.8;
+    c.beginPath();
+    c.ellipse(sx, sy + 2, 26, 7, 0, 0, Math.PI * 2);
+    c.stroke();
+    c.fillStyle = '#4e3420';
+    c.beginPath();
+    c.moveTo(sx - 22 * f, sy - 8);
+    c.lineTo(sx + 24 * f, sy - 10);
+    c.quadraticCurveTo(sx + 18 * f, sy + 4, sx + 8 * f, sy + 4);
+    c.lineTo(sx - 14 * f, sy + 4);
+    c.quadraticCurveTo(sx - 21 * f, sy + 2, sx - 22 * f, sy - 8);
+    c.fill();
+    c.fillStyle = '#6e4c2e';
+    c.fillRect(Math.min(sx - 21 * f, sx + 23 * f), sy - 10, 44, 2);
+    // The castle at the stern.
+    c.fillStyle = '#7a5636';
+    c.fillRect(sx - 22 * f + (f > 0 ? 0 : -10), sy - 17, 10, 8);
+    // Mast and sail.
+    c.strokeStyle = '#5a3a22';
+    c.lineWidth = 1.6;
+    c.beginPath();
+    c.moveTo(sx + 2 * f, sy - 9);
+    c.lineTo(sx + 2 * f, sy - 46);
+    c.stroke();
+    if (moored) {
+      c.fillStyle = '#e8dcc0';
+      c.fillRect(sx + 2 * f - 11, sy - 44, 22, 3);
+    } else {
+      const billow = Math.sin(this.time * 2) * 1.2;
+      for (let i = 0; i < 4; i++) {
+        c.fillStyle = i % 2 ? '#b8402e' : '#f0e6cc';
+        c.beginPath();
+        c.moveTo(sx + 2 * f - 13 + i * 6.5, sy - 43);
+        c.lineTo(sx + 2 * f - 13 + (i + 1) * 6.5, sy - 43);
+        c.quadraticCurveTo(sx + 2 * f - 13 + (i + 0.5) * 6.5 + billow * f * 2, sy - 30, sx + 2 * f - 13 + (i + 1) * 6.5, sy - 18);
+        c.lineTo(sx + 2 * f - 13 + i * 6.5, sy - 18);
+        c.closePath();
+        c.fill();
+      }
+    }
+    // A pennant at the masthead.
+    c.fillStyle = '#c8402e';
+    c.beginPath();
+    c.moveTo(sx + 2 * f, sy - 46);
+    c.lineTo(sx + 2 * f + 9 * f, sy - 44.5 + Math.sin(this.time * 5) * 0.8);
+    c.lineTo(sx + 2 * f, sy - 43);
+    c.closePath();
+    c.fill();
   }
 
   /** Each fishery's rowing boat: out on its shoal with one of its own fishers casting a line, or moored empty by the hut. */
