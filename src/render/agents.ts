@@ -111,7 +111,7 @@ const YARD_WORK: Partial<Record<string, string[]>> = {
 
 /** Leisure acts (no tools in hand). */
 export const LEISURE_ACTS = new Set(['dance', 'pray', 'toast', 'sit', 'chat']);
-const MAX_AGENTS = 180;
+const MAX_AGENTS = 240;
 
 export class AgentSystem {
   agents: Agent[] = [];
@@ -132,7 +132,8 @@ export class AgentSystem {
 
   /** `dayFrac` is how far through the day it is (0 at dawn, 1 at the next). */
   update(s: GameState, dt: number, dayFrac = 0.5): void {
-    this.evening = dayFrac > 0.8 && dayFrac < 0.97;
+    // Home by nightfall (see the renderer's nights), out again in the morning.
+    this.evening = dayFrac > 0.74 && dayFrac < 0.99;
     // Once a month a merchant cart visits trading posts and docks with orders.
     // The first such day seen after a load sends no cart; later ones do.
     const marketDay = s.day % 10 === CART_DAY ? s.day : null;
@@ -187,6 +188,9 @@ export class AgentSystem {
     for (const a of this.agents) {
       if (a.role.kind === 'settler' || a.role.kind === 'cart') {
         if (!a.gone) keep.push(a);
+        // A newcomer still walking in already holds the place they will take:
+        // no second villager is made for it (one of the two would vanish on arrival).
+        if (!a.gone && a.role.kind === 'settler' && keyed.has(a.key) && !taken.has(a.key)) taken.add(a.key);
         continue;
       }
       if (keyed.has(a.key) && !taken.has(a.key)) {
@@ -194,6 +198,11 @@ export class AgentSystem {
         keep.push(a);
       }
     }
+    // Villagers whose job went (jobs are shuffled as the town changes) take up
+    // the new ones where they stand, rather than vanishing mid-step while a
+    // stranger appears indoors elsewhere.
+    const villager = (r: Role) => r.kind === 'work' || r.kind === 'build' || r.kind === 'idle';
+    const orphans = this.agents.filter((a) => !keep.includes(a) && villager(a.role)).sort((a, b) => Number(b.visible) - Number(a.visible));
     const homes = this.homeSlots(s);
     const growth = this.lastPop >= 0 ? Math.max(0, s.population - this.lastPop) : 0;
     let settlersToSpawn = Math.min(growth, 12);
@@ -203,6 +212,13 @@ export class AgentSystem {
       if (keep.length >= MAX_AGENTS) break;
       i++;
       if (taken.has(key)) continue;
+      const free = villager(role) ? orphans.shift() : undefined;
+      if (free) {
+        free.key = key;
+        free.role = role;
+        keep.push(free);
+        continue;
+      }
       const home = role.kind === 'lord' ? role.id : role.kind === 'beast' ? (stableFor(s, role.id)?.id ?? -1) : (homes[i % Math.max(1, homes.length)] ?? -1);
       const a = this.spawn(s, key, role, home);
       if (settlersToSpawn > 0 && this.sendFromEdge(s, a)) settlersToSpawn--;
