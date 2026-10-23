@@ -334,10 +334,9 @@ check('a town file opens where it was saved', JSON.stringify(townBefore) === JSO
 await page.evaluate(() => window.game.hud.showGameMenu());
 await page.waitForTimeout(200);
 await page.click('[data-m="settings"]');
-const musicBefore = await page.textContent('[data-m="music"]');
-await page.click('[data-m="music"]');
-check('music switch toggles', musicBefore !== (await page.textContent('[data-m="music"]')));
-await page.click('[data-m="music"]');
+await page.fill('input[data-vol="music"]', '30');
+await page.dispatchEvent('input[data-vol="music"]', 'change');
+check('music volume is kept', await page.evaluate(() => window.game.hud.volume.music === 0.3 && JSON.parse(localStorage.getItem('cornerlands.volume')).music === 0.3));
 await page.click('[data-m="back"]');
 check('the seed link button is there', !!(await page.$('[data-m="seed-link"]')));
 await page.click('[data-m="photo"]');

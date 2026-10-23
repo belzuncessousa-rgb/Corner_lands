@@ -145,8 +145,8 @@ import { LANDS, idx, inBounds } from '../game/world';
 import type { Game } from '../main';
 import { BUILDING_ICONS, CATEGORY_ICONS, ICONS, LOGO, SEASON_ICONS } from './icons';
 import { Minimap } from './minimap';
-import { Ambient } from './ambient';
-import { Music } from './music';
+import { CHANNELS, DEFAULT_VOLUME, Soundscape, type Channel } from './soundscape';
+import { LICENCE_LINKS, MUSIC_CREDITS, SOUND_CREDITS } from './credits';
 import { folkDoing, folkName, folkThought, WISHES, workplaceOf } from './folk';
 
 const ZONE_COST_NOTE: Partial<Record<BuildingType, string>> = {
@@ -258,10 +258,10 @@ export class Hud {
   private shownMessages = 0;
   private modal: HTMLElement | null = null;
   private audio: AudioContext | null = null;
-  private ambient: Ambient | null = null;
-  private music: Music | null = null;
+  private sounds: Soundscape | null = null;
+  /** Volume of each kind of sound, 0 to 1. */
+  volume: Record<Channel, number> = { ...DEFAULT_VOLUME };
   /** The seasonal tune, separately from the other sounds. */
-  private musicOn = true;
   muted = false;
   private objectivesMin = true;
   private lastInspectorKey = '';
@@ -284,7 +284,10 @@ export class Hud {
       game.renderer.nights = localStorage.getItem('cornerlands.nights') !== '0';
       this.tipsOn = localStorage.getItem('cornerlands.tipsOff') !== '1';
       this.buildIcons = localStorage.getItem('cornerlands.buildPictures') !== '1';
-      this.musicOn = localStorage.getItem('cornerlands.music') !== '0';
+      const vol = JSON.parse(localStorage.getItem('cornerlands.volume') ?? 'null') as Partial<Record<Channel, number>> | null;
+      if (vol) this.volume = { ...this.volume, ...vol };
+      // Players who had switched the old music off keep it off.
+      if (!vol && localStorage.getItem('cornerlands.music') === '0') this.volume.music = 0;
       this.tipsSeen = new Set(JSON.parse(localStorage.getItem('cornerlands.tips') ?? '[]') as string[]);
       const lord = JSON.parse(localStorage.getItem('cornerlands.lord') ?? 'null') as { look: LordLook; arms: Heraldry } | null;
       if (lord) {
@@ -327,6 +330,16 @@ export class Hud {
     }
     this.minimap = new Minimap(root, game.renderer, () => game.state);
     root.addEventListener('click', (e) => this.onClick(e));
+    // Every button clicks; closing and going back has its own sound.
+    document.addEventListener(
+      'click',
+      (e) => {
+        const b = (e.target as HTMLElement).closest('button');
+        if (!b || b.disabled) return;
+        this.uiClick(!!b.closest('[data-m="back"], [data-action="close-modal"], [data-m="cancel"], [data-m="resume"], .close, .back'));
+      },
+      true,
+    );
     root.addEventListener('pointerdown', (e) => this.onOrderPointerDown(e));
     root.addEventListener('mousemove', (e) => this.onTipMove(e));
     root.addEventListener('mouseleave', () => (this.el.tooltip.style.display = 'none'));
@@ -2304,6 +2317,7 @@ export class Hud {
 
   /** The charter tree: paths radiate from the Town Charter at the centre. */
   private showCharters(): void {
+    this.sound('charters');
     const s = this.game.state;
     const numeral = (c: (typeof CHARTERS)[number]) => (c.rank === 3 ? 'III' : 'I'.repeat(c.rank));
     const node = (c: (typeof CHARTERS)[number]) => {
@@ -2449,6 +2463,7 @@ export class Hud {
         ${saves.length ? '<button data-m="load">Load Game</button>' : ''}
         <button data-m="help">How to Play</button>
         <button data-m="settings">Settings</button>
+        <button data-m="credits">Credits</button>
       </div>
       ${this.newsHtml()}`,
       false,
@@ -2469,10 +2484,32 @@ export class Hud {
     m.querySelector('[data-m="load"]')?.addEventListener('click', () => this.showLoad(true));
     m.querySelector('[data-m="help"]')!.addEventListener('click', () => this.showHelp(true));
     m.querySelector('[data-m="settings"]')!.addEventListener('click', () => this.showSettings(true));
+    m.querySelector('[data-m="credits"]')!.addEventListener('click', () => this.showCredits());
     m.querySelector('[data-m="tutorial"]')!.addEventListener('click', () => {
       this.ensureAudio();
       this.showNewGame(true, TUTORIAL_SEED, 'meadow', undefined, true);
     });
+  }
+
+  /** Who made the music and sounds, as their licences ask. */
+  private showCredits(): void {
+    const rows = MUSIC_CREDITS.map(
+      (c) =>
+        `<li><b>${esc(c.title)}</b> by ${esc(c.by)} <small>(${esc(c.source)}) · <a href="${LICENCE_LINKS[c.licence] ?? '#'}" target="_blank" rel="noopener">${esc(c.licence)}</a></small></li>`,
+    ).join('');
+    const m = this.openModal(
+      `<h2>Credits</h2>
+      <p>Corner Lands: game, code and art made with Claude (Anthropic).</p>
+      <h3>Music</h3>
+      <ul class="credits">${rows}</ul>
+      <h3>Sounds</h3>
+      <p>${esc(SOUND_CREDITS)}</p>
+      <h3>Fonts</h3>
+      <p>Cinzel, EB Garamond, Texturina and Kurale, from Google Fonts (SIL Open Font License).</p>
+      <div class="menu"><button class="primary" data-m="back">Back</button></div>`,
+      false,
+    );
+    m.querySelector('[data-m="back"]')!.addEventListener('click', () => this.showMainMenu());
   }
 
   showNewGame(fromMain: boolean, presetSeed?: number, presetLand?: Land, preset?: { name: string; named: boolean; mode: string }, tutorial = false): void {
@@ -2811,7 +2848,10 @@ export class Hud {
       `<h2>Settings</h2>
       <div class="menu">
         <button data-m="sound">Sound: ${this.muted ? 'Off' : 'On'}</button>
-        <button data-m="music" ${this.muted ? 'disabled' : ''}>Music: ${this.musicOn ? 'On' : 'Off'}</button>
+        <div class="volumes">${CHANNELS.map(
+          (c) =>
+            `<label class="volume"><span>${c.name}</span><input type="range" min="0" max="100" step="5" data-vol="${c.id}" value="${Math.round(this.volume[c.id] * 100)}" ${this.muted ? 'disabled' : ''}><output>${Math.round(this.volume[c.id] * 100)}%</output></label>`,
+        ).join('')}</div>
         <button data-m="scale">Text size: ${Math.round(this.uiScale * 100)}%</button>
         <button data-m="pausebad">Pause on bad news: ${this.pauseOnBad ? 'On' : 'Off'}</button>
         <button data-m="nights" data-tip="Night falls each day at normal speed, longer in winter">Nights: ${this.game.renderer.nights ? 'On' : 'Off'}</button>
@@ -2842,15 +2882,23 @@ export class Hud {
       }
       this.showSettings(fromMain);
     });
-    m.querySelector('[data-m="music"]')!.addEventListener('click', () => {
-      this.musicOn = !this.musicOn;
-      this.music?.setOn(this.musicOn);
-      try {
-        localStorage.setItem('cornerlands.music', this.musicOn ? '1' : '0');
-      } catch {
-        /* ignore */
-      }
-      this.showSettings(fromMain);
+    m.querySelectorAll<HTMLInputElement>('input[data-vol]').forEach((inp) => {
+      const ch = inp.dataset.vol as Channel;
+      inp.addEventListener('input', () => {
+        this.volume[ch] = Number(inp.value) / 100;
+        inp.nextElementSibling!.textContent = `${inp.value}%`;
+        this.ensureAudio();
+        this.sounds?.setVolume(ch, this.volume[ch]);
+      });
+      // A sample of the sound being set, when the slider is let go.
+      inp.addEventListener('change', () => {
+        try {
+          localStorage.setItem('cornerlands.volume', JSON.stringify(this.volume));
+        } catch {
+          /* ignore */
+        }
+        if (ch === 'effects') this.sound('open');
+      });
     });
     m.querySelector('[data-m="bicons"]')!.addEventListener('click', () => {
       this.buildIcons = !this.buildIcons;
@@ -2887,7 +2935,7 @@ export class Hud {
     });
     m.querySelector('[data-m="sound"]')!.addEventListener('click', () => {
       this.muted = !this.muted;
-      this.ambient?.setMuted(this.muted);
+      this.sounds?.setMuted(this.muted);
       if (!this.muted) this.ensureAudio();
       try {
         localStorage.setItem('cornerlands.muted', this.muted ? '1' : '0');
@@ -3042,105 +3090,60 @@ export class Hud {
     if (this.audio || this.muted) return;
     try {
       this.audio = new AudioContext();
-      this.ambient = new Ambient(this.audio);
-      this.music = new Music(this.audio);
-      this.music.setOn(this.musicOn);
+      this.sounds = new Soundscape(this.audio, this.volume);
     } catch {
       /* no audio */
     }
   }
 
-  /** Drives ambient sound; called every frame. */
+  /** Drives the music, ambience and town sounds; called every frame. */
   tickAudio(dt: number, running: boolean): void {
-    if (!this.ambient || this.muted || this.audio?.state !== 'running') return;
-    this.ambient.update(dt, seasonOf(this.game.state.day), running);
-    this.music?.update(dt, seasonOf(this.game.state.day), running);
+    if (!this.sounds || this.muted || this.audio?.state !== 'running') return;
+    const g = this.game;
+    this.sounds.update(dt, { s: g.state, renderer: g.renderer, agents: g.agents.agents, selected: g.selected, menu: g.demo, running });
   }
 
-  sound(kind: 'place' | 'road' | 'demolish' | 'good' | 'bad' | 'coin' | 'jig' | 'fanfare' | 'march' | 'stone'): void {
+  /** A click on any button: its own sound for closing and going back. */
+  uiClick(back: boolean): void {
+    if (this.muted) return;
+    this.ensureAudio();
+    if (this.audio?.state === 'suspended') this.audio.resume().catch(() => undefined);
+    this.sounds?.click(back);
+  }
+
+  sound(kind: 'place' | 'road' | 'demolish' | 'good' | 'bad' | 'coin' | 'jig' | 'fanfare' | 'march' | 'stone' | 'open' | 'charters'): void {
     if (this.muted) return;
     this.ensureAudio();
     const ac = this.audio;
-    if (!ac) return;
+    if (!ac || !this.sounds) return;
     if (ac.state === 'suspended') ac.resume().catch(() => undefined);
-    const now = ac.currentTime;
-    const tone = (freq: number, start: number, dur: number, type: OscillatorType = 'sine', vol = 0.12) => {
-      const o = ac.createOscillator();
-      const gn = ac.createGain();
-      o.type = type;
-      o.frequency.setValueAtTime(freq, now + start);
-      gn.gain.setValueAtTime(0, now + start);
-      gn.gain.linearRampToValueAtTime(vol, now + start + 0.01);
-      gn.gain.exponentialRampToValueAtTime(0.001, now + start + dur);
-      o.connect(gn).connect(ac.destination);
-      o.start(now + start);
-      o.stop(now + start + dur + 0.05);
-    };
-    const noise = (dur: number, vol: number, freq: number) => {
-      const len = Math.floor(ac.sampleRate * dur);
-      const buf = ac.createBuffer(1, len, ac.sampleRate);
-      const data = buf.getChannelData(0);
-      for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
-      const src = ac.createBufferSource();
-      src.buffer = buf;
-      const f = ac.createBiquadFilter();
-      f.type = 'lowpass';
-      f.frequency.value = freq;
-      const gn = ac.createGain();
-      gn.gain.value = vol;
-      src.connect(f).connect(gn).connect(ac.destination);
-      src.start(now);
-    };
+    const sc = this.sounds;
     switch (kind) {
       case 'place':
-        tone(140, 0, 0.18, 'triangle', 0.2);
-        tone(210, 0.07, 0.15, 'triangle', 0.12);
-        noise(0.12, 0.15, 900);
+      case 'stone':
+      case 'open':
+        sc.play('open', kind === 'open' ? 0.7 : 0.9);
         break;
       case 'road':
-        noise(0.2, 0.18, 600);
+        sc.play('click', 0.7);
         break;
-      case 'demolish':
-        noise(0.45, 0.3, 1200);
-        tone(90, 0, 0.3, 'sawtooth', 0.06);
-        break;
-      case 'good':
-        tone(523, 0, 0.25, 'sine', 0.08);
-        tone(659, 0.1, 0.25, 'sine', 0.08);
-        tone(784, 0.2, 0.35, 'sine', 0.08);
-        break;
-      case 'bad':
-        tone(300, 0, 0.2, 'triangle', 0.08);
-        tone(220, 0.12, 0.3, 'triangle', 0.08);
-        break;
-      case 'coin':
-        tone(1200, 0, 0.12, 'square', 0.04);
-        tone(1600, 0.06, 0.18, 'square', 0.04);
-        break;
-      case 'jig':
-        // A few bars on a pipe for a festival.
-        [784, 880, 988, 880, 784, 659, 784, 988].forEach((f, i) => tone(f, i * 0.11, 0.14, 'triangle', 0.06));
+      case 'charters':
+        sc.play('charters', 0.8);
         break;
       case 'fanfare':
-        // Heralds' trumpets for a fair.
-        tone(392, 0, 0.18, 'sawtooth', 0.035);
-        tone(523, 0.16, 0.18, 'sawtooth', 0.035);
-        tone(659, 0.32, 0.18, 'sawtooth', 0.035);
-        tone(784, 0.48, 0.5, 'sawtooth', 0.04);
-        break;
       case 'march':
-        // Drums as the men-at-arms take service.
-        for (let i = 0; i < 4; i++) {
-          tone(80, i * 0.22, 0.16, 'sine', 0.2);
-          noise(0.08, 0.08, 400);
-        }
+      case 'jig':
+        sc.bells(this.game.state);
         break;
-      case 'stone':
-        tone(70, 0, 0.25, 'sine', 0.22);
-        noise(0.18, 0.12, 500);
+      // No recording yet for these: see docs/AUDIO-OPTIONS.md.
+      case 'demolish':
+      case 'good':
+      case 'bad':
+      case 'coin':
         break;
     }
   }
+
 }
 
 function upgradeName(b: Building): string {

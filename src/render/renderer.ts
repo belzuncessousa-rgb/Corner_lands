@@ -4477,7 +4477,7 @@ export class Renderer {
 
   private rain: { x: number; y: number; s: number }[] = [];
   /** How heavy the shower is now, easing towards today's weather. */
-  private rainLevel = 0;
+  rainLevel = 0;
 
   /** Spring brings a passing shower about one day in three, chosen by the date. */
   private drawRain(s: GameState, season: Season, dt: number, wrap: (f: { x: number; y: number }) => void): void {
@@ -4556,7 +4556,7 @@ export class Renderer {
   }
 
   /** How deep into dusk the day is (0 by day, 1 at its deepest), eased so it never jumps. */
-  private dusk = 0;
+  dusk = 0;
 
   /** Whether night falls at all (a setting). */
   nights = true;
