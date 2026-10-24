@@ -1454,34 +1454,6 @@ button.active {
   }
 }
 
-/* Chronicle. */
-.chronicle {
-  max-height: 55vh;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.chron {
-  padding: 4px 8px;
-  border-left: 3px solid rgba(91, 58, 34, 0.3);
-  background: rgba(255, 250, 235, 0.5);
-  font-size: 15px;
-}
-.chron small {
-  color: var(--ink-soft);
-  margin-right: 4px;
-}
-.chron.good {
-  border-left-color: var(--good);
-}
-.chron.bad {
-  border-left-color: var(--bad);
-}
-.chron.advice {
-  border-left-color: #c89a38;
-}
-
 #inspector {
   /* Room left for the build bar below; the panel scrolls rather than run off the top. */
   bottom: var(--inspector-bottom, 120px);
@@ -2228,26 +2200,6 @@ table.prod td.num {
   cursor: pointer;
 }
 .msg.tip b { color: #4a6f90; }
-/* Milestones: a short timeline above the chronicle. */
-.milestones {
-  max-height: 22vh;
-  overflow: auto;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px 12px;
-  margin-bottom: 6px;
-}
-.milestones + .sub + .chronicle,
-.milestones ~ .chronicle { max-height: 36vh; }
-.mile {
-  display: flex;
-  flex-direction: column;
-  padding: 3px 8px;
-  border-left: 3px solid #c89a38;
-  font-size: 14px;
-}
-.mile small { color: var(--ink-soft); font-size: 12px; }
-@media (max-width: 600px) { .milestones { grid-template-columns: 1fr; } }
 .save .deeds { color: #8a6a2a; font-style: italic; }
 
 /* Phones: fit every build-bar tab (categories and tools) on one row. */

@@ -231,6 +231,8 @@ export class Renderer {
 
   /** Drawing with the lighter sprite copies because frames were slow. */
   light = false;
+  /** Trees drawn flat, to see the ground under the woods (F). */
+  hideTrees = false;
   private renderMs = 0;
 
   /** Keeps a running average of render time and switches light mode with some slack. */
@@ -1522,7 +1524,12 @@ export class Renderer {
       }
     }
     const n = s.trees[i];
-    if (n) {
+    if (n && this.hideTrees) {
+      // Trees laid flat: a low clump of green where each stands, so the ground between shows.
+      const sp = this.sprite(`th:${n}:${season === 3}`, () => this.treeFootprint(n, season === 3));
+      const [wx, wy] = iso(x, y);
+      this.blit(sp, wx, wy);
+    } else if (n) {
       const kind: TreeKind = v % 9 < 4 ? 'pine' : v % 9 < 8 ? 'oak' : 'birch';
       const base = v % TREE_VARIANTS;
       const mixBirch = kind === 'oak' && v % 2 === 1;
@@ -1556,6 +1563,29 @@ export class Renderer {
         c.fillRect(sx + 0.4, sy - 3.0, 0.5, 0.5);
       }
     }
+  }
+
+  /** Where a tile's trees stand, drawn low: a dab of crown on a stub of trunk for each. */
+  private treeFootprint(n: number, winter: boolean): Sprite {
+    const slots = TREE_SLOTS[n - 1];
+    return makeSprite(TW + 8, TH + 12, TW / 2 + 4, 8, (ctx) => {
+      for (const [sx, sy] of slots) {
+        const [lx, ly] = iso(sx, sy);
+        ctx.fillStyle = 'rgba(30,40,20,0.25)';
+        ctx.beginPath();
+        ctx.ellipse(lx, ly, 6, 3, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#6b4a2e';
+        ctx.fillRect(lx - 1, ly - 4, 2, 4);
+        ctx.fillStyle = winter ? '#dfe6e4' : '#4f7a34';
+        ctx.strokeStyle = winter ? '#9aa6a4' : '#2f4a1e';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.ellipse(lx, ly - 5, 4.5, 3, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+    });
   }
 
   private treeClump(kind: TreeKind, n: number, base: number, mixBirch: boolean, season: Season): Sprite {

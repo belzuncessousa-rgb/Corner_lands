@@ -1732,7 +1732,7 @@ export function recompute(s: GameState): void {
     // A site's own priority puts it in the same bands as the workplaces'.
     if (isProject(b) && !starvedSite(s, b)) jobs.push({ b, site: true, p: (2 - (b.sitePriority ?? 1)) * 100 + (b.type === 'wall' ? WALL_SITE_PRIORITY : SITE_PRIORITY) + b.id * 1e-6 });
     if (b.paused) continue;
-    if (b.build >= 1 && workDef(b).workers > 0 && (b.want ?? 1) > 0 && !restingNow(s, b)) {
+    if (b.build >= 1 && workDef(b).workers > 0 && wantOf(s, b) > 0 && !restingNow(s, b)) {
       if (isMarket(b)) {
         // One vendor opens the market, hired with the food makers; the
         // other stalls are kept only when there are hands to spare.
@@ -1747,7 +1747,7 @@ export function recompute(s: GameState): void {
   }
   jobs.sort((a, c) => a.p - c.p || a.b.id - c.b.id);
   for (const j of jobs) {
-    const places = Math.min(workersOf(j.b), j.b.want ?? Infinity);
+    const places = Math.min(workersOf(j.b), wantOf(s, j.b));
     const n = Math.min(free, j.site ? (j.b.type === 'wall' ? 1 : SITE_BUILDERS) : j.more ? places - j.b.workers : Math.min(places, j.cap ?? Infinity));
     if (j.site) j.b.builders = n;
     else if (j.more) j.b.workers += n;
@@ -1965,7 +1965,28 @@ export function setRecipe(s: GameState, b: Building, id: string | undefined): vo
 
 export function setWorkers(s: GameState, b: Building, want: number | undefined): void {
   b.want = want === undefined ? undefined : Math.max(0, Math.min(workersOf(b), Math.round(want)));
-  if (b.want === workersOf(b)) b.want = undefined;
+  // Full is the default, unless hiring is by hand: then it has to be said.
+  if (b.want === workersOf(b) && !s.manualHire) b.want = undefined;
+  recompute(s);
+}
+
+/** Workers a workplace may take: as the player set, else all its places (none when hiring is by hand). */
+export function wantOf(s: GameState, b: Building): number {
+  return b.want ?? (s.manualHire ? 0 : Infinity);
+}
+
+/**
+ * Hiring by hand or by the town. Going by hand keeps each workplace's crew
+ * as it is now, so nothing changes until the player moves someone; going
+ * back lets every workplace set full fill up again.
+ */
+export function setManualHire(s: GameState, on: boolean): void {
+  for (const b of s.buildings) {
+    if (b.build < 1 || workersOf(b) <= 0) continue;
+    if (on && b.want === undefined) b.want = b.workers;
+    else if (!on && b.want === workersOf(b)) b.want = undefined;
+  }
+  s.manualHire = on || undefined;
   recompute(s);
 }
 
@@ -2003,7 +2024,7 @@ export function labourSummary(s: GameState): LabourSummary {
     const d = workDef(b);
     if (b.build < 1 || d.workers === 0) continue;
     out.workers += b.workers;
-    const want = b.paused ? 0 : Math.min(workersOf(b), b.want ?? Infinity);
+    const want = b.paused ? 0 : Math.min(workersOf(b), wantOf(s, b));
     const resting = !b.paused && want > 0 && restingNow(s, b);
     if (resting) out.resting += want;
     const c = cats.get(d.category) ?? { have: 0, slots: 0 };
@@ -3680,7 +3701,7 @@ export function dailyProduction(s: GameState, rng: StateRng): void {
       b.blocked = BLOCK_SEASONAL;
       continue;
     }
-    if (b.want === 0) {
+    if (wantOf(s, b) === 0) {
       b.status = 'No workers assigned';
       b.blocked = 0;
       continue;

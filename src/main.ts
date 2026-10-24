@@ -64,7 +64,7 @@ import { AgentSystem } from './render/agents';
 import { knows, learnEverything } from './game/unlocks';
 import { grantCharter } from './game/charters';
 import { penShoal, reachOf } from './game/levels';
-import { Wildlife } from './render/wildlife';
+import { type View, Wildlife } from './render/wildlife';
 import { type Overlay, Renderer } from './render/renderer';
 import { type LensData, lensData } from './render/lens';
 import { Tutor } from './ui/tutorial';
@@ -144,6 +144,12 @@ export class Game {
       this.coverage = null;
       this.hud.showCoverage(null);
     }
+    this.hud.update();
+  }
+
+  /** Lays the trees flat, or stands them up again. */
+  setHideTrees(on: boolean): void {
+    this.renderer.hideTrees = on;
     this.hud.update();
   }
 
@@ -330,6 +336,24 @@ export class Game {
    * The time of day, 0 at dawn to 1 at the next: one turn of day and night
    * spans DAYS_PER_CYCLE game days, so a month sees two.
    */
+  /** The tiles on screen, leaving out the edges the interface covers. */
+  private view(): View {
+    const r = this.renderer;
+    const corners = [r.screenToTile(0, 0), r.screenToTile(r.width, 0), r.screenToTile(0, r.height), r.screenToTile(r.width, r.height)];
+    const xs = corners.map((c) => c[0]);
+    const ys = corners.map((c) => c[1]);
+    return {
+      x0: Math.max(0, Math.min(...xs)),
+      y0: Math.max(0, Math.min(...ys)),
+      x1: Math.min(this.state.width, Math.max(...xs)),
+      y1: Math.min(this.state.height, Math.max(...ys)),
+      inside: (x, y) => {
+        const [sx, sy] = r.tileToScreen(x, y);
+        return sx > 80 && sy > 90 && sx < r.width - 80 && sy < r.height - 130;
+      },
+    };
+  }
+
   private clock(): number {
     return ((this.state.day % DAYS_PER_CYCLE) + this.simAcc / DAY_SECONDS) / DAYS_PER_CYCLE;
   }
@@ -419,7 +443,7 @@ export class Game {
       }
     }
     this.agents.update(this.state, gameDt, this.clock());
-    this.wildlife.update(this.state, gameDt);
+    this.wildlife.update(this.state, gameDt, this.view());
     // Dusk only at normal speed: faster, the days would flicker.
     this.renderer.setDayTime(this.clock(), !this.demo && this.speed <= 1, dt, seasonOf(this.state.day) === 3);
     this.renderer.dayFrac = this.dayFraction;
@@ -1209,6 +1233,8 @@ export class Game {
         this.cycleCoverage();
       } else if (k === 'l') {
         this.setLens(this.lens === 'normal' ? 'resources' : 'normal');
+      } else if (k === 'f') {
+        this.setHideTrees(!this.renderer.hideTrees);
       } else if (k === 'u') {
         this.setPhoto(!this.photo);
       } else if (k === 'x' || k === 'delete') {

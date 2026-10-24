@@ -15,7 +15,7 @@ function mulberry(seed: number): () => number {
 }
 
 /** A board of grain, `w` by `h`, in the given tones (light, mid, dark). */
-function paintWood(w: number, h: number, tones: [string, string, string], seed: number): string {
+function paintWood(w: number, h: number, tones: [string, string, string], seed: number, knotCount?: number): string {
   const cv = document.createElement('canvas');
   cv.width = w;
   cv.height = h;
@@ -35,8 +35,10 @@ function paintWood(w: number, h: number, tones: [string, string, string], seed: 
     c.fillStyle = rand() < 0.5 ? 'rgba(255,235,190,0.07)' : 'rgba(40,20,5,0.08)';
     c.fillRect(0, y, w, bh);
   }
-  // Knots the grain bends around.
-  const knots = Array.from({ length: 2 + Math.floor(rand() * 2) }, () => ({ x: w * (0.1 + rand() * 0.8), y: h * (0.15 + rand() * 0.7), r: 5 + rand() * 7 }));
+  // Knots the grain bends around; a given count scatters them wider and in more sizes.
+  const knots = knotCount
+    ? Array.from({ length: knotCount }, () => ({ x: w * (0.04 + rand() * 0.92), y: h * (0.06 + rand() * 0.88), r: 3 + rand() * 9 }))
+    : Array.from({ length: 2 + Math.floor(rand() * 2) }, () => ({ x: w * (0.1 + rand() * 0.8), y: h * (0.15 + rand() * 0.7), r: 5 + rand() * 7 }));
   const lines = Math.round(h / 3.2);
   for (let k = 0; k < lines; k++) {
     const y0 = (k + rand() * 0.8) * (h / lines);
@@ -223,7 +225,7 @@ export function installWood(): void {
   root.setProperty('--wood-img', `url(${paintWood(1024, 512, ['#b98a55', '#a87842', '#5a3416'], 7)})`);
   root.setProperty('--wood-img-dark', `url(${paintWood(512, 256, ['#7a5230', '#6a4424', '#3a200c'], 19)})`);
   // Pale pine for the boards text is read from, and walnut for their frames.
-  root.setProperty('--wood-pale', `url(${paintWood(1024, 512, ['#f3d6a2', '#e8c690', '#a87a46'], 31)})`);
+  root.setProperty('--wood-pale', `url(${paintWood(1024, 512, ['#f3d6a2', '#e8c690', '#a87a46'], 31, 8)})`);
   root.setProperty('--wood-frame', `url(${paintWood(512, 256, ['#83552e', '#6b4223', '#2e1608'], 43)})`);
   root.setProperty('--weave', `url(${paintWeave(5)})`);
   // Flat painted grain: see-through for the pale boards, solid for the frames.

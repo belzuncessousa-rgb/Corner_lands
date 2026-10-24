@@ -28,6 +28,15 @@ export interface Animal {
 /** Most animals shown for one herd (the rest are out of sight in the woods). */
 const SHOWN = { deer: 3, rabbit: 3 };
 
+/** The tiles on screen: a box around them, and whether a tile is really in sight. */
+export interface View {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+  inside: (x: number, y: number) => boolean;
+}
+
 /**
  * The game's herds, seen: a few deer or rabbits graze about each herd's
  * home, follow it when it moves on, grow fewer as it is hunted and bolt from
@@ -79,7 +88,8 @@ export class Wildlife {
     return fallback;
   }
 
-  update(s: GameState, dt: number): void {
+  /** `view`: the tiles on screen, as a box, so the bear can pick a spot where it will be seen. */
+  update(s: GameState, dt: number, view?: View): void {
     if (dt <= 0) return;
     const herds = s.herds ?? [];
     // Keep each herd's animals in step with its size. They stay in sight: a
@@ -104,7 +114,7 @@ export class Wildlife {
         mine.push(a);
       }
     });
-    this.visitors(s, dt);
+    this.visitors(s, dt, view);
     for (const a of this.animals) {
       if (a.herd < 0) continue;
       a.alpha = a.leaving ? Math.max(0, a.alpha - dt * 0.7) : Math.min(1, a.alpha + dt * 0.7);
@@ -179,16 +189,21 @@ export class Wildlife {
    * any building, and goes back in; in the warm months a few turtles crawl out
    * on a quiet shore to bask, and slip back into the water one by one.
    */
-  private visitors(s: GameState, dt: number): void {
+  private visitors(s: GameState, dt: number, view?: View): void {
     const winter = seasonOf(s.day) === 3;
     // The bear.
     const bear = this.animals.find((a) => a.kind === 'bear');
     if (!bear && !winter && (this.bearIn -= dt) <= 0) {
-      this.bearIn = 150 + Math.random() * 300;
-      for (let tries = 0; tries < 400; tries++) {
-        const x = Math.floor(Math.random() * s.width);
-        const y = Math.floor(Math.random() * s.height);
-        if (!this.edge(s, x + 0.5, y + 0.5, 7)) continue;
+      this.bearIn = 120 + Math.random() * 180;
+      // Mostly on a wood's edge in sight, so it is met now and then; else anywhere.
+      const sight = view && Math.random() < 0.7 ? view : undefined;
+      for (let tries = 0; tries < 600; tries++) {
+        const v = tries < 400 ? sight : undefined;
+        const x = Math.floor(v ? v.x0 + Math.random() * (v.x1 - v.x0) : Math.random() * s.width);
+        const y = Math.floor(v ? v.y0 + Math.random() * (v.y1 - v.y0) : Math.random() * s.height);
+        if (v && !v.inside(x + 0.5, y + 0.5)) continue;
+        // In sight it may come a little nearer the town than it would out of it.
+        if (!this.edge(s, x + 0.5, y + 0.5, v ? 4 : 7)) continue;
         this.animals.push({ kind: 'bear', herd: -1, x: x + 0.5, y: y + 0.5, tx: x + 0.5, ty: y + 0.5, timer: 2, dir: 1, step: 0, alpha: 0, leaving: false, grazing: true, life: 50 + Math.random() * 60 });
         break;
       }

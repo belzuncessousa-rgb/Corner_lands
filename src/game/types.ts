@@ -422,6 +422,8 @@ export interface GameState {
   happinessTarget: number;
   happinessFactors: { label: string; value: number }[];
   taxLevel: number;
+  /** Workplaces staffed only as the player sets them: one left unset gets no one. */
+  manualHire?: boolean;
   tier: number;
   quests: string[];
   messages: Message[];

@@ -302,9 +302,9 @@ export function generateWorld(seed: number, opts: { relaxed?: boolean; hardy?: b
     }
   }
   if (land !== 'meadow') s.land = land;
-  // Enough timber for a home, a woodcutter and a food camp; a little coin.
+  // Enough timber for a home, a woodcutter and a food camp; stone for a well and a granary; a little coin.
   s.res.wood = 15;
-  s.res.stone = 10;
+  s.res.stone = 12;
   s.res.planks = 0;
   s.res.berries = 40;
   s.res.meat = 20;
