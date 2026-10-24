@@ -23,6 +23,7 @@ import {
   GOODS,
   GROUP_NAMES,
   RESOURCE_STORAGE,
+  SILO_GOODS,
   STORAGE_CAPACITY,
   YARD_STORE,
   EXPORT_PER_DOCK,
@@ -46,6 +47,7 @@ import {
   HOMES_PER_STALL,
   siloCap,
   siloHeld,
+  siloShare,
   recompute,
   seasonOf,
   setKeep,
@@ -1436,13 +1438,24 @@ export class Hud {
     const s = this.game.state;
     const kinds = Object.keys(STORAGE_CAPACITY[b.type] ?? {}) as StorageKind[];
     const rows: string[] = [];
+    // What the silos keep is shown at the silos, not counted again in the granaries.
+    const inStore = (r: ResourceId) => s.res[r] - siloShare(s, r);
+    if (b.type === 'silo') {
+      const held = Math.floor(siloHeld(s));
+      const cap = siloCap(s);
+      const list = SILO_GOODS.filter((r) => siloShare(s, r) >= 1)
+        .map((r) => `<div class="kv store-row"><span>${ICONS[r] ?? ''} ${GOODS[r].name}</span><span>${Math.floor(siloShare(s, r))}</span></div>`)
+        .join('');
+      rows.push(`<div class="needs-h">All silos · ${held} / ${cap}</div>
+        <div class="progress"><i style="width:${Math.min(100, (held / Math.max(1, cap)) * 100)}%"></i></div>${list || '<div class="note"><i>Empty: wheat and barley come here first after the harvest.</i></div>'}`);
+    }
     for (const kind of kinds) {
       const used = Math.floor(stored(s, kind));
       const cap = storageCap(s, kind);
-      const goods = RESOURCE_IDS.filter((r) => RESOURCE_STORAGE[r] === kind && s.res[r] >= 1).sort((a, c) => s.res[c] - s.res[a]);
+      const goods = RESOURCE_IDS.filter((r) => RESOURCE_STORAGE[r] === kind && inStore(r) >= 1).sort((a, c) => inStore(c) - inStore(a));
       const list = goods
         .slice(0, 8)
-        .map((r) => `<div class="kv store-row"><span>${ICONS[r] ?? ''} ${GOODS[r].name}</span><span>${Math.floor(s.res[r])}</span></div>`)
+        .map((r) => `<div class="kv store-row"><span>${ICONS[r] ?? ''} ${GOODS[r].name}</span><span>${Math.floor(inStore(r))}</span></div>`)
         .join('');
       rows.push(`<div class="needs-h">${kind === 'food' ? 'All granaries' : 'All storehouses'} · ${used} / ${cap}</div>
         <div class="progress"><i style="width:${Math.min(100, (used / Math.max(1, cap)) * 100)}%"></i></div>${list}`);

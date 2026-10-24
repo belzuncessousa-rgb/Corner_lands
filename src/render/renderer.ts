@@ -91,7 +91,8 @@ interface Particle {
 
 const GRASS_VARIANTS = 8;
 /** Seconds the old season's picture takes to fade when a new season begins. */
-const SEASON_FADE = 3;
+/** Seconds the old season's picture takes to fade into the new one. */
+const SEASON_FADE = 6;
 const CHUNK = 16;
 const TREE_VARIANTS = 6;
 
@@ -274,6 +275,9 @@ export class Renderer {
     for (const b of s.buildings) this.byId.set(b.id, b);
     const c = this.ctx;
     const season = seasonOf(s.day);
+    // Through the second half of late autumn the trees drop their leaves and the roofs whiten one by one.
+    const lateAutumn = monthOf(s.day) === 8 ? ((s.day % DAYS_PER_MONTH) + this.dayFrac) / DAYS_PER_MONTH : 0;
+    this.winterIn = Math.max(0, Math.min(1, (lateAutumn - 0.3) / 0.7));
     const z = this.cam.zoom;
     HERALDRY.current = s.heraldry ?? DEFAULT_HERALDRY;
     this.lordLook = s.lord ?? DEFAULT_LORD;
@@ -1435,7 +1439,17 @@ export class Renderer {
   /** Orchard tiles visible this frame, drawn as fruit trees. */
   private orchardTiles = new Map<number, Building>();
 
+  /** How far late autumn has turned towards winter (0-1), for things that turn one by one. */
+  private winterIn = 0;
+
+  /** A thing's own season: in late autumn some have turned to winter already, each on its own day. */
+  private ownSeason(key: number, season: Season): Season {
+    if (!this.winterIn) return season;
+    return ((Math.imul(key, 2654435761) >>> 0) / 4294967296 < this.winterIn ? 3 : season) as Season;
+  }
+
   private drawTileObjects(s: GameState, i: number, season: Season): void {
+    season = this.ownSeason(i, season);
     const x = i % s.width;
     const y = (i - x) / s.width;
     const stall = this.stallTiles.get(i);
@@ -1604,6 +1618,7 @@ export class Renderer {
   }
 
   private drawBuilding(s: GameState, b: Building, season: Season, selected: boolean): void {
+    season = this.ownSeason(b.id * 7919 + 13, season);
     // A mill that ground grain lately turns its sails (drawn live, not in the picture).
     const turning = b.type === 'windmill' && b.build >= 1 && !this.light && b.workers > 0 && !b.paused && (b.output > 0 || b.lastOutput > 0);
     const look = variantOf(s, b);
@@ -4510,20 +4525,38 @@ export class Renderer {
         f.x = Math.random() * this.width;
       }
     };
-    if (season === 3) {
-      if (this.snow.length < 220) {
+    // Late autumn: the first flakes come halfway through the month and thicken towards winter, as the leaves thin.
+    const month = monthOf(s.day);
+    const into = ((s.day % DAYS_PER_MONTH) + this.dayFrac) / DAYS_PER_MONTH;
+    const firstSnow = month === 8 ? Math.max(0, Math.min(1, (into - 0.4) / 0.6)) : 0;
+    if (season === 3 || firstSnow > 0) {
+      if (this.snow.length < 220 || this.snowKind !== 'snow') {
+        this.snow = [];
+        this.snowKind = 'snow';
         for (let k = 0; k < 220; k++) this.snow.push({ x: Math.random() * this.width, y: Math.random() * this.height, s: 0.5 + Math.random() });
       }
-      c.fillStyle = 'rgba(255,255,255,0.85)';
-      for (const f of this.snow) {
-        f.y += (20 + f.s * 25) * dt;
-        f.x += Math.sin(t + f.s * 10) * 10 * dt;
+      const flakes = season === 3 ? 220 : Math.round(220 * 0.7 * firstSnow);
+      // The last leaves still falling among the first flakes, from the far end of the list.
+      const leaves = season === 3 ? 0 : Math.round(30 * (1 - firstSnow));
+      this.snow.forEach((f, k) => {
+        const leaf = k >= this.snow.length - leaves;
+        if (k >= flakes && !leaf) return;
+        f.y += (leaf ? 14 + f.s * 6 : 20 + f.s * 25) * dt;
+        f.x += Math.sin((leaf ? t * 1.5 : t) + f.s * 10) * (leaf ? 20 : 10) * dt;
         wrap(f);
-        c.fillRect(f.x, f.y, 1.2 + f.s, 1.2 + f.s);
-      }
+        if (leaf) {
+          c.fillStyle = f.s < 1 ? 'rgba(200,120,40,0.8)' : 'rgba(220,170,60,0.8)';
+          c.fillRect(f.x, f.y, 3, 2);
+        } else {
+          c.fillStyle = 'rgba(255,255,255,0.85)';
+          c.fillRect(f.x, f.y, 1.2 + f.s, 1.2 + f.s);
+        }
+      });
     } else if (season === 2) {
       // A few falling leaves.
-      if (this.snow.length < 40) {
+      if (this.snow.length < 40 || this.snowKind !== 'leaves') {
+        this.snow = [];
+        this.snowKind = 'leaves';
         for (let k = 0; k < 40; k++) this.snow.push({ x: Math.random() * this.width, y: Math.random() * this.height, s: Math.random() });
       }
       for (const f of this.snow.slice(0, 40)) {
@@ -4539,6 +4572,8 @@ export class Renderer {
     this.drawRain(s, season, dt, wrap);
   }
 
+  /** What the falling specks are now: snowflakes or leaves. */
+  private snowKind: 'snow' | 'leaves' = 'snow';
   private rain: { x: number; y: number; s: number }[] = [];
   /** How heavy the shower is now, easing towards today's weather. */
   rainLevel = 0;

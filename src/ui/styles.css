@@ -2646,16 +2646,17 @@ button.plaque-btn.small {
   flex: 1;
   opacity: 0.85;
 }
+/* Every tab the same width, whatever its name; on a narrow screen they wrap, still even. */
 .lb-tabs {
-  display: flex;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 6px;
-  flex-wrap: wrap;
   margin-bottom: 6px;
 }
 .lb-tab {
   position: relative;
   padding: 5px 12px;
+  white-space: nowrap;
   border-radius: 6px 6px 0 0;
 }
 .lb-tab.active {

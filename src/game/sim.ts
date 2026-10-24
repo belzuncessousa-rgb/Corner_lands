@@ -120,6 +120,14 @@ export function siloHeld(s: GameState): number {
   return Math.min(cap, n);
 }
 
+/** How much of one grain the silos hold: the space shared out by how much of each there is. */
+export function siloShare(s: GameState, id: ResourceId): number {
+  if (!SILO_GOODS.includes(id)) return 0;
+  let all = 0;
+  for (const r of SILO_GOODS) all += s.res[r];
+  return all > 0 ? (siloHeld(s) * s.res[id]) / all : 0;
+}
+
 /** Free space left for a resource's storage pool (Infinity for gold). */
 export function roomFor(s: GameState, id: ResourceId): number {
   const kind = RESOURCE_STORAGE[id];
@@ -2947,7 +2955,9 @@ function unloadBarn(s: GameState, b: Building): void {
   for (const k in b.barn) {
     const id = k as ResourceId;
     const kind = RESOURCE_STORAGE[id];
-    const spare = kind ? roomFor(s, id) - storageCap(s, kind) * BARN_HEADROOM : budget;
+    // The headroom keeps the granaries and storehouses some space for fresh goods; a silo's room is all for grain.
+    const silo = SILO_GOODS.includes(id) ? siloCap(s) - siloHeld(s) : 0;
+    const spare = kind ? silo + Math.max(0, roomFor(s, id) - silo - storageCap(s, kind) * BARN_HEADROOM) : budget;
     const moved = store(s, id, Math.max(0, Math.min(budget, b.barn[id] ?? 0, Math.floor(spare))));
     b.barn[id] = (b.barn[id] ?? 0) - moved;
     budget -= moved;
