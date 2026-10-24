@@ -3063,6 +3063,7 @@ button.finga-help svg {
   #veil span {
     animation: none;
   }
+}
 /* The steward's tabs down the left edge: red for trouble, yellow for tutorial tips. */
 #alerts {
   position: absolute;
