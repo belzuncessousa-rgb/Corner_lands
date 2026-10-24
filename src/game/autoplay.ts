@@ -469,9 +469,17 @@ function renovate(s: GameState): void {
   }
   // The church in stone (a Borough needs it) and the alehouse into a tavern.
   for (const b of s.buildings) {
-    if ((b.type !== 'church' && b.type !== 'tavern') || upgradeBlocker(s, b)) continue;
-    const p = upgradePlan(s, b)!;
-    if (affordsWithPromises(s, p.cost)) startUpgrade(s, b);
+    if (b.type !== 'church' && b.type !== 'tavern') continue;
+    const p = upgradePlan(s, b);
+    // Short only of materials: buy them from the merchants (roof tiles where no clay is dug).
+    if (p && !b.upgrading && p.reqs.every((r) => r.met) && hasTrade(s) && s.res.gold > (p.cost.gold ?? 0) + 60)
+      for (const k in p.cost) {
+        const id = k as ResourceId;
+        const short = id === 'gold' || id === 'prestige' ? 0 : (p.cost[id] ?? 0) - s.res[id];
+        if (short > 0) trade(s, id, Math.min(short, roomFor(s, id)));
+      }
+    if (upgradeBlocker(s, b)) continue;
+    if (affordsWithPromises(s, p!.cost)) startUpgrade(s, b);
   }
   // Improvements the town has learned, onto the workplaces that can take them.
   if (s.day % DAYS_PER_MONTH === 15 && s.res.gold > 80) {
@@ -677,9 +685,10 @@ export function act(s: GameState, rand: () => number): void {
     if (count(s, 'smithy') < 1) wants.push('smithy');
     if (count(s, 'church') < 1) wants.push('church');
     if (pop >= 60 && count(s, 'tanner') < 1) wants.push('tanner');
-    if (count(s, 'mine') > 0 && count(s, 'bloomery') < 1) wants.push('bloomery');
-    if (count(s, 'claypit') < 1) wants.push('claypit');
-    if (count(s, 'claypit') > 0 && count(s, 'kiln') < 1) wants.push('kiln');
+    // The missing link of a chain comes first: ore with no bloomery, clay with no kiln.
+    if (count(s, 'mine') > 0 && count(s, 'bloomery') < 1) wants.unshift('bloomery');
+    if (count(s, 'claypit') < 1) wants.unshift('claypit');
+    if (count(s, 'claypit') > 0 && count(s, 'kiln') < 1) wants.unshift('kiln');
   }
   if (s.tier >= 2 && count(s, 'tavern') < 1 + Math.floor(pop / 70)) wants.push('tavern');
   // Many idle hands: more workshops wherever their inputs are to hand; the
