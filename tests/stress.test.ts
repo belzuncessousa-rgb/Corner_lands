@@ -26,6 +26,7 @@ import {
   setYard,
   stepDay,
   storageCap,
+  totalHousing,
   store,
   stored,
   trade,
@@ -245,7 +246,8 @@ describe('stress', () => {
       const bad = invariants(s);
       expect(bad, `day ${s.day}`).toBeNull();
     }
-    expect(s.population).toBeGreaterThanOrEqual(pop);
+    // The town keeps going: as full as its homes allow (older saves house fewer since homes shrank), up to where it began.
+    expect(s.population).toBeGreaterThanOrEqual(Math.min(pop, totalHousing(s)));
   });
 
   it.runIf(process.env.STRESS)('thirty years: nothing drifts or piles up', { timeout: 1800000 }, () => {

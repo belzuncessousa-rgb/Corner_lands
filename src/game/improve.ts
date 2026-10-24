@@ -28,14 +28,14 @@ export interface Improvement {
 export const IMPROVEMENTS: Improvement[] = [
   // ------------------------------------------------ upgrades
   { id: 'biglodge', name: "Large woodcutter's lodge", kind: 'upgrade', of: ['woodcutter'], desc: 'Two more places for woodcutters.', cost: { wood: 6 }, days: 6, places: 2 },
-  { id: 'towermill', name: 'Tower mill', kind: 'upgrade', of: ['windmill'], desc: 'Four grain make five flour.', cost: { stone: 8, woodparts: 4, tiles: 4 }, days: 12 },
+  { id: 'towermill', name: 'Tower mill', kind: 'upgrade', of: ['windmill'], desc: 'A quarter more flour from the same grain.', cost: { stone: 8, woodparts: 4, tiles: 4 }, days: 12 },
   { id: 'secondcopper', name: "Brewer's second copper", kind: 'upgrade', of: ['brewhouse'], desc: 'Brews two drinks at once.', cost: { planks: 6, stone: 4 }, days: 8 },
   { id: 'animalsheds', name: 'Animal sheds', kind: 'upgrade', of: ['pasture'], desc: 'This pasture carries 15% more animals.', cost: { planks: 10 }, days: 8 },
-  { id: 'cheesecellar', name: 'Cheese cellar', kind: 'upgrade', of: ['dairy'], desc: 'Two milk make two cheese (three before).', cost: { stone: 6, tiles: 2 }, days: 8 },
+  { id: 'cheesecellar', name: 'Cheese cellar', kind: 'upgrade', of: ['dairy'], desc: 'A third less milk for the same cheese.', cost: { stone: 6, tiles: 2 }, days: 8 },
   { id: 'fishingboat', name: 'Fishing boat', kind: 'upgrade', of: ['fisher'], desc: 'One more place, out on deeper water.', cost: { planks: 6, woodparts: 2 }, days: 6, upkeep: { woodparts: 1 }, places: 1 },
-  { id: 'broadloom', name: 'Broadloom', kind: 'upgrade', of: ['weaver'], desc: 'Two wool or three flax make three cloth (two before).', cost: { planks: 6, woodparts: 4 }, days: 8, upkeep: { woodparts: 1 } },
-  { id: 'crownglass', name: 'Crown glass', kind: 'upgrade', of: ['glassworks'], desc: 'Each melt makes two glass.', cost: { stone: 8, tools: 4 }, days: 12 },
-  { id: 'secondvat', name: 'Second vat', kind: 'upgrade', of: ['papermill'], desc: 'One flax makes two paper.', cost: { planks: 6, woodparts: 2 }, days: 8 },
+  { id: 'broadloom', name: 'Broadloom', kind: 'upgrade', of: ['weaver'], desc: 'Half as much cloth again from the same wool or flax.', cost: { planks: 6, woodparts: 4 }, days: 8, upkeep: { woodparts: 1 } },
+  { id: 'crownglass', name: 'Crown glass', kind: 'upgrade', of: ['glassworks'], desc: 'Each melt makes half as much glass again.', cost: { stone: 8, tools: 4 }, days: 12 },
+  { id: 'secondvat', name: 'Second vat', kind: 'upgrade', of: ['papermill'], desc: 'Half as much paper again from the same flax.', cost: { planks: 6, woodparts: 2 }, days: 8 },
   { id: 'masonslodge', name: "Mason's lodge", kind: 'upgrade', of: ['stonemason'], desc: 'The masons help raise Great Works in reach: a fifth faster.', cost: { dressedstone: 2, tiles: 2 }, days: 8 },
   { id: 'loft', name: 'Loft', kind: 'upgrade', of: ['storehouse', 'granary'], desc: 'Holds half as much again.', cost: { planks: 6 }, days: 6 },
   { id: 'bigstore', name: 'Improved store', kind: 'upgrade', of: ['storehouse', 'granary'], desc: 'Holds twice as much as at first, and two more haulers.', cost: { stone: 6, planks: 6 }, days: 10, after: 'loft', places: 2 },
@@ -45,7 +45,7 @@ export const IMPROVEMENTS: Improvement[] = [
   { id: 'bigstable', name: 'Expanded draught stable', kind: 'upgrade', of: ['draughtstable'], desc: 'Six stalls instead of three.', cost: { wood: 4, planks: 6 }, days: 8 },
   // ------------------------------------------------ extensions
   { id: 'oxshed', name: 'Ox tool-shed', kind: 'extension', of: ['woodcutter'], desc: 'An ox (bought for it, kept in a Draught Stable) drags the logs: half the walking.', cost: { wood: 2, planks: 2, tiles: 1 }, days: 4, upkeep: { tools: 0.5 } },
-  { id: 'lathe', name: 'Lathe', kind: 'extension', of: ['carpenter'], desc: 'Wood parts from two planks instead of three.', cost: { planks: 4, tools: 2, tiles: 1 }, days: 6, upkeep: { tools: 1 } },
+  { id: 'lathe', name: 'Lathe', kind: 'extension', of: ['carpenter'], desc: 'Wood parts from a third fewer planks.', cost: { planks: 4, tools: 2, tiles: 1 }, days: 6, upkeep: { tools: 1 } },
   { id: 'nursery', name: 'Tree nursery', kind: 'extension', of: ['forester'], desc: 'Saplings for the orchards: those in reach bear a season sooner.', cost: { wood: 4, planks: 2 }, days: 4 },
   { id: 'crane', name: 'Quarry crane', kind: 'extension', of: ['quarry'], desc: 'One more place, and one stone in five comes out ready-dressed.', cost: { planks: 4, woodparts: 2 }, days: 6, upkeep: { woodparts: 1 }, places: 1 },
   { id: 'firingchamber', name: 'Second firing chamber', kind: 'extension', of: ['kiln'], desc: 'Tiles on half the fuel.', cost: { stone: 6, tiles: 2 }, days: 6 },
@@ -105,12 +105,13 @@ export function improvedRecipe(b: Building, inputs: Goods, outputs: Goods): { in
   if (!b.improved?.length) return { inputs, outputs };
   const i = { ...inputs };
   const o = { ...outputs };
-  if (has(b, 'towermill') && o.flour) o.flour += 1;
-  if (has(b, 'cheesecellar') && i.milk) i.milk = 2;
-  if (has(b, 'broadloom') && o.cloth) o.cloth = 3;
-  if (has(b, 'crownglass') && o.glass) o.glass *= 2;
-  if (has(b, 'secondvat') && o.paper && i.flax) o.paper = i.flax * 2;
-  if (has(b, 'lathe') && o.woodparts && i.planks) i.planks = 2;
+  // Each scales the batch it improves, so the recipes can be retuned without breaking it.
+  if (has(b, 'towermill') && o.flour) o.flour = Math.round(o.flour * 1.25);
+  if (has(b, 'cheesecellar') && i.milk) i.milk = Math.round((i.milk * 2) / 3);
+  if (has(b, 'broadloom') && o.cloth) o.cloth = Math.round(o.cloth * 1.5);
+  if (has(b, 'crownglass') && o.glass) o.glass = Math.round(o.glass * 1.5);
+  if (has(b, 'secondvat') && o.paper) o.paper = Math.round(o.paper * 1.5);
+  if (has(b, 'lathe') && o.woodparts && i.planks) i.planks = Math.round((i.planks * 2) / 3);
   return { inputs: i as never, outputs: o as never };
 }
 
