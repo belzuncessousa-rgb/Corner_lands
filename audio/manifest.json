@@ -1,0 +1,922 @@
+{
+ "sounds": {
+  "birds": {
+   "file": "audio/birds.mp3",
+   "kind": "bed",
+   "duration": 30.04
+  },
+  "meadow": {
+   "file": "audio/meadow.mp3",
+   "kind": "bed",
+   "duration": 145.53
+  },
+  "forest": {
+   "file": "audio/forest.mp3",
+   "kind": "bed",
+   "duration": 27.09
+  },
+  "river": {
+   "file": "audio/river.mp3",
+   "kind": "bed",
+   "duration": 10.03
+  },
+  "lightrain": {
+   "file": "audio/lightrain.mp3",
+   "kind": "bed",
+   "duration": 150.05
+  },
+  "rain": {
+   "file": "audio/rain.mp3",
+   "kind": "bed",
+   "duration": 146.78
+  },
+  "wind": {
+   "file": "audio/wind.mp3",
+   "kind": "bed",
+   "duration": 85.45
+  },
+  "autumnwind": {
+   "file": "audio/autumnwind.mp3",
+   "kind": "bed",
+   "duration": 42.95
+  },
+  "snowstorm": {
+   "file": "audio/snowstorm.mp3",
+   "kind": "bed",
+   "duration": 150.05
+  },
+  "crickets": {
+   "file": "audio/crickets.mp3",
+   "kind": "bed",
+   "duration": 82.55
+  },
+  "owl": {
+   "file": "audio/owl.mp3",
+   "kind": "call",
+   "duration": 4.44,
+   "busy": [
+    [
+     0,
+     1.5
+    ],
+    [
+     2.5,
+     4.25
+    ]
+   ]
+  },
+  "frogs": {
+   "file": "audio/frogs.mp3",
+   "kind": "call",
+   "duration": 39.86,
+   "busy": [
+    [
+     0.5,
+     1.5
+    ],
+    [
+     2,
+     3
+    ],
+    [
+     4.75,
+     6.25
+    ],
+    [
+     11,
+     13.75
+    ],
+    [
+     19.75,
+     20.75
+    ],
+    [
+     21,
+     23.75
+    ],
+    [
+     34,
+     35.5
+    ]
+   ]
+  },
+  "village": {
+   "file": "audio/village.mp3",
+   "kind": "bed",
+   "duration": 150.05
+  },
+  "residential": {
+   "file": "audio/residential.mp3",
+   "kind": "bed",
+   "duration": 40.41
+  },
+  "footsteps": {
+   "file": "audio/footsteps.mp3",
+   "kind": "bed",
+   "duration": 35.03
+  },
+  "tavern": {
+   "file": "audio/tavern.mp3",
+   "kind": "bed",
+   "duration": 61.05
+  },
+  "market": {
+   "file": "audio/market.mp3",
+   "kind": "bed",
+   "duration": 9.64
+  },
+  "street": {
+   "file": "audio/street.mp3",
+   "kind": "bed",
+   "duration": 71.63
+  },
+  "bees": {
+   "file": "audio/bees.mp3",
+   "kind": "bed",
+   "duration": 67.03
+  },
+  "smithy": {
+   "file": "audio/smithy.mp3",
+   "kind": "bed",
+   "duration": 130.06
+  },
+  "stone": {
+   "file": "audio/stone.mp3",
+   "kind": "bed",
+   "duration": 26.15
+  },
+  "building": {
+   "file": "audio/building.mp3",
+   "kind": "bed",
+   "duration": 13.37
+  },
+  "watermill": {
+   "file": "audio/watermill.mp3",
+   "kind": "bed",
+   "duration": 111.67
+  },
+  "sawing": {
+   "file": "audio/sawing.mp3",
+   "kind": "call",
+   "duration": 87.01,
+   "busy": [
+    [
+     6.5,
+     8
+    ],
+    [
+     8.25,
+     17
+    ],
+    [
+     17.25,
+     19.25
+    ],
+    [
+     19.75,
+     22.5
+    ],
+    [
+     22.25,
+     23.5
+    ],
+    [
+     26,
+     27.25
+    ],
+    [
+     27,
+     28
+    ],
+    [
+     27.75,
+     29
+    ],
+    [
+     28.75,
+     29.75
+    ],
+    [
+     31.5,
+     36
+    ],
+    [
+     36.25,
+     40.5
+    ],
+    [
+     40.5,
+     42.5
+    ],
+    [
+     42.25,
+     43.25
+    ],
+    [
+     43,
+     44
+    ],
+    [
+     53.75,
+     54.75
+    ],
+    [
+     56,
+     57.75
+    ],
+    [
+     58.25,
+     61.75
+    ],
+    [
+     63.5,
+     64.75
+    ],
+    [
+     66,
+     70.75
+    ],
+    [
+     70.75,
+     72
+    ],
+    [
+     71.75,
+     73.75
+    ],
+    [
+     75.25,
+     77.5
+    ],
+    [
+     77.25,
+     79.5
+    ]
+   ]
+  },
+  "woodmill": {
+   "file": "audio/woodmill.mp3",
+   "kind": "call",
+   "duration": 20.69,
+   "busy": [
+    [
+     3,
+     4
+    ],
+    [
+     6.25,
+     7.25
+    ],
+    [
+     7.75,
+     9
+    ],
+    [
+     9.5,
+     10.5
+    ],
+    [
+     10.75,
+     16
+    ],
+    [
+     16.5,
+     18.75
+    ],
+    [
+     19.75,
+     20.5
+    ]
+   ]
+  },
+  "treefall": {
+   "file": "audio/treefall.mp3",
+   "kind": "call",
+   "duration": 8.02,
+   "busy": [
+    [
+     0,
+     5.75
+    ]
+   ]
+  },
+  "bells": {
+   "file": "audio/bells.mp3",
+   "kind": "call",
+   "duration": 25.29,
+   "busy": [
+    [
+     0,
+     25
+    ]
+   ]
+  },
+  "sheep": {
+   "file": "audio/sheep.mp3",
+   "kind": "call",
+   "duration": 30.22,
+   "busy": [
+    [
+     1,
+     2.75
+    ],
+    [
+     5.75,
+     7.25
+    ],
+    [
+     12.75,
+     14
+    ],
+    [
+     21.25,
+     23
+    ],
+    [
+     28.5,
+     30
+    ]
+   ]
+  },
+  "cattle": {
+   "file": "audio/cattle.mp3",
+   "kind": "call",
+   "duration": 60.03,
+   "busy": [
+    [
+     0,
+     2.75
+    ],
+    [
+     3,
+     8.25
+    ],
+    [
+     8.25,
+     10.5
+    ],
+    [
+     10.5,
+     14
+    ],
+    [
+     14.25,
+     16.75
+    ],
+    [
+     16.75,
+     17.75
+    ],
+    [
+     18,
+     23.75
+    ],
+    [
+     23.5,
+     24.5
+    ],
+    [
+     24.75,
+     26.75
+    ],
+    [
+     26.5,
+     27.75
+    ],
+    [
+     27.75,
+     45.5
+    ],
+    [
+     45.5,
+     46.75
+    ],
+    [
+     46.5,
+     60
+    ]
+   ]
+  },
+  "cattle2": {
+   "file": "audio/cattle2.mp3",
+   "kind": "call",
+   "duration": 10.87,
+   "busy": [
+    [
+     0,
+     9.5
+    ],
+    [
+     9.25,
+     10.75
+    ]
+   ]
+  },
+  "goats": {
+   "file": "audio/goats.mp3",
+   "kind": "call",
+   "duration": 37.98,
+   "busy": [
+    [
+     0,
+     37.75
+    ]
+   ]
+  },
+  "pigs": {
+   "file": "audio/pigs.mp3",
+   "kind": "call",
+   "duration": 2.04,
+   "busy": [
+    [
+     0.5,
+     1.5
+    ]
+   ]
+  },
+  "hens": {
+   "file": "audio/hens.mp3",
+   "kind": "call",
+   "duration": 37.09,
+   "busy": [
+    [
+     2,
+     3
+    ],
+    [
+     3.75,
+     5
+    ],
+    [
+     4.75,
+     6
+    ],
+    [
+     5.75,
+     6.75
+    ],
+    [
+     10.25,
+     11.75
+    ],
+    [
+     21.25,
+     24
+    ],
+    [
+     32.5,
+     35
+    ]
+   ]
+  },
+  "hens2": {
+   "file": "audio/hens2.mp3",
+   "kind": "call",
+   "duration": 14.99,
+   "busy": [
+    [
+     1,
+     2
+    ],
+    [
+     2.5,
+     3.5
+    ],
+    [
+     4.5,
+     5.5
+    ],
+    [
+     6.75,
+     8.25
+    ],
+    [
+     14,
+     14.75
+    ]
+   ]
+  },
+  "rooster": {
+   "file": "audio/rooster.mp3",
+   "kind": "call",
+   "duration": 6.06,
+   "busy": [
+    [
+     0,
+     6
+    ]
+   ]
+  },
+  "ducks": {
+   "file": "audio/ducks.mp3",
+   "kind": "call",
+   "duration": 6.45,
+   "busy": [
+    [
+     0,
+     1.5
+    ],
+    [
+     5.5,
+     6.25
+    ]
+   ]
+  },
+  "dogs": {
+   "file": "audio/dogs.mp3",
+   "kind": "call",
+   "duration": 18.81,
+   "busy": [
+    [
+     0.25,
+     1.5
+    ],
+    [
+     2.5,
+     3.75
+    ],
+    [
+     4.75,
+     5.75
+    ],
+    [
+     6.75,
+     7.75
+    ],
+    [
+     8.75,
+     9.75
+    ],
+    [
+     13.25,
+     14.5
+    ],
+    [
+     16.5,
+     17.75
+    ]
+   ]
+  },
+  "dogs2": {
+   "file": "audio/dogs2.mp3",
+   "kind": "call",
+   "duration": 20.3,
+   "busy": [
+    [
+     0.5,
+     1.5
+    ],
+    [
+     1.75,
+     2.75
+    ],
+    [
+     4.75,
+     5.75
+    ],
+    [
+     6,
+     7.25
+    ],
+    [
+     8.25,
+     10
+    ],
+    [
+     11.25,
+     12.25
+    ],
+    [
+     12.5,
+     13.5
+    ],
+    [
+     15.25,
+     16.75
+    ]
+   ]
+  },
+  "chop": {
+   "file": "audio/chop.mp3",
+   "kind": "ui",
+   "duration": 0.6
+  },
+  "coins": {
+   "file": "audio/coins.mp3",
+   "kind": "ui",
+   "duration": 1.2
+  },
+  "demolish": {
+   "file": "audio/demolish.mp3",
+   "kind": "ui",
+   "duration": 1.62
+  },
+  "click": {
+   "file": "audio/click.mp3",
+   "kind": "ui",
+   "duration": 0.13
+  },
+  "back": {
+   "file": "audio/back.mp3",
+   "kind": "ui",
+   "duration": 0.55
+  },
+  "open": {
+   "file": "audio/open.mp3",
+   "kind": "ui",
+   "duration": 1.1
+  },
+  "charters": {
+   "file": "audio/charters.mp3",
+   "kind": "ui",
+   "duration": 2.64
+  },
+  "open-smithy": {
+   "file": "audio/open-smithy.mp3",
+   "kind": "ui",
+   "duration": 2.51
+  },
+  "open-stone": {
+   "file": "audio/open-stone.mp3",
+   "kind": "ui",
+   "duration": 2.25
+  },
+  "open-saw": {
+   "file": "audio/open-saw.mp3",
+   "kind": "ui",
+   "duration": 2.53
+  },
+  "open-watermill": {
+   "file": "audio/open-watermill.mp3",
+   "kind": "ui",
+   "duration": 3.03
+  },
+  "open-woodcutter": {
+   "file": "audio/open-woodcutter.mp3",
+   "kind": "ui",
+   "duration": 2.53
+  },
+  "open-tavern": {
+   "file": "audio/open-tavern.mp3",
+   "kind": "ui",
+   "duration": 3
+  },
+  "open-market": {
+   "file": "audio/open-market.mp3",
+   "kind": "ui",
+   "duration": 3.03
+  },
+  "open-home": {
+   "file": "audio/open-home.mp3",
+   "kind": "ui",
+   "duration": 2.51
+  },
+  "open-bees": {
+   "file": "audio/open-bees.mp3",
+   "kind": "ui",
+   "duration": 2.51
+  },
+  "open-church": {
+   "file": "audio/open-church.mp3",
+   "kind": "ui",
+   "duration": 3.53
+  },
+  "open-farm": {
+   "file": "audio/open-farm.mp3",
+   "kind": "ui",
+   "duration": 2.53
+  },
+  "open-hens": {
+   "file": "audio/open-hens.mp3",
+   "kind": "ui",
+   "duration": 2.51
+  },
+  "open-cattle": {
+   "file": "audio/open-cattle.mp3",
+   "kind": "ui",
+   "duration": 2.51
+  },
+  "open-building": {
+   "file": "audio/open-building.mp3",
+   "kind": "ui",
+   "duration": 2.3
+  }
+ },
+ "music": [
+  {
+   "file": "audio/music/teller-of-the-tales.mp3",
+   "title": "Teller of the Tales",
+   "by": "Kevin MacLeod",
+   "source": "https://incompetech.com",
+   "licence": "CC BY 4.0",
+   "mood": "menu",
+   "duration": 212
+  },
+  {
+   "file": "audio/music/angevin.mp3",
+   "title": "Angevin",
+   "by": "Kevin MacLeod",
+   "source": "https://incompetech.com",
+   "licence": "CC BY 4.0",
+   "mood": "autumn",
+   "duration": 281
+  },
+  {
+   "file": "audio/music/woodland-fantasy.mp3",
+   "title": "Woodland Fantasy",
+   "by": "Matthew Pablo",
+   "source": "https://opengameart.org/content/woodland-fantasy",
+   "licence": "CC BY 3.0",
+   "mood": "day",
+   "duration": 150
+  },
+  {
+   "file": "audio/music/village-ambiance.mp3",
+   "title": "Village Ambiance",
+   "by": "Alexander Nakarada (CreatorChords)",
+   "source": "https://creatorchords.com",
+   "licence": "CC BY 4.0",
+   "mood": "day",
+   "duration": 118
+  },
+  {
+   "file": "audio/music/wintersong.mp3",
+   "title": "Wintersong",
+   "by": "Alexander Nakarada (CreatorChords)",
+   "source": "https://creatorchords.com",
+   "licence": "CC BY 4.0",
+   "mood": "winter",
+   "duration": 158
+  },
+  {
+   "file": "audio/music/winter-night.mp3",
+   "title": "Winter Night",
+   "by": "Alexander Nakarada (CreatorChords)",
+   "source": "https://creatorchords.com",
+   "licence": "CC BY-SA 4.0",
+   "mood": "winter",
+   "duration": 212
+  },
+  {
+   "file": "audio/music/the-medieval-banquet.mp3",
+   "title": "The Medieval Banquet",
+   "by": "Shane Ivers",
+   "source": "https://www.silvermansound.com",
+   "licence": "CC BY 4.0",
+   "mood": "festival",
+   "duration": 112
+  },
+  {
+   "file": "audio/music/marais-pieces-en-trio.mp3",
+   "title": "Marais, Suite No. 3 from Pièces en trio (1692)",
+   "by": "New Comma Baroque (Matthew C. Cataldi, Leighann Daihl, Phillip W. Serna, Emily J. Morlan)",
+   "source": "https://commons.wikimedia.org/wiki/File:Marin_Marais_(1656-1728)_-_Excerpts_from_Suite_No.3_from_Pieces_en_trio_pour_les_flutes,_violon,_et_dessus_de_viole_(1692).ogg",
+   "licence": "CC BY-SA 3.0",
+   "mood": "day",
+   "duration": 718
+  },
+  {
+   "file": "audio/music/dowland-whitehead-almand.mp3",
+   "title": "Dowland, M. George Whitehead his Almand",
+   "by": "Phillip W. Serna, viols",
+   "source": "https://commons.wikimedia.org/wiki/File:John_Dowland_(1563-1626)_-_M._George_Whitehead_His_Almand,_Lachrimae,_No.21_for_Treble,_Tenor_%26_Bass_Viols_with_Great_Bass_Violone_in_G_1604.ogg",
+   "licence": "CC BY-SA 4.0",
+   "mood": "day",
+   "duration": 72
+  },
+  {
+   "file": "audio/music/chopin-nocturne-op32-1.mp3",
+   "title": "Chopin, Nocturne Op. 32 No. 1",
+   "by": "Constantin Stephan",
+   "source": "https://commons.wikimedia.org/wiki/File:Chopin,_Nocturne_op_32_no_1.ogg",
+   "licence": "CC BY-SA 4.0",
+   "mood": "winter",
+   "duration": 283
+  },
+  {
+   "file": "audio/music/o-frondens.mp3",
+   "title": "Hildegard von Bingen, O frondens",
+   "by": "Magdalen Kadel",
+   "source": "https://commons.wikimedia.org/wiki/File:O_frondens.ogg",
+   "licence": "CC BY-SA 3.0",
+   "mood": "winter",
+   "duration": 118
+  },
+  {
+   "file": "audio/music/harvest-season.mp3",
+   "title": "Harvest Season",
+   "by": "",
+   "source": "",
+   "licence": "",
+   "mood": "autumn",
+   "duration": 214
+  },
+  {
+   "file": "audio/music/peaceful-town.mp3",
+   "title": "Peaceful Town",
+   "by": "",
+   "source": "",
+   "licence": "",
+   "mood": "day",
+   "duration": 119
+  },
+  {
+   "file": "audio/music/town-theme.mp3",
+   "title": "Town",
+   "by": "",
+   "source": "",
+   "licence": "",
+   "mood": "day",
+   "duration": 97
+  },
+  {
+   "file": "audio/music/celebrations.mp3",
+   "title": "Celebrations",
+   "by": "",
+   "source": "",
+   "licence": "",
+   "mood": "festival",
+   "duration": 140
+  },
+  {
+   "file": "audio/music/alkakrab-knight-in-a-tavern.mp3",
+   "title": "Knight In A Tavern",
+   "by": "alkakrab",
+   "source": "https://alkakrab04.wixsite.com/alkakrab-game-music",
+   "licence": "alkakrab licence",
+   "private": true,
+   "mood": "festival",
+   "duration": 188
+  },
+  {
+   "file": "audio/music/alkakrab-drunken-king.mp3",
+   "title": "Drunken King",
+   "by": "alkakrab",
+   "source": "https://alkakrab04.wixsite.com/alkakrab-game-music",
+   "licence": "alkakrab licence",
+   "private": true,
+   "mood": "festival",
+   "duration": 169
+  },
+  {
+   "file": "audio/music/alkakrab-morning-in-a-castle.mp3",
+   "title": "Morning In A Castle",
+   "by": "alkakrab",
+   "source": "https://alkakrab04.wixsite.com/alkakrab-game-music",
+   "licence": "alkakrab licence",
+   "private": true,
+   "mood": "day",
+   "duration": 200
+  },
+  {
+   "file": "audio/music/alkakrab-hunters-in-the-forest.mp3",
+   "title": "Hunters In The Forest",
+   "by": "alkakrab",
+   "source": "https://alkakrab04.wixsite.com/alkakrab-game-music",
+   "licence": "alkakrab licence",
+   "private": true,
+   "mood": "autumn",
+   "duration": 224
+  },
+  {
+   "file": "audio/music/alkakrab-sacred-rivers.mp3",
+   "title": "Sacred Rivers",
+   "by": "alkakrab",
+   "source": "https://alkakrab04.wixsite.com/alkakrab-game-music",
+   "licence": "alkakrab licence",
+   "private": true,
+   "mood": "day",
+   "duration": 221
+  },
+  {
+   "file": "audio/music/alkakrab-tournier-of-the-knights.mp3",
+   "title": "Tournier Of The Knights",
+   "by": "alkakrab",
+   "source": "https://alkakrab04.wixsite.com/alkakrab-game-music",
+   "licence": "alkakrab licence",
+   "private": true,
+   "mood": "festival",
+   "duration": 199
+  },
+  {
+   "file": "audio/music/alkakrab-midnight-walk.mp3",
+   "title": "Midnight Walk",
+   "by": "alkakrab",
+   "source": "https://alkakrab04.wixsite.com/alkakrab-game-music",
+   "licence": "alkakrab licence",
+   "private": true,
+   "mood": "winter",
+   "duration": 218
+  },
+  {
+   "file": "audio/music/alkakrab-stranger-in-town.mp3",
+   "title": "Stranger In Town",
+   "by": "alkakrab",
+   "source": "https://alkakrab04.wixsite.com/alkakrab-game-music",
+   "licence": "alkakrab licence",
+   "private": true,
+   "mood": "autumn",
+   "duration": 200
+  }
+ ]
+}
