@@ -387,7 +387,8 @@ function shop(s: GameState): void {
   if (s.res.tools < 6 && s.tier >= 2) buy('tools', 5, 150);
   else if (s.res.tools < 3) buy('tools', 3, 60);
   if (s.res.woodparts < 2) buy('woodparts', 2, 60);
-  if (totalFood(s) < s.population * 2) buy('bread', 20, 80);
+  // Short of food: the cheapest meals the merchants carry.
+  if (totalFood(s) < s.population * 2) buy('fish', 30, 80);
   if (s.res.stone < 30) buy('stone', 20, 120);
   // Finer homes and the tavern use up wares; buy them when our own run short.
   const homes = (lvl: number) => s.buildings.filter((b) => b.type === 'house' && b.level >= lvl).length;
