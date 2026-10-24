@@ -1,6 +1,6 @@
-import { BUILDINGS, DAY_SECONDS, GATHER_REACH, GATHERERS, OFFROAD_TILES_PER_DAY, RESOURCE_STORAGE, ROAD_TILES_PER_DAY, STONE_ROAD_TILES_PER_DAY, COBBLE_TILES_PER_DAY, STORAGE_CAPACITY } from '../game/data';
+import { BUILDINGS, DAY_SECONDS, GATHER_REACH, GATHERERS, OFFROAD_TILES_PER_DAY, RESOURCE_STORAGE, ROAD_TILES_PER_DAY, SILO_GOODS, STONE_ROAD_TILES_PER_DAY, COBBLE_TILES_PER_DAY, STORAGE_CAPACITY } from '../game/data';
 import { findPath, ROYAL_ROAD_PACE, WOODS_SLOWDOWN } from '../game/path';
-import { chooseRecipe, lordRides, nearestShoal, doorTile, forTilesInRadius, bCenter, isWinter, nearestHerd, needsMaterials, seatOf, beastWorks, constructionSites, yardFor } from '../game/sim';
+import { chooseRecipe, lordRides, nearestShoal, doorTile, forTilesInRadius, bCenter, isWinter, nearestHerd, needsMaterials, seatOf, beastWorks, constructionSites, yardFor, siloCap, siloHeld, siloShare } from '../game/sim';
 
 /** The day of each month a merchant cart sets out from the trading post. */
 const CART_DAY = 4;
@@ -605,8 +605,8 @@ export class AgentSystem {
           this.goToSiteEdge(s, a, b, 'drop');
           return;
         }
-        const store = nearestStore(s, b);
         const want = Object.keys(b.need!).find((k) => (b.need![k as ResourceId] ?? 0) > 0 && s.res[k as ResourceId] >= 1) as ResourceId | undefined;
+        const store = nearestStore(s, b, want, true);
         if (store && want) {
           this.exitIfInside(s, a);
           a.want = want;
@@ -728,13 +728,14 @@ export class AgentSystem {
       a.act = '';
       return;
     }
-    const store = nearestStore(s, site);
+    const need = site.need ? (Object.keys(site.need).find((k) => (site.need![k as ResourceId] ?? 0) > 0) as ResourceId | undefined) : undefined;
+    const want: ResourceId = need ?? (Math.random() < 0.5 ? 'planks' : 'stone');
+    const store = nearestStore(s, site, want, true);
     if (!store) {
       rest();
       return;
     }
-    const need = site.need ? (Object.keys(site.need).find((k) => (site.need![k as ResourceId] ?? 0) > 0) as ResourceId | undefined) : undefined;
-    a.want = need ?? (Math.random() < 0.5 ? 'planks' : 'stone');
+    a.want = want;
     const std = doorTile(s, store);
     this.walkTo(s, a, std.x, std.y, [store.id], 'fetch');
   }
@@ -979,7 +980,7 @@ export class AgentSystem {
     const inputs = Object.keys(chooseRecipe(s, b)?.inputs ?? d.inputs ?? {}) as ResourceId[];
     const want = inputs.find((k) => s.res[k] >= 1);
     if (want && b.status !== 'Paused' && Math.random() < 0.35) {
-      const store = nearestStore(s, b);
+      const store = nearestStore(s, b, want, true);
       if (store) {
         this.exitAt(s, a, b);
         a.carry = null;
@@ -1003,11 +1004,12 @@ export class AgentSystem {
     }
     // Where haulers come for the goods, workers leave them in the yard.
     if (!b.hauled && d.outputs && Object.keys(d.outputs).length && Math.random() < 0.5 && b.type !== 'market') {
-      // Deliver goods to the manor hall or a storehouse.
-      const store = nearestStore(s, b);
+      // Deliver goods to the store that keeps them.
+      const carry = goodCarried(s, b);
+      const store = nearestStore(s, b, carry);
       if (store) {
         this.exitAt(s, a, b);
-        a.carry = goodCarried(s, b);
+        a.carry = carry;
         const sd = doorTile(s, store);
         this.walkTo(s, a, sd.x, sd.y, [b.id, store.id], 'return');
         return;
@@ -1150,12 +1152,25 @@ function besideFree(s: GameState, b: Building, seed = 0): { x: number; y: number
   return free[(seed + (Math.random() < 0.7 ? 0 : Math.floor(Math.random() * 3))) % free.length];
 }
 
-function nearestStore(s: GameState, b: Building): Building | null {
+/**
+ * The nearest store for a good: wheat and barley go to a silo with room (and
+ * are fetched from one that holds them), other food to a granary, materials
+ * to a storehouse; the camp keeps both. Without a good, or a store of its
+ * kind, any store.
+ */
+export function nearestStore(s: GameState, b: Building, good?: ResourceId | null, fetching = false): Building | null {
+  const kind = good ? RESOURCE_STORAGE[good] : null;
+  const silo = !!good && SILO_GOODS.includes(good) && (fetching ? siloShare(s, good) >= 1 : siloHeld(s) < siloCap(s));
+  const fits = (o: Building) => (silo ? o.type === 'silo' : !kind || !!STORAGE_CAPACITY[o.type]?.[kind]);
+  return closestStore(s, b, fits) ?? closestStore(s, b, (o) => !!STORAGE_CAPACITY[o.type]);
+}
+
+function closestStore(s: GameState, b: Building, fits: (o: Building) => boolean): Building | null {
   const c = bCenter(b);
   let best: Building | null = null;
   let bestD = Infinity;
   for (const o of s.buildings) {
-    if (!STORAGE_CAPACITY[o.type] || o.build < 1) continue;
+    if (o.build < 1 || !fits(o)) continue;
     const oc = bCenter(o);
     const d = Math.hypot(oc.x - c.x, oc.y - c.y);
     if (d < bestD) {
