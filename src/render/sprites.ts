@@ -5076,6 +5076,26 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       }
       break;
     }
+    case 'streetlamp': {
+      // An iron post on a stone foot, with a glazed lantern under a little roof.
+      p.box(0.4, 0.4, 0.6, 0.6, 0, 3, '#9a9288');
+      p.line([0.5, 0.5, 3], [0.5, 0.5, 30], '#34343a', 2);
+      p.line([0.5, 0.5, 26], [0.58, 0.42, 30], '#34343a', 1);
+      p.box(0.44, 0.44, 0.56, 0.56, 30, 7, '#f6d070');
+      p.line([0.44, 0.56, 30], [0.44, 0.56, 37], '#34343a', 0.8);
+      p.line([0.56, 0.44, 30], [0.56, 0.44, 37], '#34343a', 0.8);
+      p.line([0.56, 0.56, 30], [0.56, 0.56, 37], '#34343a', 0.8);
+      const [tx, ty] = iso(0.5, 0.5, 37);
+      const c = p.ctx;
+      c.fillStyle = '#34343a';
+      c.beginPath();
+      c.moveTo(tx - 6, ty + 1.5);
+      c.lineTo(tx, ty - 5);
+      c.lineTo(tx + 6, ty + 1.5);
+      c.closePath();
+      c.fill();
+      break;
+    }
     case 'fountain': {
       // A small round stone basin with a spout on a column.
       const [cx, cy] = iso(0.5, 0.5, 0);

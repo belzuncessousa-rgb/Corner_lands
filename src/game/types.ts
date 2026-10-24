@@ -139,6 +139,7 @@ export type BuildingType =
   | 'shrine'
   | 'flowerbed'
   | 'fountain'
+  | 'streetlamp'
   | 'draughtstable'
   | 'builderyard'
   | 'sandpit'
@@ -483,6 +484,8 @@ export interface GameState {
   using?: Partial<Record<ResourceId, number>>;
   /** Whether the university had its books and wood parts this month. */
   universityOk?: boolean;
+  /** The street lamps went unlit this month for want of firewood or charcoal. */
+  lampsDark?: boolean;
   /** The lord keeps an armed retinue (Borough and up). */
   retinue?: boolean;
   /** Town charters granted (see charters.ts). */

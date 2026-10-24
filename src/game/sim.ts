@@ -267,6 +267,7 @@ export function placementError(s: GameState, type: BuildingType, x: number, y: n
   if ((type === 'fisher' || type === 'claypit' || type === 'sandpit' || type === 'watermill' || type === 'dock' || type === 'papermill' || type === 'watersawmill') && countInRadius(s, centerOf(x, y, d.w, d.h), 2.5, (i) => s.terrain[i] === 1) < 2) {
     return 'Must be next to water';
   }
+  if (type === 'streetlamp' && !besidePavedRoad(s, x, y)) return 'Must stand beside a stone road or cobbled street';
   if (type === 'cathedral' && s.buildings.some((b) => b.type === 'cathedral')) return 'Your town has its cathedral';
   if (type === 'townhall' && s.buildings.some((b) => b.type === 'townhall')) return 'Your town has its manor';
   if (type === 'church' && s.buildings.some((b) => b.type === 'church')) return 'One church to a town: rebuild it to grow';
@@ -3602,6 +3603,12 @@ function passiveStatus(s: GameState, b: Building): string {
       }
       return homes ? `Cheering ${homes} home${homes > 1 ? 's' : ''} nearby` : 'No homes nearby yet';
     }
+    case 'streetlamp': {
+      if (s.lampsDark) return 'Unlit: no firewood or charcoal for the lamps this month';
+      let homes = 0;
+      for (const o of s.buildings) if (o.residents > 0 && Math.hypot(bCenter(o).x - b.x - 0.5, bCenter(o).y - b.y - 0.5) <= BUILDINGS.streetlamp.radius) homes++;
+      return homes ? `Lighting the street for ${homes} home${homes > 1 ? 's' : ''}` : 'No homes nearby yet';
+    }
     case 'bathhouse': {
       if (b.blocked === BLOCK_PROBLEM) return 'The fires are out: needs firewood or charcoal';
       const n = [...crewAssign(s, 'bathhouse').values()].filter((id) => id === b.id).length;
@@ -3984,8 +3991,41 @@ export const CROWDING_FROM = 90;
  * uses paper or parchment and its watch wears clothes and boots (a set every
  * two months). Short of them, they shut (bathhouse) or police half as many.
  */
+/** Street lamps one firewood keeps lit for a month (a charcoal, eight). */
+export const LAMPS_PER_FIREWOOD = 4;
+
+/** A tile beside a stone road, cobbled street or the Royal Road. */
+export function besidePavedRoad(s: GameState, x: number, y: number): boolean {
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    if (inBounds(s, x + dx, y + dy) && s.road[idx(s, x + dx, y + dy)] >= 2) return true;
+  }
+  return false;
+}
+
+/** The lamplighter's round: a little fuel for every lamp, or the streets go dark this month. */
+function lightLamps(s: GameState): void {
+  const lamps = s.buildings.filter((b) => b.type === 'streetlamp' && b.build >= 1).length;
+  if (!lamps) {
+    s.lampsDark = undefined;
+    return;
+  }
+  const fuel = fuelPlan(s, 'streetlamp', Math.ceil(lamps / LAMPS_PER_FIREWOOD));
+  if (fuel) pay(s, fuel);
+  if (!fuel && !s.lampsDark) log(s, 'No firewood for the street lamps: the streets are dark this month.', 'bad');
+  s.lampsDark = !fuel || undefined;
+}
+
+/** Whether a lit street lamp stands near a home. */
+export function litLampNear(s: GameState, home: Building): boolean {
+  if (s.lampsDark) return false;
+  const c = bCenter(home);
+  const r = BUILDINGS.streetlamp.radius + Math.max(home.w, home.h) / 2;
+  return s.buildings.some((o) => o.type === 'streetlamp' && o.build >= 1 && Math.hypot(o.x + 0.5 - c.x, o.y + 0.5 - c.y) <= r);
+}
+
 function monthlyCivic(s: GameState): void {
   const month = monthOf(s.day);
+  lightLamps(s);
   for (const b of s.buildings) {
     if (b.build < 1 || b.workers <= 0) continue;
     if (b.type === 'bathhouse') {
@@ -4630,7 +4670,7 @@ export function beautyAt(s: GameState, home: Building): number {
   const c = bCenter(home);
   let total = 0;
   for (const o of s.buildings) {
-    if (o.build < 1) continue;
+    if (o.build < 1 || (o.type === 'streetlamp' && s.lampsDark)) continue;
     const d = BUILDINGS[o.type];
     const oc = bCenter(o);
     if (d.beauty && Math.hypot(oc.x - c.x, oc.y - c.y) <= d.radius) total += d.beauty;

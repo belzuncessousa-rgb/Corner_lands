@@ -132,6 +132,7 @@ export const UNLOCKS: Unlock[] = [
   { id: b('school'), name: 'Public School', kind: 'building', tab: 'civic', group: 'Faith & learning', desc: 'A little knowledge from every home; all work a little slower.', knowledge: 2, building: 'school', icon: 'school' },
   { id: b('papermill'), name: 'Paper Mill', kind: 'building', tab: 'civic', group: 'Faith & learning', desc: 'Flax beaten into rag paper by a water wheel.', knowledge: 8, building: 'papermill', icon: 'papermill' },
   { id: b('taxoffice'), name: 'Tax Office', kind: 'building', tab: 'civic', group: 'Services', desc: 'Taxes forty more villagers, on paper or parchment.', rank: 2, building: 'taxoffice', icon: 'taxoffice' },
+  { id: b('streetlamp'), name: 'Street Lamp', kind: 'building', tab: 'civic', group: 'Services', desc: 'Lanterns along the paved streets: lovelier by day, lit by night, and wanted by Patrician Houses.', knowledge: 8, needs: ['x:stoneroad'], building: 'streetlamp', icon: 'streetlamp' },
   { id: b('bathhouse'), name: 'Bathhouse', kind: 'building', tab: 'civic', group: 'Services', desc: "Hot baths: a Merchant's House need.", rank: 3, building: 'bathhouse', icon: 'bathhouse' },
   { id: b('courthouse'), name: 'Courthouse', kind: 'building', tab: 'civic', group: 'Services', desc: 'Keeps order in a crowded town.', rank: 3, building: 'courthouse', icon: 'courthouse' },
   { id: b('tavern'), name: 'Alehouse', kind: 'building', tab: 'civic', group: 'Services', desc: 'Pours drink for the homes around it.', rank: 2, building: 'tavern', icon: 'tavern' },

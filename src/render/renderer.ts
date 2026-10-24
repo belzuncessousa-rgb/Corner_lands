@@ -1664,6 +1664,7 @@ export class Renderer {
     if (b.type === 'townhall' && (s.commissions?.includes('tapestry') || optionOn(s, 'banners'))) this.drawHeraldry(b);
     // Lamplight in lived-in homes and the tavern as evening falls.
     if (this.dusk > 0.25 && b.build >= 1 && (b.residents > 0 || (b.type === 'tavern' && b.workers > 0))) this.drawLamplight(s, b);
+    if (b.type === 'streetlamp' && b.build >= 1 && !s.lampsDark && this.dusk > 0.15) this.drawStreetLight(b);
     if (b.upgrading) this.drawScaffold(b);
     if (selected) {
       c.save();
@@ -2776,6 +2777,20 @@ export class Renderer {
     }
   }
 
+  /** A street lamp after dusk: the lantern burns bright and throws a wide pool of light on the street. */
+  private drawStreetLight(b: Building): void {
+    const c = this.ctx;
+    const on = Math.min(1, (this.dusk - 0.15) / 0.35) * (0.94 + 0.06 * Math.sin(this.time * 7 + b.id));
+    const [x, y] = iso(b.x + 0.5, b.y + 0.5, 33);
+    const [gx, gy] = iso(b.x + 0.5, b.y + 0.5, 0);
+    c.save();
+    c.globalAlpha = on;
+    c.fillStyle = '#fff2b0';
+    c.fillRect(x - 2.2, y - 3, 4.4, 5);
+    c.restore();
+    this.nightLights.push(x, y, 1.6 * on, 16, gx, gy, 1.4 * on, 64);
+  }
+
   /** A soft window glow on the front of a building. */
   private drawLamplight(s: GameState, b: Building): void {
     const c = this.ctx;
@@ -3291,7 +3306,7 @@ export class Renderer {
       const glow = Math.min(1, (this.dusk - 0.35) / 0.3) * (0.9 + 0.1 * Math.sin(this.time * 9 + a.step));
       const lx = wx + 4 * a.dir;
       const ly = wy - 6 - bob + Math.sin(a.step) * 0.6;
-      this.nightLights.push(lx, wy - 3, glow);
+      this.nightLights.push(lx, wy - 3, glow, 22);
       c.strokeStyle = '#3a2c20';
       c.lineWidth = 0.6;
       c.beginPath();
@@ -4611,9 +4626,9 @@ export class Renderer {
   nights = true;
 
   setDayTime(frac: number, allowed: boolean, dt: number, winter = false): void {
-    // Evening falls in the last third of the day, and the night lasts into the
-    // next morning: longer in winter.
-    const fall = winter ? 0.6 : 0.68;
+    // Evening falls past the middle of the afternoon and the night lasts into
+    // the next morning: about half as long as the day, longer in winter.
+    const fall = winter ? 0.56 : 0.64;
     const dark = fall + 0.1;
     const morning = winter ? 0.14 : 0.08;
     const target = !allowed || this.light || !this.nights ? 0 : frac < fall ? (frac < morning ? 1 - frac / morning : 0) : frac < dark ? (frac - fall) / 0.1 : 1;
@@ -4935,11 +4950,11 @@ export class Renderer {
       c.fill();
     }
     if (Math.random() < 0.3) this.sparks.push({ x: px + (Math.random() - 0.5) * 6, y: py - 18, vx: (Math.random() - 0.5) * 14 + this.wind * 6, vy: -30 - Math.random() * 20, life: 0, max: 0.8 + Math.random() * 0.5 });
-    this.nightLights.push(px, py - 6, 1.6);
+    this.nightLights.push(px, py - 6, 1.6, 22);
     folk(front);
   }
 
-  /** Lanterns seen this frame, as world x, y and strength triples. */
+  /** Lanterns seen this frame, as world x, y, strength and reach. */
   private nightLights: number[] = [];
 
   /** Warm light added back over the evening tint, so lanterns light the lanes. */
@@ -4950,10 +4965,10 @@ export class Renderer {
     const z = this.cam.zoom;
     c.save();
     c.globalCompositeOperation = 'lighter';
-    for (let k = 0; k < L.length; k += 3) {
+    for (let k = 0; k < L.length; k += 4) {
       const x = this.width / 2 + (L[k] - this.cam.x) * z;
       const y = this.height / 2 + (L[k + 1] - this.cam.y) * z;
-      const r = 22 * z;
+      const r = L[k + 3] * z;
       const g = c.createRadialGradient(x, y, 0, x, y, r);
       g.addColorStop(0, `rgba(255,170,70,${0.32 * L[k + 2]})`);
       g.addColorStop(1, 'rgba(255,170,70,0)');
