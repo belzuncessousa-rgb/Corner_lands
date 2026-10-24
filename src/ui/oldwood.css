@@ -1,85 +1,15 @@
 /*
- * Trial: every board in the knotted, grained wood of the charter plaque
- * (`--wood-img` from wood.ts) in a frame of the darker wood, instead of the
- * flat painted planks. Loaded after painted.css; drop the import in main.ts
- * to go back.
+ * Trial: every board in the knotted, grained wood of the charter plaque,
+ * painted pale (`--wood-pale` from wood.ts) so dark lettering reads on it,
+ * in a frame of the darker wood. Loaded after painted.css; drop the import
+ * in main.ts to go back.
  */
 :root {
   --board:
-    radial-gradient(ellipse at 50% 40%, rgba(255, 230, 180, 0.1), rgba(30, 12, 0, 0.32)) padding-box,
-    var(--wood-img, #a87842) center / cover padding-box,
+    radial-gradient(ellipse at 50% 30%, rgba(255, 248, 228, 0.2), transparent 70%) padding-box,
+    var(--wood-pale, #ecd09c) center / cover padding-box,
     linear-gradient(180deg, rgba(255, 220, 160, 0.25), rgba(0, 0, 0, 0.25)) border-box,
     var(--wood-img-dark, #6a4424) center / cover border-box;
-}
-
-/* Cream lettering on the darker wood, as on the plaque. */
-.panel,
-#buildbar,
-.pill-panel.min {
-  --ink: #fbefd6;
-  --ink-soft: #f2dca8;
-  --berry: #ffb4a0;
-  --leaf: #c8f0a0;
-  color: var(--ink);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
-}
-.panel h1,
-.panel h2,
-.panel h3 {
-  color: #ffe9b0;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
-}
-.panel .neg,
-.res.low,
-.res.full,
-.chain .link.weak,
-.chain .link.weak b,
-.alert-tab.alert .name {
-  color: #ffb4a0;
-}
-.panel .pos {
-  color: #c8f0a0;
-}
-#topbar .chip .prestige {
-  color: #dcc8ff;
-}
-.msg.tip b {
-  color: #b4d8f4;
-}
-
-/* What sits on cream inside a board keeps its dark ink. */
-.card,
-.upgrade-box,
-.modal .save,
-.mode,
-.chron,
-.order,
-.pick-grid .pick,
-.event .choice,
-#inspector .status,
-.modal input,
-input[type='text'],
-input[type='number'],
-button.active,
-#buildbar .tab.active,
-.choices button.on,
-.trade .keep b,
-table.goods td.keep span {
-  --ink: #3a2412;
-  --ink-soft: #7a5432;
-  --berry: #b8433a;
-  --leaf: #4f8a3c;
-  color: var(--ink);
-  text-shadow: none;
-}
-:is(.card, .upgrade-box, .chron, .order, .mode) :is(.neg) {
-  color: #a8322d;
-}
-:is(.card, .upgrade-box, .chron, .order, .mode) :is(.pos) {
-  color: #3c7a2c;
-}
-:is(.card, .upgrade-box, .chron, .order, .mode) :is(.sub, .note, small) {
-  color: var(--ink-soft);
 }
 
 /* The charter plaque itself, back in its own wood. */

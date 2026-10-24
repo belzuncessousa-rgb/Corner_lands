@@ -223,7 +223,7 @@ export function installWood(): void {
   root.setProperty('--wood-img', `url(${paintWood(1024, 512, ['#b98a55', '#a87842', '#5a3416'], 7)})`);
   root.setProperty('--wood-img-dark', `url(${paintWood(512, 256, ['#7a5230', '#6a4424', '#3a200c'], 19)})`);
   // Pale pine for the boards text is read from, and walnut for their frames.
-  root.setProperty('--wood-pale', `url(${paintWood(768, 384, ['#e9cd9c', '#dcb985', '#a87a46'], 31)})`);
+  root.setProperty('--wood-pale', `url(${paintWood(1024, 512, ['#f3d6a2', '#e8c690', '#a87a46'], 31)})`);
   root.setProperty('--wood-frame', `url(${paintWood(512, 256, ['#83552e', '#6b4223', '#2e1608'], 43)})`);
   root.setProperty('--weave', `url(${paintWeave(5)})`);
   // Flat painted grain: see-through for the pale boards, solid for the frames.
