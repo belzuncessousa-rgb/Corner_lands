@@ -1,5 +1,6 @@
 import './ui/styles.css';
 import './ui/painted.css';
+import './ui/oldwood.css';
 import { deleteSave, listSaves, loadGame, saveGame } from './api';
 import { BUILDINGS, BUILD_ORDER, DAY_SECONDS, GATHER_REACH, GATHERERS, MONTH_NAMES, TIERS } from './game/data';
 import { playBot } from './game/autoplay';
