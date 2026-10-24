@@ -10,3 +10,4 @@ itch/*.jpg
 audio-src/
 # Licensed for the game, not for sharing as files (see scripts/audio.mjs)
 public/audio/music/alkakrab-*
+game-texts.json
