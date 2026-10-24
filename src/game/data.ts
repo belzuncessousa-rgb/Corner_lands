@@ -1057,7 +1057,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   market: def({
     type: 'market',
     name: 'Marketplace',
-    desc: 'A square for stalls, free to lay out: click one corner, then the other. A vendor for each stall stocks it from the storehouse and granary, and each open stall serves ten households with their goods, the nearest homes first. Food comes from the stores either way.',
+    desc: 'A square for stalls, free to lay out: click one corner, then the other. A vendor for each stall stocks it from the storehouse and granary, and each open stall serves ten households with their goods, the nearest homes first. Food comes from the stores either way, but only homes a market serves enjoy a varied table, clothes, boots and luxuries.',
     category: 'civic',
     w: 3,
     h: 3,

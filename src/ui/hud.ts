@@ -1771,7 +1771,8 @@ export class Hud {
     if (performance.now() < this.flashUntil) return;
     if (this.game.tool.kind !== 'select') return;
     if (this.coverageType) this.updateCoverageHint();
-    else this.setHint('', false);
+    // The resource lens keeps its own line in the bar (set each frame by the game); clearing it here made it blink.
+    else if (this.game.lens !== 'resources') this.setHint('', false);
   }
 
   // ---------------------------------------------------------------- tooltips
@@ -3142,7 +3143,7 @@ export class Hud {
         <p><b>The Manor</b> is optional: build it for feasts, festivals and prestige, and renovate it as the town grows into a Manor House and then a Stone Manor, which lets you lay out a manor garden, watch towers and the town walls.</p>
         <p><b>Retinue</b>: a Borough can raise men-at-arms at the manor for prestige and arms. Paid 10 coins a month, they ride out against wolves and bandits.</p>
         <p><b>Harvest feast</b>: once each autumn, select the manor to call a feast. A meal for everyone and drink for every eight cheer the town for half a year and bring prestige.</p>
-        <p><b>Villagers</b> eat one food a month each; several food groups (grain, meat, produce, dairy) cheer them. When every food is gone they boil stored wheat into pottage, which is only half as filling. Each winter month a home burns firewood. Finer homes need clothes, a tavern, boots and medicine, and enjoy luxuries. A family may set up a craft at home: the workshop costs materials and takes days to build, and the craft stays for good.</p>
+        <p><b>Villagers</b> eat one food a month each; several food groups (grain, meat, produce, dairy) cheer the homes a market serves. When every food is gone they boil stored wheat into pottage, which is only half as filling. Each winter month a home burns firewood. Finer homes need clothes, a tavern, boots and medicine, and enjoy luxuries. A family may set up a craft at home: the workshop costs materials and takes days to build, and the craft stays for good.</p>
         <p><b>Prestige</b> comes from a fine manor, a church and monuments. From Town on, spend it on <b>charters</b> (crown button) to specialise your town.</p>
         <p>Your <b>steward</b> warns you when things go wrong; the latest news shows at the side of the screen.</p>
         <div class="ornament">❦</div>

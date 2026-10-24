@@ -4715,8 +4715,9 @@ export function updateHappiness(s: GameState): void {
   factors.push({ label: 'Base contentment', value: 50 });
   const r = s.report;
   if (s.population > 0) {
-    const variety = VARIETY_BONUS[Math.min(4, r.variety)];
-    if (variety) factors.push({ label: `Food variety (${r.variety} food groups)`, value: variety });
+    // Variety is bought at the market: only the homes it serves enjoy it.
+    const variety = VARIETY_BONUS[Math.min(4, r.variety)] * (marketReach(s) / s.population);
+    if (variety >= 0.5) factors.push({ label: `Food variety (${r.variety} food groups, from the market)`, value: Math.round(variety) });
     if (r.shortage > 0) factors.push({ label: 'Hunger', value: -Math.round(15 + 30 * (r.shortage / s.population)) });
   }
   if (r.cold) factors.push({ label: 'No firewood', value: -Math.round(20 * Math.min(1, (r.coldShare ?? 1) * 1.5)) });
@@ -4758,7 +4759,6 @@ export function updateHappiness(s: GameState): void {
   const homeless = Math.max(0, s.population - residents);
   if (residents > 0) {
     if (well) factors.push({ label: 'Wells nearby', value: Math.round((8 * well) / residents) });
-    if (market) factors.push({ label: 'Served by a market', value: Math.round((10 * market) / residents) });
     // Homes the markets cannot serve go without their goods: a slow grumble, not hunger.
     if (s.day > MARKET_GRACE_DAYS && market < residents) factors.push({ label: 'No market to shop at', value: -Math.round((10 * (residents - market)) / residents) });
     if (church) factors.push({ label: 'Church nearby', value: Math.round((15 * church) / residents) });
