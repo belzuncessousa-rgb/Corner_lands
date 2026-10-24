@@ -3260,13 +3260,15 @@ export function espalierShare(s: GameState, o: Building): number {
   return n / Math.max(1, o.w * o.h);
 }
 
-/** Months the keepers tend the trees (spring and summer); the fruit sets and is picked in autumn. */
-export const ORCHARD_TEND_MONTHS = 7;
+/** Months the keepers tend the trees (spring and early summer); then the fruit sets. */
+export const ORCHARD_TEND_MONTHS = 6;
+/** Months the fruit hangs to be picked, late summer through autumn, before what is left rots. */
+export const ORCHARD_PICK_MONTHS = 3;
 /**
  * Keeper-days of tending each tile of orchard needs over the season,
- * whatever grows on it: a keeper tends about seventeen tiles.
+ * whatever grows on it: a keeper tends about ten tiles.
  */
-export const ORCHARD_TEND_PER_TILE = 4;
+export const ORCHARD_TEND_PER_TILE = 6;
 
 /** Tiles of orchard a lodge's keepers can tend in a season. */
 export function orchardHands(b: Building): number {
@@ -3331,7 +3333,7 @@ function stepOrchardist(s: GameState, b: Building): void {
   b.status = `Picking fruit (${Math.floor(hanging)} on the trees)`;
 }
 
-/** Orchards age daily; fruit sets in autumn, as much as the season's tending allows, and rots if not picked. */
+/** Orchards age daily; fruit sets at the end of summer, as much as the season's tending allows, and rots if not picked. */
 function dailyOrchards(s: GameState): void {
   const month = monthOf(s.day);
   const first = s.day % DAYS_PER_MONTH === 0;
@@ -3351,13 +3353,13 @@ function dailyOrchards(s: GameState): void {
       o.lastOutput = 0;
       o.tended = 0;
     }
-    if (month === ORCHARD_TEND_MONTHS + 2 && first) o.growth = 0;
+    if (month === ORCHARD_TEND_MONTHS + ORCHARD_PICK_MONTHS && first) o.growth = 0;
     const fruit = GOODS[(o.recipe ?? 'apples') as ResourceId].name.toLowerCase();
     const care = month < ORCHARD_TEND_MONTHS ? ` · ${Math.round((o.tended ?? 0) * 100)}% tended` : '';
     o.status =
       m < 1
         ? `Young trees: ${Math.round(m * 100)}% grown${care}`
-        : month >= ORCHARD_TEND_MONTHS && month <= ORCHARD_TEND_MONTHS + 1 && o.growth > 0
+        : month >= ORCHARD_TEND_MONTHS && month < ORCHARD_TEND_MONTHS + ORCHARD_PICK_MONTHS && o.growth > 0
           ? `${Math.floor(o.growth)} ${fruit} ripe`
           : month <= 1
             ? `In blossom${care}`

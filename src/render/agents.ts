@@ -1109,7 +1109,7 @@ export class AgentSystem {
         if (!zones.length) return null;
         const z = zones[Math.floor(Math.random() * zones.length)];
         // Orchard keepers hoe round the trees in spring and summer, and reach up to pick in autumn.
-        const act = b.type === 'farm' ? (m >= 6 ? 'scythe' : 'hoe') : b.type === 'orchardist' ? (m >= 7 ? 'reach' : 'hoe') : 'herd';
+        const act = b.type === 'farm' ? (m >= 6 ? 'scythe' : 'hoe') : b.type === 'orchardist' ? (m >= 6 ? 'reach' : 'hoe') : 'herd';
         return { x: z.x + Math.floor(Math.random() * z.w), y: z.y + Math.floor(Math.random() * z.h), act };
       }
       default:

@@ -19,7 +19,7 @@ import type { Renderer } from '../render/renderer';
 
 export type Channel = 'music' | 'ambience' | 'noise' | 'effects';
 /** How loud each channel sits in the mix. */
-const MIX: Record<Channel, number> = { music: 0.6, ambience: 0.45, noise: 0.55, effects: 0.7 };
+const MIX: Record<Channel, number> = { music: 0.6, ambience: 0.22, noise: 0.55, effects: 0.7 };
 
 /** Each channel's volume from the settings, 0 to 1 (1 is the mix as made). */
 export type Volumes = Record<Channel, number>;
@@ -78,7 +78,7 @@ export interface Scene {
 const BED_LEVEL: Record<string, number> = {
   birds: 0.55,
   meadow: 0.5,
-  river: 0.6,
+  river: 0.3,
   lightrain: 0.7,
   rain: 0.7,
   wind: 0.55,
@@ -88,7 +88,7 @@ const BED_LEVEL: Record<string, number> = {
   tavern: 0.6,
   market: 0.55,
   street: 0.4,
-  bees: 0.35,
+  bees: 0.15,
   smithy: 0.5,
   stone: 0.5,
   building: 0.3,
@@ -493,12 +493,12 @@ export class Soundscape {
    */
   openSound(b: Building): void {
     const id = b.build < 1 ? 'open-building' : b.type === 'house' && b.yard === 'hens' ? 'open-hens' : (OPEN_BY_TYPE[b.type] ?? `open-${BUILDINGS[b.type]?.category}`);
-    this.play(this.manifest?.sounds[id] ? id : 'open', 0.45);
+    this.play(this.manifest?.sounds[id] ? id : 'open', 0.25);
   }
 
   /** An interface click; a close or back button gets its own. */
   click(back: boolean): void {
-    this.play(back ? 'back' : 'click', back ? 0.12 : 0.4);
+    this.play(back ? 'back' : 'click', back ? 0.06 : 0.15);
   }
 
   /** A pastures's or a home's animals, a call now and then. */
@@ -570,7 +570,8 @@ export class Soundscape {
     // The evening chorus at dusk and dawn, and softly through the day.
     want.meadow = warm * (r.dusk > 0.1 && r.dusk < 0.7 ? 1 : 0.35 * day) * dry;
     want.forest = (season === 3 ? 0.15 : warm) * day * dry * Math.min(1, (woods / all) * 2.5);
-    want.river = season === 3 ? 0 : Math.min(1, (water / all) * 4);
+    // The river only where a good stretch of water is in view, and fuller close to it.
+    want.river = season === 3 ? 0 : Math.min(1, Math.max(0, water / all - 0.15) * 2.5) * (0.4 + 0.6 * close);
     want[season === 2 ? 'rain' : 'lightrain'] = rain;
     want.wind = season === 3 ? 0.55 + 0.35 * (1 - close) : 0.08 * (1 - close);
     want.autumnwind = season === 2 ? 0.45 + 0.35 * (1 - close) : 0;
@@ -589,7 +590,7 @@ export class Soundscape {
     want.smithy = nearest(working(WORK_BEDS.smithy!), 0.5) * day * close;
     want.stone = nearest(working(WORK_BEDS.stone!), 0.5) * day * close;
     want.watermill = nearest(working(WORK_BEDS.watermill!), 0.5) * close;
-    want.bees = (season === 0 || season === 1 ? 1 : 0) * day * nearest((b) => built(b) && (b.type === 'beekeeper' || (b.type === 'house' && b.yard === 'bees')), 0.4) * close;
+    want.bees = (season === 0 || season === 1 ? 1 : 0) * day * nearest((b) => built(b) && (b.type === 'beekeeper' || (b.type === 'house' && b.yard === 'bees')), 0.4) * Math.max(0, close - 0.5) * 2;
     want.building = nearest((b) => b.build < 1 && b.build > 0 && !b.need, 0.5) * day * close;
     // Feet on the lanes: the villagers walking close to the middle of the view.
     let walkers = 0;
@@ -640,7 +641,7 @@ export class Soundscape {
       this.calls('goats', flock('goats') * (0.4 + 0.6 * close), [12, 30], dt);
       this.calls('pigs', flock('pigs') * (0.4 + 0.6 * close), [9, 24], dt, [1, 2]);
       this.calls(Math.random() < 0.5 ? 'hens' : 'hens2', hens * close, [9, 25], dt);
-      this.calls('ducks', season !== 3 ? want.river * close : 0, [14, 40], dt, [1.5, 3]);
+      this.calls('ducks', season !== 3 ? want.river * close : 0, [30, 80], dt, [1.5, 3]);
       this.calls(Math.random() < 0.5 ? 'dogs' : 'dogs2', homes * close * Math.min(1, s.population / 30) * 0.7, [25, 70], dt, [1, 2.5]);
       // Saws at the sawpits and carpenters' and on the building sites; the woodcutters' saws.
       this.calls('sawing', Math.max(nearest(working(['sawmill', 'carpenter', 'cooper', 'builderyard', 'watersawmill']), 0.8), want.building) * (0.3 + 0.7 * close), [12, 32], dt, [2, 4]);
@@ -648,7 +649,7 @@ export class Soundscape {
     }
     if (night > 0.6 && season !== 3) this.calls('owl', 0.7, [25, 60], dt, [1.5, 3]);
     // Frogs by the water on warm evenings and nights.
-    if (warm >= 1 && r.dusk > 0.3) this.calls('frogs', want.river * (0.4 + 0.6 * close), [12, 35], dt, [1.5, 3.5]);
+    if (warm >= 1 && r.dusk > 0.3) this.calls('frogs', want.river * (0.4 + 0.6 * close), [25, 70], dt, [1.5, 3.5]);
     // The cock crows as the night ends, where there are farms or hens.
     if (this.lastDusk > 0.3 && r.dusk <= 0.3 && r.dusk < this.lastDusk && season !== 3) {
       const farms = Math.max(hens, nearest((b) => built(b) && (b.type === 'farm' || b.type === 'byre'), 1));

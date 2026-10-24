@@ -1468,7 +1468,7 @@ export class Hud {
       } else if (b.type === 'orchard') {
         const m = orchardMaturity(s, b);
         rows.push(`<div class="kv"><span>Trees</span><span>${m < 1 ? `${Math.round(m * 100)}% grown` : 'Bearing fruit'}</span></div>${m < 1 ? bar(m) : ''}`);
-        if (monthOf(s.day) < ORCHARD_TEND_MONTHS && !b.bare) rows.push(`<div class="kv" data-tip="How much of this season's tending the keepers have done: the fruit that sets in autumn is in proportion."><span>Tended this season</span><span>${Math.round((b.tended ?? 0) * 100)}%</span></div>${bar(b.tended ?? 0)}`);
+        if (monthOf(s.day) < ORCHARD_TEND_MONTHS && !b.bare) rows.push(`<div class="kv" data-tip="How much of this season's tending the keepers have done: the fruit that sets at the end of summer is in proportion."><span>Tended this season</span><span>${Math.round((b.tended ?? 0) * 100)}%</span></div>${bar(b.tended ?? 0)}`);
         if (b.growth > 0) rows.push(`<div class="kv"><span>Fruit on the trees</span><span>${Math.floor(b.growth)}</span></div>`);
       }
     }
@@ -1611,7 +1611,7 @@ export class Hud {
           const hint = `${a.at ? 'Click to show the place' : 'Click to read'} · right-click to dismiss`;
           return `<div class="alert-tab panel ${a.level}${open ? ' open' : ''}" data-id="${esc(a.id)}" title="${hint}">
             <div class="head"><span class="mark">${a.level === 'alert' ? '!' : '?'}</span><span class="name">${esc(a.title)}</span></div>
-            ${open ? `<div class="body">${esc(a.text.replace(/^Steward: /, ''))}<div class="how">${hint}</div></div>` : ''}
+            ${open ? `<div class="body">${esc(a.text.replace(/^Steward: (.)/, (_, c: string) => c.toUpperCase()))}<div class="how">${hint}</div></div>` : ''}
           </div>`;
         })
         .join(''),

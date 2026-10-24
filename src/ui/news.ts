@@ -3,6 +3,7 @@
  * something worth telling returning players goes in; the number only grows.
  */
 export const NEWS: { n: number; text: string }[] = [
+  { n: 37, text: 'Orchards are picked from late summer through autumn, so pears and strawberries bring in their fuller crops; a keeper tends about ten tiles. Quieter ambience, river, bees and page sounds; the top bar figures sit centred' },
   { n: 36, text: 'Food rebalanced: two foragers feed a hamlet of ten all year; wild food comes easiest, bread, cheese and orchards close behind, vegetables hardest. Orchard keepers tend their trees from spring and pick in autumn. Market prices follow the work each food takes' },
   { n: 35, text: 'The steward speaks up only in an emergency (worn-out gear, food or firewood running short, no market for the people), as red tabs on the left you click to see and right-click to dismiss; tutorial players also get yellow tips. Workshops may burn the last of the firewood' },
   { n: 34, text: 'Taxes by home, harder-working fields, marketplaces of any shape with a stall for every two tiles, no more batches, the lord\'s buildings within four tiles of the manor, and a manor that grows towards any free side' },

@@ -757,7 +757,7 @@ describe('fields, herds, orchards and backyards', () => {
     s.population = 6;
     // Tended from spring through summer, the fruit sets and is picked in autumn.
     s.day = Math.ceil(s.day / DAYS_PER_YEAR) * DAYS_PER_YEAR;
-    run(s, DAYS_PER_MONTH * 7);
+    run(s, DAYS_PER_MONTH * 6);
     expect(o.tended).toBe(1);
     run(s, 1);
     expect(o.tended).toBe(0);
@@ -781,7 +781,7 @@ describe('fields, herds, orchards and backyards', () => {
     // No keepers at all this season.
     lodge.want = 0;
     recompute(s);
-    run(s, DAYS_PER_MONTH * 7 + 1);
+    run(s, DAYS_PER_MONTH * 6 + 1);
     expect(o.growth).toBe(0);
   });
 

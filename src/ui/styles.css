@@ -1644,14 +1644,29 @@ button.active {
 }
 #topbar .badge.none,
 #topbar .prestige.none {
-  visibility: hidden;
+  display: none;
 }
+/* Each figure sits centred in a cell of its own, wide enough for its largest value, so the bar keeps its width. */
 @media (min-width: 701px) {
-  #topbar .n4 {
-    min-width: 4ch;
+  #top #topbar .chip {
+    justify-content: center;
   }
-  #topbar .n5 {
-    min-width: 5ch;
+  #topbar .chip[data-chip='happy'] {
+    width: 82px;
+  }
+  #topbar .chip[data-chip='pop'] {
+    width: 136px;
+  }
+  #topbar .chip[data-chip='food'],
+  #topbar .chip[data-chip='materials'],
+  #topbar .chip[data-chip='goods'] {
+    width: 90px;
+  }
+  #topbar .chip[data-chip='treasury'] {
+    width: 160px;
+  }
+  #topbar .learn-chip {
+    width: 104px;
   }
 }
 @media (max-width: 700px) {
