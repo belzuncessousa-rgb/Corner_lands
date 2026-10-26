@@ -104,7 +104,7 @@ export class Renderer {
   private cache = new Map<string, Sprite>();
   private particles: Particle[] = [];
   private smokeTimer = 0;
-  private boost = new Int32Array(0);
+  private boost = new Float64Array(0);
   /** Whether the lord rides out on horseback (a staffed stable). */
   private lordRides = false;
   private buckets: number[][] = [];
@@ -448,12 +448,11 @@ export class Renderer {
       this.buckets[k].push(code);
       this.bucketKeys[k].push(key);
     };
-    const tileKey = (d: number, i: number) => (this.boost[i] > d ? this.boost[i] + 1.001 : d + 1);
+    const tileKey = (d: number, i: number) => this.standDepth(d + 1, i);
     const standKey = (x: number, y: number) => {
       const tx = Math.floor(x);
       const ty = Math.floor(y);
-      const bo = inBounds(s, tx, ty) ? this.boost[ty * W + tx] : 0;
-      return bo > tx + ty ? bo + 1.002 + (x + y - tx - ty) * 0.001 : x + y;
+      return inBounds(s, tx, ty) ? this.standDepth(x + y, ty * W + tx) : x + y;
     };
     this.orchardTiles.clear();
     this.stallTiles.clear();
@@ -489,7 +488,7 @@ export class Renderer {
       }
       const [wx, wy] = iso(b.x + b.w / 2, b.y + b.h / 2);
       if (!visible(wx, wy + 60) && !visible(wx, wy - 100)) return;
-      put(bi * 8 + 1, this.buildingDepth(s, b) + 1);
+      put(bi * 8 + 1, this.bkey[bi]);
     });
     for (let d = 0; d < W + H - 1; d++) {
       for (let x = Math.max(0, d - H + 1); x <= Math.min(W - 1, d); x++) {
@@ -1392,40 +1391,61 @@ export class Renderer {
 
   // ---------------------------------------------------------------- depth
 
-  /** Tiles in front of a building (east/south ring) must draw after it. */
+  /**
+   * Whatever stands in front of a building (east or south of it) must draw
+   * after it, even where it is nearer the back of the picture than the
+   * building's front corner: each such tile gets a floor, the building's own
+   * key, that what stands on it is drawn just above. Only buildings drawn
+   * whole count: a zone (field, pasture, orchard, park, market) is flat
+   * ground with its things sorted one by one.
+   */
   private computeBoost(s: GameState): void {
     const n = s.width * s.height;
-    if (this.boost.length !== n) this.boost = new Int32Array(n);
+    if (this.boost.length !== n) this.boost = new Float64Array(n);
     this.boost.fill(0);
-    for (let pass = 0; pass < 2; pass++) {
-      for (const b of s.buildings) {
-        const d = this.buildingDepth(s, b);
-        for (let y = b.y; y < b.y + b.h; y++) {
-          const x = b.x + b.w;
-          if (inBounds(s, x, y)) this.bump(s, x, y, d);
+    if (this.bkey.length < s.buildings.length) this.bkey = new Float64Array(s.buildings.length * 2);
+    // A building standing in front of another takes a key above it, so a few passes settle a row of them.
+    for (let pass = 0; pass < 3; pass++) {
+      s.buildings.forEach((b, bi) => {
+        if (BUILDINGS[b.type].zone) return;
+        const k = this.buildingKey(s, b);
+        this.bkey[bi] = k;
+        for (let y = b.y; y < k - b.x; y++) {
+          for (let x = y >= b.y + b.h ? b.x : b.x + b.w; x + y < k; x++) {
+            if (!inBounds(s, x, y)) continue;
+            const i = y * s.width + x;
+            if (this.boost[i] < k) this.boost[i] = k;
+          }
         }
-        for (let x = b.x; x <= b.x + b.w; x++) {
-          const y = b.y + b.h;
-          if (inBounds(s, x, y)) this.bump(s, x, y, d);
-        }
-      }
+      });
     }
   }
 
-  private bump(s: GameState, x: number, y: number, d: number): void {
-    const i = y * s.width + x;
-    if (this.boost[i] < d) this.boost[i] = d;
-  }
+  /** Building draw keys for this frame (see computeBoost). */
+  private bkey = new Float64Array(0);
 
-  private buildingDepth(s: GameState, b: Building): number {
-    let d = b.x + b.w - 1 + b.y + b.h - 1;
+  /** A building's key: its front tile's centre, or just above any building it stands in front of. */
+  private buildingKey(s: GameState, b: Building): number {
+    let d = b.x + b.w - 1 + b.y + b.h - 1 + 1;
     for (let y = b.y; y < b.y + b.h; y++) {
       for (let x = b.x; x < b.x + b.w; x++) {
         const v = this.boost[y * s.width + x] ?? 0;
-        if (v > d) d = v;
+        if (v + 0.01 > d) d = v + 0.01;
       }
     }
     return Math.min(d, s.width + s.height + 2);
+  }
+
+  /**
+   * The key of something standing at depth `r` (x + y) on tile `i`: its own
+   * depth, or, in front of a building that reaches nearer, just above the
+   * building, the nearer still drawn the later, so things standing together
+   * keep their order among themselves.
+   */
+  private standDepth(r: number, i: number): number {
+    const f = this.boost[i];
+    if (!(f > r)) return r;
+    return f + 0.0001 + 0.0008 * Math.max(0, 1 - (f - r) / 40);
   }
 
   // ---------------------------------------------------------------- objects

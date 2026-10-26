@@ -418,7 +418,7 @@ export class Game {
       }
     }
     this.agents.update(this.state, gameDt, this.clock());
-    this.wildlife.update(this.state, gameDt);
+    this.wildlife.update(this.state, gameDt, () => this.renderer.screenToTile(Math.random() * this.renderer.width, Math.random() * this.renderer.height));
     // Dusk only at normal speed: faster, the days would flicker.
     this.renderer.setDayTime(this.clock(), !this.demo && this.speed <= 1, dt, seasonOf(this.state.day) === 3);
     this.renderer.dayFrac = this.dayFraction;
