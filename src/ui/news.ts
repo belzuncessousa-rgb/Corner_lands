@@ -3,6 +3,7 @@
  * something worth telling returning players goes in; the number only grows.
  */
 export const NEWS: { n: number; text: string }[] = [
+  { n: 39, text: 'Workshops rebalanced: one of each kind now supplies a Borough, and the ones that cost more learning pay better (glass, paper, pottery, fine clothes, stained glass and jewellery above all); a bakery bakes for thirty; improvements like the cheese cellar and broadloom scale with the recipe' },
   { n: 38, text: 'Woodcutters bring in about a third more; one blacksmith now keeps a whole Borough in tools (about three times as many), fed by a single bloomery' },
   { n: 37, text: 'Orchards are picked from late summer through autumn, so pears and strawberries bring in their fuller crops; a keeper tends about ten tiles. Quieter ambience, river, bees and page sounds; the top bar figures sit centred' },
   { n: 36, text: 'Food rebalanced: two foragers feed a hamlet of ten all year; wild food comes easiest, bread, cheese and orchards close behind, vegetables hardest. Orchard keepers tend their trees from spring and pick in autumn. Market prices follow the work each food takes' },
