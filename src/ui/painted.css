@@ -249,8 +249,7 @@ button.plaque-btn:hover:not(:disabled) {
 }
 .upgrade-box,
 .modal .save,
-.mode,
-.chron {
+.mode {
   background: #fbecc8;
   border: 2px solid var(--seam);
   border-radius: 8px;

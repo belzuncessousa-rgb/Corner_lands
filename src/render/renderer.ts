@@ -91,7 +91,8 @@ interface Particle {
 
 const GRASS_VARIANTS = 8;
 /** Seconds the old season's picture takes to fade when a new season begins. */
-const SEASON_FADE = 3;
+/** Seconds the old season's picture takes to fade into the new one. */
+const SEASON_FADE = 6;
 const CHUNK = 16;
 const TREE_VARIANTS = 6;
 
@@ -231,6 +232,8 @@ export class Renderer {
 
   /** Drawing with the lighter sprite copies because frames were slow. */
   light = false;
+  /** Trees drawn flat, to see the ground under the woods (F). */
+  hideTrees = false;
   private renderMs = 0;
 
   /** Keeps a running average of render time and switches light mode with some slack. */
@@ -272,6 +275,9 @@ export class Renderer {
     for (const b of s.buildings) this.byId.set(b.id, b);
     const c = this.ctx;
     const season = seasonOf(s.day);
+    // Through the second half of late autumn the trees drop their leaves and the roofs whiten one by one.
+    const lateAutumn = monthOf(s.day) === 8 ? ((s.day % DAYS_PER_MONTH) + this.dayFrac) / DAYS_PER_MONTH : 0;
+    this.winterIn = Math.max(0, Math.min(1, (lateAutumn - 0.3) / 0.7));
     const z = this.cam.zoom;
     HERALDRY.current = s.heraldry ?? DEFAULT_HERALDRY;
     this.lordLook = s.lord ?? DEFAULT_LORD;
@@ -1453,7 +1459,17 @@ export class Renderer {
   /** Orchard tiles visible this frame, drawn as fruit trees. */
   private orchardTiles = new Map<number, Building>();
 
+  /** How far late autumn has turned towards winter (0-1), for things that turn one by one. */
+  private winterIn = 0;
+
+  /** A thing's own season: in late autumn some have turned to winter already, each on its own day. */
+  private ownSeason(key: number, season: Season): Season {
+    if (!this.winterIn) return season;
+    return ((Math.imul(key, 2654435761) >>> 0) / 4294967296 < this.winterIn ? 3 : season) as Season;
+  }
+
   private drawTileObjects(s: GameState, i: number, season: Season): void {
+    season = this.ownSeason(i, season);
     const x = i % s.width;
     const y = (i - x) / s.width;
     const stall = this.stallTiles.get(i);
@@ -1542,7 +1558,12 @@ export class Renderer {
       }
     }
     const n = s.trees[i];
-    if (n) {
+    if (n && this.hideTrees) {
+      // Trees laid flat: a low clump of green where each stands, so the ground between shows.
+      const sp = this.sprite(`th:${n}:${season === 3}`, () => this.treeFootprint(n, season === 3));
+      const [wx, wy] = iso(x, y);
+      this.blit(sp, wx, wy);
+    } else if (n) {
       const kind: TreeKind = v % 9 < 4 ? 'pine' : v % 9 < 8 ? 'oak' : 'birch';
       const base = v % TREE_VARIANTS;
       const mixBirch = kind === 'oak' && v % 2 === 1;
@@ -1578,6 +1599,29 @@ export class Renderer {
     }
   }
 
+  /** Where a tile's trees stand, drawn low: a dab of crown on a stub of trunk for each. */
+  private treeFootprint(n: number, winter: boolean): Sprite {
+    const slots = TREE_SLOTS[n - 1];
+    return makeSprite(TW + 8, TH + 12, TW / 2 + 4, 8, (ctx) => {
+      for (const [sx, sy] of slots) {
+        const [lx, ly] = iso(sx, sy);
+        ctx.fillStyle = 'rgba(30,40,20,0.25)';
+        ctx.beginPath();
+        ctx.ellipse(lx, ly, 6, 3, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#6b4a2e';
+        ctx.fillRect(lx - 1, ly - 4, 2, 4);
+        ctx.fillStyle = winter ? '#dfe6e4' : '#4f7a34';
+        ctx.strokeStyle = winter ? '#9aa6a4' : '#2f4a1e';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.ellipse(lx, ly - 5, 4.5, 3, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+    });
+  }
+
   private treeClump(kind: TreeKind, n: number, base: number, mixBirch: boolean, season: Season): Sprite {
     const slots = TREE_SLOTS[n - 1];
     // Trees stand a third taller than their drawings, to sit right by the houses.
@@ -1594,6 +1638,7 @@ export class Renderer {
   }
 
   private drawBuilding(s: GameState, b: Building, season: Season, selected: boolean): void {
+    season = this.ownSeason(b.id * 7919 + 13, season);
     // A mill that ground grain lately turns its sails (drawn live, not in the picture).
     const turning = b.type === 'windmill' && b.build >= 1 && !this.light && b.workers > 0 && !b.paused && (b.output > 0 || b.lastOutput > 0);
     const look = variantOf(s, b);
@@ -1654,6 +1699,7 @@ export class Renderer {
     if (b.type === 'townhall' && (s.commissions?.includes('tapestry') || optionOn(s, 'banners'))) this.drawHeraldry(b);
     // Lamplight in lived-in homes and the tavern as evening falls.
     if (this.dusk > 0.25 && b.build >= 1 && (b.residents > 0 || (b.type === 'tavern' && b.workers > 0))) this.drawLamplight(s, b);
+    if (b.type === 'streetlamp' && b.build >= 1 && !s.lampsDark && this.dusk > 0.15) this.drawStreetLight(b);
     if (b.upgrading) this.drawScaffold(b);
     if (selected) {
       c.save();
@@ -2766,6 +2812,20 @@ export class Renderer {
     }
   }
 
+  /** A street lamp after dusk: the lantern burns bright and throws a wide pool of light on the street. */
+  private drawStreetLight(b: Building): void {
+    const c = this.ctx;
+    const on = Math.min(1, (this.dusk - 0.15) / 0.35) * (0.94 + 0.06 * Math.sin(this.time * 7 + b.id));
+    const [x, y] = iso(b.x + 0.5, b.y + 0.5, 33);
+    const [gx, gy] = iso(b.x + 0.5, b.y + 0.5, 0);
+    c.save();
+    c.globalAlpha = on;
+    c.fillStyle = '#fff2b0';
+    c.fillRect(x - 2.2, y - 3, 4.4, 5);
+    c.restore();
+    this.nightLights.push(x, y, 1.6 * on, 16, gx, gy, 1.4 * on, 64);
+  }
+
   /** A soft window glow on the front of a building. */
   private drawLamplight(s: GameState, b: Building): void {
     const c = this.ctx;
@@ -3281,7 +3341,7 @@ export class Renderer {
       const glow = Math.min(1, (this.dusk - 0.35) / 0.3) * (0.9 + 0.1 * Math.sin(this.time * 9 + a.step));
       const lx = wx + 4 * a.dir;
       const ly = wy - 6 - bob + Math.sin(a.step) * 0.6;
-      this.nightLights.push(lx, wy - 3, glow);
+      this.nightLights.push(lx, wy - 3, glow, 22);
       c.strokeStyle = '#3a2c20';
       c.lineWidth = 0.6;
       c.beginPath();
@@ -4485,20 +4545,38 @@ export class Renderer {
         f.x = Math.random() * this.width;
       }
     };
-    if (season === 3) {
-      if (this.snow.length < 220) {
+    // Late autumn: the first flakes come halfway through the month and thicken towards winter, as the leaves thin.
+    const month = monthOf(s.day);
+    const into = ((s.day % DAYS_PER_MONTH) + this.dayFrac) / DAYS_PER_MONTH;
+    const firstSnow = month === 8 ? Math.max(0, Math.min(1, (into - 0.4) / 0.6)) : 0;
+    if (season === 3 || firstSnow > 0) {
+      if (this.snow.length < 220 || this.snowKind !== 'snow') {
+        this.snow = [];
+        this.snowKind = 'snow';
         for (let k = 0; k < 220; k++) this.snow.push({ x: Math.random() * this.width, y: Math.random() * this.height, s: 0.5 + Math.random() });
       }
-      c.fillStyle = 'rgba(255,255,255,0.85)';
-      for (const f of this.snow) {
-        f.y += (20 + f.s * 25) * dt;
-        f.x += Math.sin(t + f.s * 10) * 10 * dt;
+      const flakes = season === 3 ? 220 : Math.round(220 * 0.7 * firstSnow);
+      // The last leaves still falling among the first flakes, from the far end of the list.
+      const leaves = season === 3 ? 0 : Math.round(30 * (1 - firstSnow));
+      this.snow.forEach((f, k) => {
+        const leaf = k >= this.snow.length - leaves;
+        if (k >= flakes && !leaf) return;
+        f.y += (leaf ? 14 + f.s * 6 : 20 + f.s * 25) * dt;
+        f.x += Math.sin((leaf ? t * 1.5 : t) + f.s * 10) * (leaf ? 20 : 10) * dt;
         wrap(f);
-        c.fillRect(f.x, f.y, 1.2 + f.s, 1.2 + f.s);
-      }
+        if (leaf) {
+          c.fillStyle = f.s < 1 ? 'rgba(200,120,40,0.8)' : 'rgba(220,170,60,0.8)';
+          c.fillRect(f.x, f.y, 3, 2);
+        } else {
+          c.fillStyle = 'rgba(255,255,255,0.85)';
+          c.fillRect(f.x, f.y, 1.2 + f.s, 1.2 + f.s);
+        }
+      });
     } else if (season === 2) {
       // A few falling leaves.
-      if (this.snow.length < 40) {
+      if (this.snow.length < 40 || this.snowKind !== 'leaves') {
+        this.snow = [];
+        this.snowKind = 'leaves';
         for (let k = 0; k < 40; k++) this.snow.push({ x: Math.random() * this.width, y: Math.random() * this.height, s: Math.random() });
       }
       for (const f of this.snow.slice(0, 40)) {
@@ -4514,6 +4592,8 @@ export class Renderer {
     this.drawRain(s, season, dt, wrap);
   }
 
+  /** What the falling specks are now: snowflakes or leaves. */
+  private snowKind: 'snow' | 'leaves' = 'snow';
   private rain: { x: number; y: number; s: number }[] = [];
   /** How heavy the shower is now, easing towards today's weather. */
   rainLevel = 0;
@@ -4601,9 +4681,9 @@ export class Renderer {
   nights = true;
 
   setDayTime(frac: number, allowed: boolean, dt: number, winter = false): void {
-    // Evening falls in the last third of the day, and the night lasts into the
-    // next morning: longer in winter.
-    const fall = winter ? 0.6 : 0.68;
+    // Evening falls past the middle of the afternoon and the night lasts into
+    // the next morning: about half as long as the day, longer in winter.
+    const fall = winter ? 0.56 : 0.64;
     const dark = fall + 0.1;
     const morning = winter ? 0.14 : 0.08;
     const target = !allowed || this.light || !this.nights ? 0 : frac < fall ? (frac < morning ? 1 - frac / morning : 0) : frac < dark ? (frac - fall) / 0.1 : 1;
@@ -4925,11 +5005,11 @@ export class Renderer {
       c.fill();
     }
     if (Math.random() < 0.3) this.sparks.push({ x: px + (Math.random() - 0.5) * 6, y: py - 18, vx: (Math.random() - 0.5) * 14 + this.wind * 6, vy: -30 - Math.random() * 20, life: 0, max: 0.8 + Math.random() * 0.5 });
-    this.nightLights.push(px, py - 6, 1.6);
+    this.nightLights.push(px, py - 6, 1.6, 22);
     folk(front);
   }
 
-  /** Lanterns seen this frame, as world x, y and strength triples. */
+  /** Lanterns seen this frame, as world x, y, strength and reach. */
   private nightLights: number[] = [];
 
   /** Warm light added back over the evening tint, so lanterns light the lanes. */
@@ -4940,10 +5020,10 @@ export class Renderer {
     const z = this.cam.zoom;
     c.save();
     c.globalCompositeOperation = 'lighter';
-    for (let k = 0; k < L.length; k += 3) {
+    for (let k = 0; k < L.length; k += 4) {
       const x = this.width / 2 + (L[k] - this.cam.x) * z;
       const y = this.height / 2 + (L[k + 1] - this.cam.y) * z;
-      const r = 22 * z;
+      const r = L[k + 3] * z;
       const g = c.createRadialGradient(x, y, 0, x, y, r);
       g.addColorStop(0, `rgba(255,170,70,${0.32 * L[k + 2]})`);
       g.addColorStop(1, 'rgba(255,170,70,0)');

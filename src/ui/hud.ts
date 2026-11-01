@@ -1,5 +1,5 @@
 import { knows, learn, unlockForBuilding, UNLOCK_BY_ID, type LearnTab } from '../game/unlocks';
-import { boardHtml, readyCount, tabOf } from './learning';
+import { boardHtml, oneDecimal, readyCount, tabOf } from './learning';
 import { fingaButton, hasHelp, helpPages } from './fingahelp';
 import { IMPROVEMENT_BY_ID, improvementsFor } from '../game/improve';
 import { OPTIONS, optionError, optionOn, optionOnce, setOption } from '../game/options';
@@ -23,6 +23,7 @@ import {
   GOODS,
   GROUP_NAMES,
   RESOURCE_STORAGE,
+  SILO_GOODS,
   STORAGE_CAPACITY,
   YARD_STORE,
   EXPORT_PER_DOCK,
@@ -46,6 +47,7 @@ import {
   HOMES_PER_STALL,
   siloCap,
   siloHeld,
+  siloShare,
   recompute,
   seasonOf,
   setKeep,
@@ -94,7 +96,9 @@ import {
   ROYAL_COST,
   ROYAL_TIER,
   setWorkers,
+  setManualHire,
   setPriority,
+  wantOf,
   setRecipe,
   setStopped,
   stoppedMaking,
@@ -175,6 +179,10 @@ const REACH_ICON =
 /** The resource lens: a magnifying glass over a gem. */
 const LENS_ICON =
   '<svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="6" fill="#e8eef0" stroke="#5a3a22" stroke-width="1.5"/><path d="M8.5 5l3 2.6-3 4-3-4z" fill="#d04a5a"/><path d="M5.5 7.6h6" stroke="#8a2a3a" stroke-width=".6"/><path d="M13 13l5 5" stroke="#5a3a22" stroke-width="2.4" stroke-linecap="round"/></svg>';
+
+/** Hide trees: a pine with a stroke through it. */
+const TREES_ICON =
+  '<svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><path d="M10 2l5 7h-3l4 5H4l4-5H5z" fill="#4f7a34" stroke="#2f4a1e" stroke-width="1"/><rect x="9" y="14" width="2" height="4" fill="#6b4a2e"/><path d="M3 17L17 3" stroke="#b8433a" stroke-width="2.2" stroke-linecap="round"/></svg>';
 
 /** A number on the top bar, in a box `w` digits wide. */
 const n = (v: number | string, w: number) => `<span class="n n${w}">${v}</span>`;
@@ -323,11 +331,11 @@ export class Hud {
           <div class="btnrow">
             <button id="menu-btn" class="panel icon-btn" data-action="menu" data-tip="Menu (Esc)">${CATEGORY_ICONS.menu}</button>
             <button id="lord-btn" class="panel icon-btn" data-action="lord" data-tip="<b>Your Lord</b><br>Choose how your lord or lady looks, and the arms on your flags."></button>
-            <button class="panel icon-btn" data-action="chronicle" data-tip="<b>Chronicle</b><br>Everything that has happened in your lands.">${CATEGORY_ICONS.scroll}</button>
             <button class="panel icon-btn" data-action="production" data-tip="<b>Production Book</b><br>Every trade, what it takes and what it makes.">${ICONS.books}</button>
             <button class="panel icon-btn" data-action="charters" data-tip="<b>Town Charters</b><br>Spend prestige to specialise your town.">${ICONS.prestige}</button>
             <button class="panel icon-btn" data-action="coverage" data-tip="<b>Reach</b> (V)<br>Show where wells, markets, taverns and churches reach, and which homes they miss.">${REACH_ICON}</button>
             <button id="lens-btn" class="panel icon-btn" data-action="lens" data-tip="<b>Resource lens</b> (L)<br>Grey the land and light up rock, bog ore, berries, game and fish, even under the trees, with about how much of each. Click again to see the land as it is.">${LENS_ICON}</button>
+            <button id="trees-btn" class="panel icon-btn" data-action="hide-trees" data-tip="<b>Hide trees</b> (F)<br>Lay the woods flat to see the ground under them, for building among the trees. Click again to stand them up.">${TREES_ICON}</button>
           </div>
           <div id="objectives" class="panel"></div>
         </div>
@@ -624,7 +632,7 @@ export class Hud {
       chip('treasury', '', `${ICONS.gold}${n(Math.floor(s.res.gold), 5)}<span class="prestige${s.res.prestige > 0 || s.tier >= 1 ? '' : ' none'}">${ICONS.prestige}${n(Math.floor(s.res.prestige), 4)}</span>`),
       (() => {
         const ready = readyCount(s);
-        return `<button class="res chip learn-chip" data-action="learning" data-tip="<b>The learning board</b><br>Spend knowledge on new buildings, recipes and better ways of working.${ready ? `<br>${ready} can be learned now.` : ''}">${ICONS.knowledge}${n(Math.floor(s.res.knowledge), 4)}${badge(ready)}</button>`;
+        return `<button class="res chip learn-chip" data-action="learning" data-tip="<b>The learning board</b><br>Spend knowledge on new buildings, recipes and better ways of working.${ready ? `<br>${ready} can be learned now.` : ''}">${ICONS.knowledge}${n(oneDecimal(s.res.knowledge), 4)}${badge(ready)}</button>`;
       })(),
     ].join('');
     setHTML(this.el.topbar, html);
@@ -860,6 +868,7 @@ export class Hud {
     this.renderChipPanel();
     this.renderLordButton();
     this.root.querySelector('#lens-btn')?.classList.toggle('active', g.lens === 'resources');
+    this.root.querySelector('#trees-btn')?.classList.toggle('active', g.renderer.hideTrees);
 
     // Clock.
     const season = seasonOf(s.day);
@@ -1031,7 +1040,7 @@ export class Hud {
     } else {
       const slots = workersOf(b);
       if (slots) {
-        const want = Math.min(slots, b.want ?? slots);
+        const want = Math.min(slots, wantOf(s, b));
         const pips = Array.from(
           { length: slots },
           (_, i) => `<i class="${i < b.workers ? 'on' : ''} ${i >= want ? 'unwanted' : ''}" data-action="want" data-n="${i + 1 === want ? i : i + 1}"></i>`,
@@ -1040,7 +1049,8 @@ export class Hud {
         rows.push(`<div class="kv labour" data-tip="Click the pips to choose how many villagers work here. Workers left free take other jobs or help build."><span>Workers ${b.workers}/${want}</span><span class="pips">${pips}</span></div>
           <div class="kv prio"><span>Priority</span><span class="seg">${['Low', 'Normal', 'High']
             .map((n, i) => `<button data-action="prio" data-p="${i}" class="${prio === i ? 'active' : ''}" data-tip="${['Staffed last', 'Staffed in the usual order', 'Staffed before everything else'][i]}">${n}</button>`)
-            .join('')}</span></div>`);
+            .join('')}</span></div>
+          <label class="kv auto-hire" data-tip="<b>Auto-hire</b> (whole town)<br>Ticked: villagers fill every workplace, in order of priority. Unticked: each workplace keeps the crew it has, a new one starts empty, and only the pips you set move anyone."><span>Auto-hire</span><input type="checkbox" data-action="auto-hire" ${s.manualHire ? '' : 'checked'}></label>`);
         if (d.months) {
           const names = d.months.length >= 12 ? '' : seasonSpan(d.months);
           if (names) rows.push(`<div class="kv"><span>Works in</span><span>${names}</span></div>`);
@@ -1254,7 +1264,7 @@ export class Hud {
     const src = knowledgeSources(s);
     if (!src.length && s.res.knowledge <= 0) return '';
     const tip = src.length ? src.map((x) => `${x.label}: +${x.value.toFixed(1)}`).join('<br>') : 'Nothing teaches yet';
-    return `<div class="kv" style="margin-top:8px" data-tip="${esc(`<b>Knowledge a month</b><br>${tip}`)}"><span>${ICONS.knowledge} Knowledge</span><b>${Math.floor(s.res.knowledge)} <small class="pos">+${knowledgeIncome(s).toFixed(1)}/month</small></b></div>`;
+    return `<div class="kv" style="margin-top:8px" data-tip="${esc(`<b>Knowledge a month</b><br>${tip}`)}"><span>${ICONS.knowledge} Knowledge</span><b>${oneDecimal(s.res.knowledge)} <small class="pos">+${knowledgeIncome(s).toFixed(1)}/month</small></b></div>`;
   }
 
   /** The prestige in hand, what comes in each month, and from where (largest first). */
@@ -1429,13 +1439,24 @@ export class Hud {
     const s = this.game.state;
     const kinds = Object.keys(STORAGE_CAPACITY[b.type] ?? {}) as StorageKind[];
     const rows: string[] = [];
+    // What the silos keep is shown at the silos, not counted again in the granaries.
+    const inStore = (r: ResourceId) => s.res[r] - siloShare(s, r);
+    if (b.type === 'silo') {
+      const held = Math.floor(siloHeld(s));
+      const cap = siloCap(s);
+      const list = SILO_GOODS.filter((r) => siloShare(s, r) >= 1)
+        .map((r) => `<div class="kv store-row"><span>${ICONS[r] ?? ''} ${GOODS[r].name}</span><span>${Math.floor(siloShare(s, r))}</span></div>`)
+        .join('');
+      rows.push(`<div class="needs-h">All silos · ${held} / ${cap}</div>
+        <div class="progress"><i style="width:${Math.min(100, (held / Math.max(1, cap)) * 100)}%"></i></div>${list || '<div class="note"><i>Empty: wheat and barley come here first after the harvest.</i></div>'}`);
+    }
     for (const kind of kinds) {
       const used = Math.floor(stored(s, kind));
       const cap = storageCap(s, kind);
-      const goods = RESOURCE_IDS.filter((r) => RESOURCE_STORAGE[r] === kind && s.res[r] >= 1).sort((a, c) => s.res[c] - s.res[a]);
+      const goods = RESOURCE_IDS.filter((r) => RESOURCE_STORAGE[r] === kind && inStore(r) >= 1).sort((a, c) => inStore(c) - inStore(a));
       const list = goods
         .slice(0, 8)
-        .map((r) => `<div class="kv store-row"><span>${ICONS[r] ?? ''} ${GOODS[r].name}</span><span>${Math.floor(s.res[r])}</span></div>`)
+        .map((r) => `<div class="kv store-row"><span>${ICONS[r] ?? ''} ${GOODS[r].name}</span><span>${Math.floor(inStore(r))}</span></div>`)
         .join('');
       rows.push(`<div class="needs-h">${kind === 'food' ? 'All granaries' : 'All storehouses'} · ${used} / ${cap}</div>
         <div class="progress"><i style="width:${Math.min(100, (used / Math.max(1, cap)) * 100)}%"></i></div>${list}`);
@@ -1543,7 +1564,7 @@ export class Hud {
     let played = false;
     for (const m of msgs) {
       if ((m.n ?? 0) <= this.shownMessages) continue;
-      // Routine news goes to the chronicle only.
+      // Routine news is kept but not shown.
       if (m.kind === 'info') continue;
       const text = `${m.kind === 'advice' ? '<b>Steward:</b> ' : ''}${esc(m.text.replace(/^Steward: /, ''))}`;
       // The same news again bumps a counter on the toast already showing.
@@ -1631,10 +1652,14 @@ export class Hud {
 
   private celebrate(tier: number): void {
     const t = TIERS[tier];
-    // Only decorations and monuments wait for the town's size; everything else is open from the start.
+    // Decorations and monuments wait for the town's size, and some buildings open with a rank instead of learning.
     const sized = (b: BuildingType) => BUILDINGS[b].category === 'decor' || MONUMENTS.includes(b);
-    const unlocked = BUILD_ORDER.filter((b) => sized(b) && BUILDINGS[b].tier === tier && !BUILDINGS[b].charter);
-    const works = unlocked.some((b) => BUILDINGS[b].category === 'works');
+    const ranked = (b: BuildingType) => {
+      const u = unlockForBuilding(b);
+      return !!u && u.rank === tier && u.knowledge === undefined;
+    };
+    const unlocked = BUILD_ORDER.filter((b) => !BUILDINGS[b].charter && (ranked(b) || (sized(b) && BUILDINGS[b].tier === tier && !unlockForBuilding(b))));
+    const works = unlocked.some((b) => BUILDINGS[b].category !== 'decor');
     const div = document.createElement('div');
     div.className = 'banner panel';
     div.innerHTML = `<div class="ornament">❦ ❦ ❦</div><div class="tier-sub">Your settlement is now a</div><h1>${t.name}</h1>
@@ -1731,22 +1756,6 @@ export class Hud {
     );
   }
 
-  private showChronicle(): void {
-    const s = this.game.state;
-    const rows = s.messages
-      .slice()
-      .reverse()
-      .map((m) => `<div class="chron ${m.kind}"><small>${MONTH_NAMES[monthOf(m.day)]}, Y${yearOf(m.day)}</small> ${esc(m.text)}</div>`)
-      .join('');
-    const dated = (s.milestones ?? []).filter((m) => m.day >= 0);
-    const miles = dated
-      .map((m) => `<div class="mile"><small>${MONTH_NAMES[monthOf(m.day)]}, Year ${yearOf(m.day)}</small><span>${esc(m.text)}</span></div>`)
-      .join('');
-    this.modalHelp = 'chronicle';
-    this.openModal(`<h2>Chronicle of ${esc(townName(s))}</h2>${miles ? `<div class="sub">Milestones</div><div class="milestones">${miles}</div><div class="sub">Lately</div>` : ''}<div class="chronicle">${rows || '<i>Nothing has happened yet.</i>'}</div>
-      <div class="row" style="justify-content:flex-end;margin-top:10px"><button class="primary" data-action="close-modal">Close</button></div>`);
-  }
-
   // ---------------------------------------------------------------- hints
 
   setHint(text: string, err: boolean): void {
@@ -1776,7 +1785,8 @@ export class Hud {
     if (performance.now() < this.flashUntil) return;
     if (this.game.tool.kind !== 'select') return;
     if (this.coverageType) this.updateCoverageHint();
-    else this.setHint('', false);
+    // The resource lens keeps its own line in the bar (set each frame by the game); clearing it here made it blink.
+    else if (this.game.lens !== 'resources') this.setHint('', false);
   }
 
   // ---------------------------------------------------------------- tooltips
@@ -1935,11 +1945,11 @@ export class Hud {
         this.objectivesMin = !this.objectivesMin;
         this.update();
         break;
-      case 'chronicle':
-        this.showChronicle();
-        break;
       case 'coverage':
         g.cycleCoverage();
+        break;
+      case 'hide-trees':
+        g.setHideTrees(!g.renderer.hideTrees);
         break;
       case 'lens':
         g.setLens(g.lens === 'resources' ? 'normal' : 'resources');
@@ -2000,6 +2010,11 @@ export class Hud {
           setSitePriority(s, b, Number(t.dataset.p));
           this.update();
         }
+        break;
+      }
+      case 'auto-hire': {
+        setManualHire(s, !(t as HTMLInputElement).checked);
+        this.update();
         break;
       }
       case 'prio': {
@@ -3142,11 +3157,11 @@ export class Hud {
         <p><b>The Manor</b> is optional: build it for feasts, festivals and prestige, and renovate it as the town grows into a Manor House and then a Stone Manor, which lets you lay out a manor garden, watch towers and the town walls.</p>
         <p><b>Retinue</b>: a Borough can raise men-at-arms at the manor for prestige and arms. Paid 10 coins a month, they ride out against wolves and bandits.</p>
         <p><b>Harvest feast</b>: once each autumn, select the manor to call a feast. A meal for everyone and drink for every eight cheer the town for half a year and bring prestige.</p>
-        <p><b>Villagers</b> eat one food a month each; several food groups (grain, meat, produce, dairy) cheer them. When every food is gone they boil stored wheat into pottage, which is only half as filling. Each winter month a home burns firewood. Finer homes need clothes, a tavern, boots and medicine, and enjoy luxuries. A family may set up a craft at home: the workshop costs materials and takes days to build, and the craft stays for good.</p>
+        <p><b>Villagers</b> eat one food a month each; several food groups (grain, meat, produce, dairy) cheer the homes a market serves. When every food is gone they boil stored wheat into pottage, which is only half as filling. Each winter month a home burns firewood. Finer homes need clothes, a tavern, boots and medicine, and enjoy luxuries. A family may set up a craft at home: the workshop costs materials and takes days to build, and the craft stays for good.</p>
         <p><b>Prestige</b> comes from a fine manor, a church and monuments. From Town on, spend it on <b>charters</b> (crown button) to specialise your town.</p>
-        <p>Your <b>steward</b> warns you when things go wrong; the <b>Chronicle</b> (scroll button) keeps the full story.</p>
+        <p>Your <b>steward</b> warns you when things go wrong; the latest news shows at the side of the screen.</p>
         <div class="ornament">❦</div>
-        <p><b>Keys</b>: <kbd>Left-drag</kbd> / <kbd>WASD</kbd> / arrows pan · <kbd>Wheel</kbd> / <kbd>+</kbd><kbd>-</kbd> / pinch zoom · <kbd>R</kbd> road (click, click) · <kbd>T</kbd> stone road · <kbd>Y</kbd> cobbled street · <kbd>X</kbd> / <kbd>Del</kbd> demolish · <kbd>P</kbd> protect a wood · <kbd>U</kbd> photo mode (hide the interface) · <kbd>V</kbd> reach of wells, markets, taverns, churches · <kbd>L</kbd> resource lens · ${BUILD_ORDER.filter((b) => BUILDINGS[b].hotkey)
+        <p><b>Keys</b>: <kbd>Left-drag</kbd> / <kbd>WASD</kbd> / arrows pan · <kbd>Wheel</kbd> / <kbd>+</kbd><kbd>-</kbd> / pinch zoom · <kbd>R</kbd> road (click, click) · <kbd>T</kbd> stone road · <kbd>Y</kbd> cobbled street · <kbd>X</kbd> / <kbd>Del</kbd> demolish · <kbd>P</kbd> protect a wood · <kbd>U</kbd> photo mode (hide the interface) · <kbd>V</kbd> reach of wells, markets, taverns, churches · <kbd>L</kbd> resource lens · <kbd>F</kbd> hide trees · ${BUILD_ORDER.filter((b) => BUILDINGS[b].hotkey)
           .map((b) => `<kbd>${BUILDINGS[b].hotkey!.toUpperCase()}</kbd> ${BUILDINGS[b].name.toLowerCase()}`)
           .join(' · ')} · <kbd>Space</kbd> pause · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> speed</p>
         <p><b>Playing with friends:</b> found the same land with the seed of the week, download your town from Save Game for a friend to open, and compare <b>scores</b> on the load cards: villagers and rank, the lord's title, great works, works of art, milestones and every year in which no one went hungry.</p>

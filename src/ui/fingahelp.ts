@@ -77,10 +77,6 @@ const HELP: Record<string, HelpPage[]> = {
     { say: 'The charters go in order along the path, and each costs more prestige than the last.', show: '.t-nodes' },
     { say: 'Click one and its details show here. Two full paths make a fine reign; a Guildhall makes them cheaper.', show: '.charter-detail' },
   ],
-  chronicle: [
-    { say: 'The milestones of your reign, my liege. Something to tell the grandchildren.', show: '.modal .milestones' },
-    { say: 'And below, everything that has happened in your lands. Click an entry and I shall take you to the place.', show: '.modal .chronicle' },
-  ],
   production: [
     { say: 'The production book! What each good comes from, and what uses it.', show: '.modal .prodbook' },
     { say: 'How much was made and used of late, and the stock targets. When something runs short, look here first: the chain shows which link is missing.' },

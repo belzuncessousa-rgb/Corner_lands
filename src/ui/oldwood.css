@@ -1,0 +1,26 @@
+/*
+ * Trial: every board in the knotted, grained wood of the charter plaque,
+ * painted pale (`--wood-pale` from wood.ts) so dark lettering reads on it,
+ * in a frame of the darker wood. Loaded after painted.css; drop the import
+ * in main.ts to go back.
+ */
+:root {
+  --board:
+    radial-gradient(ellipse at 50% 30%, rgba(255, 248, 228, 0.2), transparent 70%) padding-box,
+    var(--wood-pale, #ecd09c) center / cover padding-box,
+    linear-gradient(180deg, rgba(255, 220, 160, 0.25), rgba(0, 0, 0, 0.25)) border-box,
+    var(--wood-img-dark, #6a4424) center / cover border-box;
+}
+
+/* The charter plaque itself, back in its own wood. */
+.modal.plaque::before {
+  background:
+    linear-gradient(180deg, rgba(255, 220, 160, 0.25), rgba(0, 0, 0, 0.25)),
+    var(--wood-img-dark, #6a4424) center / cover;
+  outline: none;
+}
+.modal.plaque::after {
+  background:
+    radial-gradient(ellipse at 50% 40%, rgba(255, 230, 180, 0.1), rgba(30, 12, 0, 0.32)),
+    var(--wood-img, #a87842) center / cover;
+}

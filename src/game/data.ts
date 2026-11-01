@@ -149,7 +149,7 @@ export const STORAGE_CAPACITY: Partial<Record<BuildingType, Partial<Record<Stora
 /** Grains a silo keeps: they go there first, before the granaries. */
 export const SILO_GOODS: ResourceId[] = ['grain', 'barley'];
 /** Wheat and barley each silo holds. */
-export const SILO_CAPACITY = 500;
+export const SILO_CAPACITY = 1500;
 
 export const DAYS_PER_MONTH = 10;
 export const MONTHS_PER_YEAR = 12;
@@ -1032,7 +1032,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   silo: def({
     type: 'silo',
     name: 'Silo',
-    desc: `A tall round store that keeps 500 wheat and barley dry for years. Harvested grain goes here first and the granaries stay free for other food. It needs no keepers.`,
+    desc: `A tall round store that keeps 1500 wheat and barley dry for years. Harvested grain goes here first and the granaries stay free for other food. It needs no keepers.`,
     category: 'farming',
     w: 2,
     h: 2,
@@ -1057,7 +1057,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   market: def({
     type: 'market',
     name: 'Marketplace',
-    desc: 'A square for stalls, free to lay out: click one corner, then the other. A vendor for each stall stocks it from the storehouse and granary, and each open stall serves ten households with their goods, the nearest homes first. Food comes from the stores either way.',
+    desc: 'A square for stalls, free to lay out: click one corner, then the other. A vendor for each stall stocks it from the storehouse and granary, and each open stall serves ten households with their goods, the nearest homes first. Food comes from the stores either way, but only homes a market serves enjoy a varied table, clothes, boots and luxuries.',
     category: 'civic',
     w: 3,
     h: 3,
@@ -1288,6 +1288,19 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     radius: 3,
     beauty: 1,
   }),
+  streetlamp: def({
+    type: 'streetlamp',
+    name: 'Street Lamp',
+    desc: 'An iron post with a glazed lantern, set beside a stone road or cobbled street. Lit at dusk, it makes the street lovelier and lights it through the night; a firewood (or charcoal) a month keeps four burning. Patrician Houses want one nearby.',
+    category: 'decor',
+    w: 1,
+    h: 1,
+    cost: { iron: 2, glass: 1, stone: 2, gold: 30 },
+    buildDays: 3,
+    radius: 4,
+    beauty: 2,
+    tier: 3,
+  }),
   manorgarden: def({
     type: 'manorgarden',
     name: 'Manor Garden',
@@ -1435,6 +1448,7 @@ export const BUILD_ORDER: BuildingType[] = [
   'hedge',
   'shrine',
   'fountain',
+  'streetlamp',
   'publicgarden',
   'maypole',
   'townhall',

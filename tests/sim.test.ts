@@ -1282,6 +1282,32 @@ describe('farm barn', () => {
   });
 });
 
+describe('farm barn and silo', () => {
+  it('a barn empties into a silo with room even when the granaries are full', async () => {
+    const { barnTotal, siloCap, siloHeld, storageCap, stored } = await import('../src/game/sim');
+    const { RESOURCE_STORAGE } = await import('../src/game/data');
+    const { RESOURCE_IDS } = await import('../src/game/types');
+    const s = generateWorld(91);
+    s.tier = 1;
+    const farm = placeNearRoad(s, 'farm');
+    farm.build = 1;
+    farm.need = undefined;
+    const silo = placeNearRoad(s, 'silo');
+    silo.build = 1;
+    silo.need = undefined;
+    for (const k of RESOURCE_IDS) if (RESOURCE_STORAGE[k] === 'food') s.res[k] = 0;
+    // The silo nearly full, the granaries full of bread: only a little room left, all of it in the silo.
+    s.res.grain = siloCap(s) - 60;
+    s.res.bread = storageCap(s, 'food') - stored(s, 'food');
+    farm.barn = { grain: 100 };
+    farm.paused = true;
+    s.dirty = true;
+    run(s, 3);
+    expect(siloHeld(s)).toBe(siloCap(s));
+    expect(barnTotal(farm)).toBe(40);
+  });
+});
+
 describe('farm barn safety', () => {
   it('demolishing a farm or pausing it does not lose the barn', async () => {
     const { barnTotal, demolish, stored } = await import('../src/game/sim');

@@ -139,6 +139,7 @@ export type BuildingType =
   | 'shrine'
   | 'flowerbed'
   | 'fountain'
+  | 'streetlamp'
   | 'draughtstable'
   | 'builderyard'
   | 'sandpit'
@@ -422,6 +423,8 @@ export interface GameState {
   happinessTarget: number;
   happinessFactors: { label: string; value: number }[];
   taxLevel: number;
+  /** Workplaces staffed only as the player sets them: one left unset gets no one. */
+  manualHire?: boolean;
   tier: number;
   quests: string[];
   messages: Message[];
@@ -481,6 +484,8 @@ export interface GameState {
   using?: Partial<Record<ResourceId, number>>;
   /** Whether the university had its books and wood parts this month. */
   universityOk?: boolean;
+  /** The street lamps went unlit this month for want of firewood or charcoal. */
+  lampsDark?: boolean;
   /** The lord keeps an armed retinue (Borough and up). */
   retinue?: boolean;
   /** Town charters granted (see charters.ts). */

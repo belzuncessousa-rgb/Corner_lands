@@ -120,6 +120,14 @@ export function siloHeld(s: GameState): number {
   return Math.min(cap, n);
 }
 
+/** How much of one grain the silos hold: the space shared out by how much of each there is. */
+export function siloShare(s: GameState, id: ResourceId): number {
+  if (!SILO_GOODS.includes(id)) return 0;
+  let all = 0;
+  for (const r of SILO_GOODS) all += s.res[r];
+  return all > 0 ? (siloHeld(s) * s.res[id]) / all : 0;
+}
+
 /** Free space left for a resource's storage pool (Infinity for gold). */
 export function roomFor(s: GameState, id: ResourceId): number {
   const kind = RESOURCE_STORAGE[id];
@@ -267,6 +275,7 @@ export function placementError(s: GameState, type: BuildingType, x: number, y: n
   if ((type === 'fisher' || type === 'claypit' || type === 'sandpit' || type === 'watermill' || type === 'dock' || type === 'papermill' || type === 'watersawmill') && countInRadius(s, centerOf(x, y, d.w, d.h), 2.5, (i) => s.terrain[i] === 1) < 2) {
     return 'Must be next to water';
   }
+  if (type === 'streetlamp' && !besidePavedRoad(s, x, y)) return 'Must stand beside a stone road or cobbled street';
   if (type === 'cathedral' && s.buildings.some((b) => b.type === 'cathedral')) return 'Your town has its cathedral';
   if (type === 'townhall' && s.buildings.some((b) => b.type === 'townhall')) return 'Your town has its manor';
   if (type === 'church' && s.buildings.some((b) => b.type === 'church')) return 'One church to a town: rebuild it to grow';
@@ -1732,7 +1741,7 @@ export function recompute(s: GameState): void {
     // A site's own priority puts it in the same bands as the workplaces'.
     if (isProject(b) && !starvedSite(s, b)) jobs.push({ b, site: true, p: (2 - (b.sitePriority ?? 1)) * 100 + (b.type === 'wall' ? WALL_SITE_PRIORITY : SITE_PRIORITY) + b.id * 1e-6 });
     if (b.paused) continue;
-    if (b.build >= 1 && workDef(b).workers > 0 && (b.want ?? 1) > 0 && !restingNow(s, b)) {
+    if (b.build >= 1 && workDef(b).workers > 0 && wantOf(s, b) > 0 && !restingNow(s, b)) {
       if (isMarket(b)) {
         // One vendor opens the market, hired with the food makers; the
         // other stalls are kept only when there are hands to spare.
@@ -1747,7 +1756,7 @@ export function recompute(s: GameState): void {
   }
   jobs.sort((a, c) => a.p - c.p || a.b.id - c.b.id);
   for (const j of jobs) {
-    const places = Math.min(workersOf(j.b), j.b.want ?? Infinity);
+    const places = Math.min(workersOf(j.b), wantOf(s, j.b));
     const n = Math.min(free, j.site ? (j.b.type === 'wall' ? 1 : SITE_BUILDERS) : j.more ? places - j.b.workers : Math.min(places, j.cap ?? Infinity));
     if (j.site) j.b.builders = n;
     else if (j.more) j.b.workers += n;
@@ -1965,7 +1974,28 @@ export function setRecipe(s: GameState, b: Building, id: string | undefined): vo
 
 export function setWorkers(s: GameState, b: Building, want: number | undefined): void {
   b.want = want === undefined ? undefined : Math.max(0, Math.min(workersOf(b), Math.round(want)));
-  if (b.want === workersOf(b)) b.want = undefined;
+  // Full is the default, unless hiring is by hand: then it has to be said.
+  if (b.want === workersOf(b) && !s.manualHire) b.want = undefined;
+  recompute(s);
+}
+
+/** Workers a workplace may take: as the player set, else all its places (none when hiring is by hand). */
+export function wantOf(s: GameState, b: Building): number {
+  return b.want ?? (s.manualHire ? 0 : Infinity);
+}
+
+/**
+ * Hiring by hand or by the town. Going by hand keeps each workplace's crew
+ * as it is now, so nothing changes until the player moves someone; going
+ * back lets every workplace set full fill up again.
+ */
+export function setManualHire(s: GameState, on: boolean): void {
+  for (const b of s.buildings) {
+    if (b.build < 1 || workersOf(b) <= 0) continue;
+    if (on && b.want === undefined) b.want = b.workers;
+    else if (!on && b.want === workersOf(b)) b.want = undefined;
+  }
+  s.manualHire = on || undefined;
   recompute(s);
 }
 
@@ -2003,7 +2033,7 @@ export function labourSummary(s: GameState): LabourSummary {
     const d = workDef(b);
     if (b.build < 1 || d.workers === 0) continue;
     out.workers += b.workers;
-    const want = b.paused ? 0 : Math.min(workersOf(b), b.want ?? Infinity);
+    const want = b.paused ? 0 : Math.min(workersOf(b), wantOf(s, b));
     const resting = !b.paused && want > 0 && restingNow(s, b);
     if (resting) out.resting += want;
     const c = cats.get(d.category) ?? { have: 0, slots: 0 };
@@ -2925,7 +2955,9 @@ function unloadBarn(s: GameState, b: Building): void {
   for (const k in b.barn) {
     const id = k as ResourceId;
     const kind = RESOURCE_STORAGE[id];
-    const spare = kind ? roomFor(s, id) - storageCap(s, kind) * BARN_HEADROOM : budget;
+    // The headroom keeps the granaries and storehouses some space for fresh goods; a silo's room is all for grain.
+    const silo = SILO_GOODS.includes(id) ? siloCap(s) - siloHeld(s) : 0;
+    const spare = kind ? silo + Math.max(0, roomFor(s, id) - silo - storageCap(s, kind) * BARN_HEADROOM) : budget;
     const moved = store(s, id, Math.max(0, Math.min(budget, b.barn[id] ?? 0, Math.floor(spare))));
     b.barn[id] = (b.barn[id] ?? 0) - moved;
     budget -= moved;
@@ -3581,6 +3613,12 @@ function passiveStatus(s: GameState, b: Building): string {
       }
       return homes ? `Cheering ${homes} home${homes > 1 ? 's' : ''} nearby` : 'No homes nearby yet';
     }
+    case 'streetlamp': {
+      if (s.lampsDark) return 'Unlit: no firewood or charcoal for the lamps this month';
+      let homes = 0;
+      for (const o of s.buildings) if (o.residents > 0 && Math.hypot(bCenter(o).x - b.x - 0.5, bCenter(o).y - b.y - 0.5) <= BUILDINGS.streetlamp.radius) homes++;
+      return homes ? `Lighting the street for ${homes} home${homes > 1 ? 's' : ''}` : 'No homes nearby yet';
+    }
     case 'bathhouse': {
       if (b.blocked === BLOCK_PROBLEM) return 'The fires are out: needs firewood or charcoal';
       const n = [...crewAssign(s, 'bathhouse').values()].filter((id) => id === b.id).length;
@@ -3680,7 +3718,7 @@ export function dailyProduction(s: GameState, rng: StateRng): void {
       b.blocked = BLOCK_SEASONAL;
       continue;
     }
-    if (b.want === 0) {
+    if (wantOf(s, b) === 0) {
       b.status = 'No workers assigned';
       b.blocked = 0;
       continue;
@@ -3963,8 +4001,41 @@ export const CROWDING_FROM = 90;
  * uses paper or parchment and its watch wears clothes and boots (a set every
  * two months). Short of them, they shut (bathhouse) or police half as many.
  */
+/** Street lamps one firewood keeps lit for a month (a charcoal, eight). */
+export const LAMPS_PER_FIREWOOD = 4;
+
+/** A tile beside a stone road, cobbled street or the Royal Road. */
+export function besidePavedRoad(s: GameState, x: number, y: number): boolean {
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    if (inBounds(s, x + dx, y + dy) && s.road[idx(s, x + dx, y + dy)] >= 2) return true;
+  }
+  return false;
+}
+
+/** The lamplighter's round: a little fuel for every lamp, or the streets go dark this month. */
+function lightLamps(s: GameState): void {
+  const lamps = s.buildings.filter((b) => b.type === 'streetlamp' && b.build >= 1).length;
+  if (!lamps) {
+    s.lampsDark = undefined;
+    return;
+  }
+  const fuel = fuelPlan(s, 'streetlamp', Math.ceil(lamps / LAMPS_PER_FIREWOOD));
+  if (fuel) pay(s, fuel);
+  if (!fuel && !s.lampsDark) log(s, 'No firewood for the street lamps: the streets are dark this month.', 'bad');
+  s.lampsDark = !fuel || undefined;
+}
+
+/** Whether a lit street lamp stands near a home. */
+export function litLampNear(s: GameState, home: Building): boolean {
+  if (s.lampsDark) return false;
+  const c = bCenter(home);
+  const r = BUILDINGS.streetlamp.radius + Math.max(home.w, home.h) / 2;
+  return s.buildings.some((o) => o.type === 'streetlamp' && o.build >= 1 && Math.hypot(o.x + 0.5 - c.x, o.y + 0.5 - c.y) <= r);
+}
+
 function monthlyCivic(s: GameState): void {
   const month = monthOf(s.day);
+  lightLamps(s);
   for (const b of s.buildings) {
     if (b.build < 1 || b.workers <= 0) continue;
     if (b.type === 'bathhouse') {
@@ -4609,7 +4680,7 @@ export function beautyAt(s: GameState, home: Building): number {
   const c = bCenter(home);
   let total = 0;
   for (const o of s.buildings) {
-    if (o.build < 1) continue;
+    if (o.build < 1 || (o.type === 'streetlamp' && s.lampsDark)) continue;
     const d = BUILDINGS[o.type];
     const oc = bCenter(o);
     if (d.beauty && Math.hypot(oc.x - c.x, oc.y - c.y) <= d.radius) total += d.beauty;
@@ -4654,8 +4725,9 @@ export function updateHappiness(s: GameState): void {
   factors.push({ label: 'Base contentment', value: 50 });
   const r = s.report;
   if (s.population > 0) {
-    const variety = VARIETY_BONUS[Math.min(4, r.variety)];
-    if (variety) factors.push({ label: `Food variety (${r.variety} food groups)`, value: variety });
+    // Variety is bought at the market: only the homes it serves enjoy it.
+    const variety = VARIETY_BONUS[Math.min(4, r.variety)] * (marketReach(s) / s.population);
+    if (variety >= 0.5) factors.push({ label: `Food variety (${r.variety} food groups, from the market)`, value: Math.round(variety) });
     if (r.shortage > 0) factors.push({ label: 'Hunger', value: -Math.round(15 + 30 * (r.shortage / s.population)) });
   }
   if (r.cold) factors.push({ label: 'No firewood', value: -Math.round(20 * Math.min(1, (r.coldShare ?? 1) * 1.5)) });
@@ -4697,7 +4769,6 @@ export function updateHappiness(s: GameState): void {
   const homeless = Math.max(0, s.population - residents);
   if (residents > 0) {
     if (well) factors.push({ label: 'Wells nearby', value: Math.round((8 * well) / residents) });
-    if (market) factors.push({ label: 'Served by a market', value: Math.round((10 * market) / residents) });
     // Homes the markets cannot serve go without their goods: a slow grumble, not hunger.
     if (s.day > MARKET_GRACE_DAYS && market < residents) factors.push({ label: 'No market to shop at', value: -Math.round((10 * (residents - market)) / residents) });
     if (church) factors.push({ label: 'Church nearby', value: Math.round((15 * church) / residents) });

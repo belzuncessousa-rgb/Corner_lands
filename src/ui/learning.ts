@@ -5,6 +5,9 @@ import { LEARN_TABS, UNLOCKS, UNLOCK_BY_ID, conditionMet, conditionProgress, kno
 import { fingaButton } from './fingahelp';
 import { BUILDING_ICONS, ICONS } from './icons';
 
+/** Knowledge to a tenth, rounded down so it never shows more than can be spent. */
+export const oneDecimal = (v: number): string => (Math.floor(v * 10 + 1e-6) / 10).toFixed(1);
+
 /**
  * The learning board: every unlock is an embroidered patch sewn onto the
  * board, linked patches close together, threads running from a patch to what
@@ -284,7 +287,7 @@ export function boardHtml(s: GameState, tab: LearnTab, sel: string | null, confi
       <svg class="lb-threads" width="${w}" height="${h}"><defs><marker id="lb-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 1L9 5L0 9z" fill="#7a5530"/></marker></defs>${threads.join('')}</svg>
       ${ors.join('')}${patches}</div></div>`;
   return `<div class="lb">
-    <div class="lb-head"><div class="lb-title">${ICONS.knowledge} The learning board</div><div class="lb-have">${Math.floor(s.res.knowledge)} knowledge to spend</div>${fingaButton('learning')}<button class="plaque-btn small" data-action="close-modal">Close</button></div>
+    <div class="lb-head"><div class="lb-title">${ICONS.knowledge} The learning board</div><div class="lb-have">${oneDecimal(s.res.knowledge)} knowledge to spend</div>${fingaButton('learning')}<button class="plaque-btn small" data-action="close-modal">Close</button></div>
     <div class="lb-tabs">${tabs}</div>
     <div class="lb-body">${board}<div class="lb-detail">${detailHtml(s, sel, confirm)}</div></div>
   </div>`;

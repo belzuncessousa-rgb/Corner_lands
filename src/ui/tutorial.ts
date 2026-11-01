@@ -115,7 +115,7 @@ const START: Step[] = [
     show: '#clock',
   },
   {
-    say: 'In the corner: the game menu, your portrait (dress yourself and design your arms there), the chronicle of all that happens, the production book, the town charters, and the reach of your wells and markets.',
+    say: 'In the corner: the game menu, your portrait (dress yourself and design your arms there), the production book, the town charters, and the reach of your wells and markets.',
     show: '#top .btnrow',
   },
   {
