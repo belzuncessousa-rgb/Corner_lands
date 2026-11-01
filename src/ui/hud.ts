@@ -100,6 +100,7 @@ import {
   setPriority,
   wantOf,
   setRecipe,
+  cropLocked,
   setStopped,
   stoppedMaking,
   addOrder,
@@ -1072,7 +1073,9 @@ export class Hud {
               : '<b>Auto</b><br>Make whatever is in season and below its stock target.';
             const icon = rec ? (ICONS[Object.keys(rec.outputs)[0] as ResourceId] ?? '') : '';
             const price = b.type === 'orchard' && current !== r.id ? ` <small>${plantingCost(b, r.id)}c</small>` : '';
-            return `<button data-action="recipe" data-r="${r.id}" class="${current === r.id ? 'active' : ''}" data-tip="${esc(tip)}">${icon}${r.name}${price}</button>`;
+            const locked = cropLocked(b) && current !== r.id;
+            const lockTip = locked ? `<br><i>The ${current} is already sown: the crop can be changed once it is harvested.</i>` : '';
+            return `<button data-action="recipe" data-r="${r.id}" class="${current === r.id ? 'active' : locked ? 'locked' : ''}" data-tip="${esc(tip + lockTip)}">${icon}${r.name}${price}</button>`;
           })
           .join('')}</span></div>`);
       }
@@ -2066,6 +2069,8 @@ export class Hud {
           else this.sound('place');
           this.lastInspectorKey = '';
           this.update();
+        } else if (b && cropLocked(b)) {
+          this.flash('Already sown: change the crop once it is harvested');
         } else if (b) {
           setRecipe(s, b, t.dataset.r || undefined);
           recompute(s);

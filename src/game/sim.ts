@@ -1958,10 +1958,16 @@ export function plantOrchard(s: GameState, b: Building, fruit: string): string |
   return null;
 }
 
+/** A field's crop is fixed from the sowing until the harvest is in. */
+export function cropLocked(b: Building): boolean {
+  return b.type === 'field' && b.growth > 0;
+}
+
 export function setRecipe(s: GameState, b: Building, id: string | undefined): void {
   // Only what the town has learned.
   const r = id ? workDef(b).recipes?.find((x) => x.id === id) : undefined;
   if (r && !recipeKnown(s, b.type, r)) return;
+  if (cropLocked(b)) return;
   // An orchard is planted, and paid for, by fruit.
   if (b.type === 'orchard') {
     if (id) plantOrchard(s, b, id);

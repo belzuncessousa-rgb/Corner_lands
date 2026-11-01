@@ -647,6 +647,11 @@ button.active {
   background: var(--wood-2);
   color: #fff8e6;
 }
+/* A field's other crops while one is sown. */
+.seg button.locked {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 #inspector .kv.product {
   align-items: flex-start;
 }
