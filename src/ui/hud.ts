@@ -156,6 +156,7 @@ import { Minimap } from './minimap';
 import { CHANNEL_NAMES, FULL_VOLUME, Soundscape, type Channel, type SoundSwitches, type Track, type Volumes } from './soundscape';
 import { LICENCE_LINKS, SOUND_CREDITS } from './credits';
 import { folkDoing, folkName, folkThought, WISHES, workplaceOf } from './folk';
+import { DEMO, DEMO_TIER, demoOver, WISHLIST_URL } from '../demo';
 
 const ZONE_COST_NOTE: Partial<Record<BuildingType, string>> = {
   field: '<small>Free · draw it</small>',
@@ -294,6 +295,8 @@ export class Hud {
   private cardImgs = new Map<string, string>();
   minimap: Minimap;
   private lastTier = -1;
+  /** The demo's thank-you was shown for this town (see demo.ts). */
+  private demoShown = false;
   private lordKey = '';
   /** The look and arms a new settlement starts with (the last ones chosen). */
   private draftLord: LordLook = { ...DEFAULT_LORD };
@@ -437,6 +440,7 @@ export class Hud {
 
   rebuild(): void {
     this.lastTier = this.game.state.tier;
+    this.demoShown = false;
     this.lastSeason = seasonOf(this.game.state.day);
     this.category = null;
     this.shownMessages = lastNumber(this.game.state.messages);
@@ -894,8 +898,10 @@ export class Hud {
     // interface again, and must not celebrate twice.
     const grew = this.lastTier >= 0 && s.tier > this.lastTier && !g.demo;
     this.lastTier = s.tier;
-    if (grew) this.celebrate(s.tier);
-    if (s.pendingEvent && !g.demo && !this.modal) this.showEvent();
+    // In the demo, becoming a Town is the end, thanked for instead of celebrated.
+    if (grew && !(DEMO && s.tier >= DEMO_TIER)) this.celebrate(s.tier);
+    if (!g.demo && !this.demoShown && !this.modal && demoOver(s)) this.showDemoEnd();
+    else if (s.pendingEvent && !g.demo && !this.modal) this.showEvent();
     this.updateObjectives();
     if (this.buildBarState() !== this.buildBarKey) this.renderBuildBar();
     this.updateInspector();
@@ -1721,6 +1727,42 @@ export class Hud {
     el.classList.remove('show');
     void el.offsetWidth;
     el.classList.add('show');
+  }
+
+  /**
+   * The end of the demo: thanks, a link to the store page, and the town kept
+   * to look round (paused for good) or to save a picture of.
+   */
+  showDemoEnd(): void {
+    const s = this.game.state;
+    this.demoShown = true;
+    this.game.setSpeed(0);
+    const how = s.tier >= DEMO_TIER ? `${esc(townName(s))} has become a Town` : `Two years have passed in ${esc(townName(s))}`;
+    const m = this.openModal(
+      `<div class="event demo-end">
+        <div class="ornament">❦ ❦ ❦</div>
+        <h2>Thank you for playing</h2>
+        <p class="tale"><span class="initial">${how[0]}</span>${how.slice(1)}, with ${s.population} souls, and this is where the demo ends.</p>
+        <p>In the full game your town grows on into a Borough and a City: charters and guilds, a manor that becomes a palace, a cathedral, fairs, town walls and great works.</p>
+        ${WISHLIST_URL ? '<p>If you enjoyed your time here, a wishlist helps more than you might think.</p>' : ''}
+        <div class="menu">
+          ${WISHLIST_URL ? '<button class="primary" data-m="wishlist">Wishlist Corner Lands on Steam</button>' : ''}
+          <button data-m="picture">📷 Save a picture of my town</button>
+          <button data-m="look">Look around</button>
+          <button data-m="main">Main Menu</button>
+        </div>
+      </div>`,
+      false,
+    );
+    this.sound('good');
+    this.game.autosave().catch(() => undefined);
+    m.querySelector('[data-m="picture"]')!.addEventListener('click', () => {
+      this.closeModal(true);
+      requestAnimationFrame(() => requestAnimationFrame(() => this.game.savePicture()));
+    });
+    m.querySelector('[data-m="wishlist"]')?.addEventListener('click', () => window.open(WISHLIST_URL, '_blank', 'noopener'));
+    m.querySelector('[data-m="look"]')!.addEventListener('click', () => this.closeModal(true));
+    m.querySelector('[data-m="main"]')!.addEventListener('click', () => this.showMainMenu());
   }
 
   /** A decision event: the game waits until the lord chooses. */
@@ -2579,6 +2621,7 @@ export class Hud {
       `<div class="art-slot title-art" data-art="title"></div>
       <h1 class="logo-h">${LOGO}</h1>
       <div class="sub">Raise a humble hamlet into a thriving medieval city</div>
+      ${DEMO ? '<div class="sub">Demo: play until your hamlet becomes a Town, or for two years</div>' : ''}
       <div class="ornament">❦ ❦ ❦</div>
       <div class="menu">
         ${latest ? `<button class="primary" data-m="continue">Continue <small>(${esc(latest.summary.split(' — ')[0])})</small></button>` : ''}
@@ -2589,7 +2632,7 @@ export class Hud {
         <button data-m="settings">Settings</button>
         <button data-m="credits">Credits</button>
       </div>
-      ${this.newsHtml()}`,
+      ${DEMO ? '' : this.newsHtml()}`,
       false,
     );
     m.querySelector('[data-m="continue"]')?.addEventListener('click', async () => {

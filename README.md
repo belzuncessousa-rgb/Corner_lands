@@ -1,11 +1,12 @@
 # Corner Lands
 
-A casual medieval city builder in the spirit of *Manor Lords*. Start with a
-manor hall and eight settlers in a quiet corner of the land, then grow your
-hamlet into a village, a town and finally a borough.
+A casual medieval city builder in the spirit of *Manor Lords*. Start with
+eight settlers and their camp in a quiet corner of the land, then grow your
+hamlet into a village, a town, a borough and finally a city.
 
-Everything — terrain, forests, timber-framed houses, villagers and UI icons —
-is drawn procedurally in code, so there are no image assets.
+Everything you see (terrain, forests, timber-framed houses, villagers and UI
+icons) is drawn procedurally in code, so there are no image files. The music
+and sounds are recordings, credited in [CREDITS.md](CREDITS.md).
 
 **Play it in your browser:** https://belzuncessousa-rgb.github.io/Corner_lands/
 (saves stay in your own browser).
@@ -41,7 +42,6 @@ then fall back to the browser's localStorage.
 | Demolish | `X`, then click a building or drag across roads |
 | Cancel / deselect | Right-click, `Esc`, or a long press on touch screens |
 | Pause / speed | `Space`, `1` `2` `3` (normal, ×3, ×8) |
-| Undo | `Ctrl+Z` (or the button) within ten seconds takes back the last placement or demolition |
 | Reach overlay | `V` cycles wells, markets, taverns and churches: which homes each covers |
 | Resource lens | `L` (or the magnifying-glass button at the top) switches on a view that greys the map and lights up rock, bog ore, berries, game and fish, with about how much of each in every patch |
 | Who works where | Select a building: curved lines run from it to each of its workers or builders, wherever they are |
@@ -102,19 +102,22 @@ then fall back to the browser's localStorage.
   hungry, there is free housing and the larders hold two months of food for
   everyone (the villagers chip says what is holding them back).
 - **Farming** — a Farmstead tends the fields you draw near it (click one
-  corner, then the opposite one): wheat, barley, oats or flax, sown in spring
-  and harvested in autumn; rotate crops for better yields. Rich soil yields
+  corner, then the opposite one): vegetables, wheat, rye, beans, barley, flax
+  or woad, sown in spring and harvested in autumn (a sown crop stays until the
+  harvest is in); rotate crops for better yields. Rich soil yields
   up to twice as much: the hint while drawing and the field's panel show the
   soil and the expected harvest. What the stores cannot take waits in the
   farmstead's barn. Animal Farms keep
-  sheep (wool), cattle (milk, beef, hides) or pigs (pork) on fenced pastures;
-  oats let a herd outgrow its pasture over winter. Orchards are laid out
-  for nothing and then planted: strawberries (1 coin a tile), apples or plums
-  (2), pears (3) or vines (4); fruit trees bear after a year and a half. Households can keep a vegetable
+  sheep (wool), cattle (milk) and pigs on fenced pastures; each animal is
+  bought at a trading post, they do not breed, and any can be slaughtered for
+  meat and a hide. Orchards are laid out for nothing and then planted:
+  strawberry beds (2 coins a tile), apples or plums (4), pears (6) or vines
+  (8); keepers tend them through spring and summer and pick from late summer
+  through autumn. Households can keep a vegetable
   patch, hens or beehives in the backyard.
 - **Food & seasons** — each villager eats one food per month (bread and cheese
   go further); meals from several food groups (grain, meat, produce, dairy)
-  raise happiness. With nothing else left, families boil wheat or oats into
+  raise happiness. With nothing else left, families boil grain into
   pottage, half as filling. Foragers pick berries or herbs (the mushrooms in the woods are only for looking at) and rest in deep winter;
   every household burns a bundle of firewood (or two logs) each winter month.
 - **Workshops** — a Windmill grinds wheat for the Bakery; the Brewhouse brews
@@ -139,9 +142,17 @@ then fall back to the browser's localStorage.
 - **The lord's grounds** — the stable, gardens, armoury, stew pond and the
   rest stand within four tiles of the manor or of one another; the grass
   under them wears into one gravelled ground.
-- **The manor** — raise the Manor Hall to a Manor House, Stone Manor,
-  Lord's Keep and finally a Castle to become a Village, Town, Borough and
-  City. Each rank unlocks buildings and adds storage.
+- **Town sizes** — the settlement grows by itself when it meets the next
+  size's needs: a Village at 20 villagers with a marketplace and a well, a
+  Town at 45 with a church, a Borough at 90 with a tavern and a stone church,
+  a City at 150 with three town charters. The game pauses to show what opens.
+- **The manor** — built by choice, once, from Village on: a Manor Hall that is
+  renovated into a Manor House, a Stone Manor and at last a Palace, each level
+  waiting for a town size. It brings taxes, storage, prestige, feasts and
+  festivals, and from the Stone Manor its grounds spread round a courtyard.
+- **Learning** — the town gathers knowledge (faster with a church, a school,
+  monks and fine homes); spend it on the learning board (the book at the top)
+  to open new buildings and recipes.
 - **Festivals** — May Day round the maypole in spring and a Midsummer bonfire
   by the manor: small spends from the manor's panel for a season's cheer.
 - **Fairs and the Cathedral** — from Town on the treasury can endow a fair once
@@ -155,9 +166,10 @@ then fall back to the browser's localStorage.
 - **Works of art** — from Borough on, prestige can commission a great tapestry
   for the manor and stained-glass windows for the cathedral, each lifting
   spirits for good.
-- **A goal each year** — once a City, the objectives panel sets a goal for the
-  year (welcome 30 newcomers, let no one go hungry, raise 8 buildings, bring in
-  800 sacks); meet it by spring for prestige and a merry season.
+- **Objectives** — in Easy mode an objectives panel guides you, and a City
+  gets a goal each year (welcome 30 newcomers, let no one go hungry, raise 8
+  buildings, bring in 800 sacks); meet it by spring for prestige and a merry
+  season.
 - **Great works for rich towns** — a Borough may also ring the hours from a
   Bell Tower (wide beauty, prestige), and a City may found a Guildhall:
   merchants pay a fifth more, the town takes pride in it, prestige every month.
@@ -179,11 +191,7 @@ then fall back to the browser's localStorage.
   Some charters open new trades: silver and the Jeweller's Shop, vines and the
   Winery, mead from honey, the Scriptorium's paper and books. Jewellery,
   books, wine and mead are luxuries: Townhouses that have one are happier and pay more tax. An Armoury
-  (Borough) makes the arms a castle garrison needs.
-- **Expansions** — workshops can be expanded once for half as many workers again.
-- **Trade** — at the marketplace buy and sell goods; mark goods for sale in the
-  top bar and a merchant's cart visits each month to buy what is above the
-  stock target.
+  (Borough) makes the arms the lord's men-at-arms need.
 - **Events** — once or twice a year something happens (wanderers, a merchant,
   wolves, a harvest feast, the king's tax collector...) and you choose what to
   do.
@@ -213,14 +221,16 @@ then fall back to the browser's localStorage.
   lived-in homes (off at faster speeds and in light mode).
 - **Weather** — snow drifts in winter, leaves fall in autumn and spring brings
   passing showers (all off in light mode).
-- **Music** — now and then a short recorder tune over a plucked drone, in a
-  different mode for each season, with long silences between; Music in the
-  game menu turns it off.
-- **Settings** — the game menu (Esc) scales every panel from 85% to 130% and
-  can pause the game whenever bad news arrives.
-- **Relaxed and Hardy modes** — Relaxed doubles the starting supplies and nobody
-  ever leaves in anger; Hardy starts scarcer, burns twice the firewood in winter
-  and needs three months of food before settlers come.
+- **Music and sound** — recorded music chosen by season and mood, ambience by
+  season and weather, and the sounds of the town and its animals where the
+  camera looks; the note beside the date turns music and ambience on or off.
+- **Settings** — the game menu (Esc) has volume sliders, scales every panel
+  from 85% to 130%, turns nights and tips on or off, and can pause the game
+  whenever bad news arrives.
+- **Easy and Hardy modes** — Easy doubles the starting supplies, adds the
+  objectives, and nobody ever leaves in anger; Hardy starts scarcer, burns
+  twice the firewood in winter and needs three months of food before settlers
+  come.
 
 ## Project layout
 
@@ -266,6 +276,22 @@ node scripts/cvdshots.mjs        # map, ledger and charters as seen with deutera
 node scripts/touchtest.mjs       # phone: wobbly taps still select, long press cancels
 node scripts/uifuzz.mjs          # random clicks, keys and drags over a big town (STEPS, SEED, W, H)
 ```
+
+### The demo
+
+`npm run build:demo` builds the demo as `corner-lands-demo.zip` (the same
+static build as `npm run build:itch`, for itch.io). The demo is the whole game
+until the settlement becomes a Town or its second year ends, whichever comes
+first; then a thank-you screen offers a picture of the town, a look around
+(with time stopped) or the main menu. Set `WISHLIST_URL` to the Steam store
+page when building to add a "Wishlist on Steam" button:
+
+```bash
+WISHLIST_URL=https://store.steampowered.com/app/<id>/Corner_Lands/ npm run build:demo
+```
+
+The limits are in `src/demo.ts`. Music under a licence that keeps it out of
+this repository (see CREDITS.md) is only in builds made where those files are.
 
 The screenshot scripts expect the game at `http://localhost:3001` and a
 Chromium headless shell (set `CHROME` to its path if it lives elsewhere).

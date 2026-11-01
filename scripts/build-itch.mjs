@@ -1,13 +1,19 @@
 // Builds the game for itch.io (no server: saves stay in the browser) and
 // packs it as corner-lands-itch.zip, with index.html at the top of the zip.
 //   node scripts/build-itch.mjs
+//   node scripts/build-itch.mjs --demo    the demo (see src/demo.ts), as corner-lands-demo.zip
+// WISHLIST_URL=<store page> adds the demo's wishlist button.
 import { build } from 'vite';
 import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { crc32, deflateRawSync } from 'node:zlib';
 
 process.env.VITE_STATIC = '1';
-const out = 'dist-itch';
+const demo = process.argv.includes('--demo');
+if (demo) process.env.VITE_DEMO = '1';
+if (process.env.WISHLIST_URL) process.env.VITE_WISHLIST_URL = process.env.WISHLIST_URL;
+const out = demo ? 'dist-demo' : 'dist-itch';
+const zip = demo ? 'corner-lands-demo.zip' : 'corner-lands-itch.zip';
 await build({ build: { outDir: out, emptyOutDir: true }, logLevel: 'warn' });
 
 const files = [];
@@ -68,5 +74,5 @@ end.writeUInt16LE(files.length, 8);
 end.writeUInt16LE(files.length, 10);
 end.writeUInt32LE(dir.length, 12);
 end.writeUInt32LE(offset, 16);
-writeFileSync('corner-lands-itch.zip', Buffer.concat([...chunks, dir, end]));
-console.log(`corner-lands-itch.zip: ${files.length} files, ${(offset / 1024).toFixed(0)} KB`);
+writeFileSync(zip, Buffer.concat([...chunks, dir, end]));
+console.log(`${zip}: ${files.length} files, ${(offset / 1024).toFixed(0)} KB`);

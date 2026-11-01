@@ -4,6 +4,8 @@ saves
 *.log
 dist-itch
 corner-lands-itch.zip
+dist-demo
+corner-lands-demo.zip
 itch/*.png
 promo-out
 itch/*.jpg

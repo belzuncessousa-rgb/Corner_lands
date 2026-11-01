@@ -71,6 +71,7 @@ import { Tutor } from './ui/tutorial';
 import { installWood } from './ui/wood';
 import { installIconPaint } from './ui/icons';
 import { Hud } from './ui/hud';
+import { demoOver } from './demo';
 
 export type Tool =
   | { kind: 'select' }
@@ -226,6 +227,11 @@ export class Game {
   }
 
   setSpeed(i: number): void {
+    // A demo town that has played all the demo holds stays paused: asking for time thanks the player again.
+    if (i > 0 && !this.demo && demoOver(this.state)) {
+      this.hud.showDemoEnd();
+      return;
+    }
     this.speedIndex = Math.max(0, Math.min(SPEEDS.length - 1, i));
     if (this.speedIndex > 0) this.lastSpeed = this.speedIndex;
     this.hud.update();
