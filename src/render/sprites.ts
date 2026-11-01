@@ -3467,7 +3467,7 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       p.windowL(1.25, 0.45, 5, 0.18, 7);
       for (const t of [0.5, 0.56]) p.line([t, 1.253, 5], [t, 1.253, 12], '#2a2a2a', 0.7);
       p.roofPyramid(0.3, 0.3, 1.35, 1.25, 16, 12, 'slate');
-      p.flag(1.05, 1.252, 13, 5, '#c42b3a');
+      p.lordFlag(1.05, 1.252, 13, 5);
       p.box(0.55, 1.4, 0.85, 1.6, 0, 5, '#6a4426');
       p.box(0.55, 1.4, 0.85, 1.6, 5, 0.8, '#c89a38');
       p.sack(1.5, 0.8, '#d8c79c');
@@ -3494,7 +3494,7 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       p.ctx.moveTo(sx - 3, sy - 2);
       p.ctx.lineTo(sx + 3, sy - 2);
       p.ctx.stroke();
-      p.flag(2.65, 2.2, 22, 8, '#2f4fa8');
+      p.lordFlag(2.65, 2.2, 22, 8);
       break;
     }
     case 'atelier': {
@@ -3564,7 +3564,7 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
       for (const x of [0.45, 0.75]) p.windowL(1.402, x, 6, 0.12, 4);
       p.roofX(0.3, 0.3, 1.6, 1.4, 14, 10, 'slate', '#a49c8e', 0.1);
       p.line([0.4, 1.75, 0], [0.4, 1.75, 14], BEAM, 1.2);
-      p.flag(0.4, 1.75, 14, 7, '#c42b3a');
+      p.lordFlag(0.4, 1.75, 14, 7);
       // Spears in a rack.
       p.box(1.0, 1.65, 1.5, 1.72, 0, 6, '#7b5a36');
       for (let k = 0; k < 5; k++) {
@@ -4963,7 +4963,7 @@ function drawBuildingBody(p: Pen, type: BuildingType, level: number, season: Sea
         p.ctx.stroke();
       }
       p.roofPyramid(1.76, 1.26, 2.24, 1.74, 66, 16, 'slate', 0.04);
-      p.flag(2.0, 1.5, 82, 12, '#c8962a');
+      p.lordFlag(2.0, 1.5, 82, 12);
       break;
     }
     case 'university': {

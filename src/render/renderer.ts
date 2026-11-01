@@ -186,8 +186,9 @@ export class Renderer {
 
   buildingSprite(type: BuildingType, level: number, season: Season, variant = 0): Sprite {
     const d = BUILDINGS[type];
-    // The manor flies the lord's arms: a new design means a new picture.
-    const arms = type === 'townhall' ? `:${heraldryKey()}` : '';
+    // Many buildings fly or bear the lord's arms (the manor, the civic offices,
+    // the tiltyard, the great houses): a new design means a new picture.
+    const arms = `:${heraldryKey()}`;
     // The manor's grounds grow with it.
     const size = type === 'townhall' ? (MANOR_SIZE[level] ?? d.w) : 0;
     return this.sprite(`b:${type}:${level}:${season}:${variant}${arms}`, () => buildingSprite(type, size || d.w, size || d.h, level, season, variant));
