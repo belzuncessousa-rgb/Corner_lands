@@ -2183,7 +2183,24 @@ function walkToPoint(f: WalkField, s: GameState, px: number, py: number, near: n
 // ---------------------------------------------------------------- production
 
 /** How much more (or less) a workplace makes thanks to the town's charters. */
+/** Food and bread grain come in a fifth lighter than they used to. */
+export const FOOD_CUT = 0.8;
+
+/**
+ * The cut on what is grown, caught or gathered to eat: every food and wheat or
+ * rye, apples excepted. Bread and cheese are not cut themselves: they are made
+ * from wheat and milk, which already are.
+ */
+export function foodCut(id: ResourceId): number {
+  if (id === 'apples' || id === 'bread' || id === 'cheese') return 1;
+  return id === 'grain' || GOODS[id].food ? FOOD_CUT : 1;
+}
+
 export function charterBonus(s: GameState, b: Building, id: ResourceId): number {
+  return foodCut(id) * charterOnly(s, b, id);
+}
+
+function charterOnly(s: GameState, b: Building, id: ResourceId): number {
   if (!s.charters?.length) return 1;
   const d = workDef(b);
   let f = 1;
@@ -2726,7 +2743,7 @@ function fieldYield(s: GameState, f: Building, crew: number): number {
   const rotation = (f.lastCrop === crop ? 0.85 : 1) * (f.lastCrop === 'beans' && crop !== 'beans' ? BEANS_BONUS : 1) * fieldCharterFactor(s);
   // Rye grows on poor soil as well as on rich.
   const soil = crop === 'rye' ? 1 : 0.5 + 0.5 * farmFertility(s, f);
-  return Math.round(f.w * f.h * FIELD_YIELD * f.growth * soil * (0.6 + 0.4 * crew) * CROP_FACTOR[crop] * rotation);
+  return Math.round(f.w * f.h * FIELD_YIELD * f.growth * soil * (0.6 + 0.4 * crew) * CROP_FACTOR[crop] * rotation * foodCut(CROP_GOOD[crop]));
 }
 
 /**
@@ -2778,8 +2795,8 @@ export function harvestForecast(s: GameState): { kind: StorageKind; expected: nu
 }
 
 /** Stores what a herd, orchard, yard or gatherer brought in, and counts it as made. */
-function produced(s: GameState, id: ResourceId, n: number): number {
-  const k = store(s, id, n);
+function produced(s: GameState, id: ResourceId, n: number, cut = true): number {
+  const k = store(s, id, cut ? n * foodCut(id) : n);
   tally(s, 'making', id, k);
   return k;
 }
@@ -3357,7 +3374,8 @@ function stepOrchardist(s: GameState, b: Building): void {
       if (o.growth >= 1) full = true;
       continue;
     }
-    const k = produced(s, good, n);
+    // (The fruit was cut when it ripened, so what is on the trees is what is picked.)
+    const k = produced(s, good, n, false);
     o.growth -= k;
     o.lastOutput += k;
     b.output += k;
@@ -3387,7 +3405,7 @@ function dailyOrchards(s: GameState): void {
     if (month === ORCHARD_TEND_MONTHS && first) {
       // (Orchards from before tending came in count as fully tended this once.)
       const tended = Math.min(1, o.tended ?? 1);
-      o.growth = Math.round(o.w * o.h * ORCHARD_YIELD * (m >= 1 ? 1 : m * m) * tended * (hasCharter(s, 'orchard1') ? 1.3 : 1) * orchardFactor(s, o));
+      o.growth = Math.round(o.w * o.h * ORCHARD_YIELD * (m >= 1 ? 1 : m * m) * tended * (hasCharter(s, 'orchard1') ? 1.3 : 1) * orchardFactor(s, o) * foodCut((o.recipe ?? 'apples') as ResourceId));
       o.lastOutput = 0;
       o.tended = 0;
     }

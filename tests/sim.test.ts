@@ -694,7 +694,8 @@ describe('fields, herds, orchards and backyards', () => {
     expect(wheat.owner).toBe(farm.id);
     expect(barley.owner).toBe(farm.id);
     run(s, DAYS_PER_MONTH * 8 + 1);
-    expect(s.res.grain).toBeGreaterThan(100);
+    // (Wheat is food: it comes in lighter than barley would.)
+    expect(s.res.grain).toBeGreaterThan(65);
     expect(s.res.barley).toBeGreaterThan(60);
     expect(wheat.lastCrop).toBe('wheat');
   });
@@ -761,9 +762,10 @@ describe('fields, herds, orchards and backyards', () => {
     expect(o.tended).toBe(1);
     run(s, 1);
     expect(o.tended).toBe(0);
-    expect(o.growth).toBeGreaterThan(o.w * o.h * 8);
+    // (Pears are food: lighter than the orchard's full yield.)
+    expect(o.growth).toBeGreaterThan(o.w * o.h * 8 * (2 / 3));
     run(s, DAYS_PER_MONTH * 2);
-    expect(s.res.pears).toBeGreaterThan(80);
+    expect(s.res.pears).toBeGreaterThan(50);
   });
 
   it('untended orchards bear only as much as they were tended', async () => {
@@ -1239,10 +1241,12 @@ describe('harvest forecast', () => {
     field!.build = 1;
     field!.growth = 1;
     s.res.grain += storageCap(s, 'food') - stored(s, 'food');
+    // The barn half full already.
+    farm.barn = { grain: 100 };
     const f = harvestForecast(s).find((h) => h.kind === 'food')!;
-    expect(f.expected).toBeGreaterThan(10);
-    // Only the farm's barn is left to take it.
-    expect(f.room).toBe(200);
+    expect(f.expected).toBeGreaterThan(100);
+    // Only what is left of the farm's barn is there to take it.
+    expect(f.room).toBe(100);
     s.advice = { housing: s.day, 'food-low': s.day, firewood: s.day, granary: s.day };
     s.tutorial = { step: 0, chapter: 'done' };
     advise(s, 6);

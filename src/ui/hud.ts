@@ -100,6 +100,7 @@ import {
   setPriority,
   wantOf,
   setRecipe,
+  foodCut,
   cropLocked,
   setStopped,
   stoppedMaking,
@@ -269,6 +270,14 @@ const MODES: [string, string, string][] = [
   ['relaxed', 'Easy', 'Objectives to guide you, double starting supplies; nobody ever leaves in anger.'],
   ['hardy', 'Hardy', 'A scarcer start, bitter winters, choosier settlers.'],
 ];
+
+
+/** What a workplace really makes in a round: its recipe, less the cut on food. */
+function madeOf(c: Cost): Cost {
+  const out: Cost = {};
+  for (const k in c) out[k as ResourceId] = Math.round((c[k as ResourceId] ?? 0) * foodCut(k as ResourceId) * 10) / 10;
+  return out;
+}
 
 export class Hud {
   private el: Record<string, HTMLElement> = {};
@@ -1151,7 +1160,7 @@ export class Hud {
         rows.push(`<div class="kv walk" data-tip="${tip}"><span>Walking time</span><span class="${b.efficiency < LOW_EFFICIENCY ? 'neg' : ''}">${Math.round(b.efficiency * 100)}% efficient</span></div>`);
       }
       if (!d.recipes && Object.keys(d.inputs).length) rows.push(`<div class="kv"><span>Consumes</span><span class="costline">${costHtml(d.inputs)}</span></div>`);
-      if (!d.recipes && Object.keys(d.outputs).length) rows.push(`<div class="kv"><span>Produces</span><span class="costline">${costHtml(d.outputs)}</span></div>`);
+      if (!d.recipes && Object.keys(d.outputs).length) rows.push(`<div class="kv"><span>Produces</span><span class="costline">${costHtml(madeOf(d.outputs))}</span></div>`);
       if (b.type === 'house') {
         const needs = houseNeeds(s, b, b.level);
         rows.push(`<div class="needs"><div class="needs-h">Needs</div>${needs.map((n) => `<span class="${n.met ? 'met' : 'unmet'}">${n.met ? '✓' : '✗'} ${n.label}</span>`).join('')}</div>`);
@@ -2388,7 +2397,7 @@ export class Hud {
             else
               lines = recipes
                 .filter((r) => Object.keys(r.outputs).length)
-                .map((r) => `<span class="recipe">${Object.keys(r.inputs).length ? `${goods(r.inputs)}<span class="arrow">→</span>` : ''}${goods(r.outputs)}</span>`)
+                .map((r) => `<span class="recipe">${Object.keys(r.inputs).length ? `${goods(r.inputs)}<span class="arrow">→</span>` : ''}${goods(madeOf(r.outputs))}</span>`)
                 .join('<span class="or">or</span>');
             return `<tr class="${lock ? 'locked' : ''}">
               <td class="pimg"><img src="${this.cardImage(t)}" alt=""></td>
