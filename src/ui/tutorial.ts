@@ -206,8 +206,8 @@ const START: Step[] = [
     },
   },
   {
-    say: "Let us build a Forager's Hut, a Hunting Camp or a Fisher's Hut (in the Food menu), so we have food in store. Remember: workers walk to the workplace, and from there to the food. Building close to it makes them quicker.",
-    show: '#buildbar [data-cat="food"]',
+    say: "Let us build a Forager's Hut, a Hunting Camp or a Fisher's Hut (in the Farming menu), so we have food in store. Remember: workers walk to the workplace, and from there to the food. Building close to it makes them quicker.",
+    show: '#buildbar [data-cat="farming"]',
     enter: (g) => {
       const camp = g.state.buildings.find((b) => b.type === 'camp');
       if (camp) lookAt(g, camp.x + 1.5, camp.y + 1.5);
