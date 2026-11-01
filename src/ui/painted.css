@@ -263,6 +263,46 @@ input[type='number'] {
   color: var(--ink);
   font-family: var(--serif);
 }
+/* Tick boxes: a little wooden peg box; ticked, it fills with button wood and a painted cream tick. */
+input[type='checkbox'] {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  padding: 0;
+  border: 2.5px solid var(--line);
+  border-radius: 6px;
+  background: #fff8e8;
+  box-shadow: inset 0 2px 0 rgba(122, 84, 50, 0.25), 0 2px 0 rgba(40, 22, 8, 0.35);
+  cursor: pointer;
+  vertical-align: middle;
+  position: relative;
+}
+input[type='checkbox']:hover {
+  background: #fdeccb;
+}
+input[type='checkbox']:checked {
+  background: linear-gradient(180deg, var(--btn-hi), var(--btn-lo));
+  box-shadow: inset 0 2px 0 rgba(255, 224, 176, 0.35), 0 2px 0 rgba(40, 22, 8, 0.35);
+}
+input[type='checkbox']:checked::after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 0;
+  width: 6px;
+  height: 11px;
+  border: solid var(--btn-text);
+  border-width: 0 3.5px 3.5px 0;
+  border-radius: 1px;
+  transform: rotate(40deg);
+}
+input[type='checkbox']:focus-visible {
+  outline: 2px solid var(--honey);
+  outline-offset: 2px;
+}
 
 /* ------------------------------------------------------------ notes and boards */
 
