@@ -1107,7 +1107,11 @@ export class AgentSystem {
         const m = Math.floor(s.day / 10) % 12;
         if (b.type === 'farm' && m >= 9) return null;
         // Work out in one of the fields, pastures or orchards this place tends.
-        const zones = s.buildings.filter((z) => z.owner === b.id);
+        // Orchard keepers only go out to trees that are planted: they tend them in
+        // spring and summer, and in autumn only where fruit still hangs to pick.
+        const zones = s.buildings.filter(
+          (z) => z.owner === b.id && !(z.type === 'orchard' && (z.bare || (m >= 6 && z.growth < 1))),
+        );
         if (!zones.length) return null;
         const z = zones[Math.floor(Math.random() * zones.length)];
         // Orchard keepers hoe round the trees in spring and summer, and reach up to pick in autumn.
@@ -1185,7 +1189,7 @@ function closestStore(s: GameState, b: Building, fits: (o: Building) => boolean)
 function goodCarried(s: GameState, b: Building): ResourceId | null {
   if (b.type === 'byre') return ({ sheep: 'wool', cattle: 'milk', pigs: 'pork' } as Record<string, ResourceId>)[b.recipe ?? 'sheep'];
   if (b.type === 'orchardist') {
-    const o = s.buildings.find((z) => z.owner === b.id);
+    const o = s.buildings.find((z) => z.owner === b.id && !z.bare);
     return ((o?.recipe ?? 'apples') as ResourceId) ?? 'apples';
   }
   if (b.type === 'farm') {
