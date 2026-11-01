@@ -585,7 +585,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     cycle: 3,
     outputs: { ore: 5 },
     gathers: 'ore',
-    tier: 1,
+    tier: 2,
   }),
   smithy: def({
     type: 'smithy',
