@@ -119,7 +119,7 @@ export const UNLOCKS: Unlock[] = [
   { id: b('dyer'), name: "Dyer's Workshop", kind: 'building', tab: 'craft', group: 'Dyes', desc: 'Woad or berries into dyes.', knowledge: 5, building: 'dyer', icon: 'dyer' },
 
   // ------------------------------------------------ metal & glass
-  { id: b('mine'), name: 'Bog Iron Pit', kind: 'building', tab: 'craft', group: 'Iron', desc: 'Digs bog ore.', knowledge: 4, building: 'mine', icon: 'mine' },
+  { id: b('mine'), name: 'Bog Iron Pit', kind: 'building', tab: 'craft', group: 'Iron', desc: 'Digs bog ore.', rank: 1, building: 'mine', icon: 'mine' },
   { id: b('collier'), name: 'Charcoal Burner', kind: 'building', tab: 'craft', group: 'Iron', desc: 'Timber into charcoal, the hot fuel.', knowledge: 3, building: 'collier', icon: 'collier' },
   { id: b('bloomery'), name: 'Bloomery', kind: 'building', tab: 'craft', group: 'Iron', desc: 'Smelts ore into iron.', rank: 1, building: 'bloomery', icon: 'bloomery' },
   { id: b('smithy'), name: 'Blacksmith', kind: 'building', tab: 'craft', group: 'Iron', desc: 'Iron and timber into tools.', knowledge: 2, building: 'smithy', icon: 'smithy' },
