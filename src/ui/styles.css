@@ -1507,12 +1507,81 @@ button.active {
   border-radius: 3px;
   box-shadow: inset 0 0 0 2px #fff4cc;
 }
-/* The demo's thank-you: the tale, a word on the full game, then the buttons. */
-.demo-end p:not(.tale) {
-  clear: both;
-  font-size: 15px;
-  line-height: 1.4;
-  margin: 0 4px 10px;
+/* The demo's thank-you: Fingamoboblius, large, says it in a big balloon, then the buttons. */
+.modal:has(.demo-end) {
+  width: min(760px, calc(100vw - 32px));
+}
+.steward-farewell {
+  display: flex;
+  align-items: flex-end;
+  gap: 22px;
+  margin: 6px 4px 12px;
+}
+.steward-figure {
+  flex: none;
+  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.35));
+}
+.steward-figure canvas {
+  display: block;
+}
+.steward-says {
+  position: relative;
+  flex: 1;
+  align-self: center;
+  background: linear-gradient(#fbf3dc, #f0e2bc);
+  border: 2px solid #8a6a3a;
+  border-radius: 16px;
+  padding: 14px 20px 6px;
+  color: var(--ink);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+  text-align: left;
+}
+/* The balloon's tail, pointing at him. */
+.steward-says::before {
+  content: '';
+  position: absolute;
+  left: -14px;
+  bottom: 40px;
+  border: 13px solid transparent;
+  border-right-color: #8a6a3a;
+  border-left: 0;
+}
+.steward-says .t-name {
+  font-weight: bold;
+  font-variant: small-caps;
+  letter-spacing: 0.04em;
+  color: #7a3a1a;
+  font-size: 19px;
+}
+.demo-end .steward-says p {
+  font-size: 17px;
+  line-height: 1.45;
+  margin: 6px 0 10px;
+}
+.demo-end .steward-says .steward-ask {
+  font-size: 18px;
+}
+.demo-end .menu .wishlist {
+  font-size: 18px;
+  padding: 10px 18px;
+}
+@media (max-width: 600px) {
+  .steward-farewell {
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .steward-says::before {
+    display: none;
+  }
+  .steward-says {
+    padding: 10px 14px 4px;
+  }
+  .demo-end .steward-says p,
+  .demo-end .steward-says .steward-ask {
+    font-size: 15px;
+    margin: 4px 0 8px;
+  }
 }
 .demo-end .menu {
   margin-top: 6px;

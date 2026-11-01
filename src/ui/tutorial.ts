@@ -915,62 +915,91 @@ export class Tutor {
     c.scale(k, k);
     const bob = walking ? Math.abs(Math.sin(this.walk)) * 0.8 : 0;
     const leg = walking ? Math.sin(this.walk) * 1.6 : 0;
-    c.fillStyle = 'rgba(20,20,10,0.3)';
-    c.beginPath();
-    c.ellipse(0, 0, 4.2, 1.6, 0, 0, Math.PI * 2);
-    c.fill();
-    c.strokeStyle = '#3a2c20';
-    c.lineWidth = 1.3;
-    c.beginPath();
-    c.moveTo(-1, -4 - bob);
-    c.lineTo(-1 + leg, 0);
-    c.moveTo(1, -4 - bob);
-    c.lineTo(1 - leg, 0);
-    c.stroke();
-    // A long robe with a rope belt.
-    c.fillStyle = '#6a4a7a';
-    c.beginPath();
-    c.moveTo(-3.4, -2.5 - bob);
-    c.lineTo(3.4, -2.5 - bob);
-    c.lineTo(2.4, -10.5 - bob);
-    c.lineTo(-2.4, -10.5 - bob);
-    c.closePath();
-    c.fill();
-    c.fillStyle = '#c8a040';
-    c.fillRect(-2.8, -6.6 - bob, 5.6, 0.7);
-    // The staff.
-    c.strokeStyle = '#7a5a3a';
-    c.lineWidth = 0.9;
-    c.beginPath();
-    c.moveTo(3.6, 0);
-    c.lineTo(3.6, -16 - bob);
-    c.stroke();
-    c.fillStyle = '#c8a040';
-    c.beginPath();
-    c.arc(3.6, -16.4 - bob, 0.8, 0, Math.PI * 2);
-    c.fill();
-    // Head, beard and cap.
-    c.fillStyle = '#e8c4a0';
-    c.beginPath();
-    c.arc(0, -12.5 - bob, 2.2, 0, Math.PI * 2);
-    c.fill();
-    c.fillStyle = '#f2ece0';
-    c.beginPath();
-    c.moveTo(-2, -12.2 - bob);
-    c.quadraticCurveTo(0, -11 - bob, 2, -12.2 - bob);
-    c.lineTo(0.6, -6.5 - bob);
-    c.lineTo(0, -6 - bob);
-    c.lineTo(-0.6, -6.5 - bob);
-    c.closePath();
-    c.fill();
-    c.fillStyle = '#4a2a5a';
-    c.beginPath();
-    c.arc(0, -13.4 - bob, 2.3, Math.PI, 0);
-    c.lineTo(-1, -17.5 - bob);
-    c.closePath();
-    c.fill();
+    paintSteward(c, bob, leg);
     c.restore();
   }
+}
+
+/**
+ * Fingamoboblius, standing at the origin with his feet on it, 1 unit to a
+ * villager's pixel: an old steward drawn like the villagers, with a long white
+ * beard, a cap and a staff. `bob` and `leg` swing him as he walks.
+ */
+function paintSteward(c: CanvasRenderingContext2D, bob = 0, leg = 0): void {
+  c.fillStyle = 'rgba(20,20,10,0.3)';
+  c.beginPath();
+  c.ellipse(0, 0, 4.2, 1.6, 0, 0, Math.PI * 2);
+  c.fill();
+  c.strokeStyle = '#3a2c20';
+  c.lineWidth = 1.3;
+  c.beginPath();
+  c.moveTo(-1, -4 - bob);
+  c.lineTo(-1 + leg, 0);
+  c.moveTo(1, -4 - bob);
+  c.lineTo(1 - leg, 0);
+  c.stroke();
+  // A long robe with a rope belt.
+  c.fillStyle = '#6a4a7a';
+  c.beginPath();
+  c.moveTo(-3.4, -2.5 - bob);
+  c.lineTo(3.4, -2.5 - bob);
+  c.lineTo(2.4, -10.5 - bob);
+  c.lineTo(-2.4, -10.5 - bob);
+  c.closePath();
+  c.fill();
+  c.fillStyle = '#c8a040';
+  c.fillRect(-2.8, -6.6 - bob, 5.6, 0.7);
+  // The staff.
+  c.strokeStyle = '#7a5a3a';
+  c.lineWidth = 0.9;
+  c.beginPath();
+  c.moveTo(3.6, 0);
+  c.lineTo(3.6, -16 - bob);
+  c.stroke();
+  c.fillStyle = '#c8a040';
+  c.beginPath();
+  c.arc(3.6, -16.4 - bob, 0.8, 0, Math.PI * 2);
+  c.fill();
+  // Head, beard and cap.
+  c.fillStyle = '#e8c4a0';
+  c.beginPath();
+  c.arc(0, -12.5 - bob, 2.2, 0, Math.PI * 2);
+  c.fill();
+  c.fillStyle = '#f2ece0';
+  c.beginPath();
+  c.moveTo(-2, -12.2 - bob);
+  c.quadraticCurveTo(0, -11 - bob, 2, -12.2 - bob);
+  c.lineTo(0.6, -6.5 - bob);
+  c.lineTo(0, -6 - bob);
+  c.lineTo(-0.6, -6.5 - bob);
+  c.closePath();
+  c.fill();
+  c.fillStyle = '#4a2a5a';
+  c.beginPath();
+  c.arc(0, -13.4 - bob, 2.3, Math.PI, 0);
+  c.lineTo(-1, -17.5 - bob);
+  c.closePath();
+  c.fill();
+}
+
+/** Fingamoboblius standing still, `h` CSS pixels tall, sharp on any screen. */
+export function stewardCanvas(h: number): HTMLCanvasElement {
+  const w = Math.round((h * 44) / 64);
+  const dpr = Math.min(3, window.devicePixelRatio || 1);
+  const cv = document.createElement('canvas');
+  cv.width = Math.round(w * dpr);
+  cv.height = Math.round(h * dpr);
+  cv.style.width = `${w}px`;
+  cv.style.height = `${h}px`;
+  const c = cv.getContext('2d');
+  if (c) {
+    const u = (h / 64) * dpr;
+    c.setTransform(u, 0, 0, u, 0, 0);
+    c.translate(22, 60);
+    c.scale(2.6, 2.6);
+    paintSteward(c);
+  }
+  return cv;
 }
 
 /** Whether a spot lies within a panel's box (give or take its outline). */

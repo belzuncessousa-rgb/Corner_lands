@@ -5,7 +5,7 @@ import { IMPROVEMENT_BY_ID, improvementsFor } from '../game/improve';
 import { OPTIONS, optionError, optionOn, optionOnce, setOption } from '../game/options';
 import { NEWS } from './news';
 import { drawTapestry } from './tapestry';
-import { TUTORIAL_SEED } from './tutorial';
+import { stewardCanvas, TUTORIAL_SEED } from './tutorial';
 import { CHARGES, DEFAULT_HERALDRY, DIVISIONS, FLAG_SHAPES, type Heraldry, TINCTURES, flagOutline, paintArms } from '../render/heraldry';
 import { BEARDS, CLOTHS, DEFAULT_LORD, FIXED_HATS, GARMENTS, HAIRS, HAIR_STYLES, HATS, HELD, type LordLook, SKINS, TRIMS, lordPortrait } from '../render/lord';
 import { placeName, townName, weeklySeed } from '../game/names';
@@ -1747,15 +1747,22 @@ export class Hud {
     this.demoShown = true;
     this.game.setSpeed(0);
     const how = s.tier >= DEMO_TIER ? `${esc(townName(s))} has become a Town` : `Two years have passed in ${esc(townName(s))}`;
+    // Fingamoboblius says goodbye himself, large, with the store page at the end.
     const m = this.openModal(
       `<div class="event demo-end">
         <div class="ornament">❦ ❦ ❦</div>
         <h2>Thank you for playing</h2>
-        <p class="tale"><span class="initial">${how[0]}</span>${how.slice(1)}, with ${s.population} souls, and this is where the demo ends.</p>
-        <p>In the full game your town grows on into a Borough and a City: charters and guilds, a manor that becomes a palace, a cathedral, fairs, town walls and great works.</p>
-        ${WISHLIST_URL ? '<p>If you enjoyed your time here, a wishlist helps more than you might think.</p>' : ''}
+        <div class="steward-farewell">
+          <div class="steward-figure"></div>
+          <div class="steward-says">
+            <div class="t-name">Fingamoboblius</div>
+            <p>My liege! ${how}, with ${s.population} souls, and here our little demo comes to its end. Thank you, truly, for playing.</p>
+            <p>Yet the tale goes on! In the full game your town grows into a Borough and a City: charters and guilds, a manor that becomes a palace, a cathedral, fairs, town walls and great works.</p>
+            ${WISHLIST_URL ? '<p class="steward-ask">If you enjoyed your time here, add <b>Corner Lands</b> to your <b>Steam wishlist</b>. It helps more than you might think, and you shall hear the moment the full game is out. I shall be waiting for you!</p>' : '<p class="steward-ask">I shall be waiting for you!</p>'}
+          </div>
+        </div>
         <div class="menu">
-          ${WISHLIST_URL ? '<button class="primary" data-m="wishlist">Wishlist Corner Lands on Steam</button>' : ''}
+          ${WISHLIST_URL ? '<button class="primary wishlist" data-m="wishlist">★ Wishlist Corner Lands on Steam</button>' : ''}
           <button data-m="picture">📷 Save a picture of my town</button>
           <button data-m="look">Look around</button>
           <button data-m="main">Main Menu</button>
@@ -1763,6 +1770,7 @@ export class Hud {
       </div>`,
       false,
     );
+    m.querySelector('.steward-figure')!.replaceChildren(stewardCanvas(window.innerWidth < 600 ? 110 : window.innerHeight < 700 ? 170 : 280));
     this.sound('good');
     this.game.autosave().catch(() => undefined);
     m.querySelector('[data-m="picture"]')!.addEventListener('click', () => {
