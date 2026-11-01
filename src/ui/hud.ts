@@ -452,13 +452,14 @@ export class Hud {
   private renderBuildBar(): void {
     const g = this.game;
     const s = g.state;
-    const cats = Object.keys(CATEGORY_NAMES) as Category[];
+    // Food and Farming share one tab in the bar.
+    const cats = (Object.keys(CATEGORY_NAMES) as Category[]).filter((c) => c !== 'food');
     const tool = g.tool;
     const roading = tool.kind === 'road' && !tool.wall;
     const tabs = cats
       .map(
         (c) =>
-          `<button data-action="cat" data-cat="${c}" class="tab name-tip ${c === this.category ? 'active' : ''}" data-tip="<b>${CATEGORY_NAMES[c]}</b>">${CATEGORY_ICONS[c]}<span>${CATEGORY_NAMES[c]}</span></button>`,
+          `<button data-action="cat" data-cat="${c}" class="tab name-tip ${c === this.category ? 'active' : ''}" data-tip="<b>${c === 'farming' ? 'Farming & Food' : CATEGORY_NAMES[c]}</b>">${CATEGORY_ICONS[c]}<span>${CATEGORY_NAMES[c]}</span></button>`,
       )
       .join('');
     const tools = `<span class="divider"></span>
@@ -468,7 +469,7 @@ export class Hud {
     let cards = '';
     if (this.category) {
       // Buildings not yet open to the town stay out of the menu until they are.
-      cards = BUILD_ORDER.filter((t) => BUILDINGS[t].category === this.category && isUnlocked(s, t))
+      cards = BUILD_ORDER.filter((t) => barCategory(BUILDINGS[t].category) === this.category && isUnlocked(s, t))
         .map((t) => {
           const d = BUILDINGS[t];
           // One to a town, and the town has it: ticked off, and a click shows it.
@@ -490,7 +491,7 @@ export class Hud {
         })
         .join('');
       // Buildings still to be learned: a locked card that opens the learning board at its patch.
-      cards += BUILD_ORDER.filter((t) => BUILDINGS[t].category === this.category && !isUnlocked(s, t) && unlockForBuilding(t) && !knows(s, unlockForBuilding(t)!.id) && !BUILDINGS[t].charter)
+      cards += BUILD_ORDER.filter((t) => barCategory(BUILDINGS[t].category) === this.category && !isUnlocked(s, t) && unlockForBuilding(t) && !knows(s, unlockForBuilding(t)!.id) && !BUILDINGS[t].charter)
         .map((t) => {
           const d = BUILDINGS[t];
           const u = unlockForBuilding(t)!;
@@ -1860,7 +1861,7 @@ export class Hud {
       this.flash(`${BUILDINGS[t].name}: ${lockReason(s, t)}.`);
       return;
     }
-    this.category = BUILDINGS[t].category;
+    this.category = barCategory(BUILDINGS[t].category);
     if (t === 'wall' || t === 'hedge' || t === 'flowerbed') {
       // Walls, hedges and flower beds are laid like roads, click to click.
       const lay = t === 'wall' ? undefined : t;
@@ -1887,7 +1888,7 @@ export class Hud {
         this.showLord();
         break;
       case 'cat': {
-        const c = t.dataset.cat as Category;
+        const c = barCategory(t.dataset.cat as Category);
         this.category = this.category === c ? null : c;
         if (g.tool.kind === 'road' || g.tool.kind === 'demolish') g.setTool({ kind: 'select' });
         this.renderBuildBar();
@@ -3443,4 +3444,9 @@ function fillArt(root: HTMLElement): void {
     };
     tryExt(['webp', 'jpg', 'png']);
   });
+}
+
+/** The build-bar tab a category's buildings appear under: food shares the Farming tab. */
+function barCategory(c: Category): Category {
+  return c === 'food' ? 'farming' : c;
 }

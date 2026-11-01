@@ -309,7 +309,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     cost: { wood: 5 },
     workers: 2,
     cycle: 3,
-    outputs: { stone: 6 },
+    outputs: { stone: 4 },
     gathers: 'rock',
     hotkey: 'q',
   }),

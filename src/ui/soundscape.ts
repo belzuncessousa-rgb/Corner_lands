@@ -616,12 +616,7 @@ export class Soundscape {
       }
     }
 
-    if (!this.on.ambience) return;
-    for (const [id, bed] of this.beds) bed.update(sc.running || BED_CHANNEL[id] ? (want[id] ?? 0) * (BED_LEVEL[id] ?? 0.5) : 0, dt);
-
-    if (!sc.running) return;
-
-    // ---- animals: a call now and then from what is in view; the chosen one at once
+    // ---- a building looked into is heard at once, paused or not, with a call from its animals
     const sel = sc.selected !== null ? s.buildings.find((b) => b.id === sc.selected) : undefined;
     if (sel && sel.id !== this.lastSelected) {
       this.openSound(sel);
@@ -633,6 +628,13 @@ export class Soundscape {
       if (call && this.manifest.sounds[call]) this.play(call, 0.9, 'noise', [2, 4]);
     }
     this.lastSelected = sel?.id ?? null;
+
+    if (!this.on.ambience) return;
+    for (const [id, bed] of this.beds) bed.update(sc.running || BED_CHANNEL[id] ? (want[id] ?? 0) * (BED_LEVEL[id] ?? 0.5) : 0, dt);
+
+    if (!sc.running) return;
+
+    // ---- animals: a call now and then from what is in view
     const flock = (kind: string) => nearest((b) => built(b) && ((b.animals as Record<string, number> | undefined)?.[kind] ?? 0) > 0, 0.7);
     const hens = nearest((b) => built(b) && b.type === 'house' && b.yard === 'hens', 0.5);
     if (day > 0.3) {
