@@ -2617,6 +2617,8 @@ export class Hud {
     this.game.modalOpen = true;
     const saves = await listSaves().catch(() => [] as SaveInfo[]);
     const latest = saves[0];
+    // The desktop (Steam) app lets the page quit (desktop/preload.cjs).
+    const desktop = (window as unknown as { cornerDesktop?: { quit(): void } }).cornerDesktop;
     const m = this.openModal(
       `<div class="art-slot title-art" data-art="title"></div>
       <h1 class="logo-h">${LOGO}</h1>
@@ -2631,6 +2633,7 @@ export class Hud {
         <button data-m="help">How to Play</button>
         <button data-m="settings">Settings</button>
         <button data-m="credits">Credits</button>
+        ${desktop ? '<button data-m="quit">Quit</button>' : ''}
       </div>
       ${DEMO ? '' : this.newsHtml()}`,
       false,
@@ -2648,6 +2651,7 @@ export class Hud {
       this.ensureAudio();
       this.showNewGame(true);
     });
+    m.querySelector('[data-m="quit"]')?.addEventListener('click', () => desktop?.quit());
     m.querySelector('[data-m="load"]')?.addEventListener('click', () => this.showLoad(true));
     m.querySelector('[data-m="help"]')!.addEventListener('click', () => this.showHelp(true));
     m.querySelector('[data-m="settings"]')!.addEventListener('click', () => this.showSettings(true));

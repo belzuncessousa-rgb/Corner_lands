@@ -290,7 +290,8 @@ page when building to add a "Wishlist on Steam" button:
 WISHLIST_URL=https://store.steampowered.com/app/<id>/Corner_Lands/ npm run build:demo
 ```
 
-The limits are in `src/demo.ts`. Music under a licence that keeps it out of
+The limits are in `src/demo.ts`. For Steam, `desktop/` wraps the same build
+in its own window; see [docs/STEAM.md](docs/STEAM.md). Music under a licence that keeps it out of
 this repository (see CREDITS.md) is only in builds made where those files are.
 
 The screenshot scripts expect the game at `http://localhost:3001` and a

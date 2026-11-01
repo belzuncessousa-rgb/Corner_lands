@@ -1,0 +1,31 @@
+{
+  "name": "corner-lands-desktop",
+  "productName": "Corner Lands",
+  "version": "0.2.0",
+  "description": "Corner Lands, the desktop game (for Steam).",
+  "author": "Corner Lands",
+  "private": true,
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "pack:win": "electron-builder --win --x64 --dir",
+    "pack:linux": "electron-builder --linux --x64 --dir",
+    "pack:mac": "electron-builder --mac --universal --dir"
+  },
+  "devDependencies": {
+    "electron": "44.7.2",
+    "electron-builder": "26.17.0"
+  },
+  "build": {
+    "appId": "com.cornerlands.game",
+    "productName": "Corner Lands",
+    "executableName": "CornerLands",
+    "directories": { "output": "out" },
+    "files": ["main.cjs", "preload.cjs", "game/**/*"],
+    "asar": true,
+    "icon": "icon.png",
+    "win": { "target": "dir" },
+    "linux": { "target": "dir", "category": "Game" },
+    "mac": { "target": "dir", "category": "public.app-category.simulation-games" }
+  }
+}

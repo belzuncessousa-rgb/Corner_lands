@@ -12,7 +12,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "build:itch": "tsc --noEmit && node scripts/build-itch.mjs",
-    "build:demo": "tsc --noEmit && node scripts/build-itch.mjs --demo"
+    "build:demo": "tsc --noEmit && node scripts/build-itch.mjs --demo",
+    "build:desktop": "tsc --noEmit && node scripts/build-desktop.mjs",
+    "build:desktop-demo": "tsc --noEmit && node scripts/build-desktop.mjs --demo"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
