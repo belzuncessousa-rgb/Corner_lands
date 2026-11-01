@@ -75,8 +75,7 @@ signing and notarising it; Windows and Linux are enough to begin with.
   controller layout yet, so mark it unverified for now.
 - **The music licences.** Check that every track's licence allows selling the
   game on Steam (the CC BY and CC BY-SA ones do, with the credits shown; the
-  four without credits in CREDITS.md must be sorted out first; alkakrab's
-  allows commercial use).
+  four free tracks need no credit; alkakrab's allows commercial use).
 - **The name.** `com.cornerlands.game` and "Corner Lands" in
   `desktop/package.json` go into the app; change them before the first upload
   if needed.

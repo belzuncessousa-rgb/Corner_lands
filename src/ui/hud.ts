@@ -2673,7 +2673,7 @@ export class Hud {
       .map((c) =>
         c.by
           ? `<li><b>${esc(c.title)}</b> by ${esc(c.by)} <small>(${link(c.source, c.source.replace(/^https?:\/\/(www\.)?/, '').split('/')[0])}) · ${LICENCE_LINKS[c.licence] ? link(LICENCE_LINKS[c.licence], c.licence) : esc(c.licence)}</small></li>`
-          : `<li><b>${esc(c.title)}</b> <small>(credit to come)</small></li>`,
+          : `<li><b>${esc(c.title)}</b>${c.licence ? ` <small>(${esc(c.licence)})</small>` : ''}</li>`,
       )
       .join('');
     const m = this.openModal(

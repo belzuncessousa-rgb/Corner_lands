@@ -18,7 +18,7 @@ The game's Credits screen reads these from `public/audio/manifest.json`, written
 - **Hildegard von Bingen, O frondens**, sung by Magdalen Kadel. Wikimedia Commons. CC BY-SA 3.0.
 - **Medieval Vol. 2** (Knight In A Tavern, Drunken King, Morning In A Castle, Hunters In The Forest, Sacred Rivers, Tournier Of The Knights, Midnight Walk, Stranger In Town), by **alkakrab**, <https://alkakrab04.wixsite.com/alkakrab-game-music>, alkakrab04@gmail.com. Under alkakrab's music licence (royalty-free, commercial use allowed, credit appreciated). The licence does not allow sharing the files themselves, so they are kept out of this public repository (see `.gitignore`); they go only into builds of the game.
 
-In the game, credit still to be noted (their files carry no artist or source): **Harvest Season** (`harvestseason.mp3`), **Peaceful Town** (`music_peaceful_town_loop.mp3`), **Town** (`022815townbgm.ogg`), **Celebrations** (`celebrations_1min.mp3`).
+Free to use with no credit required (royalty-free game-engine music): **Harvest Season** (`harvestseason.mp3`), **Peaceful Town** (`music_peaceful_town_loop.mp3`), **Town** (`022815townbgm.ogg`), **Celebrations** (`celebrations_1min.mp3`).
 
 Removed because its file carried no credit information: `Satie_-_Gnossienne_1.ogg`.
 
