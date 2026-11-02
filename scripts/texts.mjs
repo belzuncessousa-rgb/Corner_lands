@@ -36,7 +36,8 @@ const skip = new Set(['src/game/autoplay.ts', 'src/game/rng.ts', 'src/game/path.
 const items = [];
 const decode = (s) => s.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ');
 const words = (s) => (s.match(/[A-Za-zÀ-ÿ']{2,}/g) ?? []).length;
-const looksCode = (s) => /^[\w-]+(\s[\w-]+)*$/.test(s) && !/\s/.test(s.trim()) || /^(\.|#|@media|rgba?\(|M\d|<svg|https?:)/.test(s.trim()) || /[{};]\s*$/.test(s.trim()) && /:\s*[\w#-]+;/.test(s);
+const looksCode = (s) =>
+  /^[a-z-]+:[^ ;]*;/.test(s.trim()) || /^[\w-]+(\s[\w-]+)*$/.test(s) && !/\s/.test(s.trim()) || /^(\.|#|@media|rgba?\(|M\d|<svg|https?:)/.test(s.trim()) || /[{};]\s*$/.test(s.trim()) && /:\s*[\w#-]+;/.test(s);
 /** The name or title of the nearest object that has one: the event, building or charter a line belongs to. */
 function owner(node, sf) {
   for (let n = node.parent; n; n = n.parent) {
