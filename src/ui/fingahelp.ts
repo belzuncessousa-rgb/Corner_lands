@@ -40,49 +40,45 @@ function goodsPages(chip: string, first: string, last: string): HelpPage[] {
 const HELP: Record<string, HelpPage[]> = {
   happy: [
     { say: 'Ah, happiness! The mood of your people. Come, let me show you.', show: '#topbar [data-chip="happy"]' },
-    { say: 'This bar is the whole town\'s mood. Above half, settlers come knocking. Below a third... well, families start loading their carts.', show: '#chip-panel .bar' },
+    { say: 'This bar is the whole town\'s mood. Above half, settlers come knocking. Below a third... well, families start loading their carts to seek better prospects.', show: '#chip-panel .bar' },
     { say: 'Every line in here is something that pleases or grieves them, with its weight. Green helps, red hurts. Simple as porridge.', show: '#chip-panel' },
     { say: 'And this is town talk: what they grumble about in the lanes. Click a line and I shall take you to a home that says it.', show: '#chip-panel .talk' },
     { say: 'Happy folk even work harder, a tenth faster at best. Sad ones drag their feet. So it pays to keep them smiling!', show: '#chip-panel [data-tip^="Happy villagers"]' },
   ],
   pop: [
     { say: 'Your people, my liege, and the beds they have to sleep in.', show: '#topbar [data-chip="pop"]' },
-    { say: 'Who is doing what: at work, building, idle, and jobs resting for the season. Idle hands help the builders, so they are never quite wasted.', show: '#chip-panel .labour-sum' },
-    { say: 'Errands! Every household walks to market, to the well, to church. That time comes off their work, so build those places near the homes.', show: '#chip-panel [data-tip^="Each household"]' },
+    { say: 'Who is doing what: at work, building, idle, and jobs resting for the season. Idle and seasonal hands help the builders, so they are never quite wasted.', show: '#chip-panel .labour-sum' },
+    { say: 'Errands! Every household walks to market, to the well, to church. That time comes off their work, so build those places near the homes, and they have more time left to work.', show: '#chip-panel [data-tip^="Each household"]' },
     { say: 'Jobs fill by need, food first. A workplace short of hands shows up in this list; click it and I shall walk you there.', show: '#chip-panel .sub' },
-    { say: 'A rule of thumb: many idle? Build workplaces. Many short? Build homes, not more workshops.' },
+    { say: 'A rule of thumb: many idle? Build workplaces. Many short? Build homes.' },
   ],
   food: goodsPages('food', 'The larder! Everything your people can eat, kind by kind.', 'Each villager eats a measure a month, and a varied table makes a happier town. Winter brings nothing in from the fields, so fill the granaries before the frost.'),
-  materials: goodsPages('materials', 'Materials and fuel: timber, stone, planks and the like. What everything is built from.', 'Building sites take their materials a load at a time, so keep a little of each in store and the builders never stand about.'),
+  materials: goodsPages('materials', 'Materials and fuel: timber, stone, planks and the like. Those are what you need to build and expand your town.', 'Building sites take their materials a load at a time, so keep a little of each in store and the builders never stand about.'),
   goods: goodsPages('goods', 'Goods: what your workshops make from other things. Flour, cloth, ale, tools...', 'Workshops wear out tools and wood parts as they work, too, so keep a few of each in store. A crew with worn gear works a quarter slower.'),
   treasury: [
     { say: 'The treasury! My favourite chip, if I may say so.', show: '#topbar [data-chip="treasury"]' },
     { say: 'Taxes. Higher fills the chest, but your people grumble. And only a manor hall collects them, mind.', show: '#chip-panel .tax' },
-    { say: 'Prestige: the standing of your house. It buys titles and town charters, and pays for fairs\' renown. Below it, where each month\'s prestige comes from: the manor as it grows, the church, fine homes, gardens, great works, banners and more.', show: '#chip-panel .prestige-row' },
+    { say: 'Prestige: the standing of your house. It buys titles and town charters, and pays for fairs\' renown. Below it, where each month\'s prestige comes from; you will find more ways of raising it as your town grows.', show: '#chip-panel .prestige-row' },
     { say: 'Knowledge, gathered month by month, to spend on the learning board. Hover it to see who teaches.', show: '#chip-panel [data-tip*="Knowledge a month"]' },
     { say: 'With enough prestige you may even become something grander. A fine ring to it!', show: '#chip-panel [data-action="title"]' },
     { say: 'And here: the ledger, with the town\'s numbers over the years, and the charters.', show: '#chip-panel .row' },
   ],
   learning: [
     { say: 'The learning board! Your people\'s knowledge, ready to spend. Let me walk you round it.', show: '.lb-have' },
-    { say: 'It has several cloths, one for each part of town life. A badge says how many patches are ready on each.', show: '.lb-tabs' },
-    { say: 'Patches that glow can be learned now. Click one to see what it does and what it costs.', show: '.lb-patch.ready' },
+    { say: 'It has several cloths, one for each part of town life. A badge says how many patches are ready to learn.', show: '.lb-tabs' },
+    { say: 'Patches that glow can be learned now. Click one to see the details of what it does.', show: '.lb-patch.ready' },
     { say: 'Locked ones say what they wait for: a rank, another patch, or something your town must do first.', show: '.lb-patch.locked' },
-    { say: 'And patches joined by "or"... those are a choice for good. Choose wisely, my liege!', show: '.lb-or' },
+    { say: 'And patches joined by "or"... those are a choice for good, and will likely shape the way your town works. Choose wisely, my liege!', show: '.lb-or' },
     { say: 'Knowledge grows with the town: churches, schools, monks and fine homes all teach.' },
   ],
   charters: [
     { say: 'The town charters, granted by the crown once you are a Town.', show: '.charter-hall' },
     { say: 'Each tapestry is a path. It makes your town good at one thing, at a small cost somewhere else.', show: '.tapestry' },
-    { say: 'The charters go in order along the path, and each costs more prestige than the last.', show: '.t-nodes' },
-    { say: 'Click one and its details show here. Two full paths make a fine reign; a Guildhall makes them cheaper.', show: '.charter-detail' },
-  ],
-  production: [
-    { say: 'The production book! What each good comes from, and what uses it.', show: '.modal .prodbook' },
-    { say: 'How much was made and used of late, and the stock targets. When something runs short, look here first: the chain shows which link is missing.' },
+    { say: 'The charters go in order along the path, and each choice costs more prestige than the last. You may go all the way along a couple of paths, or spread your choices.', show: '.t-nodes' },
+    { say: 'Click one, and its details will show here. Two full paths make a reign worthy of a duke, my liege.', show: '.charter-detail' },
   ],
   ledger: [
-    { say: 'The town ledger: your numbers over the years, drawn as charts.', show: '.modal .ledger' },
+    { say: 'The town ledger: your numbers over the years, drawn as charts, so you can see which way things are heading.', show: '.modal .ledger' },
     { say: 'Watch the lines, my liege. A trouble shows in them long before it knocks at the door.' },
   ],
   lord: [
@@ -90,37 +86,15 @@ const HELP: Record<string, HelpPage[]> = {
     { say: 'Dress yourself here, piece by piece.', show: '.lord-tabs' },
     { say: 'And your arms. They fly on the manor, on the banners and on the town\'s flags.', show: '.lord-flag' },
   ],
-  menu: [
-    { say: 'The game menu: save your town, go back to the main menu (to load another or found a new one), help, and the settings for sound, text size and the like.', show: '.modal .menu' },
-    { say: 'And the seed of your land. The same seed always grows the same land, so friends can play it too.', show: '.modal .seed-line' },
-  ],
-  settings: [
-    { say: 'Your settings, my liege: how the game sounds, looks and behaves. Each button flips its setting, and it is remembered next time.', show: '.modal .menu' },
-    { say: 'Sound and music; the size of the writing; whether bad news stops time; tips like mine; and pictures or icons on the build bar.' },
-  ],
-  newgame: [
-    { say: 'A new settlement! How exciting. Let us choose your land.' },
-    { say: 'The seed. The same seed always gives the same land, so you can share it with a friend.', show: '.modal #seed' },
-    { say: 'Then choose the kind of land and how hard the going should be. Do not worry, I shall be there either way.' },
-  ],
   save: [
     { say: 'Your saved towns, my liege.' },
-    { say: 'Download one to keep it safe, or to give a friend the very same town.' },
-  ],
-  help: [
-    { say: 'How to play, in short. A good read for a rainy evening.' },
-    { say: 'And remember: I am always here. Click my face on any panel and I shall come.' },
-  ],
-  event: [
-    { say: 'Something has happened in your lands, and the choice is yours.', show: '.modal .tale' },
-    { say: 'Each answer says what it costs and what it brings. Take your time; the world waits for you.', show: '.modal .choices' },
   ],
   orders: [
     { say: 'Choose a good for this order.' },
     { say: 'Its price is shown. Imports cost a little more than the good is worth, exports bring a little less. The merchants must eat too!' },
   ],
   folk: [
-    { say: 'One of your villagers! Where they live, where they work, and what they want.', show: '#inspector' },
+    { say: 'One of your villagers! Look into where they live, where they work, and what they want: it all tells you how your town is faring.', show: '#inspector' },
     { say: 'Their home\'s needs are the town\'s needs. Meet them, and they will be happy.' },
   ],
   objectives: [

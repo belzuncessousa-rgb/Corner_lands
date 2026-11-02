@@ -6,7 +6,7 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 await page.goto(process.env.URL || 'http://localhost:3001/');
 await page.waitForTimeout(800);
 await page.click('text=New Settlement');
-await page.fill('#seed', process.env.SEED || '4242');
+await page.evaluate((n) => window.game.hud.showNewGame(true, Number(n)), process.env.SEED || '4242');
 await page.click('text=Found the Settlement');
 await page.waitForTimeout(400);
 await page.evaluate((years) => {

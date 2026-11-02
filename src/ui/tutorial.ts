@@ -75,11 +75,11 @@ function lookAt(_g: Game, x: number, y: number): void {
 
 const START: Step[] = [
   {
-    say: 'Greetings, my liege! Welcome to your new land. I am Fingamoboblius, and I shall assist you in your task.',
+    say: 'Greetings, my liege! Welcome to your new land. I am Fingamoboblius, and I shall assist you in turning this lovely corner of land into a beautiful city worthy of thy name.',
     enter: (g) => g.setSpeed(0),
   },
   {
-    say: "First, let's take a look at the reports I'll keep updated for you to track.",
+    say: "First, let's take a look at the reports. I'll keep everything updated, so you can easily follow what is happening in the village.",
     show: '#topbar',
   },
   {
@@ -87,39 +87,55 @@ const START: Step[] = [
     show: '#topbar [data-chip="happy"]',
   },
   {
-    say: 'These are your people, and the homes they have room in. The little badge counts those without work: idle hands are wasted hands, my liege.',
+    say: 'This tab keeps count of your people: how many live here, and how many the homes have room for. The little badge counts those without work: idle hands are wasted hands, my liege.',
     show: '#topbar [data-chip="pop"]',
   },
   {
-    say: 'Food in the stores. Hover it to see each kind and how many months it will last. Your people eat from the stores every month, so keep an eye on it before winter.',
+    say: 'Here you can see how much food we have in store. Hover it to see how much of each kind. For now our people are easy to please, and any kind of food will do; but as they move into finer homes, they will want more than one kind on the table to be happy.',
     show: '#topbar [data-chip="food"]',
   },
   {
-    say: 'Materials: timber, stone, planks and the like, for building. The settlers brought some on their carts, but not enough for long.',
+    say: 'Every villager eats one measure of food a month. At the end, you can see how many months the stores will feed everyone. Remember that berries, fish and even game stop coming in winter, so make sure you are well stocked up!',
+    show: '#topbar [data-chip="food"]',
+  },
+  {
+    say: 'You can also set a stock target for each food or good: once it is reached, the workers stop making it and lend a hand elsewhere.',
+    show: '#topbar [data-chip="food"]',
+  },
+  {
+    say: 'Construction materials: timber, stone, planks and the like, for building. The settlers brought some on their carts, but not enough for long. We shall need a proper local industry, or trade, to keep up.',
     show: '#topbar [data-chip="materials"]',
   },
   {
-    say: 'Goods: what your workshops make from other things, such as flour, cloth, ale and tools.',
+    say: 'In this tab you can see the goods: materials for the workshops, such as tools, flour and cloth, and finished goods your people will want as their needs grow finer, such as clothes, ale and books.',
     show: '#topbar [data-chip="goods"]',
   },
   {
-    say: 'And the treasury: coins from trade, and taxes once you raise a manor hall, and later the prestige of your house. Click it to set the taxes.',
+    say: 'And these are your main currencies as lord of this land: coins, prestige and knowledge.',
     show: '#topbar [data-chip="treasury"]',
   },
   {
-    say: "This book holds what your people know. Knowledge gathers slowly, month by month, and buys new buildings, recipes and better ways of working. I shall show you more when there is enough to spend.",
+    say: "Coins are collected from your people once you raise a Manor Hall (click here to set the taxes). They also come from trade, selling to the world beyond this county. Spend them to bring in materials and goods you cannot make here, and to build all sorts of things, from decorations to great works.",
+    show: '#topbar [data-chip="treasury"]',
+  },
+  {
+    say: 'Prestige comes mostly from your estate: build up your manor, and the improvements worthy of a lord of your standing. Spend it on titles, and on charters that make your town special. We shall talk more of those later.',
+    show: '#topbar [data-chip="treasury"] .prestige',
+  },
+  {
+    say: "And knowledge: what we have learned here, and so what your people can and cannot do. It gathers slowly, month by month, and buys new buildings, recipes and better ways of working. I shall show you more when there is enough to spend.",
     show: '#topbar .learn-chip',
   },
   {
-    say: 'Over here is the calendar. A year has twelve months and four seasons. These buttons pause time or make it run faster. I have stopped it while we talk.',
+    say: 'Over here is the calendar. A year has twelve months and four seasons. These buttons pause time or make it run faster; I have stopped it while we talk. Here you can also switch the music and the sounds of the town, should you need a little peace from them.',
     show: '#clock',
   },
   {
-    say: 'In the corner: the game menu, your portrait (dress yourself and design your arms there), the production book, the town charters, and the reach of your wells and markets.',
+    say: 'In the corner, a few tools to help you rule: the main menu, your portrait (dress yourself and design your banner there), and the town charters.',
     show: '#top .btnrow',
   },
   {
-    say: 'And this little glass changes how you see the land. Click it and it greys the land out and lights up what can be gathered: rock, bog ore, berries hiding under the trees, game and fish, with about how much of each. Handy, before you build a lodge!',
+    say: 'Finally, your lordship can look at the map through a few lenses: show how far the wells, markets and the like reach, light up the natural resources and how much of each lies there, and hide the trees that block the view.',
     show: '#lens-btn',
   },
   {
@@ -127,7 +143,7 @@ const START: Step[] = [
     show: '#objectives',
   },
   {
-    say: 'But that is enough tattle. Let us get this town going! Down here you place the buildings that will fuel your town and serve your subjects. Let us start with some essential work. Click on the Resources icon.',
+    say: 'But that is enough tattle. Let us get this town going! Down here, you may place the buildings that will fuel your town and serve your subjects. Let us start with some essential work. Click on the Resources icon.',
     show: '#buildbar [data-cat="resources"]',
     until: () => !!document.querySelector('#buildbar [data-type="woodcutter"]'),
   },
@@ -146,8 +162,8 @@ const START: Step[] = [
           for (let x = Math.floor(c.x - 5); x <= c.x + 5; x++) if (x >= 0 && y >= 0 && x < g.state.width && y < g.state.height && g.state.trees[y * g.state.width + x]) trees++;
       }
       return trees < 12
-        ? 'Hmm, there are few trees about that spot, my liege: the woodcutters will walk a long way. You may demolish it and build nearer the woods. For now, let us go on.'
-        : 'Splendid, right by the trees! The woodcutters will not walk far.';
+        ? 'Hmm, there are few trees about that spot, my liege: the woodcutters will walk a long way. You may demolish it and build nearer the woods; your people walk to every task, so distances matter. For now, let us go on.'
+        : 'Splendid, right by the trees! The woodcutters will not walk far. Your people walk to every task, so distances matter.';
     },
     show: (g) => {
       const w = g.state.buildings.find((b) => b.type === 'woodcutter');
@@ -215,12 +231,12 @@ const START: Step[] = [
     until: (g) => count(g.state, 'forager') + count(g.state, 'hunter') + count(g.state, 'fisher') > 0,
   },
   {
-    say: 'Our people still sleep in the tents they came with. Open Housing and build a cottage for a family. Leave room around it: homes grow, and gardens come later.',
+    say: 'Our people still sleep in the tents they came with. Open Housing and build a cottage for a new family to settle in and help our town grow.',
     show: '#buildbar [data-cat="housing"]',
     until: (g) => count(g.state, 'house') > 0,
   },
   {
-    say: 'Now a road. Buildings work without one, but villagers walk much faster on a road. Choose Road, click where it starts and click where it ends. Join the cottage to the camp.',
+    say: 'Lastly, before I grant you a moment of respite: a road! Buildings work without one, but villagers walk much faster on a road. Choose Road, click where it starts, and click where it ends. Join the cottage to the camp.',
     show: '#buildbar [data-action="road"]',
     enter: (g) => {
       (g as unknown as { tutorRoads: number }).tutorRoads = roadsOf(g.state);
@@ -239,11 +255,11 @@ const START: Step[] = [
     run: true,
   },
   {
-    say: 'They stand! Click any building to see what it does, who works there and what it lacks. Workers leave what they make in a little yard, until someone carries it to storage.',
+    say: 'They stand! Click any building to see what it does, who is working there, and whether it lacks anything to work. Workers leave what they make in a little yard, until someone carries it to proper storage.',
     enter: (g) => g.setSpeed(0),
   },
   {
-    say: 'That is why you will soon want a Storehouse for materials and a Granary for food (in the Civic menu): their haulers fetch from the yards, and the camp cannot hold much.',
+    say: 'That is why you will soon want a Storehouse for materials and a Granary for food (both in the Civic menu): their haulers fetch what the workplaces make and store it, for the workplaces cannot hold much.',
     show: '#buildbar [data-cat="civic"]',
   },
   {
@@ -251,18 +267,18 @@ const START: Step[] = [
     show: '#objectives',
   },
   {
-    say: 'And raise a Manor Hall (in the Manor menu) as soon as you can spare the timber: no lord, no taxes, and coins buy tools and goods when your own run short.',
+    say: 'And raise a Manor Hall (in the Manor menu) as soon as you can spare the timber: no lord\'s house, no taxes and no prestige, and both shall come in handy soon.',
     show: '#buildbar [data-cat="manor"]',
   },
   {
-    say: 'I shall leave you to it now, my liege. When there is knowledge to spend, or your manor stands, I shall come back. Good fortune!',
+    say: 'I shall leave you to it now, my liege. Should I be of any service, summon me on any screen by clicking the little picture of my face. I bid thee good luck!',
     enter: (g) => g.setSpeed(1),
   },
 ];
 
 const MANOR: Step[] = [
   {
-    say: 'Ah, my liege! A manor worthy of your house. Allow me a word or two.',
+    say: 'Ah, my liege! A manor worthy of thine house. Allow me a word or two.',
     enter: (g) => {
       g.setSpeed(0);
       const m = g.state.buildings.find((b) => b.type === 'townhall');
@@ -274,19 +290,14 @@ const MANOR: Step[] = [
     },
   },
   {
-    say: 'From here you hold feasts and festivals that cheer the people and bring prestige: click the manor to see them. You yourself will now walk out among your subjects.',
+    say: 'From here you hold feasts and festivals that cheer the people and bring prestige: click the manor to see them. You yourself will now walk out among your subjects and see to their affairs. And remember to keep some space around your estate, for the buildings that will give you the comfort you need.',
   },
   {
-    say: 'Taxes are paid now: the manor clerk can see to five and forty villagers, and tax offices to more. Prestige gathers each month from the manor, the church and other fine things. Spend it on town charters here, once you are a Town: each shapes what kind of town yours becomes, and each costs more than the last.',
+    say: 'Taxes will now be collected: the manor clerk can see to five and forty villagers, and tax offices to more. Prestige gathers each month from the manor, the church and other fine things. Spend it on town charters here, once you are a Town: each shapes what kind of town yours becomes, and each costs more than the last, so choose carefully.',
     show: '#top [data-action="charters"]',
   },
   {
-    say: "The manor can be renovated into a Manor House, a Stone Manor and at last a Palace. Each opens buildings for the lord's grounds: a stable, a garden, an armoury, a deer park, the atelier where masterpieces are made. They must stand within four tiles of the manor, or of the lord's other buildings and gardens.",
-  },
-  {
-    say: 'And here you may dress yourself and design the arms that fly over the manor. That is all, my liege. Rule well!',
-    show: '#lord-btn',
-    enter: (g) => g.setSpeed(0),
+    say: "The manor can be renovated into a Manor House, a Stone Manor and at last a Palace. Each opens buildings for the lord's grounds: a stable, a garden, an armoury, a deer park, the atelier where masterpieces are made. They must stand within four tiles of the manor, or of the lord's other buildings and gardens. That is all, my liege. Rule well!",
   },
 ];
 
@@ -316,7 +327,7 @@ const STORE: Step[] = [
     },
   },
   {
-    say: 'Just so. When the yards fill up faster than one hauler can carry, give the place back. Each job should earn its keep!',
+    say: 'Just so. When the yards fill up faster than one hauler can carry, give the place back. Each job should earn its keep! This works for every building, and I can see to the jobs for thee, should you leave Auto-hire ticked.',
     enter: (g) => g.setSpeed(0),
   },
 ];
@@ -337,7 +348,7 @@ const LEARN: Step[] = [
     show: '.lb-board',
   },
   {
-    say: 'Gold-stitched patches are learned. Glowing ones can be learned now. The rest are locked, and show what they wait for: a size of town, something made, or another patch first (the threads show which). Patches joined by "or" are a choice, for good.',
+    say: 'Gold-stitched patches are learned. Glowing ones can be learned now. The rest are locked, and you may click them to see what they wait for: a size of town, something made, or another patch first (the threads show which).',
     show: () => {
       const e = document.querySelector('.lb-patch.ready') as HTMLElement | null;
       if (!e) return null;
@@ -346,14 +357,23 @@ const LEARN: Step[] = [
     },
   },
   {
-    say: 'Click a glowing patch to look at it, then Learn it. A Forester, perhaps, so the woods never run out.',
+    say: 'Patches joined by an "or" thread are choices for good, and may shape your town for good. So thread carefully, if you know what I mean.',
+    show: () => {
+      const e = document.querySelector('.lb-or') as HTMLElement | null;
+      if (!e) return null;
+      const r = e.getBoundingClientRect();
+      return { x: r.left - 10, y: r.top - 10, w: r.width + 20, h: r.height + 20, round: true };
+    },
+  },
+  {
+    say: 'Click a glowing patch to look at it, then Learn it. A Forester, perhaps, so the woods never run out?',
     enter: (g) => {
       learnedBefore = learned(g);
     },
     until: (g) => learned(g) > learnedBefore,
   },
   {
-    say: 'Splendid! It waits for you in the build menu now. Knowledge comes faster as the town grows, and the church, a school, the monks and the finest homes all add to it. Come back to the board whenever the book shows a number.',
+    say: 'Splendid! It waits for you in the build menu now. Knowledge comes faster as the town grows, and finer homes and pious buildings add to it. Come back whenever you like.',
   },
 ];
 
@@ -362,12 +382,12 @@ const charterReady = (g: Game) => g.state.tier >= CHARTER_TIER && g.state.res.pr
 
 const CHARTER: Step[] = [
   {
-    say: 'My liege! Your house has the standing now to ask the crown for a town charter. Allow me a moment.',
+    say: 'My liege! Thy name is now well known in the region, and thy house has the standing to ask the crown for a town charter. Allow me a moment.',
     enter: (g) => g.setSpeed(0),
     show: '#top [data-action="charters"]',
   },
   {
-    say: 'Each charter makes your town better at one thing, at a small cost somewhere else. They come in paths, one after another, and each costs more prestige than the last. Two full paths make a fine reign.',
+    say: 'Each charter makes your town better at one thing, at a small cost somewhere else. Those choices will shape what your town is known for.',
     show: '#top [data-action="charters"]',
   },
   {
@@ -420,7 +440,7 @@ const TRADE: Step[] = [
     enter: openBook,
   },
   {
-    say: 'But the carts are only so big: each month the merchants carry a set number of goods here, whatever you order. Crates nearby give them room to take more away.',
+    say: 'But the carts are only so big: each month the merchants carry a set number of goods here, whatever you order. Crates nearby give them room to take more away. To trade even more, build more trading posts, or even a dock!',
     show: '#inspector .trade-book > .note',
     enter: openBook,
   },

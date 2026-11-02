@@ -8,7 +8,7 @@ page.on('pageerror', (e) => errors.push(String(e)));
 await page.goto(process.env.URL || 'http://localhost:3001/');
 await page.waitForTimeout(800);
 await page.click('[data-m="new"]');
-await page.fill('#seed', process.env.SEED || '4242');
+await page.evaluate((n) => window.game.hud.showNewGame(true, Number(n)), process.env.SEED || '4242');
 await page.click('[data-m="go"]');
 await page.waitForTimeout(400);
 await page.evaluate(() => {

@@ -63,7 +63,7 @@ for (const [name, secs] of SCENES) {
     // Into a new game, and grown a little off camera for the later scenes.
     await page.evaluate(() => document.querySelector('.modal-back')?.style.removeProperty('display'));
     await page.click('[data-m="new"]');
-    await page.fill('#seed', process.env.SEED || '4242');
+    await page.evaluate((n) => window.game.hud.showNewGame(true, Number(n)), process.env.SEED || '4242');
     await page.click('[data-m="go"]');
     await step(10);
   }

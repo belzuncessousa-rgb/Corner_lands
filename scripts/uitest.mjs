@@ -12,7 +12,7 @@ if (process.env.SCALE) await page.addInitScript((z) => localStorage.setItem('cor
 await page.goto(process.env.URL || 'http://localhost:3001/');
 await page.waitForTimeout(800);
 await page.click('text=New Settlement');
-await page.fill('#seed', '4242');
+await page.evaluate((n) => window.game.hud.showNewGame(true, Number(n)), '4242');
 await page.click('text=Found the Settlement');
 await page.waitForTimeout(600);
 // (The charter lesson, which the prestige given below would bring on, is taken as heard: it would take the clicks.)
@@ -349,7 +349,7 @@ await page.mouse.click(640, 500);
 check('the sound switches close on a click elsewhere', !(await page.$('#sound-pop')));
 await page.evaluate(() => window.game.hud.showGameMenu());
 await page.waitForTimeout(200);
-check('the seed link button is there', !!(await page.$('[data-m="seed-link"]')));
+check('the seed is not shown in the game menu', !(await page.$('.seed-line')));
 await page.click('[data-m="photo"]');
 await page.waitForTimeout(200);
 check('photo mode hides the interface', await page.evaluate(() => document.getElementById('ui').classList.contains('photo') && document.getElementById('topbar').getClientRects().length === 0));

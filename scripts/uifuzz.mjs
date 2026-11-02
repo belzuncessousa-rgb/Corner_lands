@@ -12,7 +12,7 @@ page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 await page.goto(process.env.URL || 'http://localhost:3001/');
 await page.waitForTimeout(800);
 await page.click('text=New Settlement');
-await page.fill('#seed', process.env.SEED || '777');
+await page.evaluate((n) => window.game.hud.showNewGame(true, Number(n)), process.env.SEED || '777');
 await page.click('text=Found the Settlement');
 await page.waitForTimeout(500);
 // Grow a big town quickly with the autoplayer.

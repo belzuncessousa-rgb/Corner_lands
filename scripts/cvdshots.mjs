@@ -9,7 +9,7 @@ page.on('pageerror', (e) => errors.push(String(e)));
 await page.goto(process.env.URL || 'http://localhost:3001/');
 await page.waitForTimeout(800);
 await page.click('text=New Settlement');
-await page.fill('#seed', '4242');
+await page.evaluate((n) => window.game.hud.showNewGame(true, Number(n)), '4242');
 await page.click('text=Found the Settlement');
 await page.waitForTimeout(500);
 await page.evaluate(() => { const g = window.game; window.cl.playBot(g.state, 5, 3); g.state.pendingEvent = undefined; g.setSpeed(0);

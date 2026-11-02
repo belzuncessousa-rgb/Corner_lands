@@ -9,7 +9,7 @@ page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 await page.goto('http://localhost:3001/');
 await page.waitForTimeout(800);
 await page.click('text=New Settlement');
-await page.fill('#seed', '4242');
+await page.evaluate((n) => window.game.hud.showNewGame(true, Number(n)), '4242');
 await page.click('text=Found the Settlement');
 await page.waitForTimeout(500);
 const info = await page.evaluate(() => {

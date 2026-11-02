@@ -8,7 +8,7 @@ import { drawTapestry } from './tapestry';
 import { stewardCanvas, TUTORIAL_SEED } from './tutorial';
 import { CHARGES, DEFAULT_HERALDRY, DIVISIONS, FLAG_SHAPES, type Heraldry, TINCTURES, flagOutline, paintArms } from '../render/heraldry';
 import { BEARDS, CLOTHS, DEFAULT_LORD, FIXED_HATS, GARMENTS, HAIRS, HAIR_STYLES, HATS, HELD, type LordLook, SKINS, TRIMS, lordPortrait } from '../render/lord';
-import { placeName, townName, weeklySeed } from '../game/names';
+import { placeName, townName } from '../game/names';
 import { deleteSave, listSaves, type SaveInfo } from '../api';
 import {
   BUILDINGS,
@@ -77,8 +77,6 @@ import {
   zoneArea,
   fieldForecast,
   FARM_BARN,
-  CHAINS,
-  chainReport,
   settlerBlocker,
   ANIMAL_KINDS,
   buyAnimal,
@@ -344,7 +342,6 @@ export class Hud {
           <div class="btnrow">
             <button id="menu-btn" class="panel icon-btn" data-action="menu" data-tip="Menu (Esc)">${CATEGORY_ICONS.menu}</button>
             <button id="lord-btn" class="panel icon-btn" data-action="lord" data-tip="<b>Your Lord</b><br>Choose how your lord or lady looks, and the arms on your flags."></button>
-            <button class="panel icon-btn" data-action="production" data-tip="<b>Production Book</b><br>Every trade, what it takes and what it makes.">${ICONS.books}</button>
             <button class="panel icon-btn" data-action="charters" data-tip="<b>Town Charters</b><br>Spend prestige to specialise your town.">${ICONS.prestige}</button>
             <button class="panel icon-btn" data-action="coverage" data-tip="<b>Reach</b> (V)<br>Show where wells, markets, taverns and churches reach, and which homes they miss.">${REACH_ICON}</button>
             <button id="lens-btn" class="panel icon-btn" data-action="lens" data-tip="<b>Resource lens</b> (L)<br>Grey the land and light up rock, bog ore, berries, game and fish, even under the trees, with about how much of each. Click again to see the land as it is.">${LENS_ICON}</button>
@@ -2212,8 +2209,6 @@ export class Hud {
         this.update();
         break;
       }
-      case 'production':
-        this.showProduction();
         break;
       case 'charters':
         this.charterSel = null;
@@ -2373,69 +2368,6 @@ export class Hud {
 
   // ---------------------------------------------------------------- modals
 
-  /** Every workshop, branch by branch: what it takes, what it makes, how many you have. */
-  private showProduction(): void {
-    const s = this.game.state;
-    const goods = (c: Cost) =>
-      Object.entries(c)
-        .map(([k, v]) => `<span class="pg" data-tip="${GOODS[k as ResourceId].name}">${ICONS[k as ResourceId] ?? ''}${v}</span>`)
-        .join('');
-    const cats: Category[] = ['resources', 'farming', 'food', 'industry', 'civic', 'manor', 'works'];
-    const sections = cats
-      .map((cat) => {
-        const rows = BUILD_ORDER.filter((t) => BUILDINGS[t].category === cat && (BUILDINGS[t].workers > 0 || BUILDINGS[t].zone))
-          .map((t) => {
-            const d = BUILDINGS[t];
-            const lock = lockReason(s, t);
-            const mine = s.buildings.filter((b) => b.type === t && b.build >= 1);
-            const staff = mine.reduce((a, b) => a + b.workers, 0);
-            const stuck = mine.filter((b) => hasProblem(b));
-            const slots = mine.reduce((a, b) => a + workersOf(b), 0);
-            const recipes = (d.recipes ?? [{ id: '', name: '', inputs: d.inputs, outputs: d.outputs }]).filter((r) => recipeKnown(s, t, r));
-            const icons = (ids: ResourceId[]) => ids.map((k) => `<span class="pg" data-tip="${GOODS[k].name}">${ICONS[k] ?? ''}</span>`).join('');
-            const OWNERS: Partial<Record<BuildingType, string>> = {
-              farm: 'Sows and reaps the fields drawn nearby',
-              orchardist: 'Picks the orchards planted nearby',
-              forester: 'Plants trees for the woodcutters',
-            };
-            let lines: string;
-            if (OWNERS[t]) lines = `<i>${OWNERS[t]}</i>`;
-            else if (t === 'byre') lines = icons(['wool', 'milk', 'meat', 'pork', 'hides']);
-            else if (d.zone) lines = icons(recipes.flatMap((r) => Object.keys(r.outputs) as ResourceId[])) + (t === 'pasture' ? '<i>Grazing for the Animal Farm</i>' : '');
-            else
-              lines = recipes
-                .filter((r) => Object.keys(r.outputs).length)
-                .map((r) => `<span class="recipe">${Object.keys(r.inputs).length ? `${goods(r.inputs)}<span class="arrow">→</span>` : ''}${goods(madeOf(r.outputs))}</span>`)
-                .join('<span class="or">or</span>');
-            return `<tr class="${lock ? 'locked' : ''}">
-              <td class="pimg"><img src="${this.cardImage(t)}" alt=""></td>
-              <td><b>${esc(d.name)}</b>${lock ? `<div class="neg small">${esc(lock)}</div>` : ''}</td>
-              <td><div class="plines">${lines || '<i>—</i>'}</div></td>
-              <td class="num">${mine.length ? `${mine.length}${slots ? `<div class="small">${staff}/${slots} at work</div>` : ''}${stuck.length ? `<div class="small neg" data-tip="${esc([...new Set(stuck.map((b) => b.status))].join('<br>'))}">${stuck.length} stalled</div>` : ''}` : ''}</td>
-            </tr>`;
-          })
-          .join('');
-        return rows ? `<h3>${CATEGORY_ICONS[cat]} ${CATEGORY_NAMES[cat]}</h3><table class="prod">${rows}</table>` : '';
-      })
-      .join('');
-    // The chains: each good's stock and last month's making and using, weakest link flagged.
-    const chains = CHAINS.filter((c) => c.links.some((id) => s.seen?.includes(id) || s.res[id] > 0))
-      .map((c) => {
-        const rep = chainReport(s, c.links);
-        const links = rep.links
-          .map(
-            (l, i) => `${i ? '<span class="arrow">→</span>' : ''}<span class="link ${rep.weak === i ? 'weak' : ''}" data-tip="<b>${GOODS[l.id].name}</b><br>In store ${l.stock}<br>Made last month ${l.made}<br>Used by workshops ${l.used}">${rep.weak === i ? '⚠ ' : ''}${ICONS[l.id] ?? ''}<b>${l.stock}</b><small>+${l.made}${l.used ? ` −${l.used}` : ''}</small></span>`,
-          )
-          .join('');
-        return `<tr><td><b>${esc(c.name)}</b></td><td><div class="chain">${links}</div>${rep.why ? `<div class="small neg">${esc(rep.why)}</div>` : ''}</td></tr>`;
-      })
-      .join('');
-    this.modalHelp = 'production';
-    this.openModal(`<h2>Production Book</h2>
-      <p class="note">Every trade in your lands, what it takes and what it makes. Greyed trades unlock with rank or charters.</p>
-      <div class="prodbook">${chains ? `<h3>Chains <small class="muted">in store, +made −used last month</small></h3><table class="prod chains">${chains}</table>` : ''}${sections}</div>
-      <div class="row" style="justify-content:flex-end;margin-top:8px"><button class="primary" data-action="close-modal">Close</button></div>`).querySelector('.modal')!.classList.add('wide', 'prod-modal');
-  }
 
   private charterSel: string | null = null;
   /** The learning board: its open tab, the patch looked at, and a choice awaiting a second click. */
@@ -2647,7 +2579,6 @@ export class Hud {
         <button class="${latest ? '' : 'primary'}" data-m="new">New Settlement</button>
         <button data-m="tutorial">Tutorial</button>
         ${saves.length ? '<button data-m="load">Load Game</button>' : ''}
-        <button data-m="help">How to Play</button>
         <button data-m="settings">Settings</button>
         <button data-m="credits">Credits</button>
         ${desktop ? '<button data-m="quit">Quit</button>' : ''}
@@ -2670,7 +2601,6 @@ export class Hud {
     });
     m.querySelector('[data-m="quit"]')?.addEventListener('click', () => desktop?.quit());
     m.querySelector('[data-m="load"]')?.addEventListener('click', () => this.showLoad(true));
-    m.querySelector('[data-m="help"]')!.addEventListener('click', () => this.showHelp(true));
     m.querySelector('[data-m="settings"]')!.addEventListener('click', () => this.showSettings(true));
     m.querySelector('[data-m="credits"]')!.addEventListener('click', () => this.showCredits());
     m.querySelector('[data-m="tutorial"]')!.addEventListener('click', () => {
@@ -2718,8 +2648,7 @@ export class Hud {
       ${tutorial ? '<p>Fingamoboblius, your steward, will show you the ropes on a land chosen for learning. Pick how hard it should be; the land is always the same.</p>' : ''}
       <div class="row"><label>Name</label><input id="town" value="${esc(preset?.name ?? placeName(seed))}" maxlength="40"><button data-m="rename" data-tip="Another name">🎲</button></div>
       <div class="row lord-pick"><label>Your lord</label><span class="lord-mini"></span><span class="lord-mini flag"></span><button data-m="lord">Choose looks &amp; arms…</button></div>
-      <div class="land-pick" ${tutorial ? 'hidden' : ''}><p>Every map is generated from a seed. Share a seed to play the same land, or take this week's seed, the same for everyone.</p>
-      <div class="row"><label>Seed</label><input id="seed" value="${seed}" inputmode="numeric"><button data-m="dice" data-tip="Another land">🎲</button><button data-m="weekly" data-tip="The same land for everyone until Monday">Seed of the week</button></div>
+      <div class="land-pick" ${tutorial ? 'hidden' : ''}>
       <div class="row land-row"><label>Land</label><div class="lands">${(Object.keys(LANDS) as Land[])
         .map((l) => `<button class="land-btn ${land0 === l ? 'active' : ''}" data-land="${l}" data-tip="${esc(`${LANDS[l].name}: ${LANDS[l].desc}`)}" aria-label="${esc(LANDS[l].name)}">${LAND_ICONS[l]}</button>`)
         .join('')}</div></div></div>
@@ -2731,15 +2660,6 @@ export class Hud {
       </div>`,
       false,
     );
-    const input = m.querySelector('#seed') as HTMLInputElement;
-    const seedOf = (v: string) => {
-      let n = Number(v);
-      if (!Number.isFinite(n) || v === '') {
-        n = 0;
-        for (const ch of v) n = (n * 31 + ch.charCodeAt(0)) >>> 0;
-      }
-      return Math.floor(Math.abs(n)) % 2147483647;
-    };
     let land = land0;
     let mode = mode0;
     const landOf = () => land;
@@ -2756,29 +2676,22 @@ export class Hud {
       }),
     );
     const town = m.querySelector('#town') as HTMLInputElement;
-    // The name follows the seed until the player types their own.
     let named = preset?.named ?? false;
     town.addEventListener('input', () => (named = true));
     m.querySelector('.lord-mini')!.replaceChildren(lordPortrait(this.draftLord, 40, this.draftArms));
     m.querySelector('.lord-mini.flag')!.replaceChildren(this.flagCanvas(this.draftArms, 40, 40));
     const modeOf = () => mode;
     m.querySelector('[data-m="lord"]')!.addEventListener('click', () => {
-      const back = { seed: seedOf(input.value.trim()), land: landOf(), preset: { name: town.value, named, mode: modeOf() } };
+      const back = { seed, land: landOf(), preset: { name: town.value, named, mode: modeOf() } };
       this.showLord(() => this.showNewGame(fromMain, back.seed, back.land, back.preset, tutorial));
     });
-    const reseed = (n: number) => {
-      input.value = String(n);
-      if (!named) town.value = placeName(n);
-    };
-    m.querySelector('[data-m="dice"]')!.addEventListener('click', () => reseed(Math.floor(Math.random() * 999999)));
-    m.querySelector('[data-m="weekly"]')!.addEventListener('click', () => reseed(weeklySeed()));
     m.querySelector('[data-m="rename"]')!.addEventListener('click', () => {
       town.value = placeName(Math.floor(Math.random() * 999999));
       named = true;
     });
     m.querySelector('[data-m="back"]')!.addEventListener('click', () => (fromMain ? this.showMainMenu() : this.showGameMenu()));
     m.querySelector('[data-m="go"]')!.addEventListener('click', () => {
-      this.game.newGame(tutorial ? TUTORIAL_SEED : seedOf(input.value.trim()), mode as 'normal' | 'relaxed' | 'hardy', town.value, tutorial ? 'meadow' : landOf(), tutorial);
+      this.game.newGame(tutorial ? TUTORIAL_SEED : seed, mode as 'normal' | 'relaxed' | 'hardy', town.value, tutorial ? 'meadow' : landOf(), tutorial);
       if (tutorial) this.game.state.tutorial = { step: 0, chapter: 'start', storeSeen: false };
       this.game.state.lord = { ...this.draftLord };
       this.game.state.heraldry = { ...this.draftArms };
@@ -2991,12 +2904,11 @@ export class Hud {
         <button class="primary" data-m="resume">Resume</button>
         <button data-m="save">Save Game</button>
         <button data-m="main">Main Menu</button>
-        <button data-m="help">How to Play</button>
         <button data-m="settings">Settings</button>
         <button data-m="photo">Photo mode (U)</button>
         <button data-m="picture">📷 Save a picture</button>
       </div>
-      <div class="seed-line" data-tip="Start a New Settlement with this seed to play the same land.">Map seed <b>${this.game.state.seed}</b> <button data-m="seed">Copy</button> <button data-m="seed-link" data-tip="A link that opens New Settlement on this land">Copy a link to this land</button></div>`,
+`,
     );
     m.querySelector('[data-m="resume"]')!.addEventListener('click', () => this.closeModal());
     m.querySelector('[data-m="save"]')!.addEventListener('click', () => this.showSave());
@@ -3006,7 +2918,6 @@ export class Hud {
       await this.game.autosave().catch(() => undefined);
       this.showMainMenu();
     });
-    m.querySelector('[data-m="help"]')!.addEventListener('click', () => this.showHelp(false));
     m.querySelector('[data-m="settings"]')!.addEventListener('click', () => this.showSettings(false));
     m.querySelector('[data-m="photo"]')!.addEventListener('click', () => {
       this.closeModal();
@@ -3016,25 +2927,6 @@ export class Hud {
       // Close the menu first so the picture shows the town, not the dialog.
       this.closeModal();
       requestAnimationFrame(() => requestAnimationFrame(() => this.game.savePicture()));
-    });
-    m.querySelector('[data-m="seed"]')!.addEventListener('click', async (e) => {
-      const btn = e.currentTarget as HTMLButtonElement;
-      try {
-        await navigator.clipboard.writeText(String(this.game.state.seed));
-        btn.textContent = 'Copied';
-      } catch {
-        btn.textContent = 'Copy failed';
-      }
-    });
-    m.querySelector('[data-m="seed-link"]')!.addEventListener('click', async (e) => {
-      const btn = e.currentTarget as HTMLButtonElement;
-      const url = `${location.origin}${location.pathname}?seed=${this.game.state.seed}${this.game.state.land ? `&land=${this.game.state.land}` : ''}`;
-      try {
-        await navigator.clipboard.writeText(url);
-        btn.textContent = 'Link copied';
-      } catch {
-        btn.textContent = url;
-      }
     });
   }
 
@@ -3206,41 +3098,6 @@ export class Hud {
     m.querySelector('[data-m="back"]')!.addEventListener('click', () => (fromMain ? this.showMainMenu() : this.showGameMenu()));
   }
 
-  private showHelp(fromMain: boolean): void {
-    this.modalHelp = 'help';
-    const m = this.openModal(
-      `<h2>How to Play</h2>
-      <div class="help">
-        <p><b>Grow your settlement</b> from a settlers' camp into a City. The town climbs the ranks by itself once it is big enough and has what each rank needs (open the rank pill, top left, to see what the next one needs).</p>
-        <p><b>Building:</b> pick a category at the bottom, then a building, then click the map. Builders carry the materials over from storage, one load per trip, and then raise the walls. A plan can be laid out only once all its materials are in store. Buildings you cannot build yet stay hidden.</p>
-        <p><b>Markets</b> (Civic) are free and drawn like fields. Each open stall serves ten households with their goods, the nearest homes first; homes left out go without their goods and grumble. Food comes from the stores either way.</p>
-        <p><b>Gatherers</b> walk to the nearest trees, rocks, berries, game or fish, so place them close. Goods pile up in each workplace's yard until haulers from a Storehouse or Granary fetch them.</p>
-        <p><b>Fields, pastures and orchards</b> (Farming) are drawn: click one corner, then the opposite one, near a Farmstead, Animal Farm or Orchard Keeper's Lodge. Choose each field's crop in the panel, and build a Silo to keep the grain; animals are bought at the Animal Farm once you have a Trading Post, and share its pasture room.</p>
-        <p><b>Trading Post:</b> merchants come here to buy your surplus, and coins buy what you lack.</p>
-        <p><b>Roads</b> are optional but villagers walk faster on them. The Road button lays dirt; above the bar you can switch to stone roads (T), faster, or cobbled streets of dressed stone (Y), the fastest. Click to start, click again to plan it, keep clicking to continue; the road is laid a few tiles each day.</p>
-        <p><b>The top bar</b> shows happiness, villagers, food, materials, goods and the treasury. Hover a chip for the details, click to pin it: set how much of each good to keep, or stop making a good altogether. Workers rest when their goods reach the target.</p>
-        <p><b>Trade</b> goes through a Trading Post or Dock: select it and add orders to import a good up to a target or export it down to one. The merchants work through the orders from the top each month, as far as their carts allow; drag orders to change which come first.</p>
-        <p><b>Upkeep</b>: workplaces wear out tools or wood parts as they work (see Upkeep when you select one). Keep some in store, from a Blacksmith or a Carpenter's Workshop or the merchants; with none, the crew works a quarter slower.</p>
-        <p><b>Draught animals</b> live in a Draught Stable (four stalls each). A trading post can buy a pack horse, so its carts carry half as much again; a Builder's Yard needs an ox, and then building sites within its reach get their materials and rise half as fast again, wearing out about a wood part a month. Each animal eats a measure of grain a month, and rests if there is none.</p>
-        <p><b>Workers:</b> select a workplace to choose how many villagers work there, its priority and its product. Seasonal work frees hands in the off season. Hover the villagers chip to see who is idle and where hands are short.</p>
-        <p><b>The Manor</b> is optional: build it for feasts, festivals and prestige, and renovate it as the town grows into a Manor House and then a Stone Manor, which lets you lay out a manor garden, watch towers and the town walls.</p>
-        <p><b>Retinue</b>: a Borough can raise men-at-arms at the manor for prestige and arms. Paid 10 coins a month, they ride out against wolves and bandits.</p>
-        <p><b>Harvest feast</b>: once each autumn, select the manor to call a feast. A meal for everyone and drink for every eight cheer the town for half a year and bring prestige.</p>
-        <p><b>Villagers</b> eat one food a month each; several food groups (grain, meat, produce, dairy) cheer the homes a market serves. When every food is gone they boil stored wheat into pottage, which is only half as filling. Each winter month a home burns firewood. Finer homes need clothes, a tavern, boots and medicine, and enjoy luxuries. A family may set up a craft at home: the workshop costs materials and takes days to build, and the craft stays for good.</p>
-        <p><b>Prestige</b> comes from a fine manor, a church and monuments. From Town on, spend it on <b>charters</b> (crown button) to specialise your town.</p>
-        <p>Your <b>steward</b> warns you when things go wrong; the latest news shows at the side of the screen.</p>
-        <div class="ornament">❦</div>
-        <p><b>Keys</b>: <kbd>Left-drag</kbd> / <kbd>WASD</kbd> / arrows pan · <kbd>Wheel</kbd> / <kbd>+</kbd><kbd>-</kbd> / pinch zoom · <kbd>R</kbd> road (click, click) · <kbd>T</kbd> stone road · <kbd>Y</kbd> cobbled street · <kbd>X</kbd> / <kbd>Del</kbd> demolish · <kbd>P</kbd> protect a wood · <kbd>U</kbd> photo mode (hide the interface) · <kbd>V</kbd> reach of wells, markets, taverns, churches · <kbd>L</kbd> resource lens · <kbd>F</kbd> hide trees · ${BUILD_ORDER.filter((b) => BUILDINGS[b].hotkey)
-          .map((b) => `<kbd>${BUILDINGS[b].hotkey!.toUpperCase()}</kbd> ${BUILDINGS[b].name.toLowerCase()}`)
-          .join(' · ')} · <kbd>Space</kbd> pause · <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> speed</p>
-        <p><b>Playing with friends:</b> found the same land with the seed of the week, download your town from Save Game for a friend to open, and compare <b>scores</b> on the load cards: villagers and rank, the lord's title, great works, works of art, milestones and every year in which no one went hungry.</p>
-        <p><kbd>Esc</kbd>, <kbd>Right-click</kbd> or a long press on touch screens backs out one step at a time: a dialog, a pinned panel, a half-drawn road or field, the tool, the selection, then opens the menu.</p>
-      </div>
-      <div class="row" style="justify-content:flex-end"><button class="primary" data-m="back">Back</button></div>`,
-      !fromMain,
-    );
-    m.querySelector('[data-m="back"]')!.addEventListener('click', () => (fromMain ? this.showMainMenu() : this.showGameMenu()));
-  }
 
   private showLedger(): void {
     const s = this.game.state;
