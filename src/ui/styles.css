@@ -2153,8 +2153,8 @@ table.prod td.num {
   white-space: nowrap;
 }
 
-/* Too narrow for the buttons (~260px), the top bar (~800px) and the clock (~415px) side by side: the top bar gets its own row. */
-@media (max-width: 1520px) {
+/* Too narrow for the buttons, the top bar and the clock side by side even scaled down (see Hud.fitTop): the top bar gets its own row. */
+@media (max-width: 1260px) {
   #top {
     flex-wrap: wrap;
     gap: 6px;

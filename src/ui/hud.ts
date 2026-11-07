@@ -439,6 +439,7 @@ export class Hud {
     this.el['chip-panel'].addEventListener('mouseleave', leave);
     this.el['chip-panel'].addEventListener('mouseenter', stay);
     this.el.topbar.addEventListener('mouseenter', stay);
+    window.addEventListener('resize', () => this.fitTop());
     this.rebuild();
   }
 
@@ -604,7 +605,34 @@ export class Hud {
 
   private applyScale(): void {
     this.root.style.setProperty('zoom', this.uiScale === 1 ? '' : String(this.uiScale));
+    this.fitTop();
   }
+
+  /**
+   * The buttons, the top bar and the clock share one row; on a screen a little
+   * too narrow for them, the row is shrunk to fit rather than pushing the clock
+   * off the edge. Narrower still (the stylesheet's 1260px), the top bar takes a
+   * row of its own instead, at full size.
+   */
+  private fitTop(): void {
+    const top = this.root.querySelector('#top') as HTMLElement | null;
+    if (!top) return;
+    const kids = [...top.children] as HTMLElement[];
+    const gap = parseFloat(getComputedStyle(top).columnGap) || 0;
+    const need = kids.reduce((n, k) => n + k.offsetWidth, 0) + gap * Math.max(0, kids.length - 1);
+    // The room between the row's margins, in the UI layer's own pixels (offsetWidth ignores the scale).
+    const room = this.root.offsetWidth - 16;
+    const k = window.matchMedia('(max-width: 1260px)').matches || !need || need <= room ? 1 : room / need;
+    const key = k === 1 ? '' : `${k.toFixed(4)}:${need}`;
+    if (key === this.topFit) return;
+    this.topFit = key;
+    top.style.transformOrigin = '0 0';
+    top.style.transform = k === 1 ? '' : `scale(${k})`;
+    top.style.right = k === 1 ? '' : 'auto';
+    top.style.width = k === 1 ? '' : `${need}px`;
+  }
+  private topFit = '';
+  private fitTick = 0;
 
   /** How much the UI layer is magnified on screen: client pixels per CSS pixel. */
   private zoom(): number {
@@ -899,6 +927,8 @@ export class Hud {
     );
     const bar = this.el.clock.querySelector('.month-bar') as HTMLElement | null;
     if (bar) bar.style.width = `${progress}%`;
+    // Now and then, in case the row has changed width (a new button, a font come in).
+    if (++this.fitTick % 30 === 1) this.fitTop();
 
     // Note the new size first: celebrating pauses the game, which updates the
     // interface again, and must not celebrate twice.
