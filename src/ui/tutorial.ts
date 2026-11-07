@@ -491,6 +491,11 @@ export class Tutor {
   private grey: HTMLDivElement;
   private shield: HTMLDivElement;
   private greyMask = '';
+  /** While he talks: the lit parts of the screen, which the pointer may hover (a click there still goes on). */
+  private open: Spot[] = [];
+  private shieldClip = '';
+  /** A click whose press already moved him on, to be kept from the interface. */
+  private swallowClick = false;
   private gx = 0;
   private gy = 0;
   private walk = 0;
@@ -539,8 +544,27 @@ export class Tutor {
       (e) => {
         if (!this.active || this.waiting || this.root.style.display === 'none') return;
         if ((e.target as HTMLElement).closest('#tutor')) return;
+        // While he talks, what he lights up can be hovered to see it at work, but a click there
+        // only goes on, like a click anywhere else.
+        if (this.shield.style.display !== 'none') {
+          e.preventDefault();
+          e.stopPropagation();
+          this.swallowClick = true;
+          this.next();
+          return;
+        }
         const step = this.steps[this.game.state.tutorial?.step ?? 0];
         if (step?.until && this.typed >= this.text.length) this.waiting = true;
+      },
+      true,
+    );
+    window.addEventListener(
+      'click',
+      (e) => {
+        if (!this.swallowClick) return;
+        this.swallowClick = false;
+        e.preventDefault();
+        e.stopPropagation();
       },
       true,
     );
@@ -838,14 +862,33 @@ export class Tutor {
     const W = window.innerWidth;
     const H = window.innerHeight;
     const talking = !busy && !this.waiting;
-    // While he walks or waits nothing blocks the screen; while he talks a click anywhere goes on,
-    // except on a step that waits for the player, who must be free to do it.
-    this.shield.style.display = talking && !step.until ? 'block' : 'none';
+    // While he walks and talks a click anywhere goes on (Skip aside), except on a step that waits
+    // for the player, who must be free to do it, and once he steps aside.
+    this.shield.style.display = !this.waiting && !step.until ? 'block' : 'none';
+    // What he shows stays open to the pointer, so its tooltip or breakdown can be seen on hover;
+    // a breakdown that opens is lit up with it.
+    this.open = [];
+    if (spot && !this.waiting) {
+      this.open.push(spot);
+      const panel = document.getElementById('chip-panel');
+      if (panel && panel.getClientRects().length && panel.style.display !== 'none') {
+        const r = panel.getBoundingClientRect();
+        if (r.width) this.open.push({ x: r.left - 4, y: r.top - 4, w: r.width + 8, h: r.height + 8 });
+      }
+    }
+    const clip = this.open.length
+      ? `path(evenodd, '${['M0 0H' + W + 'V' + H + 'H0Z', ...this.open.map((o) => `M${o.x} ${o.y}h${o.w}v${o.h}h${-o.w}Z`)].join(' ')}')`
+      : 'none';
+    if (clip !== this.shieldClip) {
+      this.shieldClip = clip;
+      this.shield.style.clipPath = clip;
+    }
     this.guide.style.pointerEvents = this.waiting ? 'auto' : 'none';
     this.guide.style.cursor = this.waiting ? 'pointer' : '';
     this.guide.title = this.waiting ? 'Fingamoboblius: click to hear him again' : '';
     // The dimmed, greyed screen, with holes for him and what he shows; none while he waits.
     const holes: string[] = [`<ellipse cx="${this.gx + 22}" cy="${this.gy + 34}" rx="46" ry="52" fill="black"/>`];
+    for (const o of this.open.slice(1)) holes.push(`<rect x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" rx="10" fill="black"/>`);
     if (spot) {
       holes.push(
         spot.round
